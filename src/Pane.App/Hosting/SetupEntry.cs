@@ -32,6 +32,7 @@ internal static class SetupEntry
             var probePaths = SetupPaths.Isolated(probeRoot).ResolveInstalled(probeRoot);
             if (!SetupFiles.Full(Environment.ProcessPath!).Equals(SetupFiles.Full(probePaths.Exe), StringComparison.OrdinalIgnoreCase))
                 throw new IOException("自测启动位置无效");
+            File.WriteAllText(Path.Combine(probeRoot, "current-directory.txt"), Environment.CurrentDirectory);
             File.WriteAllText(Path.Combine(probeRoot, "launched.txt"), SetupFiles.VersionOf(Environment.ProcessPath!) ?? "unknown");
             File.AppendAllText(Path.Combine(probeRoot, "update-timeline.log"), $"{DateTimeOffset.UtcNow:O} 新版进程启动并退出 {SetupFiles.VersionOf(Environment.ProcessPath!)}\n");
             return true;

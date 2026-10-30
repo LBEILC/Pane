@@ -10,6 +10,7 @@ static class Program
  static async Task Main(string[] args){
   if(args.Length is 3 or 4 && args[0]=="--verify-release") { await ReleaseVerification.Run(args[1],args[2],args.Length==4 && args[3]=="--fake-server");return; }
   if(args is ["--fonts"]){try{await FontTests.Run();}catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}return;}
+  if(args is ["--update-e2e-before",var beforeOld,var beforeNew,var beforeEvidence]){await UpdateEndToEnd.Run(beforeOld,beforeNew,beforeEvidence,true);return;}
   if(args is ["--update-e2e",var oldPackage,var newPackage,var evidence]){await UpdateEndToEnd.Run(oldPackage,newPackage,evidence);return;}
   foreach(var failure in new[]{SelectionFailure.None,SelectionFailure.Empty,SelectionFailure.Unsupported,SelectionFailure.Elevated,SelectionFailure.Timeout}){
    var fake=new Fake{Failure=failure};var reader=new SelectionReader(fake,()=>false);var result=await reader.ReadAsync(default);Check(result.Failure==failure,"direct failure "+failure);Check(fake.Calls.SequenceEqual(["direct"]),"no clipboard");

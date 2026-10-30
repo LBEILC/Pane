@@ -80,7 +80,7 @@ internal sealed class WindowsExplorerPlatform : IExplorerPlatform
     public void Start()
     {
         using var process = Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
-            { UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden }) ?? throw new IOException("无法启动资源管理器");
+            { WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows), UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden }) ?? throw new IOException("无法启动资源管理器");
     }
     public Task RequestRestartAsync(CancellationToken timeout) => Task.Run(() =>
     {

@@ -89,7 +89,7 @@ public sealed partial class App : Application
             if(startupLevel>=4){gestures=new GestureOverlay(Glass);gestures.TickRequested+=WakeFrames;}/* 设计：手势轨迹与提示框，手势服务的接线由工程做 */
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
-                var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true};start.ArgumentList.Add("--auto-update");
+                var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
                 using var installer=System.Diagnostics.Process.Start(start)??throw new IOException("无法启动安装程序");Shutdown();
             });
             StartUpdates();/* 设计接线：软件内更新 */StartBackground();StartReleaseProbe();

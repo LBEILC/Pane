@@ -6,8 +6,8 @@ $package=Get-Content -LiteralPath $PackageManifest -Raw -Encoding UTF8 | Convert
 . "$repo/scripts/release-common.ps1"
 $Root=Join-Path ([IO.Path]::GetTempPath()) ('Pane-018-e2e-'+[Guid]::NewGuid().ToString('N'))
 $DataDirectory=Join-Path $Root 'data';$Isolated=$true;$helper=$null
-function Run-Installer([string]$Exe,[string[]]$Arguments){
-    $child=Start-Process -FilePath $Exe -ArgumentList $Arguments -WindowStyle Hidden -PassThru
+function Run-Installer([string]$Exe,[string[]]$Arguments,[string]$WorkingDirectory=$repo){
+    $child=Start-Process -FilePath $Exe -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru
     $null=$child.Handle
     try {if(!$child.WaitForExit(60000)){throw '安装进程超时'};if($child.ExitCode -ne 0){throw "安装进程失败 $($child.ExitCode)"}}finally{if(!$child.HasExited){$child.Kill();$child.WaitForExit()};$child.Dispose()}
 }
@@ -26,7 +26,7 @@ try {
     Run-Installer $package.installer @('--self-test-root',('"{0}"' -f $Root))
     if(!(Test-Path -LiteralPath "$installRoot/app.old/Pane.App.exe")){throw '升级未保留旧版'}
     Write-Host 'PASS custom install -> upgrade; registered custom location; app.old preserved'
-    Run-Installer $exe @('--uninstall','--self-test-root',('"{0}"' -f $Root))
+    Run-Installer $exe @('--uninstall','--self-test-root',('"{0}"' -f $Root)) (Split-Path $exe -Parent)
     $helperInfo=Get-Content -LiteralPath "$Root/helper.txt" -Encoding UTF8
     $helper=$helperInfo[0]
     $relay=Get-Process -Id ([int]$helperInfo[1]) -ErrorAction SilentlyContinue
@@ -37,6 +37,22 @@ try {
     Write-Host "PASS relocated uninstall; appFiles=0; temporaryAppFiles=0; helperRemains=$(Test-Path -LiteralPath $helper)"
     if(Get-ChildItem -LiteralPath $Root -Filter '*error.txt'){throw '自测存在错误记录'}
     if(!(Test-Path -LiteralPath (Split-Path $installRoot -Parent))){throw '父目录被删除'}
+    # 031：直接给卸载中转外壳传入 app 当前目录，覆盖旧版调用者的继承行为。
+    # 原中转助手已退出，先清理它；新助手仍使用既有 finally 的严格路径校验。
+    if($helper){
+        $resolved=[IO.Path]::GetFullPath($helper)
+        if([IO.Path]::GetDirectoryName($resolved) -ne [IO.Path]::GetTempPath().TrimEnd('\') -or [IO.Path]::GetFileName($resolved) -notmatch '^Pane-Cleanup-[0-9a-f]{32}\.exe$'){throw '助手清理路径无效'}
+        Remove-Item -LiteralPath $resolved -Force -ErrorAction SilentlyContinue
+    }
+    Run-Installer $package.installer @('--self-test-root',('"{0}"' -f $Root))
+    $helper=Join-Path ([IO.Path]::GetTempPath()) ('Pane-Cleanup-'+[Guid]::NewGuid().ToString('N')+'.exe')
+    Copy-Item -LiteralPath (Join-Path (Split-Path $exe -Parent) 'Pane.Maintenance.exe') -Destination $helper
+    # -1 不对应进程，模拟调用者已经退出；外壳使用现有 ArgumentException 分支。
+    Run-Installer $helper @('--relocate',('"{0}"' -f (Split-Path $exe -Parent)),'-1','--self-test-root',('"{0}"' -f $Root)) (Split-Path $exe -Parent)
+    if(Test-Path -LiteralPath $installRoot){throw '继承 app 目录的卸载中转未删除安装'}
+    if(!(Test-Path -LiteralPath "$DataDirectory/settings.json")){throw '卸载中转丢失保留的数据'}
+    if(Get-ChildItem -LiteralPath $Root -Filter '*error.txt'){throw '卸载中转存在错误记录'}
+    Write-Host 'PASS relocate inheritedCwd=app; installationRemoved=1; dataPreserved=1; errors=0; assertions=3'
     Write-Host 'PASS isolated setup; realRegistryWrites=0; realShortcuts=0; realClipboardReads=0'
 }finally {
     foreach($file in Get-ChildItem -LiteralPath $Root -Filter '*error.txt' -ErrorAction SilentlyContinue){Get-Content -LiteralPath $file.FullName -Encoding UTF8}

@@ -13,6 +13,8 @@ internal static class Program
         bool relay = args.FirstOrDefault() == "--relocate";
         try
         {
+            // 外壳等待期间不能持有待替换目录；卸载中转也走此入口。
+            Environment.CurrentDirectory = Path.GetTempPath();
             bool autoUpdate = !relay && args.Contains("--auto-update");
             args = args.Where(a => a != "--auto-update").ToArray();
             int offset = relay ? 3 : 0;

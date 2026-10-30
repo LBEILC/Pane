@@ -83,6 +83,45 @@ internal static class SetupTests
             Check(AppText() == "new" && File.ReadAllText(Path.Combine(paths.Root, "app.old/Pane.App.exe")) == "017", "登记失败逆序恢复两代目录");
             Check(process.Running && process.Launches == 1, "登记失败恢复旧进程运行");
             Check(oldSettings.SequenceEqual(File.ReadAllBytes(Path.Combine(paths.Data, "settings.json"))) && !File.Exists(Path.Combine(root, "run.txt")) && !File.Exists(Path.Combine(root, "desktop/Pane.lnk")), "登记失败恢复设置启动项快捷方式");
+            // 031：假目录移动边界，真实文件回滚；不等待真实 2.5 秒。
+            foreach (int code in new[] { 5, 32, 33 })
+            {
+                int calls = 0, waited = 0;
+                var transient = new SetupService(paths, source, "0.1.124", integration, process,
+                    move: (a, b) => { if (a == paths.App && ++calls < 3) throw new IOException("短暂占用", unchecked((int)0x80070000) | code); Directory.Move(a, b); },
+                    delay: ms => waited += ms);
+                await transient.InstallAsync(new(false, false, paths.Root), progress);
+                Check(calls == 3 && waited == 1000 && AppText() == "new", "短暂占用重试成功 " + code);
+            }
+            int attempts = 0, wait = 0;
+            var blocked = new SetupService(paths, source, "0.1.125", integration, process,
+                move: (a, b) => { if (a == paths.App) { attempts++; throw new IOException("持续占用", unchecked((int)0x80070020)); } Directory.Move(a, b); },
+                delay: ms => wait += ms);
+            try { await blocked.InstallAsync(new(false, false, paths.Root), progress); throw new Exception("应被占用阻止"); }
+            catch (SetupException error) { Check(error.Message == "有程序正在使用 Pane 的安装目录，关掉打开着这个目录的窗口或程序后再试。", "占用提示精确匹配"); }
+            Check(attempts == 6 && wait == 2500, "重试有界");
+            Check(AppText() == "new" && !Directory.Exists(Path.Combine(paths.Root, "app.new")) && !Directory.Exists(Path.Combine(paths.Root, "app.previous")), "持续占用回滚干净");
+            string logDirectory = Path.Combine(paths.Data, "logs");
+            string latest = Directory.GetFiles(logDirectory, "setup-*.txt").OrderByDescending(Path.GetFileName).First();
+            string detail = File.ReadAllText(latest);
+            Check(detail.Contains("System.IO.IOException") && detail.Contains("0x80070020") && detail.Contains("移动目录") && detail.Contains(paths.App) && detail.Contains(Path.Combine(paths.Root, "app.old")), "错误类型数值步骤及双路径入日志");
+            foreach (int code in new[] { 2, 112 })
+            {
+                attempts = 0; wait = 0;
+                var permanent = new SetupService(paths, source, "0.1.125", integration, process,
+                    move: (a, b) => { if (a == paths.App) { attempts++; throw new IOException("非占用", unchecked((int)0x80070000) | code); } Directory.Move(a, b); }, delay: ms => wait += ms);
+                try { await permanent.InstallAsync(new(false, false, paths.Root), progress); throw new Exception("应失败"); }
+                catch (SetupException error) { Check(error.Message == (code == 112 ? "磁盘空间不够" : "操作未完成，请检查目录权限和文件是否被其他程序占用后重试。"), "非占用文案 " + code); }
+                Check(attempts == 1 && wait == 0, "非占用不重试 " + code);
+            }
+            Check(SetupDiagnostics.Busy(new UnauthorizedAccessException()), "拒绝访问可重试");
+            File.WriteAllText(Path.Combine(logDirectory, "crash-keep.txt"), "保留");
+            for (int i = 0; i < 12; i++) SetupDiagnostics.Write(paths.Data, new IOException("日志测试"), "测试 " + i, source, paths.App);
+            Check(Directory.GetFiles(logDirectory, "setup-*.txt").Length == 10, "安装日志最多十份");
+            Check(File.Exists(Path.Combine(logDirectory, "crash-keep.txt")), "不删除其他日志");
+            string notDirectory = Path.Combine(root, "log-file"); File.WriteAllText(notDirectory, "x");
+            SetupDiagnostics.Write(notDirectory, new IOException("原始异常"), "日志不可写", source);
+            Check(File.ReadAllText(notDirectory) == "x", "日志不可写不掩盖失败");
             // 由其他应用接管 Run\Pane 后，卸载不能误删。
             File.WriteAllText(Path.Combine(root, "run.txt"), "\"C:\\Other\\tool.exe\" --autostart");
             File.WriteAllText(foreign, "保留");

@@ -7,16 +7,17 @@ using Pane.Services.Updates;
 
 internal static class UpdateEndToEnd
 {
-    public static async Task Run(string oldPackage, string newPackage, string evidence)
+    public static async Task Run(string oldPackage, string newPackage, string evidence, bool expectBlocked = false)
     {
         oldPackage = Path.GetFullPath(oldPackage); newPackage = Path.GetFullPath(newPackage);
         string root = Path.Combine(Path.GetTempPath(), "Pane-018-update-e2e-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root); Directory.CreateDirectory(evidence);
         string log = Path.Combine(root, "update-timeline.log");
         void Log(string text) { File.AppendAllText(log, $"{DateTimeOffset.UtcNow:O} {text}\n"); Console.WriteLine(text); }
+        string? workingDirectory = null;
         Process Start(string exe, params string[] args)
         {
-            var info = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true };
+            var info = new ProcessStartInfo(exe) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory };
             foreach (string arg in args) info.ArgumentList.Add(arg);
             return Process.Start(info) ?? throw new IOException("无法启动测试安装器");
         }
@@ -41,6 +42,7 @@ internal static class UpdateEndToEnd
             using var updates = new UpdateService(previous, paths.Data, () => true, package =>
             {
                 Log("启动自动更新安装器；测试宿主交出控制权");
+                workingDirectory = paths.App;
                 installer = Start(package, "--auto-update", "--self-test-root", root);
             }, server.Url);
             UpdateState? last = null;
@@ -49,13 +51,28 @@ internal static class UpdateEndToEnd
             if (updates.State != UpdateState.Ready) throw new Exception(updates.Error ?? "未就绪");
             updates.InstallAndRestart();
             if (installer == null) throw new Exception("安装器没有启动");
+            if (expectBlocked)
+            {
+                using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+                await installer.WaitForExitAsync(timeout.Token);
+                if (installer.ExitCode == 0 || SetupFiles.VersionOf(paths.Exe) != previous ||
+                    settings != NormalizeSettings() || File.ReadAllText(data) != "隔离测试数据" ||
+                    !Directory.GetFiles(paths.Root, "*error.txt").Any())
+                    throw new Exception("未复现旧外壳占用，或回滚未保留数据");
+                Log("PASS before: inherited app CWD blocks update; old version/settings/data preserved; assertions=4");
+                return;
+            }
             await Wait(installer);
+            string current = SetupFiles.Full(File.ReadAllText(Path.Combine(root, "current-directory.txt")));
+            if (current.Equals(SetupFiles.Full(paths.Root), StringComparison.OrdinalIgnoreCase) ||
+                current.StartsWith(SetupFiles.Full(paths.Root) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new Exception("主程序当前目录仍在安装目录内");
             string launched = File.ReadAllText(Path.Combine(root, "launched.txt"));
             if (launched != server.Version || SetupFiles.VersionOf(paths.Exe) != server.Version) throw new Exception("未启动新版");
             if (settings != NormalizeSettings() || File.ReadAllText(data) != "隔离测试数据") throw new Exception("设置或数据未保留");
             if (SetupFiles.VersionOf(Path.Combine(paths.Root, "app.old", "Pane.App.exe")) != previous) throw new Exception("旧版未保留");
             if (Directory.GetFiles(root, "*error.txt").Length != 0) throw new Exception("存在安装错误记录");
-            Log($"PASS {previous} -> {launched}; settings=unchanged; data=unchanged; realRegistry=0; globalHooks=0; liveProcesses=0");
+            Log($"PASS {previous} -> {launched}; settings=unchanged; data=unchanged; realRegistry=0; globalHooks=0; liveProcesses=0; inheritedCwd=app; startupCwd=neutral; assertions=7");
         }
         finally
         {
