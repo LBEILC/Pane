@@ -39,7 +39,9 @@ internal sealed class SetupHost : IDisposable
         {
             var integration = new SetupIntegration(SetupEntry.Paths, defaults);
             var service = new SetupService(SetupEntry.Paths, AppContext.BaseDirectory,
-                SetupFiles.VersionOf(Environment.ProcessPath!) ?? "0.1.0", integration, new SetupProcesses(SetupEntry.Paths, false), autoUpdate: SetupEntry.AutoUpdate);
+                SetupFiles.VersionOf(Environment.ProcessPath!) ?? "0.1.0", integration, new SetupProcesses(SetupEntry.Paths, false), autoUpdate: SetupEntry.AutoUpdate,
+                restoreWinV: directory => new Pane.Services.WinV.WinVReplacement(directory, new Pane.Services.WinV.WindowsWinVRegistry(),
+                    new Pane.Services.WinV.ExplorerRestart(new Pane.Services.WinV.WindowsExplorerPlatform()), new Pane.Services.WinV.NoWinVHotkey()).RestoreForUninstallAsync());
             view = SetupEntry.Uninstall ? new UninstallView(service) : new SetupView(service);
             operation = () => service.Operation;
         }

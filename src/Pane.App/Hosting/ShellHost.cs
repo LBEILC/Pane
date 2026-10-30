@@ -1,9 +1,39 @@
 using System.Runtime.InteropServices;
 using Pane.Settings;
 namespace Pane.Hosting;
-public sealed record HotkeyConflict(string Target,Hotkey Hotkey,int Error,string? Program=null);
-internal sealed class ShellHost : IDisposable
+public sealed record HotkeyConflict(string Target,Hotkey Hotkey,int Error);
+internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
 {
+    bool winVRequested;
+    volatile bool stopping;
+    readonly uint taskbarCreated=RegisterWindowMessageW("TaskbarCreated");
+    readonly System.Collections.Concurrent.ConcurrentQueue<(bool Enabled,TaskCompletionSource<bool> Done)> winVRequests=new();
+    public event Action<bool>? WinVRegistrationChanged;
+    public Task<bool> SetAsync(bool enabled)
+    {
+        var done=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        winVRequests.Enqueue((enabled,done));
+        if(stopping||!PostMessageW(window,0x8004,0,0))done.TrySetException(new IOException("热键宿主已退出"));
+        return done.Task;
+    }
+    bool ApplyWinV()
+    {
+        if(registered.Contains(3))
+        {
+            if(!Native.UnregisterHotKey(shellWindow,3))throw new IOException("无法释放 Win+V 热键");
+            registered.Remove(3);
+        }
+        lock(conflicts)conflicts.RemoveAll(c=>c.Target=="winv");
+        bool active=false;
+        if(winVRequested&&!suspended)
+        {
+            var key=new Hotkey(KeyModifiers.Win,86);
+            active=clipboard==key&&registered.Contains(2);
+            if(!active){Register(3,"winv",key);active=registered.Contains(3);}
+        }
+        WinVRegistrationChanged?.Invoke(active);
+        return active;
+    }
     readonly Native.Proc proc;
     readonly nint window;
     readonly Action<string> command;
@@ -53,25 +83,24 @@ internal sealed class ShellHost : IDisposable
     void ApplyCore(PaneSettings settings){
         currentSettings=settings;
         var a=Override("launcher",settings.Launcher.Hotkey);var b=Override("clipboard",settings.Clipboard.Hotkey);
-        {foreach(var id in registered)Native.UnregisterHotKey(shellWindow,id);registered.Clear();lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;if(!suspended){Register(1,"launcher",a);Register(2,"clipboard",b);
-            if(!settings.Launcher.UToolsHotkeyReleased&&HotkeyProcessConflict.IsUTools(a,ProcessNames())){var conflict=new HotkeyConflict("launcher",a,0,"uTools");lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));NotifyOnce("uTools 可能也在用 Alt+空格");}}}
+        {foreach(var id in registered)Native.UnregisterHotKey(shellWindow,id);registered.Clear();lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;if(!suspended){Register(1,"launcher",a);Register(2,"clipboard",b);}}
+        ApplyWinV();
         if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");}
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
-    }
-    // IsUTools 会先判断组合键；延迟枚举，非 Alt+Space 不分配整份进程快照。
-    static IEnumerable<string> ProcessNames(){
-        var processes=System.Diagnostics.Process.GetProcesses();
-        try{foreach(var p in processes){string name;try{name=p.ProcessName;}catch{name="";}yield return name;}}
-        finally{foreach(var p in processes)p.Dispose();}
     }
     void Register(int id,string name,Hotkey key){
         var chord=Pane.Services.HotkeyConversions.ToGesture(key);
         uint mods=0x4000;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Ctrl))mods|=2;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Alt))mods|=1;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Shift))mods|=4;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Win))mods|=8;
         bool ok=Native.RegisterHotKey(shellWindow,id,mods,key.VirtualKey);int code=ok?0:Marshal.GetLastWin32Error();if(ok)registered.Add(id);
         lock(Diagnostics)Diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
-        if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));}
+        if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
+            // 设计加（2026-10-30）：注册失败时提示一次，否则按了没反应也不知道为什么
+            var what=name=="launcher"?"启动器":"剪贴板";NotifyOnce($"{Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space","空格")} 被其他程序占用，{what}的热键没设上；到 设置 → {what} 里换一个");}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
+        // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
+        if(taskbarCreated!=0&&m==taskbarCreated){tray=false;if(currentSettings?.General.ShowTrayIcon==true)tray=Shell_NotifyIconW(0,ref data);return 0;}
+        if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;request.Done.TrySetResult(ApplyWinV());}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
         if(m==0x312){Dispatch(w==1?"show-launcher":"show-clipboard");return 0;}
         if(m==0x8003){while(notifications.TryDequeue(out var text)){data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
         if(m==0x8002){if(pending is {} s)ApplyCore(s);return 0;}
@@ -86,6 +115,8 @@ internal sealed class ShellHost : IDisposable
     }
     void Dispatch(string value)=>queue.TryEnqueue(()=>command(value));
     void Cleanup(){
+        stopping=true;
+        while(winVRequests.TryDequeue(out var request))request.Done.TrySetException(new IOException("热键宿主已退出"));
         foreach(var id in registered)CleanupSucceeded &= Native.UnregisterHotKey(shellWindow,id);registered.Clear();
         if(tray){CleanupSucceeded &= Shell_NotifyIconW(2,ref data);tray=false;}
         if(data.Icon!=0){DestroyIcon(data.Icon);data.Icon=0;}
@@ -110,4 +141,5 @@ internal sealed class ShellHost : IDisposable
     [DllImport("user32.dll")] static extern nint DispatchMessageW(ref Message msg);
     [DllImport("user32.dll")] static extern bool PostMessageW(nint h,uint m,nuint w,nint l);
     [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessageW(string name);
 }

@@ -22,7 +22,7 @@ public sealed partial class PaneIcon : UserControl
         nameof(IsFilled), typeof(bool), typeof(PaneIcon), new PropertyMetadata(false, (d, _) => ((PaneIcon)d).UpdateFill()));
 
     public bool IsFilled { get => (bool)GetValue(IsFilledProperty); set => SetValue(IsFilledProperty, value); }
-    void UpdateFill() => path.Fill = IsFilled ? Foreground : null;
+    void UpdateFill() => path.Fill = IsFilled ? Brush : null;
 
     public string? Glyph { get => (string?)GetValue(GlyphProperty); set => SetValue(GlyphProperty, value); }
     public double StrokeWidth { get => (double)GetValue(StrokeWidthProperty); set => SetValue(StrokeWidthProperty, value); }
@@ -42,7 +42,24 @@ public sealed partial class PaneIcon : UserControl
         canvas.Children.Add(path);
         Content = new Viewbox { Stretch = Stretch.Uniform, Child = canvas };
         path.Stroke = Foreground;
-        RegisterPropertyChangedCallback(ForegroundProperty, (_, _) => { path.Stroke = Foreground; UpdateFill(); });
+        RegisterPropertyChangedCallback(ForegroundProperty, (_, _) => { path.Stroke = Brush; UpdateFill(); });
+        Loaded += (_, _) => FollowPresenter();
+        Unloaded += (_, _) => { if (presenter is { } p) p.UnregisterPropertyChangedCallback(ContentPresenter.ForegroundProperty, presenterToken); presenter = null; Refresh(); };
+    }
+
+    // 设计改（2026-10-30）：直接放在按钮里（PaneIconButton 等）、自己没写 Foreground 也没套样式的图标，跟着按钮模板 ContentPresenter 的前景色走（含悬停、换主题）。
+    // 原来拿到的是 UserControl 默认样式的前景（随应用主题，深色 = 白），浅色面板上的图钉、关闭、超级面板「复制译文」几乎看不见
+    ContentPresenter? presenter;
+    long presenterToken;
+    Brush Brush => presenter is { } p && ReadLocalValue(ForegroundProperty) == DependencyProperty.UnsetValue ? p.Foreground : Foreground;
+    void Refresh() { path.Stroke = Brush; UpdateFill(); }
+    void FollowPresenter()
+    {
+        if (presenter is not null || Style is not null || ReadLocalValue(ForegroundProperty) != DependencyProperty.UnsetValue) return;
+        if (VisualTreeHelper.GetParent(this) is not ContentPresenter p) return;
+        presenter = p;
+        presenterToken = p.RegisterPropertyChangedCallback(ContentPresenter.ForegroundProperty, (_, _) => Refresh());
+        Refresh();
     }
 
     void UpdateGeometry()

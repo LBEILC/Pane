@@ -6,6 +6,12 @@ $DataDirectory=Resolve-PaneRoot $DataDirectory
 if($Isolated -and ($Root -eq (Join-Path $env:LOCALAPPDATA 'Programs\Pane') -or $DataDirectory -eq (Join-Path $env:APPDATA 'Pane'))){throw '隔离测试不能使用真实安装或数据目录'}
 $exe=Join-Path $Root 'app/Pane.App.exe'
 if(Test-Path -LiteralPath $exe){Invoke-PaneProcess $exe @('--exit') -Wait}
+if(Test-Path -LiteralPath (Join-Path $DataDirectory 'winv-original.json')){
+    if($Isolated){throw '隔离卸载不调用真实 Win+V 恢复，请通过假边界测试卸载服务'}
+    if(!(Test-Path -LiteralPath $exe)){throw '缺少 Win+V 恢复程序，请按原值备份手动恢复后再卸载'}
+    Invoke-PaneProcess $exe @('--restore-winv', ('"{0}"' -f $DataDirectory)) -Wait
+    Write-Host 'Win+V 注册表原值已恢复；重新登录后系统快捷键生效'
+}
 if(!$Isolated){
     $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Run',$true)
     try {if($key){$value=$key.GetValue('Pane');if(Test-PaneStartupCommand $value $exe){$key.DeleteValue('Pane');Write-Host '已删除本安装位置的启动项'}}}finally{if($key){$key.Dispose()}}

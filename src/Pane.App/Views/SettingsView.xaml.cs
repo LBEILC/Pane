@@ -1,6 +1,6 @@
 // 设置窗口逻辑（设计负责人）。结构照原型 settings.js：SECTIONS → group() / row() 拼成分组列表。
 // 已有设置模型的项（主题、主题色、圆角、动效、玻璃参数、托盘、热键、启动器位置）直接读写 SettingsStore，改了立即生效；
-// 还没有服务的项用 DesignData/SettingsSample 演示；超级面板动作等设置模型接上后再做完整页面。
+// 演示模式没有真实服务，状态用 DesignData 里的假数据。
 using System.Reflection;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
@@ -62,6 +62,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
         // 设计预览（只在演示模式）：PANE_DESIGN_GESTURE_EDIT=new 或手势序号，直接打开手势编辑器
         if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_GESTURE_EDIT") is { Length: > 0 } edit)
             draft = NewDraft(int.TryParse(edit, out var gi) ? gi : -1);
+        // 设计预览（只在演示模式）：PANE_DESIGN_REVEAL=glass / fonts / app，打开约 1.2 秒后自动展开、再过 1.2 秒自动收起（录展开动效用）
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_REVEAL") is { Length: > 0 } reveal)
+        {
+            async void Play(object s, RoutedEventArgs e)
+            {
+                Loaded -= Play;
+                for (int n = 0; n < 2; n++) { await Task.Delay(1200); if (designToggles.TryGetValue(reveal, out var t)) t(); }
+            }
+            Loaded += Play;
+        }
+        // 设计预览（只在演示模式）：PANE_DESIGN_WINV_CONFIRM=1 直接展开「用 Pane 替换 Win+V」的确认
+        winvConfirm = Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_WINV_CONFIRM") == "1";
         // 设计预览（只在演示模式）：ai-chatgpt = AI 分区切到「ChatGPT 账号」
         if (design == "ai-chatgpt" && Environment.GetEnvironmentVariable("PANE_DEMO") == "1") { SaveAi(x => x with { Provider = AiProvider.ChatGpt }); design = "ai"; }
         if (design == "glass") { glassOpen = true; Loaded += (_, _) => DispatcherQueue.TryEnqueue(() => Scroller.ChangeView(null, Scroller.ScrollableHeight, null, true)); }
@@ -83,6 +95,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         app.AppIcons.Changed += OnIconsChanged;
         app.AiSetup.Changed += OnAiChanged;
         if (app.Updates is { } up) up.Changed += OnUpdateChanged;
+        if (app.WinV is { } wv) wv.Changed += OnWinVChanged;
         Unloaded += OnUnloaded;
         Show(current);
     }
@@ -99,6 +112,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         app.AppIcons.Changed -= OnIconsChanged;
         app.AiSetup.Changed -= OnAiChanged;
         if (app.Updates is { } up) up.Changed -= OnUpdateChanged;
+        if (app.WinV is { } wv) wv.Changed -= OnWinVChanged;
         signIn?.Cancel();
         app.SetHotkeysSuspended(false);
         rerender.Stop();
@@ -202,7 +216,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var chosen = g.UiFont;
         var shown = chosen ?? $"默认（{App.DefaultUiFont}）";
         bool pending = chosen != app.AppliedUiFont;
-        var toggle = Button(fontsOpen ? "收起" : "选择字体", fontsOpen ? "chev-d" : "chev-r", () => { fontsOpen = !fontsOpen; Render(); });
+        void ToggleFonts()
+        {
+            if (fontsOpen) Collapse("fonts", () => { fontsOpen = false; Render(); });
+            else { fontsOpen = true; revealKey = "fonts"; Render(); }
+        }
+        var toggle = Button(fontsOpen ? "收起" : "选择字体", fontsOpen ? "chev-d" : "chev-r", ToggleFonts);
+        designToggles["fonts"] = ToggleFonts;
         var rows = new List<FrameworkElement>
         {
             pending
@@ -211,6 +231,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         };
         if (fontsOpen)
         {
+            var more = new List<FrameworkElement>();
             if (app.Fonts is null)
             {
                 // 读不到本机字体列表时（024 之前的正式版）：手填字族名
@@ -218,7 +239,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 box.Text = chosen ?? "";
                 void Commit() { var v = box.Text.Trim(); SaveGeneral(x => x with { UiFont = v.Length == 0 ? null : v }); Render(); }
                 box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(); e.Handled = true; } };
-                rows.Add(Row("字族名", "空着就用默认；回车保存", Wrap(box), Button("保存", "check", Commit)));
+                more.Add(Row("字族名", "空着就用默认；回车保存", Wrap(box), Button("保存", "check", Commit)));
             }
             else if (fonts is null)
             {
@@ -234,7 +255,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                         Later(0);
                     }
                 }
-                rows.Add(Row("正在读取本机字体…", null));
+                more.Add(Row("正在读取本机字体…", null));
             }
             else
             {
@@ -254,9 +275,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 }
                 search.TextChanged += (_, _) => { fontQuery = search.Text; Fill(); };
                 Fill();
-                rows.Add(Row("本机字体", $"共 {fonts.Count} 款，能写中文的排在前面；最多列 40 个，可以搜索", Wrap(search)));
-                rows.Add(list);
+                more.Add(Row("本机字体", $"共 {fonts.Count} 款，能写中文的排在前面；最多列 40 个，可以搜索", Wrap(search)));
+                more.Add(list);
             }
+            rows.Add(Reveal("fonts", more));
         }
         Group("字体", rows.ToArray(), "MiSans 不随 Pane 分发；想用的话到小米官网下载安装，再在这里选。");
 
@@ -281,22 +303,31 @@ public sealed partial class SettingsView : UserControl, IPanelView
     // 「玻璃参数（高级）」：默认折叠；改的是当前主题那一套，拖动时所有玻璃窗口实时变化，松手才存盘
     void RenderGlassAdvanced()
     {
-        var chevron = new PaneIcon { Glyph = "chev-d", Width = 16, Height = 16, Foreground = SmallProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = glassOpen ? 180 : 0 } };
+        bool opening = glassOpen && revealKey == "glass";
+        var chevron = new PaneIcon { Glyph = "chev-d", Width = 16, Height = 16, Foreground = SmallProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = glassOpen && !opening ? 180 : 0 } };
+        if (opening) chevron.Loaded += (_, _) => SpinChevron(chevron, 180);
         var header = Row("玻璃参数（高级）", glassOpen ? $"现在调的是{(app.Glass.Dark ? "深色" : "浅色")}这一套（跟随当前主题）；调好后一般不用再动" : "着色、亮度、饱和度、高光边、阴影、加强模糊", chevron);
         header.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-        header.Tapped += (_, _) => { glassOpen = !glassOpen; Render(); };
+        void Toggle()
+        {
+            if (glassOpen) { SpinChevron(chevron, 0); Collapse("glass", () => { glassOpen = false; Render(); }); }
+            else { glassOpen = true; revealKey = "glass"; Render(); }
+        }
+        header.Tapped += (_, _) => Toggle();
+        designToggles["glass"] = Toggle;
         var rows = new List<FrameworkElement> { header };
         if (glassOpen)
         {
             var d = app.Glass.Dark ? GlassParameters.Defaults().General.GlassDark : GlassParameters.Defaults().General.GlassLight;
-            rows.Add(GlassRow("着色浓度", "玻璃本身的颜色有多浓", 0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, d.TintOpacity));
-            rows.Add(GlassRow("亮度层", "深色压暗、浅色提亮的一层", 0, 1, 0.01, p => p.LuminosityOpacity, (p, v) => p with { LuminosityOpacity = v }, d.LuminosityOpacity));
-            rows.Add(GlassRow("饱和度", "背后颜色透过来的鲜艳程度", 1, 2, 0.05, p => p.Saturation, (p, v) => p with { Saturation = v }, d.Saturation));
-            rows.Add(GlassRow("高光边强度", "边缘的细高光和外描边", 0, 1, 0.01, p => p.Highlight, (p, v) => p with { Highlight = v }, d.Highlight));
-            rows.Add(GlassRow("阴影强度", "面板下面的柔和阴影", 0, 1, 0.01, p => p.Shadow, (p, v) => p with { Shadow = v }, d.Shadow));
-            rows.Add(GlassRow("加强模糊", "在系统模糊上再加一层，0 = 只用系统模糊；越大越占显卡", 0, 40, 1, p => p.ExtraBlur, (p, v) => p with { ExtraBlur = v }, d.ExtraBlur));
-            var all = Button("全部恢复默认", "refresh", () => SaveGlass(_ => d));
-            rows.Add(Row("", null, all));
+            rows.Add(Reveal("glass", [
+                GlassRow("着色浓度", "玻璃本身的颜色有多浓", 0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, d.TintOpacity),
+                GlassRow("亮度层", "深色压暗、浅色提亮的一层", 0, 1, 0.01, p => p.LuminosityOpacity, (p, v) => p with { LuminosityOpacity = v }, d.LuminosityOpacity),
+                GlassRow("饱和度", "背后颜色透过来的鲜艳程度", 1, 2, 0.05, p => p.Saturation, (p, v) => p with { Saturation = v }, d.Saturation),
+                GlassRow("高光边强度", "边缘的细高光和外描边", 0, 1, 0.01, p => p.Highlight, (p, v) => p with { Highlight = v }, d.Highlight),
+                GlassRow("阴影强度", "面板下面的柔和阴影", 0, 1, 0.01, p => p.Shadow, (p, v) => p with { Shadow = v }, d.Shadow),
+                GlassRow("加强模糊", "在系统模糊上再加一层，0 = 只用系统模糊；越大越占显卡", 0, 40, 1, p => p.ExtraBlur, (p, v) => p with { ExtraBlur = v }, d.ExtraBlur),
+                Row("", null, Button("全部恢复默认", "refresh", () => SaveGlass(_ => d))),
+            ]));
         }
         Group(null, rows.ToArray());
     }
@@ -366,12 +397,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var conflict = app.HotkeyConflicts.FirstOrDefault(c => c.Target == "launcher");
         var hotkey = Hotkey(s.Launcher.Hotkey, s.Clipboard.Hotkey, h => app.Store.Save(app.Store.Current with { Launcher = app.Store.Current.Launcher with { Hotkey = h } }));
         string? hotkeyDesc = conflict != null ? null : DevHotkey("launcher");
-        // uTools 用键盘钩子抢键，Pane 检测不到它是否已经让出；用户确认改掉后就不再按「uTools 在运行」报冲突
-        var hotkeyRow = conflict is { Program: "uTools" }
-            ? Row("呼出热键", "uTools 在运行。它的「呼出快捷键」如果也是 Alt+空格，会先抢到；在 uTools 里改掉后点右边的按钮",
-                Button("已在 uTools 里改掉", "check", () => { SaveLauncher(x => x with { UToolsHotkeyReleased = true }); Later(400); }), hotkey)
-            : conflict != null
-            ? Row("呼出热键", null, Status(false, ConflictText(conflict)), hotkey)
+        var hotkeyRow = conflict != null
+            ? Row("呼出热键", "换一个组合，或者在占用它的程序里改掉", Status(false, ConflictText(conflict)), hotkey)
             : Row("呼出热键", hotkeyDesc, hotkey);
         bool moved = s.Launcher.Position != null;
         var l = s.Launcher;
@@ -437,7 +464,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             tail.Add(del);
             return ListRow("globe", label, e.UrlTemplate, true, tail.ToArray());
         }).ToList();
-        engines.Add(addingEngine ? EngineForm() : AddRow(Button("添加搜索站点", "plus", () => { addingEngine = true; Render(); })));
+        engines.Add(addingEngine ? Reveal("engine", [EngineForm()]) : AddRow(Button("添加搜索站点", "plus", () => { addingEngine = true; revealKey = "engine"; Render(); })));
         Group("网页搜索", engines.ToArray(), "地址里用 {query} 代表搜索词；在启动器输入「关键字 空格 搜索词」直接用这个站点搜。");
     }
 
@@ -508,7 +535,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             addingEngine = false;
             Render();
         });
-        var cancel = Button("取消", null, () => { addingEngine = false; Render(); });
+        var cancel = Button("取消", null, () => Collapse("engine", () => { addingEngine = false; Render(); }));
         var fields = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         fields.Children.Add(Wrap(name)); fields.Children.Add(Wrap(key)); fields.Children.Add(Wrap(url)); fields.Children.Add(save); fields.Children.Add(cancel);
         var form = new StackPanel { Spacing = 6, Padding = new Thickness(14, 10, 14, 10) };
@@ -526,9 +553,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var c = s.Clipboard;
         var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
         var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }));
-        Group("呼出",
-            conflict != null ? Row("呼出热键", null, Status(false, ConflictText(conflict)), hotkey)
-                             : Row("呼出热键", DevHotkey("clipboard"), hotkey));
+        var winv = app.WinV;
+        var call = new List<FrameworkElement>
+        {
+            conflict != null ? Row("呼出热键", "换一个组合，或者在占用它的程序里改掉", Status(false, ConflictText(conflict)), hotkey)
+                             : Row("呼出热键", DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? "Win+V 也会打开 Pane 的剪贴板" : null), hotkey),
+        };
+        if (winv != null) call.AddRange(WinVRows(winv));
+        Group("呼出", call.ToArray());
 
         // 三种类型至少留一种（设置模型要求）：只剩一种时点它不响应，说明里写清楚
         int kinds = (c.RecordText ? 1 : 0) + (c.RecordImages ? 1 : 0) + (c.RecordFiles ? 1 : 0);
@@ -570,8 +602,63 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Group("数据",
             cleared ? Row("清空剪贴板历史", null, Status(true, "已清空，固定的条目保留了"), clear)
                     : Row("清空剪贴板历史", clearArmed ? "未固定的记录会全部删除，不能撤销" : "已固定的条目会保留", clear));
-        RenderLater("用 Pane 替换 Win+V", "要改系统设置（让资源管理器放开 Win+V），等确定回退办法后", first: false);
     }
+
+    // 用 Pane 替换 Win+V（2026-10-30，原型 settings.js winvDialog）：打开 / 关闭都先就地说明要改什么、要不要现在重启资源管理器，
+    // 再点按钮才动手。下面跟一行「同时关闭 Windows 自带的剪贴板历史」，只在已替换时可用
+    bool winvConfirm, winvBusy;
+    IEnumerable<FrameworkElement> WinVRows(IWinVReplacement w)
+    {
+        var state = w.State;
+        bool replaced = state is WinVState.On or WinVState.Pending;
+        void Run(Func<CancellationToken, Task> work)
+        {
+            winvConfirm = false; winvBusy = true; Render();
+            _ = Go();
+            async Task Go()
+            {
+                try { await work(CancellationToken.None); } catch (Exception) { }   // 失败原因由服务放进 Error
+                winvBusy = false; Render();
+            }
+        }
+        const string label = "用 Pane 替换 Win+V";
+        if (winvBusy)
+        {
+            yield return Row(label, null, Status(true, "正在处理…（重启资源管理器时任务栏会闪一下）"));
+            yield break;
+        }
+        if (winvConfirm)
+        {
+            // 说明一行占满宽度，问题和按钮另起一行（挤在一行时说明被压成很窄的一列）
+            yield return Row(replaced ? "恢复系统的 Win+V" : label, replaced
+                ? "把系统设置原样恢复，Win+V 回到 Windows 自带的剪贴板历史。"
+                : "Pane 会在当前用户的注册表里改一项，让资源管理器不再占用 Win+V（Explorer\\Advanced 的 DisabledHotkeys 加上 V）。不需要管理员权限；改之前记下原值，关掉时原样恢复。");
+            yield return Row("现在重启资源管理器吗？", "重启才生效，任务栏和打开的文件夹会闪一下；不重启就等下次登录",
+                Button("取消", null, () => { winvConfirm = false; Render(); }),
+                Button("下次登录", null, () => Run(t => replaced ? w.DisableAsync(false, t) : w.EnableAsync(false, t))),
+                Button("现在重启", "refresh", () => Run(t => replaced ? w.DisableAsync(true, t) : w.EnableAsync(true, t))));
+            yield break;
+        }
+        // 关闭 Pending（资源管理器还没放开 Win+V）不用重启，直接恢复；其余先就地确认
+        var toggle = Switch(replaced, _ => { if (state == WinVState.Pending) Run(t => w.DisableAsync(false, t)); else { winvConfirm = true; Render(); } });
+        FrameworkElement? status = w.Error is { } err ? Status(false, err) : state switch
+        {
+            WinVState.On => Status(true, "已生效"),
+            WinVState.Pending => Status(false, "下次登录生效"),
+            WinVState.RestorePending => Status(false, "下次登录恢复"),
+            _ => null,
+        };
+        var now = state is WinVState.Pending or WinVState.RestorePending
+            ? Button("重启资源管理器", "refresh", () => Run(t => state == WinVState.Pending ? w.EnableAsync(true, t) : w.DisableAsync(true, t)))
+            : null;
+        yield return Row(label, "Win+V 交给 Pane；关掉时把系统设置原样恢复",
+            new[] { status, now, toggle }.OfType<FrameworkElement>());
+        var history = Switch(w.SystemHistoryDisabled, v => Run(t => w.SetSystemHistoryDisabledAsync(v, t)));
+        Enable(history, replaced);
+        yield return Row("同时关闭 Windows 自带的剪贴板历史", replaced ? "避免同一份内容在两个地方各存一份；关闭替换时一起恢复" : "先打开上面的替换", history);
+    }
+
+    void OnWinVChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "clipboard" && !winvBusy) Later(0); });
 
     bool clearArmed;
     DateTime clearedAt;
@@ -671,34 +758,102 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Group("基本", rows.ToArray());
 
         // 编辑中的那一行换成编辑器；新加的编辑器放在最后
-        var list = config.Global.Select((g, i) => draft is { } d && d.Index == i ? GestureEditor(d, config)
+        var list = config.Global.Select((g, i) => draft is { App: < 0 } d && d.Index == i ? Reveal("gesture", [GestureEditor(d, config)])
             : ListRow(Arrows(g), Text(g.Name, LabelProto), GestureSub(g), false,
                 IconButton("chev-r", "编辑", () => EditGesture(i)),
                 IconButton("close", "删除这个手势", () => { draft = null; SaveGestures(x => x with { Global = x.Global.Where((_, j) => j != i).ToArray() }); }))).ToList();
-        if (draft is { Index: < 0 } fresh) list.Add(GestureEditor(fresh, config));
-        else if (draft == null) list.Add(AddRow(Button("添加手势", "plus", () => EditGesture(-1))));
+        if (draft is { App: < 0, Index: < 0 } fresh) list.Add(Reveal("gesture", [GestureEditor(fresh, config)]));
+        else if (draft is not { App: < 0 }) list.Add(AddRow(Button("添加手势", "plus", () => EditGesture(-1))));
         Group($"手势（{config.Global.Count}）", list.ToArray(),
             "八个方向，建议不超过 4 段。同一个键、同样的方向和附加动作只能对应一个手势；按程序设置里的专用手势优先。");
 
-        var apps = config.Apps.Select((a, i) =>
+        RenderGestureApps(config);
+        RenderImport();
+    }
+
+    // 按程序设置（2026-10-30，用户提：每个软件单独配置）：每个程序选启用 / 禁用；启用的可以展开，
+    // 就地增删改这个程序专用的手势（编辑器同全局）。和全局一样的手势允许，这个程序里用专用的，列表里注明覆盖了哪个
+    int openApp = -1;
+    void RenderGestureApps(G.GestureConfig config)
+    {
+        if (openApp >= config.Apps.Count || openApp >= 0 && config.Apps[openApp].Mode == G.AppRuleMode.Disabled) openApp = -1;
+        var rows = new List<FrameworkElement>();
+        for (int i = 0; i < config.Apps.Count; i++)
         {
+            var a = config.Apps[i];
+            int at = i;
             var name = Path.GetFileNameWithoutExtension(a.ExePath) + (a.WindowClass is { } wc ? $"（{wc}）" : "");
             var sub = a.Mode == G.AppRuleMode.Disabled ? "这个程序里不触发手势"
-                : a.Bindings.Count > 0 ? $"另有 {a.Bindings.Count} 个专用手势，其余沿用全局" : "沿用全局手势";
+                : a.Bindings.Count > 0 ? $"{a.Bindings.Count} 个专用手势，其余沿用全局" : "沿用全局手势";
             var mode = Seg([("on", "启用"), ("off", "禁用")], a.Mode == G.AppRuleMode.Disabled ? "off" : "on",
-                v => SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == i ? r with { Mode = v == "off" ? G.AppRuleMode.Disabled : G.AppRuleMode.InheritAndOverride } : r).ToArray() }, delay: true));
+                v => SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == at ? r with { Mode = v == "off" ? G.AppRuleMode.Disabled : G.AppRuleMode.InheritAndOverride } : r).ToArray() }, render: true, delay: true));
             mode.MinWidth = 140;
-            return ListRow("app", name, sub, false, mode,
-                IconButton("close", "移除", () => SaveGestures(x => x with { Apps = x.Apps.Where((_, j) => j != i).ToArray() })));
-        }).ToList();
-        apps.Add(AddRow(Button("添加程序", "plus", async () =>
+            bool open = openApp == i;
+            var tail = new List<FrameworkElement> { mode };
+            if (a.Mode != G.AppRuleMode.Disabled)
+            {
+                bool opening = open && revealKey == "app";
+                var chevron = new PaneIcon { Glyph = "chev-d", Width = 15, Height = 15, Foreground = IconProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = open && !opening ? 180 : 0 } };
+                if (opening) chevron.Loaded += (_, _) => SpinChevron(chevron, 180);
+                var expand = new Button { Style = IconButtonProto.Style, Content = chevron };
+                ToolTipService.SetToolTip(expand, open ? "收起" : "专用手势");
+                void ToggleApp()
+                {
+                    if (open) { SpinChevron(chevron, 0); Collapse("app", () => { openApp = -1; if (draft is { App: >= 0 }) draft = null; Render(); }); }
+                    else { openApp = at; if (draft is { App: >= 0 }) draft = null; revealKey = "app"; Render(); }
+                }
+                expand.Click += (_, _) => ToggleApp();
+                if (!designToggles.ContainsKey("app") || open) designToggles["app"] = ToggleApp;   // 演示：第一个启用的程序，展开后换成它自己的收起
+                tail.Add(expand);
+            }
+            tail.Add(IconButton("close", "移除", () =>
+            {
+                openApp = -1;
+                if (draft is { App: >= 0 }) draft = null;
+                SaveGestures(x => x with { Apps = x.Apps.Where((_, j) => j != at).ToArray() });
+            }));
+            rows.Add(ListRow("app", name, sub, false, tail.ToArray()));
+            if (open) rows.Add(Reveal("app", AppBindingRows(config, at)));
+        }
+        rows.Add(AddRow(Button("添加程序", "plus", async () =>
         {
             if (await PickProgram() is not { } exe) return;
             SaveGestures(x => x.Apps.Any(r => string.Equals(r.ExePath, exe, StringComparison.OrdinalIgnoreCase) && r.WindowClass == null) ? x
                 : x with { Apps = [.. x.Apps, new G.AppRule(exe, null, G.AppRuleMode.Disabled, [])] });
         })));
-        Group("按程序设置", apps.ToArray(), "新加的程序默认禁用手势；改成「启用」就沿用全局手势。");
-        RenderImport();
+        Group("按程序设置", rows.ToArray(), "新加的程序默认禁用手势；改成「启用」就沿用全局手势，再点右边的箭头可以加这个程序专用的手势。");
+    }
+
+    // 展开的程序：它的专用手势（缩进一格，和程序行区分），编辑中的那一行换成编辑器，末尾「添加专用手势」
+    List<FrameworkElement> AppBindingRows(G.GestureConfig config, int appIndex)
+    {
+        var rule = config.Apps[appIndex];
+        var rows = new List<FrameworkElement>();
+        for (int k = 0; k < rule.Bindings.Count; k++)
+        {
+            var b = rule.Bindings[k];
+            int at = k;
+            if (draft is { } d && d.App == appIndex && d.Index == k) { rows.Add(Reveal("gesture", [GestureEditor(d, config)])); continue; }
+            var covered = config.Global.FirstOrDefault(g => G.GestureMatcher.Same(g.Pattern, b.Pattern));
+            var sub = GestureSub(b) + (covered != null ? $" · 代替全局的「{covered.Name}」" : "");
+            var row = ListRow(Arrows(b), Text(b.Name, LabelProto), sub, false,
+                IconButton("chev-r", "编辑", () => EditGesture(at, appIndex)),
+                IconButton("close", "删除这个专用手势", () =>
+                {
+                    draft = null;
+                    SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == appIndex ? r with { Bindings = r.Bindings.Where((_, n) => n != at).ToArray() } : r).ToArray() });
+                }));
+            row.Margin = new Thickness(28, 0, 0, 0);
+            rows.Add(row);
+        }
+        if (draft is { Index: < 0 } fresh && fresh.App == appIndex) rows.Add(Reveal("gesture", [GestureEditor(fresh, config)]));
+        else if (draft is not { App: >= 0 })
+        {
+            var add = AddRow(Button("添加专用手势", "plus", () => EditGesture(-1, appIndex)));
+            add.Margin = new Thickness(28, 0, 0, 0);
+            rows.Add(add);
+        }
+        return rows;
     }
 
     // 暂停热键可以不设；设了之后能改、能清除
@@ -1319,6 +1474,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     sealed class GestureDraft
     {
         public int Index = -1;                                  // -1 = 新加
+        public int App = -1;                                    // -1 = 全局手势；≥0 = 按程序设置里第几个程序的专用手势
         public G.GestureButton Button = G.GestureButton.Right;
         public List<G.GestureDirection> Directions = [];
         public G.GestureModifier Modifier = G.GestureModifier.None;
@@ -1358,16 +1514,21 @@ public sealed partial class SettingsView : UserControl, IPanelView
         _ => new G.DoNothingCommand(),
     };
 
-    void EditGesture(int index) { draft = NewDraft(index); Render(); }
+    void EditGesture(int index, int appIndex = -1) { draft = NewDraft(index, appIndex); revealKey = "gesture"; Render(); }
 
-    GestureDraft NewDraft(int index)
+    // 草稿所属的手势列表：全局，或某个程序的专用手势
+    static IReadOnlyList<G.GestureBinding> BindingsOf(G.GestureConfig config, int appIndex) =>
+        appIndex < 0 ? config.Global : appIndex < config.Apps.Count ? config.Apps[appIndex].Bindings : [];
+
+    GestureDraft NewDraft(int index, int appIndex = -1)
     {
         var config = app.GestureConfig;
-        if (index < 0 || index >= config.Global.Count) return new GestureDraft { Button = FirstButton(config.Settings.EnabledButtons) };
-        var g = config.Global[index];
+        var list = BindingsOf(config, appIndex);
+        if (index < 0 || index >= list.Count) return new GestureDraft { App = appIndex, Button = FirstButton(config.Settings.EnabledButtons) };
+        var g = list[index];
         return new GestureDraft
         {
-            Index = index, Button = g.Pattern.Button, Directions = [.. g.Pattern.Directions], Modifier = g.Pattern.Modifier,
+            Index = index, App = appIndex, Button = g.Pattern.Button, Directions = [.. g.Pattern.Directions], Modifier = g.Pattern.Modifier,
             Name = g.Name, Command = g.Command, ExecuteOnModifier = g.ExecuteOnModifier,
         };
     }
@@ -1445,7 +1606,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         // ---- 保存 ----
         var foot = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         foot.Children.Add(Button("保存", "check", () => SaveDraft(d)));
-        foot.Children.Add(Button("取消", null, () => { draft = null; Render(); }));
+        foot.Children.Add(Button("取消", null, () => Collapse("gesture", () => { draft = null; Render(); })));
         if (d.Error != null) foot.Children.Add(Status(false, d.Error));
         panel.Children.Add(FormLine("", foot));
         return panel;
@@ -1607,13 +1768,17 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 G.VolumeCommand { Action: G.VolumeAction.WheelAdjust } when d.Modifier is not (G.GestureModifier.WheelUp or G.GestureModifier.WheelDown) => "「跟着滚轮调」要配合附加动作「滚轮」",
                 _ => null,
             }
-            ?? (config.Global.Select((g, i) => (g, i)).FirstOrDefault(x => x.i != d.Index && G.GestureMatcher.Same(x.g.Pattern, pattern)) is { g: { } same } ? $"和「{same.Name}」的手势一样" : null);
+            // 只在同一个列表里查重：程序专用手势和全局一样是允许的（这个程序里用专用的）
+            ?? (BindingsOf(config, d.App).Select((g, i) => (g, i)).FirstOrDefault(x => x.i != d.Index && G.GestureMatcher.Same(x.g.Pattern, pattern)) is { g: { } same } ? $"和「{same.Name}」的手势一样" : null);
         if (error != null) { d.Error = error; Render(); return; }
         var name = d.Name.Trim().Length > 0 ? d.Name.Trim() : CommandText(d.Command);
         var binding = new G.GestureBinding(name, pattern, d.Command, d.Modifier != G.GestureModifier.None && d.ExecuteOnModifier);
-        var index = d.Index;
+        var (index, appIndex) = (d.Index, d.App);
         draft = null;
-        SaveGestures(x => x with { Global = index < 0 ? [.. x.Global, binding] : x.Global.Select((g, i) => i == index ? binding : g).ToArray() });
+        static IReadOnlyList<G.GestureBinding> Put(IReadOnlyList<G.GestureBinding> list, int index, G.GestureBinding b) =>
+            index < 0 ? [.. list, b] : list.Select((g, i) => i == index ? b : g).ToArray();
+        if (appIndex < 0) SaveGestures(x => x with { Global = Put(x.Global, index, binding) });
+        else SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == appIndex ? r with { Bindings = Put(r.Bindings, index, binding) } : r).ToArray() });
     }
 
     // 单选的小标签（复用 ToggleChip：选中的那个点了不响应）
@@ -1676,7 +1841,38 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Render();
         })));
         Group("在这些程序里不触发", programs.ToArray(), "在这些程序里长按侧键也照常传给程序。");
-        RenderLater("面板里的动作：开关和顺序", "动作设置加进设置模型之后", first: false);
+        RenderSuperActions(p);
+    }
+
+    // 面板里的动作（2026-10-30，原型 settings.js「面板里的动作」）：照启动器动作行，显示的在前、按顺序，可上移；关掉的排在后面。
+    // 一排放 6 个，开满了其余的开关变灰。候选：AI 预设动作、搜索、复制
+    void RenderSuperActions(SuperPanelSettings p)
+    {
+        var all = app.Store.Current.Ai.Actions.Select(a => ("ai:" + a.Id, a.Name, a.Glyph))
+            .Append(("search", "搜索", "globe")).Append(("copy", "复制", "clipboard")).ToList();
+        List<string> Shown(SuperPanelSettings s) =>
+            (s.Actions ?? SuperPanelSettings.DefaultActions(app.Store.Current.Ai.Actions.Select(a => a.Id))).Where(id => all.Any(a => a.Item1 == id)).Distinct().ToList();
+        var shown = Shown(p);
+        var ordered = shown.Select(id => all.First(a => a.Item1 == id)).Concat(all.Where(a => !shown.Contains(a.Item1))).ToList();
+        bool full = shown.Count >= SuperPanelSettings.MaxActions;
+        var rows = new List<FrameworkElement>();
+        foreach (var (id, name, glyph) in ordered)
+        {
+            bool on = shown.Contains(id);
+            int pos = shown.IndexOf(id);
+            var tools = new List<FrameworkElement>();
+            if (on && pos > 0)
+                tools.Add(IconButton("U", "上移", () => { SaveSuper(x => { var list = Shown(x); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { Actions = list.ToArray() }; }); Render(); }));
+            var toggle = Switch(on, v =>
+            {
+                SaveSuper(x => { var list = Shown(x).Where(a => a != id).ToList(); if (v) list.Add(id); return x with { Actions = list.ToArray() }; });
+                Render();
+            });
+            Enable(toggle, p.Enabled && (on || !full));
+            tools.Add(toggle);
+            rows.Add(ListRow(glyph, name, on ? $"第 {pos + 1} 个" : full ? "已经放满 6 个，先关掉一个" : "不显示", false, tools.ToArray()));
+        }
+        Group("面板里的动作", rows.ToArray(), "选中的不是中文、又开了自动翻译时，面板换成翻译专用的一排，不受这里影响。AI 动作的名字和提示词在「AI」里改。");
     }
 
     void SaveSuper(Func<SuperPanelSettings, SuperPanelSettings> change) =>
@@ -1689,14 +1885,6 @@ public sealed partial class SettingsView : UserControl, IPanelView
         picker.FileTypeFilter.Add(".exe");
         WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
         return (await picker.PickSingleFileAsync())?.Path;
-    }
-
-    // ================= 还没做的分区 =================
-
-    void RenderLater(string what, string when, bool first = true)
-    {
-        Group(first ? null : "其余选项",
-            Row(what, $"{when}在这里做；外观和交互已在网页原型 prototype/settings.html 定稿。", Chip("待接服务")));
     }
 
     // ================= 关于 =================
@@ -1805,6 +1993,107 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Body.Children.Add(group);
     }
 
+    // ---------------- 就地展开 / 收起的动效（设计改 2026-10-30，用户提：「玻璃参数（高级）」展开没有动效）----------------
+    // 页面每次整页重建，展开的几行原来一下子出现、下面的内容直接跳下去。改为：展开的行放进一个容器，
+    // 容器高度从 0 长到内容高度（超出部分裁掉）、内容同时淡入，下面的分组被平滑推开；收起反过来，播完才真的去掉。
+    // 用法：Group(..., [header, Reveal("key", 展开的行...)])；打开前设 revealKey = "key"；收起用 Collapse("key", 真正收起)。
+    string? revealKey;
+    readonly Dictionary<string, (Grid Host, FrameworkElement List)> reveals = [];
+    readonly Dictionary<string, Action> designToggles = [];   // 演示预览 PANE_DESIGN_REVEAL 用：各展开开关的点击动作
+
+    FrameworkElement Reveal(string key, IEnumerable<FrameworkElement> rows)
+    {
+        var list = new StackPanel();
+        int i = 0;
+        foreach (var r in rows) list.Children.Add(new Border { BorderBrush = RowsProto.BorderBrush, BorderThickness = new Thickness(0, i++ == 0 ? 0 : 1, 0, 0), Child = r });
+        var host = new Grid();
+        host.Children.Add(list);
+        reveals[key] = (host, list);
+        if (revealKey == key)
+        {
+            revealKey = null;
+            host.Height = 0;   // 第一帧就从 0 开始，不先露一下全高
+            list.Opacity = 0;
+            // 排到页面恢复滚动位置之后再开始（Render 末尾把原来的滚动位置排进了队列）
+            void Once(object s, RoutedEventArgs e) { host.Loaded -= Once; DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => PlayReveal(host, list, true, null)); }
+            host.Loaded += Once;
+        }
+        return host;
+    }
+
+    void Collapse(string key, Action done)
+    {
+        if (reveals.TryGetValue(key, out var r) && r.Host.IsLoaded && r.Host.ActualHeight > 0) PlayReveal(r.Host, r.List, false, done);
+        else done();
+    }
+
+    double RevealMs => GlassParameters.Token("PaneDurNormal") * app.Glass.Current.MotionSpeed;
+
+    void PlayReveal(Grid host, FrameworkElement list, bool open, Action? done)
+    {
+        double width = host.ActualWidth > 0 ? host.ActualWidth : double.PositiveInfinity;
+        list.Measure(new Size(width, double.PositiveInfinity));
+        double full = open ? list.DesiredSize.Height : host.ActualHeight;
+        double ms = RevealMs;
+        if (ms < 1 || full <= 0)
+        {
+            host.ClearValue(HeightProperty); list.Opacity = 1;
+            done?.Invoke();
+            return;
+        }
+        var clip = new RectangleGeometry { Rect = new Rect(0, 0, 100000, open ? 0 : full) };
+        host.Clip = clip;
+        void Resized(object s, SizeChangedEventArgs e) => clip.Rect = new Rect(0, 0, 100000, e.NewSize.Height);
+        host.SizeChanged += Resized;
+        // 在页面底部点开时，展开的内容会长在可视区外面：页面跟着往上滚，让展开的部分露出来（标题行留在视野里）
+        double follow = 0;
+        if (open)
+        {
+            double top = host.TransformToVisual(Scroller).TransformPoint(new Point(0, 0)).Y;
+            follow = Math.Max(0, Math.Min(top + full + 16 - Scroller.ViewportHeight, top - 72));
+        }
+        double startOffset = Scroller.VerticalOffset;
+        void Follow(object? s, object e) => Scroller.ChangeView(null, Math.Min(startOffset + follow, Scroller.ScrollableHeight), null, true);
+        if (follow > 0) Microsoft.UI.Xaml.Media.CompositionTarget.Rendering += Follow;
+        var board = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        board.Children.Add(Ease(host, "Height", open ? 0 : full, open ? full : 0, ms, dependent: true));
+        // 淡入比长高短一点、淡出比收起快一点，避免文字被裁一半时还很实
+        board.Children.Add(Ease(list, "Opacity", open ? 0 : 1, open ? 1 : 0, open ? ms : ms * 0.6, dependent: false));
+        board.Completed += (_, _) =>
+        {
+            host.SizeChanged -= Resized;
+            if (follow > 0) { Microsoft.UI.Xaml.Media.CompositionTarget.Rendering -= Follow; Follow(null, EventArgs.Empty); }
+            if (open) { host.ClearValue(HeightProperty); host.Clip = null; list.Opacity = 1; }
+            done?.Invoke();
+        };
+        board.Begin();
+    }
+
+    // 照令牌 PaneEaseSmooth（0.2,0,0,1）的关键帧动画
+    static Microsoft.UI.Xaml.Media.Animation.Timeline Ease(DependencyObject target, string property, double from, double to, double ms, bool dependent)
+    {
+        var a = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimationUsingKeyFrames { EnableDependentAnimation = dependent };
+        a.KeyFrames.Add(new Microsoft.UI.Xaml.Media.Animation.DiscreteDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = from });
+        a.KeyFrames.Add(new Microsoft.UI.Xaml.Media.Animation.SplineDoubleKeyFrame
+        {
+            KeyTime = TimeSpan.FromMilliseconds(ms), Value = to,
+            KeySpline = new Microsoft.UI.Xaml.Media.Animation.KeySpline { ControlPoint1 = new Point(0.2, 0), ControlPoint2 = new Point(0, 1) },
+        });
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(a, target);
+        Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(a, property);
+        return a;
+    }
+
+    // 展开箭头：跟着转（0° 收起、180° 展开）
+    void SpinChevron(PaneIcon chevron, double to)
+    {
+        if (chevron.RenderTransform is not RotateTransform rotate) return;
+        if (RevealMs < 1) { rotate.Angle = to; return; }
+        var board = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        board.Children.Add(Ease(rotate, "Angle", rotate.Angle, to, RevealMs, dependent: false));
+        board.Begin();
+    }
+
     Grid Row(string label, string? desc, params FrameworkElement[] controls) => Row(label, desc, (IEnumerable<FrameworkElement>)controls);
 
     Grid Row(string label, string? desc, IEnumerable<FrameworkElement> controls)
@@ -1895,7 +2184,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var box = new HotkeyBox(value, SmallProto, KbdProto, FillProto.Background, FillProto.BorderBrush, Accent())
         {
             Validate = h => h == other ? "和另一个热键重复了"
-                : h.Modifiers == KeyModifiers.Win && h.VirtualKey == 'V' ? "Win+V 被系统占用，以后在剪贴板里打开「替换 Win+V」"
+                : h.Modifiers == KeyModifiers.Win && h.VirtualKey == 'V' ? (app.WinV is null ? "Win+V 被系统占用，换一个组合" : "Win+V 被系统占用；想用它打开剪贴板，打开下面的「用 Pane 替换 Win+V」")
                 : null,
         };
         box.Changed += (_, h) => { changed(h); Later(400); };   // 宿主在后台线程重新注册，稍后刷新占用提示
@@ -1903,12 +2192,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
         return box;
     }
 
-    // 注册失败 = 被占用；注册成功但检测到 uTools 在运行（它用键盘钩子抢 Alt+空格）= 可能冲突
-    static string ConflictText(HotkeyConflict c)
-    {
-        var key = HotkeyBox.Text(c.Hotkey).Replace("Space", "空格");
-        return c.Program is { } program ? $"{program} 可能也在用 {key}" : $"{key} 被其他程序占用";
-    }
+    // 注册失败 = 被占用
+    static string ConflictText(HotkeyConflict c) => $"{HotkeyBox.Text(c.Hotkey).Replace("Space", "空格")} 被其他程序占用";
 
     // 开发和试用时 PANE_DEV_HOTKEYS 会改掉实际注册的键，照实说明
     static string? DevHotkey(string name)

@@ -28,11 +28,13 @@ internal sealed class SetupService : ISetupService, IUninstallService
     readonly ISetupIntegration integration;
     readonly ISetupProcesses processes;
     readonly Action<string, string>? copy;
+    readonly Func<string, Task>? restoreWinV;
     public SetupService(SetupPaths paths, string source, string version, ISetupIntegration integration,
-        ISetupProcesses processes, Action<string, string>? copy = null, bool autoUpdate = false)
+        ISetupProcesses processes, Action<string, string>? copy = null, bool autoUpdate = false, Func<string, Task>? restoreWinV = null)
     {
         this.paths = integration.InstallLocation is { Length: > 0 } location ? paths with { Root = SetupFiles.Full(location) } : paths;
         this.source = source; this.version = version; this.integration = integration; this.processes = processes; this.copy = copy;
+        this.restoreWinV = restoreWinV;
         integration.SetPaths(this.paths); processes.SetPaths(this.paths);
         AutoUpdate = autoUpdate && (File.Exists(this.paths.Exe) || integration.InstalledVersion != null);
     }
@@ -102,6 +104,10 @@ internal sealed class SetupService : ISetupService, IUninstallService
         try
         {
             progress.Report(new(.1, "正在关闭正在运行的 Pane")); processes.Stop();
+            // 恢复先于移除登记和数据；失败保留安装与原值备份，供用户重试。
+            if (restoreWinV != null) restoreWinV(paths.Data).GetAwaiter().GetResult();
+            else if (File.Exists(Path.Combine(paths.Data, "winv-original.json")))
+                throw new IOException("卸载缺少 Win+V 恢复服务");
             progress.Report(new(.35, "正在移除快捷方式和卸载入口")); integration.Remove();
             progress.Report(new(.6, "正在删除程序文件"));
             foreach (string name in new[] { "app", "app.old", "app.new", "app.previous" }) SetupFiles.Delete(Path.Combine(paths.Root, name));

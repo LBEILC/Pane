@@ -14,6 +14,18 @@ internal static class SetupEntry
     public static string? Preview { get; private set; }
     public static bool TryRun(string[] args, Action runApplication)
     {
+        if (args is ["--restore-winv", var dataDirectory])
+        {
+            try
+            {
+                var service = new Pane.Services.WinV.WinVReplacement(Path.GetFullPath(dataDirectory),
+                    new Pane.Services.WinV.WindowsWinVRegistry(),
+                    new Pane.Services.WinV.ExplorerRestart(new Pane.Services.WinV.WindowsExplorerPlatform()), new Pane.Services.WinV.NoWinVHotkey());
+                service.RestoreForUninstallAsync().GetAwaiter().GetResult();
+            }
+            catch { Environment.ExitCode = 1; }
+            return true;
+        }
         if (args is ["--setup-launch-probe", var probeRoot])
         {
             // 只验证隔离安装的新进程入口，不启动热键、钩子、剪贴板及窗口。

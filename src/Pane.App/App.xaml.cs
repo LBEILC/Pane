@@ -72,6 +72,7 @@ public sealed partial class App : Application
             Pane.Contracts.ISelectionActions actions=demo?new Pane.DesignData.SelectionActionsSample():new Pane.Services.SelectionActions();
             int startupLevel=MemoryStartupLevel();LauncherView? launcher=null;
             if(!demo&&startupLevel>=5){shell=new ShellHost(Command,Store.Current);shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
+            StartWinV();
             hotkeysReadyMs=(DateTime.UtcNow-System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
             if(!demo&&startupLevel>=6)StartGestures(data);
             if(demo)ClipboardHistory=new Pane.DesignData.ClipboardSample();

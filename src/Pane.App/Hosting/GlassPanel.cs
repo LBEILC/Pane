@@ -38,7 +38,7 @@ public sealed partial class GlassPanel : IDisposable
     readonly Grid root;
     readonly bool interactive;
     readonly bool demo=Environment.GetEnvironmentVariable("PANE_DEMO")=="1";
-    internal bool Settled=>!animating&&!resizing;
+    internal bool Settled=>!animating&&!resizing&&!rectAnimating;
     internal bool Active=>!disposing&&(Shown||!Settled||pendingFocus);
     internal event Action? TickRequested;
     internal readonly nint Visual,Input;
@@ -169,11 +169,12 @@ public sealed partial class GlassPanel : IDisposable
         Native.GetWindowRect(Visual,out var v);Native.GetWindowRect(Input,out var i);
         return $"material={MaterialAttached};opacity={opacity};scale={scale};dpi={dpi};visual=0x{Visual:X};input=0x{Input:X};visualRect={v.Left},{v.Top},{v.Right},{v.Bottom};inputRect={i.Left},{i.Top},{i.Right},{i.Bottom}";
     }
-    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;Animate();}
+    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;minimizing=false;Animate();}
     /// <summary>二级窗口再次展开：没开就打开；已经开着就还原（最小化时）、提到前台并聚焦，位置大小不动。</summary>
     public void BringToFront(bool activate=true)
     {
         if(!Shown||!animating&&!Native.IsWindowVisible(Input)){Show(activate:activate);return;}
+        if(minimizing){minimizing=false;Animate();}   // 收起动画还没播完又被叫出来：原地反向
         if(IsIconic(Input))Native.ShowWindow(Input,9);
         view.OnShown();
         if(!demo&&activate&&interactive){Activate();pendingFocus=true;}
@@ -188,10 +189,10 @@ public sealed partial class GlassPanel : IDisposable
     void Animate(){startScale=scale;startOpacity=opacity;animation.Restart();animating=true;StartAnimations();TickRequested?.Invoke();}
     void StartAnimations()
     {
-        double speed=parameters.Current.MotionSpeed;double[] curve=Shown?spring:smooth;
-        float toScale=(float)(Shown?1:GlassParameters.Token("PaneEnterScale")),toOpacity=Shown?1:0;
-        var scaleTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Shown?"PaneDurSlow":"PaneDurFast")*speed));
-        var fadeTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Shown?"PaneDurNormal":"PaneDurFast")*speed));
+        double speed=parameters.Current.MotionSpeed;double[] curve=Showing?spring:smooth;
+        float toScale=(float)(Showing?1:GlassParameters.Token("PaneEnterScale")),toOpacity=Showing?1:0;
+        var scaleTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Showing?"PaneDurSlow":"PaneDurFast")*speed));
+        var fadeTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*speed));
         Vector2 P(double[] c,int i)=>new((float)c[i],(float)c[i+1]);
         {
             var c=compositor;
@@ -215,13 +216,16 @@ public sealed partial class GlassPanel : IDisposable
         if(disposing)return;
         if(pendingFocus&&root.IsLoaded){pendingFocus=false;Focus();}
         if(resizing)StepResize();
+        if(deferFrames>0&&--deferFrames==0){if(Shown&&!IsIconic(Input))FollowTo(deferredRect);else ElementCompositionPreview.GetElementVisual(root).Opacity=opacity;}
+        if(rectAnimating)StepRect();
         if(Shown&&!animating)CheckOutsideClick();
         if(!animating)return;
-        double t=animation.Elapsed.TotalMilliseconds,duration=GlassParameters.Token(Shown?"PaneDurSlow":"PaneDurFast")*parameters.Current.MotionSpeed;
-        double a=Ease(Math.Min(1,t/duration),Shown?spring:smooth);
-        double b=Ease(Math.Min(1,t/(GlassParameters.Token(Shown?"PaneDurNormal":"PaneDurFast")*parameters.Current.MotionSpeed)),smooth);
+        double t=animation.Elapsed.TotalMilliseconds,duration=GlassParameters.Token(Showing?"PaneDurSlow":"PaneDurFast")*parameters.Current.MotionSpeed;
+        double a=Ease(Math.Min(1,t/duration),Showing?spring:smooth);
+        double b=Ease(Math.Min(1,t/(GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*parameters.Current.MotionSpeed)),smooth);
         // 这里只跟踪当前值（中途反向时作起点、诊断用），画面由合成器的动画负责
-        scale=(float)(startScale+((Shown?1:GlassParameters.Token("PaneEnterScale"))-startScale)*a);opacity=(float)(startOpacity+((Shown?1:0)-startOpacity)*b);
+        scale=(float)(startScale+((Showing?1:GlassParameters.Token("PaneEnterScale"))-startScale)*a);opacity=(float)(startOpacity+((Showing?1:0)-startOpacity)*b);
+        if(t>=duration&&minimizing){animating=false;minimizing=false;StopAnimations();Layout(positionX,positionY);Native.ShowWindow(Input,6);return;}
         if(t>=duration){animating=false;StopAnimations();Layout(positionX,positionY);if(!Shown){Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);view.OnHidden();Hidden?.Invoke(this,EventArgs.Empty);}else view.OnShown();}
     }
     static double Ease(double t,double[] curve)=>t<=0?0:t>=1?1:Bezier(t,curve[0],curve[1],curve[2],curve[3]);
@@ -281,13 +285,31 @@ public sealed partial class GlassPanel : IDisposable
         if(settingsWindow && h==Input && m==0x84)return HitTest(l);
         if(settingsWindow && m==0x83)return 0;
         if(h==Input && m==0x02E0){if(movingWindows)return 0;dpi=(w&0xffff)/96f;var rect=Marshal.PtrToStructure<Native.Rect>(l);Layout(rect.Left-(int)(48*dpi),rect.Top-(int)(48*dpi));return 0;}
-        if(settingsWindow && h==Input && m==5){if(w==1)Native.ShowWindow(Visual,0);else if(Shown){Native.ShowWindow(Visual,4);Native.SetWindowPos(Visual,Input,0,0,0,0,0x13);}}
+        // 设计改（2026-10-30，用户提：设置窗口最小化没有动效）：系统要最小化（任务栏点击、Win+↓）时先播收起动画（同关闭：玻璃缩小、整体淡出），播完再真的最小化；
+        // 从最小化还原时播出现动画。手势的「最小化」直接改窗口状态、不经过这条消息，那一下没有收起动画，还原照样有
+        if(settingsWindow && h==Input && m==0x112 && ((int)w&0xFFF0)==0xF020 && Shown && parameters.Current.MotionSpeed>0.01){if(!minimizing){minimizing=true;Animate();}return 0;}
+        if(settingsWindow && h==Input && m==5){
+            if(w==1){iconic=true;Native.ShowWindow(Visual,0);}
+            else if(Shown){Native.ShowWindow(Visual,4);Native.SetWindowPos(Visual,Input,0,0,0,0,0x13);
+                if(iconic){iconic=false;minimizing=false;if(parameters.Current.MotionSpeed>0.01){scale=(float)GlassParameters.Token("PaneEnterScale");opacity=0;Layout(positionX,positionY);Animate();}}}}
         if(settingsWindow && h==Input && m==6 && (w&0xffff)!=0 && Shown)Native.SetWindowPos(Visual,Input,0,0,0,0,0x13);
         if(settingsWindow && h==Input && m==0x24){var info=Marshal.PtrToStructure<Native.MinMaxInfo>(l);info.MinTrack.X=(int)Math.Ceiling(minWidth*dpi);info.MinTrack.Y=(int)Math.Ceiling(minHeight*dpi);Marshal.StructureToPtr(info,l,false);return 0;}
         if(settingsWindow && h==Input && (m==0x216||m==0x214)){var rect=Marshal.PtrToStructure<Native.Rect>(l);Width=Math.Max(minWidth,(rect.Right-rect.Left)/dpi);Height=Math.Max(minHeight,(rect.Bottom-rect.Top)/dpi);Layout(rect.Left-(int)(48*dpi),rect.Top-(int)(48*dpi));return 1;}
         // 设计改（2026-10-29）：设置窗口被系统或手势改了位置 / 大小（最大化、还原、贴左右半边）时，玻璃窗跟着走；
         // 原来只处理了用户拖边框，手势「最大化」后只有内容窗变大，玻璃留在原地
         if(settingsWindow && h==Input && m==0x47 && !movingWindows && Shown && !IsIconic(Input))FollowInputWindow();
+        // 系统要挪 / 改内容窗（最大化、还原、贴边）：先拦下来，窗口暂时不动、内容透明度设 0；等这一帧画出来（两次 Tick 后）再自己放到新位置、
+        // 玻璃开始长、内容淡入。直接让系统挪的话，界面线程忙着按新尺寸重排设置页（全屏时约 100 ms），这段时间新位置上露着旧尺寸的内容、玻璃还在原处
+        if(settingsWindow && resizable && h==Input && m==0x46 && !movingWindows && Shown && !IsIconic(Input) && parameters.Current.MotionSpeed>0.01){
+            var pos=Marshal.PtrToStructure<WindowPos>(l);
+            bool move=(pos.Flags&2)==0&&(pos.X!=inputX||pos.Y!=inputY),size=(pos.Flags&1)==0&&(pos.Cx!=inputW||pos.Cy!=inputH);
+            if(move||size){   // 最大化 / 还原的这条带 0x8000（系统的「状态改变」标记），照样拦
+                int x0=move?pos.X:inputX,y0=move?pos.Y:inputY,w0=size?pos.Cx:inputW,h0=size?pos.Cy:inputH;
+                deferredRect=new Native.Rect{Left=x0,Top=y0,Right=x0+w0,Bottom=y0+h0};deferFrames=2;
+                pos.Flags|=3;Marshal.StructureToPtr(pos,l,false);
+                ElementCompositionPreview.GetElementVisual(root).Opacity=0;TickRequested?.Invoke();
+            }
+        }
         if(m==0x10){Hide();return 0;}
         if(m==0x14)return 1;
         if(h==Input&&m==6&&(w&0xffff)==0&&Shown&&interactive&&!dragging&&!settingsWindow&&!demo&&l!=Input&&l!=Visual&&!Native.IsChild(Input,l)&&(HideOnBlur?.Invoke()??true))Hide();
@@ -299,11 +321,47 @@ public sealed partial class GlassPanel : IDisposable
         // 固定大小的窗口（安装 / 卸载）：不接受最大化，别人改了大小也按原尺寸放回，只跟随位置
         if(!resizable){if(IsZoomed(Input)){Native.ShowWindow(Input,9);return;}Native.GetWindowRect(Input,out var p);if(p.Left!=inputX||p.Top!=inputY||p.Right-p.Left!=inputW||p.Bottom-p.Top!=inputH)Layout(p.Left-(int)(48*dpi),p.Top-(int)(48*dpi));return;}
         Native.GetWindowRect(Input,out var r);
+        FollowTo(r);
+    }
+    Native.Rect deferredRect;
+    int deferFrames;
+    void FollowTo(Native.Rect r)
+    {
         // 最大化：铺满所在显示器的工作区（不让系统按边框外扩到屏幕外）
         if(IsZoomed(Input)){var info=new MonitorInfo{Size=Marshal.SizeOf<MonitorInfo>()};if(GetMonitorInfoW(MonitorFromWindow(Input,2),ref info))r=info.Work;}
-        if(r.Left==inputX&&r.Top==inputY&&r.Right-r.Left==inputW&&r.Bottom-r.Top==inputH)return;
+        if(r.Left==inputX&&r.Top==inputY&&r.Right-r.Left==inputW&&r.Bottom-r.Top==inputH){if(!animating&&!rectAnimating&&deferFrames==0)ElementCompositionPreview.GetElementVisual(root).Opacity=opacity;return;}
+        // 设计改（2026-10-30，用户提：设置窗口最大化没有动效）：最大化、还原、贴左右半边（系统、手势、Win+方向键都走这里）。
+        // 照「出现 / 消失」的分工：内容窗一步放到新位置、只排一次版，内容淡入；玻璃在合成层上从旧位置和大小平滑长到新的
+        // （逐帧改真实窗口试过：和系统抢位置会来回跳，每帧重排设置页内容也跟不上，慢玻璃 300 多毫秒）。动效速度为 0 时一步到位
+        var from=rectAnimating?rectNow:new Native.Rect{Left=inputX,Top=inputY,Right=inputX+inputW,Bottom=inputY+inputH};
         Width=Math.Max(minWidth,(r.Right-r.Left)/dpi);Height=Math.Max(minHeight,(r.Bottom-r.Top)/dpi);
-        Layout(r.Left-(int)(48*dpi),r.Top-(int)(48*dpi));
+        rectAnimating=false;Layout(r.Left-(int)(48*dpi),r.Top-(int)(48*dpi));
+        if(parameters.Current.MotionSpeed<=0.01||inputW<=0||from.Right<=from.Left)return;
+        rectFrom=from;rectTo=r;rectAnimating=true;rectClock.Restart();
+        var content=ElementCompositionPreview.GetElementVisual(root);var c=content.Compositor;
+        // 前 30% 保持透明：内容按新尺寸重排要几十到一百毫秒，别让旧尺寸的内容在新位置上半透明地露出来
+        var fade=c.CreateScalarKeyFrameAnimation();fade.InsertKeyFrame(0,0);fade.InsertKeyFrame(0.3f,0);fade.InsertKeyFrame(1,1,c.CreateCubicBezierEasingFunction(new Vector2((float)smooth[0],(float)smooth[1]),new Vector2((float)smooth[2],(float)smooth[3])));
+        fade.Duration=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token("PaneDurNormal")*1.4*parameters.Current.MotionSpeed));content.StartAnimation("Opacity",fade);
+        StepRect();TickRequested?.Invoke();
+    }
+    [StructLayout(LayoutKind.Sequential)] struct WindowPos{public nint Hwnd,After;public int X,Y,Cx,Cy;public uint Flags;}
+    bool rectAnimating,minimizing,iconic;
+    bool Showing=>Shown&&!minimizing;   // 正在播最小化前的收起动画时按「离开」处理
+    Native.Rect rectFrom,rectTo,rectNow;
+    readonly Stopwatch rectClock=new();
+    // 只动玻璃：玻璃窗先铺到新旧两块的并集（还原时旧的比新的大），合成层里的玻璃按插值的位置和大小画；播完收回最终位置
+    void StepRect()
+    {
+        double t=Math.Min(1,rectClock.Elapsed.TotalMilliseconds/Math.Max(1,GlassParameters.Token("PaneDurNormal")*parameters.Current.MotionSpeed)),a=Ease(t,smooth);
+        int L(int f,int to)=>(int)Math.Round(f+(to-f)*a);
+        rectNow=new Native.Rect{Left=L(rectFrom.Left,rectTo.Left),Top=L(rectFrom.Top,rectTo.Top),Right=L(rectFrom.Right,rectTo.Right),Bottom=L(rectFrom.Bottom,rectTo.Bottom)};
+        if(t>=1){rectAnimating=false;scene.Root.Offset=Vector3.Zero;Layout(positionX,positionY);return;}
+        int ul=Math.Min(rectFrom.Left,rectTo.Left),ut=Math.Min(rectFrom.Top,rectTo.Top),ur=Math.Max(rectFrom.Right,rectTo.Right),ub=Math.Max(rectFrom.Bottom,rectTo.Bottom);
+        int m=(int)(48*dpi);
+        float w=(float)((rectNow.Right-rectNow.Left)/dpi),h=(float)((rectNow.Bottom-rectNow.Top)/dpi);
+        scene.Resize(new Vector2(w,h));scene.Root.CenterPoint=new Vector3(48+w/2,48+h/2,0);
+        scene.Root.Offset=new Vector3(rectNow.Left-ul,rectNow.Top-ut,0);
+        Native.SetWindowPos(Visual,0,ul-m,ut-m,ur-ul+2*m,ub-ut+(int)(112*dpi),0x214);   // 同 MoveWindowsTogether：左右上各留 48，下面多留给阴影
     }
     [DllImport("user32.dll")] static extern bool IsZoomed(nint window);
     [DllImport("user32.dll")] static extern bool IsIconic(nint window);

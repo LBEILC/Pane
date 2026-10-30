@@ -108,7 +108,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         {
             foreach (var c in categories) c.SetCount(null);
             Bind();
-            ShowEmpty(search is null ? "文件搜索还没接上（等工程接入 Everything）" : null);
+            ShowEmpty(search is null ? "文件搜索暂时用不了" : null);
             return;
         }
         FilePage page;

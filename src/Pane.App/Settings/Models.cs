@@ -5,7 +5,19 @@ public sealed record PaneSettings(int Version, GeneralSettings General, Launcher
 // 软件内更新（设计加，2026-10-30，023）：AutoUpdate 开着就自动检查并在后台下载，下载好后提示重启更新
 public sealed record UpdateSettings(bool AutoUpdate=true);
 public enum SuperPanelButton { Middle=2, X1=4, X2=8 }
-public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton TriggerButton=SuperPanelButton.X1, int HoldMilliseconds=400, bool PauseInFullscreen=true, bool ClipboardFallback=true) { string[] disabledPrograms=[]; public string[] DisabledPrograms { get=>disabledPrograms; init=>disabledPrograms=value??[]; } }
+public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton TriggerButton=SuperPanelButton.X1, int HoldMilliseconds=400, bool PauseInFullscreen=true, bool ClipboardFallback=true)
+{
+    string[] disabledPrograms=[];
+    public string[] DisabledPrograms { get=>disabledPrograms; init=>disabledPrograms=value??[]; }
+    /// <summary>
+    /// 面板里的动作（设计加，2026-10-30），按显示顺序；最多 <see cref="MaxActions"/> 个。
+    /// Id：AI 预设动作 "ai:&lt;动作 Id&gt;"、"search"（默认站点搜索）、"copy"（复制）。认不出的 Id 跳过。
+    /// null = 默认：全部 AI 预设动作，再加搜索、复制，取前 6 个。自动翻译时的那一排是固定的，不受这项影响。
+    /// </summary>
+    public string[]? Actions { get; init; }
+    public const int MaxActions=6;
+    public static string[] DefaultActions(IEnumerable<string> aiActionIds)=>[.. aiActionIds.Select(id=>"ai:"+id).Append("search").Append("copy").Take(MaxActions)];
+}
 public sealed record GlassThemeParameters(double TintOpacity, double LuminosityOpacity, double Saturation, double Highlight, double Shadow, double ExtraBlur);
 public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } }
 public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey);
@@ -14,8 +26,7 @@ public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
 public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=null,
     bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.Clear,
-    int AutoAttachSeconds=3, int FileResultCount=8,
-    bool UToolsHotkeyReleased=false)   // 用户确认已在 uTools 里改掉 Alt+空格：不再按「uTools 在运行」报冲突
+    int AutoAttachSeconds=3, int FileResultCount=8)
 {
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }

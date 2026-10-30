@@ -39,7 +39,8 @@ public sealed partial class SuperView : UserControl, IPanelView
     readonly IAiService ai;
     readonly ISelectionActions actions;
     readonly SlidingHighlight highlight;
-    readonly List<SuperAction> normal, auto;
+    readonly List<SuperAction> auto;
+    List<SuperAction> normal;   // 每次呼出按设置重建
     List<SuperAction> items;
     SelectionResult? selection;
     const int AutoLimit = 2000;
@@ -62,10 +63,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         this.ai = ai;
         this.actions = actions;
         InitializeComponent();
-        normal = ai.Actions.Select(a => new SuperAction(a.Id, a.Name, a.Glyph, true))
-            .Append(new SuperAction("search", "搜索", "globe", false))
-            .Append(new SuperAction("copy", "复制", "clipboard", false))
-            .Take(6).ToList();
+        normal = NormalActions();
         var summary = ai.Actions.FirstOrDefault(a => a.Id == "summary");
         auto = [new("copy-translation", "复制译文", "paste", false), new("translate-window", "翻译窗口", "external", false), new("ask", "问 AI", "ai", false),
             .. summary is null ? Array.Empty<SuperAction>() : [new SuperAction(summary.Id, summary.Name, summary.Glyph, true)],
@@ -78,6 +76,26 @@ public sealed partial class SuperView : UserControl, IPanelView
         KeyDown += OnKeyDown;
         Root.SizeChanged += (_, _) => RequestHeight();
         Card.ContentGrew += (_, _) => RequestHeight();
+    }
+
+    // 设置 → 超级面板 →「面板里的动作」（2026-10-30）：按设置的顺序；AI 动作被删了就跳过
+    List<SuperAction> NormalActions()
+    {
+        var ids = ((App)Application.Current).Store.Current.SuperPanel.Actions ?? Settings.SuperPanelSettings.DefaultActions(ai.Actions.Select(a => a.Id));
+        var list = new List<SuperAction>();
+        foreach (var id in ids)
+        {
+            SuperAction? a = id switch
+            {
+                "search" => new("search", "搜索", "globe", false),
+                "copy" => new("copy", "复制", "clipboard", false),
+                _ when id.StartsWith("ai:", StringComparison.Ordinal) && ai.Actions.FirstOrDefault(x => x.Id == id[3..]) is { } act => new(act.Id, act.Name, act.Glyph, true),
+                _ => null,
+            };
+            if (a is not null && list.All(x => x.Id != a.Id)) list.Add(a);
+            if (list.Count == Settings.SuperPanelSettings.MaxActions) break;
+        }
+        return list;
     }
 
     /// <summary>宿主在显示面板之前调用（选区必须在面板抢走焦点之前读好）。</summary>
@@ -93,6 +111,7 @@ public sealed partial class SuperView : UserControl, IPanelView
     public void OnShowing(PanelShowContext context)
     {
         activate = context.Activate;
+        normal = NormalActions();
         Card.Cancel();
         ResultArea.Visibility = Visibility.Collapsed;
         // 设计预览：PANE_DESIGN_SELECTION 指定选中文字（"-" 表示没读到）；宿主没给选区时用演示文字
@@ -188,6 +207,7 @@ public sealed partial class SuperView : UserControl, IPanelView
     {
         LongBox.Visibility = Visibility.Collapsed;
         if (normal.FindIndex(a => a.Id == "translate") is var i and >= 0) _ = Execute(i);
+        else if (current.Text is { } t) OpenTranslate?.Invoke(t);   // 用户在设置里把「翻译」从这一排关掉了
     }
 
     void CopyTranslation()

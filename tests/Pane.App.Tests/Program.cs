@@ -24,11 +24,12 @@ static class Program
   {var fake=new Fake{Changes=false};using var cancel=new CancellationTokenSource(40);try{await new SelectionReader(fake,()=>true).ReadAsync(cancel.Token);throw new Exception("cancellation missing");}catch(OperationCanceledException){checks++;}await Task.Delay(30);Check(fake.Data=="original-all-formats","cancel restores");}
   ClipboardHistorySuppression.IgnoreNext(2);Check(ClipboardHistorySuppression.TryConsume()&&ClipboardHistorySuppression.TryConsume()&&!ClipboardHistorySuppression.TryConsume(),"ignore next N");
   ClipboardHistorySuppression.IgnoreSequence(42);ClipboardHistorySuppression.CancelPending();Check(ClipboardHistorySuppression.TryConsume(42)&&!ClipboardHistorySuppression.TryConsume(43),"delayed notification sequence");
-  var hotkey=new Hotkey(KeyModifiers.Alt,32);Check(HotkeyProcessConflict.IsUTools(hotkey,["uTools"]),"utools present");Check(!HotkeyProcessConflict.IsUTools(hotkey,["other"]),"utools absent");Check(!HotkeyProcessConflict.IsUTools(new(KeyModifiers.Ctrl,32),["uTools"]),"other key no conflict");
+  var hotkey=new Hotkey(KeyModifiers.Alt,32);
   var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(hotkey),new(new(KeyModifiers.Ctrl,86)));
   string json=JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings);using var document=JsonDocument.Parse(json);var old=string.Join(",",document.RootElement.EnumerateObject().Where(p=>p.Name!="SuperPanel").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()));
   var loaded=JsonSerializer.Deserialize("{"+old+"}",SettingsJson.Default.PaneSettings)!;Check(loaded.SuperPanel.TriggerButton==SuperPanelButton.X1&&loaded.SuperPanel.HoldMilliseconds==400&&loaded.SuperPanel.ClipboardFallback,"old settings defaults");
   var dir=Path.Combine(AppContext.BaseDirectory,"results","settings");var store=new SettingsStore(dir,settings);store.Save(settings with{SuperPanel=new(true,SuperPanelButton.Middle,650,false,false){DisabledPrograms=["test.exe"]}});store.Load();Check(store.Current.SuperPanel.HoldMilliseconds==650&&store.Current.SuperPanel.TriggerButton==SuperPanelButton.Middle,"super settings roundtrip");
+  checks+=await WinVTests.Run();
   checks+=await SelectionTests.Run();
   checks+=ReleaseTests.Run(settings);
   checks+=await SetupTests.Run(settings);
