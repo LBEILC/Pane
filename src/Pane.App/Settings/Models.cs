@@ -50,7 +50,9 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
 public sealed record LauncherPosition(string MonitorId, double X, double Y);
 public sealed record ClipboardSettings(Hotkey Hotkey,
     bool RecordText=true,bool RecordImages=true,bool RecordFiles=true,int Limit=500,
-    bool Dedupe=true,bool MoveToTopAfterPaste=true,bool HonorExcludeMarker=true)
+    bool Dedupe=true,bool MoveToTopAfterPaste=true,bool HonorExcludeMarker=true,
+    // 设计加（2026-10-31，033）：整个剪贴板功能的开关。关掉 = 不监听、不记录、不注册呼出热键、面板打不开、Win+V 替换先恢复；已有记录保留
+    bool Enabled=true)
 {
     string[] excludedPrograms=[];
     public string[] ExcludedPrograms {get=>excludedPrograms;init=>excludedPrograms=value??[];}

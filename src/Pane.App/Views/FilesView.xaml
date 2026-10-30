@@ -25,7 +25,7 @@
         </DataTemplate>
 
         <DataTemplate x:Key="FileTemplate" x:DataType="files:FileRow">
-            <Grid Height="50" Padding="10,0,10,0" ColumnSpacing="12" Background="Transparent" CanDrag="True">
+            <Grid Height="50" Padding="10,0,10,0" ColumnSpacing="12" Background="Transparent">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="32"/>
                     <ColumnDefinition Width="*"/>
@@ -102,7 +102,8 @@
             <!-- 结果：虚拟化，滚到接近底部再要下一批 -->
             <Grid Grid.Column="1">
                 <ScrollViewer x:Name="ListScroller" Padding="8,6,8,6" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ViewChanged="OnListScrolled" IsTabStop="False">
-                    <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource FileTemplate}" Tapped="OnListTapped" DoubleTapped="OnListDoubleTapped" DragStarting="OnDragStarting"/>
+                    <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource FileTemplate}" Tapped="OnListTapped" DoubleTapped="OnListDoubleTapped"
+                                   PointerPressed="OnListPressed" PointerMoved="OnListMoved" PointerReleased="OnListReleased"/>
                 </ScrollViewer>
                 <TextBlock x:Name="Empty" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20,60,20,0" TextAlignment="Center" TextWrapping="Wrap" LineHeight="24"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>

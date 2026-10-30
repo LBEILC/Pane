@@ -327,19 +327,55 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     void OnListTapped(object sender, TappedRoutedEventArgs e)
     {
-        if (DataOf<FileRow>(e.OriginalSource) is { } row) Select(row.Index);
+        if (RowAt(e.OriginalSource) is { } row) Select(row.Index);
         Input.Focus(FocusState.Programmatic);
     }
 
     void OnListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (DataOf<FileRow>(e.OriginalSource) is { } row) { Select(row.Index); _ = Run(search!.OpenAsync, "打开"); }
+        if (RowAt(e.OriginalSource) is { } row) { Select(row.Index); _ = Run(search!.OpenAsync, "打开"); }
     }
 
-    // 拖出：把文件（或文件夹）交给拖放的目标（资源管理器、聊天窗口……）
+    // 拖出：按住移动超过几像素才开始拖（2026-10-31）。原来行上直接开 CanDrag，鼠标单击被拖放吞掉，点结果没反应
+    FrameworkElement? pressRow;
+    Point pressAt;
+
+    void OnListPressed(object sender, PointerRoutedEventArgs e)
+    {
+        var p = e.GetCurrentPoint(List);
+        pressRow = p.Properties.IsLeftButtonPressed ? RowOf(e.OriginalSource) : null;
+        pressAt = p.Position;
+    }
+
+    async void OnListMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (pressRow is not { } row) return;
+        var p = e.GetCurrentPoint(List);
+        if (!p.Properties.IsLeftButtonPressed) { pressRow = null; return; }
+        if (Math.Abs(p.Position.X - pressAt.X) < 6 && Math.Abs(p.Position.Y - pressAt.Y) < 6) return;
+        pressRow = null;
+        row.DragStarting -= OnDragStarting;
+        row.DragStarting += OnDragStarting;
+        try { await row.StartDragAsync(e.GetCurrentPoint(row)); } catch (Exception) { }
+    }
+
+    void OnListReleased(object sender, PointerRoutedEventArgs e) => pressRow = null;
+
+    // 认行按「列表的第几个子元素」：ItemsRepeater 用 x:Bind 模板时行元素没有 DataContext，原来按 DataContext 找永远找不到，
+    // 单击、双击、拖出都落空（2026-10-31，用户录屏）
+    FrameworkElement? RowOf(object source)
+    {
+        for (var d = source as DependencyObject; d is not null; d = VisualTreeHelper.GetParent(d))
+            if (d is FrameworkElement f && VisualTreeHelper.GetParent(d) == List) return f;
+        return null;
+    }
+
+    FileRow? RowAt(object source) => RowOf(source) is { } f && List.GetElementIndex(f) is var i && i >= 0 && i < rows.Count ? rows[i] : null;
+
+    // 把文件（或文件夹）交给拖放的目标（资源管理器、聊天窗口……）
     async void OnDragStarting(UIElement sender, DragStartingEventArgs args)
     {
-        if (DataOf<FileRow>(args.OriginalSource) is not { } row) { args.Cancel = true; return; }
+        if (RowAt(sender) is not { } row) { args.Cancel = true; return; }
         var deferral = args.GetDeferral();
         try
         {

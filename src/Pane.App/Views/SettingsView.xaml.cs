@@ -551,6 +551,16 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var s = app.Store.Current;
         var c = s.Clipboard;
+        // 总开关（2026-10-31，033）：用别的剪贴板工具的人可以整个关掉。关着时只留这一行和「数据」（旧记录还能清）
+        // Win+V 替换着时不让直接关：先在下面把 Win+V 还给系统（要不要重启资源管理器得用户选），免得 Win+V 两头都不管
+        var winvOn = app.WinV is { State: not WinVState.Off };
+        var master = Switch(c.Enabled, v => { SaveClipboard(x => x with { Enabled = v }); Later(); });
+        if (c.Enabled && winvOn) Enable(master, false);
+        Group("基本", Row("启用剪贴板", c.Enabled
+                ? (winvOn ? "先关掉下面的「用 Pane 替换 Win+V」，才能关剪贴板" : "已经有别的剪贴板工具时可以关掉")
+                : "已关闭：不监听复制、不记录，呼出热键也不占用；以前的记录还在",
+            master));
+        if (!c.Enabled) { RenderClipboardData(); return; }
         var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
         var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }));
         var winv = app.WinV;
@@ -588,7 +598,11 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Render();
         })));
         Group("隐私", excluded.ToArray());
+        RenderClipboardData();
+    }
 
+    void RenderClipboardData()
+    {
         // 清空要点两次：第一次按钮变成「再点一次清空」，3 秒内不点就复原（同启动器里关机 / 重启的确认）
         var clear = Button(clearArmed ? "再点一次清空" : "清空", "trash", () =>
         {
@@ -1465,7 +1479,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void SaveAi(Func<AiSettings, AiSettings> change) =>
         app.Store.Save(app.Store.Current with { Ai = change(app.Store.Current.Ai) });
 
-    void OnAiChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "ai" && aiBusy == null) Later(0); });
+    // 任何设置保存都会让 AI 服务发 Changed；立刻重绘会把刚拨的开关换成新控件，滑块动画被截断成跳变（2026-10-31），
+    // 所以等开关动画（PaneDurNormal）播完再重绘
+    void OnAiChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "ai" && aiBusy == null) Later(); });
 
     // ================= 手势编辑器（添加 / 编辑一个全局手势） =================
     // 画方向：在画板里按住左键画（和真实手势用同一个识别器），或点右边的 8 个方向键逐段添加。

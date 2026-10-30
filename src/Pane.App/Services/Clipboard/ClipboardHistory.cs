@@ -14,6 +14,7 @@ internal interface IClipboardSource : IDisposable
 {
     event Action<ClipboardContent>? Captured;
     void Start();
+    void Stop();
 }
 internal interface IClipboardWriter
 {
@@ -63,6 +64,8 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
     readonly SemaphoreSlim signal=new(0,1);
     readonly Task persistence;
     bool stopping,dirty;
+    readonly object lifecycle=new();
+    bool listening;
     public int StorageFailures {get;private set;}
     public Task Ready {get;}
     public event EventHandler? Changed;
@@ -77,22 +80,30 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
                 var loaded=JsonSerializer.Deserialize(File.ReadAllBytes(index),ClipboardJson.Default.StoredClipArray)??[];
                 lock(sync)entries.AddRange(loaded);
             }
-            lock(sync){Trim();Schedule();}
-            source.Captured+=Capture;settings.Changed+=SettingsChanged;source.Start();Changed?.Invoke(this,EventArgs.Empty);
+            source.Captured+=Capture;settings.Changed+=SettingsChanged;SettingsChanged(this,EventArgs.Empty);
         });
     }
-    void SettingsChanged(object? sender,EventArgs e){lock(sync){Trim();Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
+    void SettingsChanged(object? sender,EventArgs e)
+    {
+        // 停止监听会等待回调退出，不可持有回调所需的历史锁。
+        lock(lifecycle){
+            bool enabled=settings.Current.Clipboard.Enabled;
+            if(enabled!=listening){if(enabled)source.Start();else source.Stop();listening=enabled;}
+            if(enabled)lock(sync){int count=entries.Count;Trim();if(entries.Count!=count)Schedule();}
+        }
+        Changed?.Invoke(this,EventArgs.Empty);
+    }
     public IReadOnlyList<ClipEntry> Snapshot(){lock(sync)return entries.Select(e=>e.Entry).OrderByDescending(e=>e.Pinned).ThenByDescending(e=>e.CopiedAt).ToArray();}
     internal void Capture(ClipboardContent content)
     {
-        var s=settings.Current.Clipboard;if(!ClipboardClassifier.Allowed(content,s))return;
+        var s=settings.Current.Clipboard;if(!s.Enabled||!ClipboardClassifier.Allowed(content,s))return;
         ClipKind kind;string fingerprint;
         if(content.Files is {Length:>0}){if(!s.RecordFiles)return;kind=ClipKind.Files;fingerprint="f:"+Hash(Encoding.UTF8.GetBytes(string.Join('\0',content.Files)));}
         else if(content.Png is {Length:>0}){if(!s.RecordImages)return;kind=ClipKind.Image;fingerprint="i:"+Hash(content.Png);}
         else if(!string.IsNullOrEmpty(content.Text)){if(!s.RecordText)return;kind=ClipboardClassifier.Classify(content.Text);fingerprint="t:"+Hash(Encoding.UTF8.GetBytes(content.Text));}
         else return;
         lock(sync){
-            if(stopping)return;
+            if(stopping||!settings.Current.Clipboard.Enabled)return;
             var now=DateTimeOffset.UtcNow;var latest=entries.MaxBy(e=>e.Entry.CopiedAt);
             if(s.Dedupe&&latest?.Fingerprint==fingerprint){entries[entries.IndexOf(latest)]=latest with{Entry=latest.Entry with{CopiedAt=now}};}
             else {
@@ -147,7 +158,7 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
     {
         try{Ready.GetAwaiter().GetResult();}finally{
             source.Captured-=Capture;settings.Changed-=SettingsChanged;source.Dispose();
-            lock(sync){stopping=true;Schedule();}persistence.GetAwaiter().GetResult();signal.Dispose();
+            lock(sync){stopping=true;if(signal.CurrentCount==0)signal.Release();}persistence.GetAwaiter().GetResult();signal.Dispose();
         }
     }
 }

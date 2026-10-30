@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,16 +12,16 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
     nint listener;
     uint lastSequence;
     public bool Registered {get;private set;}
-    public bool Removed {get;private set;}
+    public bool Removed {get;private set;}=true;
     public int Notifications {get;private set;}
     public int Failures {get;private set;}
     public event Action<ClipboardContent>? Captured;
-    public void Start(){callback=OnChange;listener=NativeClip.PaneClipListen(callback);Registered=listener!=0;if(!Registered)throw new InvalidOperationException("剪贴板监听注册失败");}
+    public void Start(){if(listener!=0)return;lastSequence=SelectionNative.GetClipboardSequenceNumber();Removed=false;callback=OnChange;listener=NativeClip.PaneClipListen(callback);Registered=listener!=0;if(!Registered)throw new InvalidOperationException("剪贴板监听注册失败");}
     void OnChange(uint sequence)
     {
         Notifications++;
         // 观察模式在任何内容/来源 API 前返回，自测只统计系统通知。
-        if(observe||sequence==lastSequence)return;
+        if(observe||!settings.Current.Clipboard.Enabled||sequence==lastSequence)return;
         lastSequence=sequence;
         if(ClipboardHistorySuppression.TryConsume(sequence))return;
         bool opened=false;
@@ -47,6 +47,7 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
                 var handle=NativeClip.GetClipboardData(13);var p=NativeClip.GlobalLock(handle);if(p!=0){try{int chars=checked((int)(NativeClip.GlobalSize(handle)/2));text=Marshal.PtrToStringUni(p,chars)?.TrimEnd('\0');}finally{NativeClip.GlobalUnlock(handle);}}
             }
             NativeClip.CloseClipboard();opened=false;
+            if(!settings.Current.Clipboard.Enabled)return;
             string? icon=null;
             if(path.Length>0){string cache=Path.Combine(settings.DirectoryPath,"clipboard","icons");Directory.CreateDirectory(cache);string target=Path.Combine(cache,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path)))+".png");
                 if(File.Exists(target)||NativeClip.PaneClipSourceIcon(path,target)==1)icon=target;
@@ -56,7 +57,8 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
     }
     static bool Has(string name)=>NativeClip.IsClipboardFormatAvailable(NativeClip.RegisterClipboardFormatW(name));
     static int? Flag(string name){uint format=NativeClip.RegisterClipboardFormatW(name);if(!NativeClip.IsClipboardFormatAvailable(format))return null;var handle=NativeClip.GetClipboardData(format);if(NativeClip.GlobalSize(handle)<4)return 0;var p=NativeClip.GlobalLock(handle);if(p==0)return 0;try{return Marshal.ReadInt32(p);}finally{NativeClip.GlobalUnlock(handle);}}
-    public void Dispose(){if(listener==0)return;Removed=NativeClip.PaneClipStop(listener,out int count)==1;Notifications=count;listener=0;GC.KeepAlive(callback);}
+    public void Dispose()=>Stop();
+    public void Stop(){if(listener==0)return;Removed=NativeClip.PaneClipStop(listener,out int count)==1;Notifications=count;listener=0;Registered=false;GC.KeepAlive(callback);}
 }
 internal sealed class WindowsClipboardImages:IClipboardImages
 {

@@ -57,7 +57,7 @@
                 <TextBlock Grid.Column="1" Text="打开启动器" Style="{StaticResource ItemText}"/>
                 <StackPanel x:Name="LauncherKeys" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"/>
             </Grid>
-            <Grid Tag="clipboard" Style="{StaticResource ItemRow}">
+            <Grid x:Name="ClipboardItem" Tag="clipboard" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="clipboard" Style="{StaticResource ItemIcon}"/>
                 <TextBlock Grid.Column="1" Text="打开剪贴板" Style="{StaticResource ItemText}"/>

@@ -51,6 +51,9 @@ internal static class Win
     [DllImport(Dll)] internal static extern int PaneEnterTestDesktop();
     [DllImport(Dll)] internal static extern void PaneLeaveTestDesktop();
     [DllImport(Dll)] internal static extern ulong PanePolicyBegin();
+    [DllImport(Dll)] internal static extern void PanePressPolicyBegin(int enabled,int timeout,int fullscreen,int paused,int superButton,int hold,int superFullscreen);
+    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern void PanePressPolicyRule(string path,string? windowClass,int disabled,int super);
+    [DllImport(Dll)] internal static extern void PanePressPolicyCommit();
     [DllImport(Dll)] internal static extern void PanePolicyCommit(ulong revision);
     [DllImport(Dll)] internal static extern int PanePolicyDirty();
     [DllImport(Dll)] internal static extern int PaneWGesturesPresent();

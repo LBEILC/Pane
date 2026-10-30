@@ -10,7 +10,7 @@ namespace Pane.Views;
 
 /// <summary>托盘菜单每次弹出时的状态（App 填）。热键为空就不显示键帽。</summary>
 public sealed record TrayMenuState(string? UpdateVersion, IReadOnlyList<string> LauncherKeys, IReadOnlyList<string> ClipboardKeys,
-    bool GesturesAvailable, bool GesturesPaused, IReadOnlyList<string> PauseKeys);
+    bool GesturesAvailable, bool GesturesPaused, IReadOnlyList<string> PauseKeys, bool ClipboardAvailable = true);
 
 public sealed partial class TrayMenuView : UserControl, IPanelView
 {
@@ -43,6 +43,7 @@ public sealed partial class TrayMenuView : UserControl, IPanelView
         UpdateHead.Visibility = UpdateItem.Visibility = UpdateSeparator.Visibility = update ? Visibility.Visible : Visibility.Collapsed;
         Keys(LauncherKeys, state.LauncherKeys);
         Keys(ClipboardKeys, state.ClipboardKeys);
+        ClipboardItem.Visibility = state.ClipboardAvailable ? Visibility.Visible : Visibility.Collapsed;   // 剪贴板关了就不列这一项（033）
         PauseSeparator.Visibility = PauseItem.Visibility = state.GesturesAvailable ? Visibility.Visible : Visibility.Collapsed;
         PauseIcon.Glyph = state.GesturesPaused ? "check" : "gesture";
         PauseIcon.Foreground = state.GesturesPaused ? AccentProto.Background : IconProto.Background;

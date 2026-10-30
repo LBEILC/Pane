@@ -83,7 +83,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     void ApplyCore(PaneSettings settings){
         currentSettings=settings;
         var a=Override("launcher",settings.Launcher.Hotkey);var b=Override("clipboard",settings.Clipboard.Hotkey);
-        {foreach(var id in registered)Native.UnregisterHotKey(shellWindow,id);registered.Clear();lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;if(!suspended){Register(1,"launcher",a);Register(2,"clipboard",b);}}
+        lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;
+        ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Clipboard.Enabled,suspended);
         ApplyWinV();
         if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");}
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}

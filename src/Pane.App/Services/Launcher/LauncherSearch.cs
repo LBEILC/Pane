@@ -109,7 +109,7 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
         cancellationToken.ThrowIfCancellationRequested();RefreshIndex();var context=Context(query);
         var pending=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
         var groups=await Task.WhenAll(pending).ConfigureAwait(false);cancellationToken.ThrowIfCancellationRequested();
-        var rows=groups.SelectMany(g=>g).ToArray();
+        var rows=groups.SelectMany(g=>g).Where(item=>store.Current.Clipboard.Enabled||item.Id!="command:clipboard").ToArray();
         bool dark=Pane.Services.Icons.IconTheme.IsDark(store.Current.General.Theme);
         var apps=context.Snapshot.Apps.ToDictionary(a=>a.Id);
         if(context.Snapshot.IconSettingsKey==lastIcons)

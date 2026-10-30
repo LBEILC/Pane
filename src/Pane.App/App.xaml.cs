@@ -81,7 +81,7 @@ public sealed partial class App : Application
             if(startupLevel>=1){
             Files=demo?new Pane.DesignData.FileSearchSample():new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(),new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
             if(!demo)launcherSearch=new(Store,new Pane.Services.Launcher.WindowsAppCatalog(data),everything,new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
-            launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),ClipboardHistory);panels.Add("launcher",new("启动器",launcher,launcher,Glass));
+            launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),new Pane.Services.Clipboard.LauncherClipboardHistory(ClipboardHistory,Store));panels.Add("launcher",new("启动器",launcher,launcher,Glass));
             panels["launcher"].PositionStore=Store;panels["launcher"].HideOnBlur=()=>Store.Current.Launcher.HideOnBlur;WireSecondary(launcher,actions);/* 设计接线：二级窗口 */}
             if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new("剪贴板",clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
             if(startupLevel>=3){var super=new SuperView(Ai,actions);superView=super;secondaryActions??=actions;WireSuper(super);panels.Add("super",new("超级面板",super,super,Glass){Placement=PanelPlacement.Pointer});}
@@ -103,6 +103,7 @@ public sealed partial class App : Application
     void WatchFrames(GlassPanel panel)=>panel.TickRequested+=WakeFrames;
     void WakeFrames(){if(!queue.HasThreadAccess){queue.TryEnqueue(WakeFrames);return;}if(!closing&&timer is {IsRunning:false})timer.Start();}
     void Command(string command){
+        if(!Pane.Services.Clipboard.ClipboardAccess.Allow(command,Store.Current.Clipboard.Enabled,text=>shell?.NotifyOnce(text)))return;
         WakeFrames();
         if(command.StartsWith("tray-menu ",StringComparison.Ordinal)){ShowTrayMenu(command[10..]);return;}/* 设计：托盘菜单 */
         if(command=="show-launcher"&&!demo){launcherSearch?.RefreshIndex();_ = FileSearchStatus.RefreshAsync(cancellation.Token);}
@@ -141,7 +142,7 @@ public sealed partial class App : Application
                 if(Environment.GetEnvironmentVariable("PANE_CYCLE_CAPTURE")=="1"&&!Take("cycle-next",out _))return;
                 current.Hide();cycleHiding=true;return;
             }
-            string[] names={"launcher","clipboard","super"};Command("show-"+names[cycleIndex%3]);return;
+            Command("show-"+Pane.Services.Clipboard.ClipboardAccess.Cycle(cycleIndex,Store.Current.Clipboard.Enabled));return;
         }
         foreach(var (name,command) in showCommands)if(Take(command,out var point)){
             Command(command);if(name=="super"&&!string.IsNullOrWhiteSpace(point)){var xy=Pair(point);current!.Show(true,(int)xy.Width,(int)xy.Height,false);}pendingAck="shown-"+name;return;

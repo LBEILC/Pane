@@ -41,6 +41,11 @@ static partial class Program
         await OriginalCalculationTests(service,fake);
         await OriginalAiTests(service);
         await OriginalCommandTests(service,fake);
+        Check((await service.SearchAsync("剪贴板",default)).Items.Any(i=>i.Id=="command:clipboard"),"clipboard command enabled");
+        store.Save(store.Current with{Clipboard=store.Current.Clipboard with{Enabled=false}});
+        Check(!(await service.SearchAsync("剪贴板",default)).Items.Any(i=>i.Id=="command:clipboard"),"clipboard command disabled immediately");
+        store.Save(store.Current with{Clipboard=store.Current.Clipboard with{Enabled=true}});
+        Check((await service.SearchAsync("剪贴板",default)).Items.Any(i=>i.Id=="command:clipboard"),"clipboard command reenabled immediately");
         LauncherResult result;
         var clip=new ClipEntry("fixture",ClipKind.Files,null,[@"C:\fixture\one.txt",@"C:\fixture\two.txt"],null,null,null,"test",null,DateTimeOffset.UtcNow,false);
         await service.RunAsync("open",clip,default);Check(fake.Calls.TakeLast(2).SequenceEqual([@"open:C:\fixture\one.txt:False",@"open:C:\fixture\two.txt:False"]),"all attached files open through fake");

@@ -26,7 +26,8 @@ public sealed partial class App
             HotkeyBox.Names(Store.Current.Launcher.Hotkey).ToList(),
             HotkeyBox.Names(Store.Current.Clipboard.Hotkey).ToList(),
             gestureService!=null,gestureService?.IsPaused??false,
-            pause is {} k?HotkeyBox.Names(new Settings.Hotkey((Settings.KeyModifiers)(int)k.Modifiers,k.VirtualKey)).ToList():[]));
+            pause is {} k?HotkeyBox.Names(new Settings.Hotkey((Settings.KeyModifiers)(int)k.Modifiers,k.VirtualKey)).ToList():[],
+            Store.Current.Clipboard.Enabled));
         foreach(var other in panels.Values)if(other!=trayPanel)other.Hide();
         current=trayPanel;
         trayPanel.Show(true,x,y,!demo);

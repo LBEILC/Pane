@@ -112,6 +112,7 @@ public sealed class GestureService : IGestureService
             Win.PaneSetWakeEvent(handles[0]);
             // 观察模式明确允许与 WGestures 并存，但绝不拦截或执行。
             wgRunning=IsWGesturesRunning()&&!isolatedTest;
+            PublishPressPolicy();
             if(observe||!wgRunning){hook=Win.PaneStart(observe?1:0)!=0;if(!hook){SetState(GestureServiceState.HookFailed);return;}}
             {emergency=isolatedTest?Win.RegisterHotKey(0,102,0x4000|1|2|4,0x87):Win.RegisterHotKey(0,102,0x4000|1|2,0x7B)||Win.RegisterHotKey(0,102,0x4000|2|4,0x7B);if(!emergency)PauseHotkeyUnavailable?.Invoke(this,"应急退出 Ctrl+Alt+F12 / Ctrl+Shift+F12");}
             SetState(!observe&&wgRunning?GestureServiceState.WGesturesRunning:GestureServiceState.Running);
@@ -144,6 +145,7 @@ public sealed class GestureService : IGestureService
     }
     void RefreshPolicy()
     {
+        PublishPressPolicy();
         var c=Config;
         var desiredChord=hotkeysSuspended?null:c.Settings.PauseHotkey;
         if(registeredChord!=desiredChord){
@@ -160,7 +162,7 @@ public sealed class GestureService : IGestureService
         }
         ulong revision=Win.PanePolicyBegin();
         var (target,dpi,full)=WindowTargets.UnderCursor();
-        bool blocked=paused||wgRunning||c.Settings.PauseInFullscreen&&full||target.ExePath.Length==0||GestureMatcher.Rule(c,target.ExePath,target.WindowClass)?.Mode==AppRuleMode.Disabled;
+        bool blocked=paused||wgRunning||c.Settings.PauseInFullscreen&&full||GestureMatcher.Rule(c,target.ExePath,target.WindowClass)?.Mode==AppRuleMode.Disabled;
         SetState(wgRunning?GestureServiceState.WGesturesRunning:paused?GestureServiceState.Paused:c.Settings.PauseInFullscreen&&full?GestureServiceState.PausedByFullscreen:GestureServiceState.Running);
         var sp=Volatile.Read(ref superPolicy);
         bool superBlocked=paused||wgRunning||sp.Fullscreen&&full||sp.Disabled.Any(p=>string.Equals(p,target.ExePath,StringComparison.OrdinalIgnoreCase));
@@ -169,6 +171,19 @@ public sealed class GestureService : IGestureService
         Win.PanePolicy(target.Window,target.ProcessId,target.Start.X,target.Start.Y,dpi,allBlocked?1:0,blocked?0:(int)c.Settings.EnabledButtons,c.Settings.StationaryTimeoutMs??0);
         Win.PanePolicyCommit(revision);
         if((paused||wgRunning)&&session!=null){Win.PaneCancelCapture();session.End(true);session=null;trail.Writer.TryWrite(new(button,lastX,lastY,TrailPhase.End));}
+    }
+    GestureConfig? publishedPressConfig;
+    SuperPolicy? publishedSuperPolicy;
+    bool publishedPressPaused;
+    void PublishPressPolicy()
+    {
+        var c=Config;var sp=Volatile.Read(ref superPolicy);bool blocked=paused||wgRunning;
+        if(ReferenceEquals(c,publishedPressConfig)&&ReferenceEquals(sp,publishedSuperPolicy)&&blocked==publishedPressPaused)return;
+        Win.PanePressPolicyBegin((int)c.Settings.EnabledButtons,c.Settings.StationaryTimeoutMs??0,c.Settings.PauseInFullscreen?1:0,blocked?1:0,sp.Button,sp.Hold,sp.Fullscreen?1:0);
+        foreach(var rule in c.Apps)Win.PanePressPolicyRule(rule.ExePath,rule.WindowClass,rule.Mode==AppRuleMode.Disabled?1:0,0);
+        foreach(var path in sp.Disabled)Win.PanePressPolicyRule(path,null,1,1);
+        Win.PanePressPolicyCommit();
+        publishedPressConfig=c;publishedSuperPolicy=sp;publishedPressPaused=blocked;
     }
     void Consume(Win.NativeEvent e)
     {

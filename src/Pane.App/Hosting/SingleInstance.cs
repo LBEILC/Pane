@@ -38,7 +38,7 @@ internal static class SingleInstance
             try {using var pipe=new NamedPipeServerStream(key,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(cancel).ConfigureAwait(false);using var reader=new StreamReader(pipe,leaveOpen:true);var line=await reader.ReadLineAsync(cancel).ConfigureAwait(false);
                 if(line=="exit"){using var writer=new StreamWriter(pipe,leaveOpen:true){AutoFlush=true};await writer.WriteLineAsync(Environment.ProcessId.ToString()).ConfigureAwait(false);}
-                if(line is "exit" or "show-launcher")command(line);
+                if(line is "exit" or "show-launcher" or "show-clipboard")command(line);
             } catch(OperationCanceledException){break;}catch(IOException){}
         }
     }

@@ -44,6 +44,7 @@ public sealed partial class GlassPanel : IDisposable
     internal readonly nint Visual,Input;
     internal bool Shown {get;private set;}
     internal nint Previous {get;private set;}
+    static readonly List<GlassPanel> transient=[];
     internal double Width=592,Height=352;
     readonly double minWidth,minHeight;
     readonly bool resizable;
@@ -68,10 +69,14 @@ public sealed partial class GlassPanel : IDisposable
         Visual=Native.CreateWindowExW(0x82800A0,wc.name!,name,0x80000000,0,0,688,464,0,0,wc.instance,0);
         Input=Native.CreateWindowExW(settingsWindow?(demo?0x8240000u:0x240000u):interactive?(demo?0x8200080u:0x200080u):0x82800A0u,wc.name!,name,settingsWindow?0x800E0000u:0x80000000u,48,48,592,352,settingsWindow?0:Visual,0,wc.instance,0);
         if(Visual==0||Input==0)throw new System.ComponentModel.Win32Exception();
+        if(!settingsWindow)transient.Add(this);
         if(settingsWindow)AppIcon.Apply(Input);   // 设置窗口在任务栏上有按钮：给它 Pane 的图标，不然是系统默认的程序图标
         Native.SetLayeredWindowAttributes(Visual,0,255,2);if(!interactive)Native.SetLayeredWindowAttributes(Input,0,255,2);
         foreach(var h in new[]{Visual,Input}){int noRound=1,noBorder=-2;Native.DwmSetWindowAttribute(h,33,ref noRound,4);Native.DwmSetWindowAttribute(h,34,ref noBorder,4);}
         int enable=1;Marshal.ThrowExceptionForHR(Native.DwmSetWindowAttribute(Visual,17,ref enable,4));
+        // 设计改（2026-10-31，用户录屏）：任务栏缩略图上悬停时系统「速览」只亮出有任务栏按钮的内容窗，玻璃窗被当成别的窗口淡掉，只剩文字。
+        // 玻璃窗排除在速览外又会在速览别的程序时留下一块玻璃，所以干脆不让这扇窗速览（缩略图本身正常，不受影响）
+        if(settingsWindow){int noPeek=1;Native.DwmSetWindowAttribute(Input,11,ref noPeek,4);}
         dpi=Native.GetDpiForWindow(Input)/96f;target=Native.Target(compositor,Visual);
         bool dark=parameters.Dark;
         if(demo){var theme=Environment.GetEnvironmentVariable("PANE_THEME");if(theme is "Light" or "Dark")dark=theme=="Dark";}
@@ -111,7 +116,12 @@ public sealed partial class GlassPanel : IDisposable
     internal bool Prepared=>root.ActualWidth>0&&root.Children.Count>0;
     public void Show(bool near=false,int px=0,int py=0,bool activate=true)
     {
-        if(disposing)return;Previous=Native.GetForegroundWindow();
+        if(disposing)return;
+        // 设计改（2026-10-31）：前台是本面板或另一个随用随收的面板（启动器 → 剪贴板、面板已开再呼出）时，
+        // 沿用它记下的原窗口；原来直接记成面板自己，收起后粘贴切不回去，误报「没有权限往这个窗口输入」
+        var foreground=Native.GetForegroundWindow();
+        var panel=transient.FirstOrDefault(p=>p.Input==foreground||p.Visual==foreground);
+        Previous=panel==null?foreground:panel.Previous;
         if(!near){Native.GetCursorPos(out var cursor);px=cursor.X;py=cursor.Y;}
         near=near||Placement is PanelPlacement.Pointer or PanelPlacement.Tray;
         view.OnShowing(new PanelShowContext(Previous,new Windows.Foundation.Point(px,py),activate&&!demo));
@@ -226,8 +236,9 @@ public sealed partial class GlassPanel : IDisposable
         // 这里只跟踪当前值（中途反向时作起点、诊断用），画面由合成器的动画负责
         scale=(float)(startScale+((Showing?1:GlassParameters.Token("PaneEnterScale"))-startScale)*a);opacity=(float)(startOpacity+((Showing?1:0)-startOpacity)*b);
         if(t>=duration&&minimizing){animating=false;minimizing=false;StopAnimations();Layout(positionX,positionY);Native.ShowWindow(Input,6);return;}
-        if(t>=duration){animating=false;StopAnimations();Layout(positionX,positionY);if(!Shown){Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);view.OnHidden();Hidden?.Invoke(this,EventArgs.Empty);}else view.OnShown();}
+        if(t>=duration){animating=false;StopAnimations();Layout(positionX,positionY);if(!Shown)Gone();else view.OnShown();}
     }
+    void Gone(){Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);view.OnHidden();Hidden?.Invoke(this,EventArgs.Empty);}
     static double Ease(double t,double[] curve)=>t<=0?0:t>=1?1:Bezier(t,curve[0],curve[1],curve[2],curve[3]);
     static double Bezier(double t,double x1,double y1,double x2,double y2)
     {
@@ -293,6 +304,10 @@ public sealed partial class GlassPanel : IDisposable
             else if(Shown){Native.ShowWindow(Visual,4);Native.SetWindowPos(Visual,Input,0,0,0,0,0x13);
                 if(iconic){iconic=false;minimizing=false;if(parameters.Current.MotionSpeed>0.01){scale=(float)GlassParameters.Token("PaneEnterScale");opacity=0;Layout(positionX,positionY);Animate();}}}}
         if(settingsWindow && h==Input && m==6 && (w&0xffff)!=0 && Shown)Native.SetWindowPos(Visual,Input,0,0,0,0,0x13);
+        // 设计改（2026-10-31，用户录屏）：收起途中把前台交出去（粘贴切回原窗口）时，玻璃那一刻就没了、文字还在淡出，看着是字后消失；
+        // 这时两扇窗口一起收掉，不等动画
+        if(!settingsWindow && h==Input && m==6 && (w&0xffff)==0 && !Shown && animating)
+            root.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.High,()=>{if(Shown||!animating)return;animating=false;StopAnimations();Layout(positionX,positionY);Gone();});
         if(settingsWindow && h==Input && m==0x24){var info=Marshal.PtrToStructure<Native.MinMaxInfo>(l);info.MinTrack.X=(int)Math.Ceiling(minWidth*dpi);info.MinTrack.Y=(int)Math.Ceiling(minHeight*dpi);Marshal.StructureToPtr(info,l,false);return 0;}
         if(settingsWindow && h==Input && (m==0x216||m==0x214)){var rect=Marshal.PtrToStructure<Native.Rect>(l);Width=Math.Max(minWidth,(rect.Right-rect.Left)/dpi);Height=Math.Max(minHeight,(rect.Bottom-rect.Top)/dpi);Layout(rect.Left-(int)(48*dpi),rect.Top-(int)(48*dpi));return 1;}
         // 设计改（2026-10-29）：设置窗口被系统或手势改了位置 / 大小（最大化、还原、贴左右半边）时，玻璃窗跟着走；
@@ -366,7 +381,7 @@ public sealed partial class GlassPanel : IDisposable
     [DllImport("user32.dll")] static extern bool IsZoomed(nint window);
     [DllImport("user32.dll")] static extern bool IsIconic(nint window);
     [DllImport("user32.dll")] static extern nint MonitorFromWindow(nint window,uint flags);
-    public void Dispose(){if(disposing)return;disposing=true;if(settingsWindow)Native.RemoveWindowSubclass(childWindow,childProc,1);parameters.Changed-=ParametersChanged;view.SizeRequested-=ViewSize;view.CloseRequested-=ViewClose;Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);root.RemoveHandler(UIElement.KeyDownEvent,keyHandler);root.PointerPressed-=DragPressed;root.PointerMoved-=DragMoved;root.PointerReleased-=DragReleased;root.PointerCaptureLost-=DragCaptureLost;root.Children.Clear();island.Content=null;island.SystemBackdrop=null;island.Dispose();target.Root=null;target.Dispose();scene.Dispose();compositor.Dispose();Native.DestroyWindow(Input);Native.DestroyWindow(Visual);Native.UnregisterClassW(className,Native.GetModuleHandleW(null));}
+    public void Dispose(){if(disposing)return;disposing=true;transient.Remove(this);if(settingsWindow)Native.RemoveWindowSubclass(childWindow,childProc,1);parameters.Changed-=ParametersChanged;view.SizeRequested-=ViewSize;view.CloseRequested-=ViewClose;Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);root.RemoveHandler(UIElement.KeyDownEvent,keyHandler);root.PointerPressed-=DragPressed;root.PointerMoved-=DragMoved;root.PointerReleased-=DragReleased;root.PointerCaptureLost-=DragCaptureLost;root.Children.Clear();island.Content=null;island.SystemBackdrop=null;island.Dispose();target.Root=null;target.Dispose();scene.Dispose();compositor.Dispose();Native.DestroyWindow(Input);Native.DestroyWindow(Visual);Native.UnregisterClassW(className,Native.GetModuleHandleW(null));}
     [StructLayout(LayoutKind.Sequential)] internal struct Point{internal int X,Y;}
     [StructLayout(LayoutKind.Sequential)] internal struct MonitorInfo{internal int Size;internal Native.Rect Monitor,Work;internal uint Flags;}
     [DllImport("user32.dll")] internal static extern nint MonitorFromPoint(Point point,uint flags);

@@ -5,12 +5,13 @@
 #include <thread>
 #include "Capture.h"
 #include "PolicyEvents.h"
+#include "PressPolicy.h"
 #include "ProcessPresence.h"
 #define API extern "C" __declspec(dllexport)
 namespace {
 struct Event {int kind,x,y,value; intptr_t window; uint32_t pid,dpi;};
 std::atomic<uint64_t> version=0;
-// 发布缓存用原子字段，不在钩子里取互斥锁或查询其他进程。
+// 后台缓存用原子字段；首次按下另用完整配置同步确认，不等待服务线程。
 std::atomic<intptr_t> pw=0;std::atomic<DWORD> pp=0;
 std::atomic<int> px=0,py=0,pdpi=96,pblocked=1,penabled=1,ptimeout=0,psuper=4,phold=400;
 std::atomic<uint64_t> policyRevision=1,policyAccepted=0;
@@ -20,6 +21,8 @@ std::atomic<intptr_t> pforeground=0;
 std::atomic<ULONG_PTR> pclass=0;
 std::atomic<int> geometry[9]{};
 PolicyGeometry preparingGeometry{};
+std::shared_ptr<const PressPolicy> pressPolicy;
+std::unique_ptr<PressPolicy> preparingPressPolicy;
 HWINEVENTHOOK windowEvents=nullptr,foregroundEvents=nullptr;
 HDESK testDesktop=nullptr,previousDesktop=nullptr;
 std::atomic<bool> running=false,ready=false;bool observe=true;
@@ -70,12 +73,39 @@ LRESULT CALLBACK hook(int code,WPARAM m,LPARAM data){
  if(i.kind==pane::Down&&!sameGeometry(publishedGeometry(),policyGeometry(p->pt)))invalidatePolicy();
  deny=pblocked.load()!=0||!w||moved||policyRevision.load()!=policyAccepted.load();
  capture.superButton=psuper;capture.hold=phold;capture.enabled=penabled;capture.timeout=ptimeout;capture.dpi=dpi;
- deny=deny||(v&1)||v!=version.load(std::memory_order_acquire);context={0,i.x,i.y,0,w,pid,static_cast<uint32_t>(dpi)};}
+ deny=deny||(v&1)||v!=version.load(std::memory_order_acquire);context={0,i.x,i.y,0,w,pid,static_cast<uint32_t>(dpi)};
+ // 窗口通知和后台刷新可能落后于首次按下，直接按当前目标与完整配置确认。
+ // 未知路径不等于排除；仍遵守暂停、启用按键、全屏与超级面板各自的规则。
+ if(i.kind==pane::Down&&i.tag!=pane::InputTag){
+  if(auto settings=std::atomic_load(&pressPolicy)){
+   auto current=policyGeometry(p->pt);
+   auto identity=pressIdentity(current,!settings->rules.empty());
+   auto decision=decidePress(*settings,current,identity);
+   capture.enabled=decision.enabled;capture.superButton=decision.superButton;
+   capture.timeout=settings->timeout;capture.hold=settings->hold;
+   capture.dpi=pressDpi(p->pt);
+   deny=!current.window||settings->paused;
+   context={0,i.x,i.y,0,reinterpret_cast<intptr_t>(current.window),current.pid,static_cast<uint32_t>(capture.dpi)};
+  }
+ }
+ }
  cancel();auto d=capture.feed(i,deny);swallow=d.swallow;result(d,i.x,i.y);updateTimer();}
  }
  QueryPerformanceCounter(&b);auto elapsed=static_cast<uint64_t>(b.QuadPart-a.QuadPart);count++;total+=elapsed;auto old=maximum.load();while(old<elapsed&&!maximum.compare_exchange_weak(old,elapsed)){}
  return swallow?1:CallNextHookEx(nullptr,code,m,data);
 }
+}
+// 仅服务线程写入构造器；发布后快照不可变，读者释放前不会被销毁。
+API void PanePressPolicyBegin(int enabled,int timeout,int fullscreen,int paused,int superButton,int hold,int superFullscreen){
+ preparingPressPolicy=std::make_unique<PressPolicy>();auto& p=*preparingPressPolicy;
+ p.enabled=enabled;p.timeout=timeout;p.fullscreen=fullscreen!=0;p.paused=paused!=0;
+ p.superButton=superButton;p.hold=hold;p.superFullscreen=superFullscreen!=0;
+}
+API void PanePressPolicyRule(const wchar_t* path,const wchar_t* windowClass,int disabled,int super){
+ if(preparingPressPolicy)preparingPressPolicy->rules.push_back({path?path:L"",windowClass?windowClass:L"",windowClass!=nullptr,disabled!=0,super!=0});
+}
+API void PanePressPolicyCommit(){
+ if(preparingPressPolicy)std::atomic_store(&pressPolicy,std::shared_ptr<const PressPolicy>(std::move(preparingPressPolicy)));
 }
 API void PanePolicy(intptr_t window,uint32_t pid,int x,int y,int dpi,int blocked,int enabled,int timeout){
  version.fetch_add(1);pw=window;pp=pid;px=x;py=y;pdpi=dpi;pblocked=blocked;penabled=enabled;ptimeout=timeout;

@@ -8,7 +8,7 @@ using Pane.Contracts;
 using Pane.Services.Clipboard;
 using Pane.Settings;
 
-static class Program
+static partial class Program
 {
     static int checks;
     static void Check(bool value,string name){checks++;if(!value)throw new Exception(name);}
@@ -72,6 +72,7 @@ static class Program
         }
         settings.Load();Check(!settings.Current.Clipboard.RecordText&&!settings.Current.Clipboard.RecordFiles&&settings.Current.Clipboard.Limit==200&&settings.Current.Clipboard.ExcludedPrograms[0]=="BLOCKED.EXE","new settings roundtrip");
         using(var source=new WindowsClipboardSource(settings,true)){source.Captured+=_=>throw new Exception("observe read content");source.Start();await Task.Delay(150);Check(source.Registered,"native register");source.Dispose();Check(source.Removed,"native unregister and thread join");}
+        await SwitchTests();
         Console.WriteLine($"PASS clipboard assertions={checks};systemClipboardRead=0;systemClipboardWrite=0;listenerStopped=1");
     }
     internal static byte[] Png(int width,int height,int seed)
@@ -84,6 +85,6 @@ static class Program
         Chunk(output,"IDAT",compressed.ToArray());Chunk(output,"IEND",[]);return output.ToArray();
     }
     static void Chunk(Stream output,string type,byte[] data){Span<byte> value=stackalloc byte[4];BinaryPrimitives.WriteInt32BigEndian(value,data.Length);output.Write(value);byte[] tag=Encoding.ASCII.GetBytes(type);output.Write(tag);output.Write(data);uint crc=uint.MaxValue;foreach(byte b in tag.Concat(data)){crc^=b;for(int i=0;i<8;i++)crc=(crc&1)!=0?(crc>>1)^0xedb88320:crc>>1;}BinaryPrimitives.WriteUInt32BigEndian(value,~crc);output.Write(value);}
-    sealed class FakeSource:IClipboardSource{public bool Disposed;public event Action<ClipboardContent>? Captured;public void Start(){}public void Emit(ClipboardContent value)=>Captured?.Invoke(value);public void Dispose()=>Disposed=true;}
+    sealed class FakeSource:IClipboardSource{public bool Disposed;public event Action<ClipboardContent>? Captured;public void Start(){}public void Stop(){}public void Emit(ClipboardContent value)=>Captured?.Invoke(value);public void Dispose()=>Disposed=true;}
     sealed class FakeWriter:IClipboardWriter{public ClipEntry? Entry;public bool Plain,Fail;public nint Target;public Task PasteAsync(ClipEntry entry,bool plain,nint target,CancellationToken token){token.ThrowIfCancellationRequested();if(Fail)throw new TimeoutException();Entry=entry;Plain=plain;Target=target;return Task.CompletedTask;}}
 }
