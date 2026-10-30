@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  手势提示框（设计负责人）。照原型 #gesture-hint：屏幕正中的玻璃小面板，完全不挡鼠标、不激活；
+  上面一排方向箭头（40px，线宽 2.2，逐个弹出），下面一行命令名（16px，600）。
+  未识别时命令名变成次要色、常规字重；执行时整块轻微弹一下。
+  修饰动作（滚轮、点左键等）画成箭头后面的小胶囊。
+-->
+<UserControl
+    x:Class="Pane.Views.GestureHintView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="False" IsHitTestVisible="False">
+
+    <Grid>
+        <StackPanel x:Name="Root" MinWidth="200" Padding="24,20,24,16" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel x:Name="Arrows" Orientation="Horizontal" Spacing="6" MinHeight="44" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="Label" Margin="0,8,0,0" HorizontalAlignment="Center" TextAlignment="Center"
+                       MaxWidth="420" TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"
+                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
+                       Foreground="{ThemeResource PaneText1Brush}"/>
+        </StackPanel>
+
+        <!-- 样板：代码从这些隐藏元素的强类型属性取颜色和字体，不按名字查资源（NativeAOT） -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="StrongProto" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="DimProto" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="DetailProto" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <Border x:Name="ChipProto" Height="28" CornerRadius="14" Padding="10,0,12,0" Background="{ThemeResource PaneFillSelectedBrush}"/>
+            <TextBlock x:Name="ChipTextProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

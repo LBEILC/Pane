@@ -1,0 +1,16 @@
+bin/
+obj/
+*.user
+.vs/
+*.log
+logs/
+.codex-runs/
+docs/research/refs/
+
+# 品牌工作目录：只提交选定方案的规范包和方案定义，构建中间产物不提交
+brand/*/sets/
+brand/*/board.*
+brand/*/logo-sheet.png
+brand/*/.cache/
+dist/
+out/

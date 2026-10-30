@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置窗口（设计负责人）。照原型 prototype/settings.html：整窗一块玻璃，左侧 216 宽导航，右侧分区标题 + 分组列表。
+  分组、行、控件在代码里按原型的 group() / row() 拼（SettingsView.xaml.cs），样式和颜色取自下面隐藏的样板。
+-->
+<UserControl
+    x:Class="Pane.Views.SettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="False">
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="216"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- 左侧导航 -->
+        <Border BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0" Padding="12,16,12,16">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <StackPanel x:Name="SideTitle" Orientation="Horizontal" Spacing="10" Padding="8,0,8,16" Background="Transparent">
+                    <Image x:Name="Logo" Width="26" Height="26"/>
+                    <TextBlock Text="Pane 设置" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="15" FontWeight="SemiBold"
+                               Foreground="{ThemeResource PaneText1Brush}"/>
+                </StackPanel>
+                <Grid Grid.Row="1">
+                    <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
+                    <StackPanel x:Name="Nav" Spacing="2"/>
+                </Grid>
+                <TextBlock Grid.Row="2" Padding="8,12,8,0" TextWrapping="Wrap" LineHeight="19"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"
+                           Text="按 Esc 关闭。改动立即生效，自动保存。"/>
+            </Grid>
+        </Border>
+
+        <!-- 右侧内容 -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Grid x:Name="Head" Padding="24,20,14,12" Background="Transparent">
+                <StackPanel Margin="0,0,40,0">
+                    <TextBlock x:Name="SectionTitle" FontFamily="{StaticResource PaneFontDisplay}" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                    <TextBlock x:Name="SectionDesc" Margin="0,4,0,0" TextWrapping="Wrap"
+                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                </StackPanel>
+                <Button x:Name="CloseButton" Style="{StaticResource PaneIconButton}" HorizontalAlignment="Right" VerticalAlignment="Top"
+                        Margin="0,-6,0,0" Click="OnClose" ToolTipService.ToolTip="关闭（Esc）">
+                    <c:PaneIcon Glyph="close" Width="16" Height="16" Foreground="{ThemeResource PaneText2Brush}"/>
+                </Button>
+            </Grid>
+            <ScrollViewer x:Name="Scroller" Grid.Row="1" Padding="24,0,24,24" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="Body"/>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 样板：代码从这些隐藏元素的强类型属性取样式、颜色和字体，不按名字查资源（NativeAOT） -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="GroupTitleProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText2Brush}"/>
+            <Border x:Name="RowsProto" CornerRadius="{StaticResource PaneRadiusItem}" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <TextBlock x:Name="LabelProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="DescProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="SmallProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="SmallStrongProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="MonoProto" FontFamily="{StaticResource PaneFontMono}" FontSize="11" Foreground="{ThemeResource PaneText3Brush}"/>
+            <Border x:Name="FillProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="SelectedProto" Background="{ThemeResource PaneFillSelectedBrush}"/>
+            <Border x:Name="KbdProto" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
+            <Button x:Name="ButtonProto" Style="{StaticResource PaneTextButton}"/>
+            <Button x:Name="IconButtonProto" Style="{StaticResource PaneIconButton}"/>
+            <c:PaneIcon x:Name="IconProto" Foreground="{ThemeResource PaneText2Brush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

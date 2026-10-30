@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  超级面板（设计负责人）。照原型 #superpanel：宽 360、内边距 12；
+  选中文字引用（两行、左边竖线）→（选中外文且打开了自动翻译时）自动翻译 → 六个动作 → AI 结果卡片（小号）。
+  动作：平时是 翻译 总结 润色 解释 搜索 复制；自动翻译时换成 复制译文 翻译窗口 问 AI 总结 复制原文 搜索（原型 launcher.html #sp）。
+  长按鼠标侧键出现在鼠标右下方（宿主放置）。
+-->
+<UserControl
+    x:Class="Pane.Views.SuperView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:Pane.Views"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="True" UseSystemFocusVisuals="False">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="ActionTemplate" x:DataType="views:SuperAction">
+            <StackPanel Width="56" Padding="2,8,2,6" Spacing="5" Background="Transparent" Opacity="{x:Bind ItemOpacity, Mode=OneWay}">
+                <c:PaneIcon Glyph="{x:Bind Glyph}" Width="19" Height="19" HorizontalAlignment="Center" Foreground="{ThemeResource PaneText1Brush}"/>
+                <TextBlock Text="{x:Bind Name}" HorizontalAlignment="Center"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText1Brush}"/>
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <StackPanel x:Name="Root" Width="360" Padding="12" VerticalAlignment="Top"><!-- 顶对齐：否则被面板撑高后量出来的就是面板高度，结果卡片收起后不会变矮 -->
+        <!-- 选中的文字 -->
+        <Border Padding="10,2,0,2" BorderThickness="2,0,0,0" BorderBrush="{ThemeResource PaneText3Brush}">
+            <TextBlock x:Name="QuoteText" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" LineHeight="19"
+                       Foreground="{ThemeResource PaneText2Brush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
+        </Border>
+
+        <!-- 选中外文自动翻译（设置 → AI 里打开；原型 .sp-tr）：标签、语言方向、复制译文、到翻译窗口继续；译文逐字流出 -->
+        <Border x:Name="AutoBox" Margin="0,10,0,0" Padding="12,8,8,10" Visibility="Collapsed" CornerRadius="{StaticResource PaneRadiusItem}"
+                Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+            <StackPanel Spacing="4">
+                <Grid ColumnSpacing="6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Height="16" Padding="6,0,6,0" CornerRadius="8" VerticalAlignment="Center"
+                            Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                        <TextBlock Text="自动翻译" FontFamily="{StaticResource PaneFontUi}" FontSize="10" LineHeight="14" Foreground="{ThemeResource PaneText2Brush}"/>
+                    </Border>
+                    <TextBlock x:Name="AutoDirection" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                    <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="6" Click="OnCopyTranslation" ToolTipService.ToolTip="复制译文">
+                        <c:PaneIcon Glyph="paste" Width="14" Height="14"/>
+                    </Button>
+                    <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="6" Click="OnOpenTranslate" ToolTipService.ToolTip="在翻译窗口里继续（Tab）">
+                        <c:PaneIcon Glyph="external" Width="14" Height="14"/>
+                    </Button>
+                </Grid>
+                <TextBlock x:Name="AutoOut" MinHeight="22" TextWrapping="Wrap" IsTextSelectionEnabled="True" LineHeight="23"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+            </StackPanel>
+        </Border>
+        <!-- 太长不自动翻：说明 + 翻译按钮 -->
+        <Border x:Name="LongBox" Margin="0,10,0,0" Padding="12,6,6,6" Visibility="Collapsed" CornerRadius="{StaticResource PaneRadiusItem}"
+                Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="LongText" VerticalAlignment="Center" TextWrapping="Wrap"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                <Button Grid.Column="1" Style="{StaticResource PaneTextButton}" Height="28" CornerRadius="14" Content="翻译" Click="OnTranslateLong"/>
+            </Grid>
+        </Border>
+
+        <!-- 动作 -->
+        <Grid Margin="0,12,0,0">
+            <Canvas x:Name="ActionHighlightLayer" IsHitTestVisible="False"/>
+            <ItemsControl x:Name="Actions" ItemTemplate="{StaticResource ActionTemplate}" IsTabStop="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+        </Grid>
+
+        <!-- AI 结果 -->
+        <Grid x:Name="ResultArea" Margin="0,8,0,0" Visibility="Collapsed">
+            <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
+            <c:AiCard x:Name="Card" Margin="2,8,2,0"/>
+        </Grid>
+    </StackPanel>
+</UserControl>

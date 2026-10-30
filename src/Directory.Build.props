@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <!-- 编译器生成的文档路径统一映射到虚拟根目录。 -->
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)..=/_/</PathMap>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- NativeAOT 的 PE 调试目录只记录符号文件名，不记录构建机目录。 -->
+    <LinkerArg Include="/PDBALTPATH:%_PDB%" />
+  </ItemGroup>
+</Project>
