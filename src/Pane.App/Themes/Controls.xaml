@@ -70,8 +70,8 @@
 
     <!-- 图标按钮（原型 .icon-btn）：透明底，悬停中性填充；按下缩小 0.9 由代码做 -->
     <Style x:Key="PaneIconButton" TargetType="Button">
-        <Setter Property="Width" Value="28"/>
-        <Setter Property="Height" Value="28"/>
+        <Setter Property="Width" Value="{StaticResource PaneControlSm}"/>
+        <Setter Property="Height" Value="{StaticResource PaneControlSm}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="IsTabStop" Value="False"/>
@@ -108,7 +108,7 @@
 
     <!-- 文字按钮（原型 .btn 的次要样式）：中性填充 + 细描边，悬停加深；按下缩小 0.97 以后由代码做 -->
     <Style x:Key="PaneTextButton" TargetType="Button">
-        <Setter Property="MinHeight" Value="28"/>
+        <Setter Property="MinHeight" Value="{StaticResource PaneControlSm}"/>
         <Setter Property="Padding" Value="12,0,12,0"/>
         <Setter Property="CornerRadius" Value="{StaticResource PaneRadiusControl}"/>
         <Setter Property="FontFamily" Value="{StaticResource PaneFontUi}"/>
@@ -140,10 +140,10 @@
     <!-- 主按钮（安装程序这类一页只有一个主要动作的地方）：主题色实心胶囊，高 40、圆角为高的一半，白字；悬停叠一层白、按下叠一层黑。
          Background 可以在用的地方覆盖（卸载用警示红）。 -->
     <Style x:Key="PanePrimaryButton" TargetType="Button">
-        <Setter Property="MinHeight" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="MinHeight" Value="{StaticResource PaneControlLg}"/>
+        <Setter Property="Height" Value="{StaticResource PaneControlLg}"/>
         <Setter Property="Padding" Value="24,0,24,0"/>
-        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="CornerRadius" Value="20"/>   <!-- 胶囊：PaneControlLg 的一半（XAML 不能算，改高度时一起改） -->
         <Setter Property="Background" Value="{StaticResource PaneAccentBrush}"/>
         <Setter Property="FontFamily" Value="{StaticResource PaneFontUi}"/>
         <Setter Property="FontSize" Value="{StaticResource PaneTextMd}"/>

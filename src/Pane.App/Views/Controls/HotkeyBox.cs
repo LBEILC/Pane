@@ -28,7 +28,7 @@ public sealed partial class HotkeyBox : UserControl
         ring = new SolidColorBrush(((SolidColorBrush)accent).Color with { A = 0x73 });
         IsTabStop = true; UseSystemFocusVisuals = false;
         var radius = ((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft;
-        box = new Border { MinWidth = 120, Height = 32, Padding = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(radius), Background = fill, BorderBrush = stroke, BorderThickness = new Thickness(1), Child = keys };
+        box = new Border { MinWidth = 120, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(radius), Background = fill, BorderBrush = stroke, BorderThickness = new Thickness(1), Child = keys };
         Content = box;
         Show();
         Tapped += (_, _) => { if (!recording) Start(); };

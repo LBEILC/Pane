@@ -91,6 +91,14 @@
     <Color x:Key="PaneAccentGraphiteColor">#FF4A505C</Color>    <!-- 石墨 -->
     <SolidColorBrush x:Key="PaneAccentBrush" Color="{ThemeResource PaneAccentColor}"/>
 
+    <!-- ================= 状态色（danger / success，2026-10-31 补）：只用于出错 / 成功的小字、小标签和危险操作的悬停底 ================= -->
+    <Color x:Key="PaneDangerColor">#FFE5484D</Color>
+    <Color x:Key="PaneSuccessColor">#FF2F9E5B</Color>
+    <Color x:Key="PaneWarningColor">#FFF5A524</Color>
+    <SolidColorBrush x:Key="PaneDangerBrush" Color="{StaticResource PaneDangerColor}"/>
+    <SolidColorBrush x:Key="PaneSuccessBrush" Color="{StaticResource PaneSuccessColor}"/>
+    <SolidColorBrush x:Key="PaneWarningBrush" Color="{StaticResource PaneWarningColor}"/>
+
     <!-- ================= 玻璃（默认值；设置「玻璃参数（高级）」可改，深浅色各一套） ================= -->
     <!-- 由玻璃宿主读取，作用在 Composition 层上，不是 XAML 画刷 -->
     <x:Double x:Key="PaneGlassTintOpacity">0.42</x:Double>      <!-- glass-tint-opacity：着色层透明度 -->
@@ -137,6 +145,14 @@
     <x:Double x:Key="PaneTextMd">14</x:Double>
     <x:Double x:Key="PaneTextLg">16</x:Double>
     <x:Double x:Key="PaneTextSearch">20</x:Double>
+    <x:Double x:Key="PaneTextTitle">20</x:Double>   <!-- 标题：设置分区、引导页每一步（2026-10-31 补） -->
+    <x:Double x:Key="PaneTextHero">26</x:Double>    <!-- 大标题：引导页 / 卸载的首屏、计算结果（2026-10-31 补） -->
+
+    <!-- ================= 控件高度（control-*，2026-10-31 补；之前各处写死，实际只用这四档） ================= -->
+    <x:Double x:Key="PaneControlXs">24</x:Double>   <!-- 小开关式标签、行内小按钮、分段里的按钮 -->
+    <x:Double x:Key="PaneControlSm">28</x:Double>   <!-- 文字按钮、图标按钮、分段整体、紧凑输入框 -->
+    <x:Double x:Key="PaneControlMd">32</x:Double>   <!-- 输入框、下拉框、窗口头部按钮、窗口底部主按钮 -->
+    <x:Double x:Key="PaneControlLg">40</x:Double>   <!-- 引导页这类大号主按钮 -->
 
     <!-- ================= 图标 ================= -->
     <x:Double x:Key="PaneIconStroke">1.75</x:Double>            <!-- Lucide 线宽（默认 2） -->

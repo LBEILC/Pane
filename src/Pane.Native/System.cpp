@@ -11,6 +11,7 @@
 #include <mutex>
 #include <chrono>
 #include "Capture.h"
+#include "ReplayInput.h"
 using Microsoft::WRL::ComPtr;
 #define API extern "C" __declspec(dllexport)
 namespace {
@@ -37,9 +38,20 @@ API int PaneKey(unsigned short vk,int down,int unicode){INPUT i{};i.type=INPUT_K
  if(unicode){i.ki.wScan=vk;i.ki.dwFlags=KEYEVENTF_UNICODE;}else{i.ki.wVk=vk;if(vk==VK_RCONTROL||vk==VK_RMENU||(vk>=VK_PRIOR&&vk<=VK_DELETE)||vk==VK_LWIN||vk==VK_RWIN)i.ki.dwFlags|=KEYEVENTF_EXTENDEDKEY;}
  if(!down)i.ki.dwFlags|=KEYEVENTF_KEYUP;return SendInput(1,&i,sizeof(i))==1;
 }
-API int PaneReplay(int button){INPUT input[2]{};for(auto& i:input){i.type=INPUT_MOUSE;i.mi.dwExtraInfo=pane::InputTag;i.mi.mouseData=button==4?1:button==8?2:0;}
+API int PaneReplay(int button){if(pane::inputBypass)return 0;pane::SimulationScope simulation;INPUT input[2]{};for(auto& i:input){i.type=INPUT_MOUSE;i.mi.dwExtraInfo=pane::InputTag;i.mi.mouseData=button==4?1:button==8?2:0;}
  input[0].mi.dwFlags=button==1?MOUSEEVENTF_RIGHTDOWN:button==2?MOUSEEVENTF_MIDDLEDOWN:MOUSEEVENTF_XDOWN;
  input[1].mi.dwFlags=button==1?MOUSEEVENTF_RIGHTUP:button==2?MOUSEEVENTF_MIDDLEUP:MOUSEEVENTF_XUP;return SendInput(2,input,sizeof(INPUT))==2;
+}
+// 保留按下位置；异步补发前移开超过原门槛时不把指针拉回。
+API int PaneReplayAt(int button,int x,int y,unsigned dpi){
+ POINT cursor{};if(!GetCursorPos(&cursor))return 0;
+ int left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);
+ int width=GetSystemMetrics(SM_CXVIRTUALSCREEN),height=GetSystemMetrics(SM_CYVIRTUALSCREEN);
+ INPUT inputs[2]{};
+ if(!replayInputs(inputs,button,x,y,dpi,cursor,{left,top,left+width,top+height}))return 0;
+ pane::SimulationScope simulation;
+ if(pane::inputBypass)return 0;
+ return SendInput(2,inputs,sizeof(INPUT))==2;
 }
 API int PaneWindow(HWND h,int action){
  if(!IsWindow(h))return 0;

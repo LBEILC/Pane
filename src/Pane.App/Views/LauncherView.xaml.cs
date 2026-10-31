@@ -73,6 +73,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         this.attachmentActions = attachmentActions;
         this.clipboard = clipboard;
         InitializeComponent();
+        Controls.PaneCaret.Attach(Input);
 
         highlight = new SlidingHighlight(HighlightLayer);
         Loaded += (_, _) => HideClearButton();
@@ -298,7 +299,14 @@ public sealed partial class LauncherView : UserControl, IPanelView
 
         if (result.IsHome)
         {
-            foreach (var group in result.Items.GroupBy(i => i.Group))
+            // 设置 → 启动器 →「空启动器显示」：只显示固定时去掉「最近使用」，什么都不显示时只剩搜索栏
+            var home = ((App)Application.Current).Store.Current.Launcher.Home;
+            foreach (var group in result.Items.GroupBy(i => i.Group).Where(g => home switch
+            {
+                Pane.Settings.LauncherHome.Nothing => false,
+                Pane.Settings.LauncherHome.PinnedOnly => g.Key != "最近使用",
+                _ => true,
+            }))
             {
                 var s = Section(group.Key, LauncherSectionKind.Tiles);
                 foreach (var item in group) Add(s, item, LauncherCell.App);

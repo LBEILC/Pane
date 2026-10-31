@@ -34,23 +34,23 @@
                     <TextBlock Text="AI 对话" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
             </Border>
-            <Button x:Name="ModelButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="NaN" Height="28" Padding="10,0,8,0" CornerRadius="14" Click="OnModel"
+            <Button x:Name="ModelButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="10,0,8,0" CornerRadius="14" Click="OnModel"
                     ToolTipService.ToolTip="换模型（只对这次对话）">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock x:Name="ModelText" VerticalAlignment="Center" MaxWidth="200" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"/>
                     <c:PaneIcon x:Name="ModelChevron" Glyph="chev-d" Width="13" Height="13" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="28" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="新对话（Ctrl+N）" VerticalAlignment="Center">
+            <Button Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="新对话（Ctrl+N）" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="plus" Width="13" Height="13" VerticalAlignment="Center" Foreground="{ThemeResource PaneText1Brush}"/>
                     <TextBlock Text="新对话" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="32" Height="32" Click="OnPin" ToolTipService.ToolTip="总在最前">
+            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="总在最前">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="32" Height="32" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
+            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>
@@ -87,8 +87,8 @@
                          PlaceholderText="问点什么…" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                          SelectionHighlightColor="{StaticResource PaneAccentBrush}" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                          ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnInputChanged"/>
-                <Button x:Name="SendButton" Grid.Column="1" Width="32" Height="32" CornerRadius="16" Padding="0" VerticalAlignment="Bottom" Click="OnSend"
-                        Background="{StaticResource PaneAccentBrush}" Style="{StaticResource PanePrimaryButton}" MinHeight="32" ToolTipService.ToolTip="发送（Enter）">
+                <Button x:Name="SendButton" Grid.Column="1" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" CornerRadius="16" Padding="0" VerticalAlignment="Bottom" Click="OnSend"
+                        Background="{StaticResource PaneAccentBrush}" Style="{StaticResource PanePrimaryButton}" MinHeight="{StaticResource PaneControlMd}" ToolTipService.ToolTip="发送（Enter）">
                     <Grid Width="16" Height="16">
                         <Viewbox x:Name="SendIcon">
                             <Path Data="M5,12 L12,5 L19,12 M12,19 V5" Stroke="White" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="24" Height="24"/>
@@ -105,7 +105,7 @@
             <TextBlock x:Name="HintLabelProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
             <TextBlock x:Name="BodyProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
             <TextBlock x:Name="MonoProto" FontFamily="{StaticResource PaneFontMono}" FontSize="12" Foreground="{ThemeResource PaneText2Brush}"/>
-            <TextBlock x:Name="ErrorProto" Foreground="#E5484D"/>
+            <TextBlock x:Name="ErrorProto" Foreground="{StaticResource PaneDangerBrush}"/>
             <TextBlock x:Name="Text3Proto" Foreground="{ThemeResource PaneText3Brush}"/>
             <Border x:Name="BubbleProto" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
             <Border x:Name="CodeProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>

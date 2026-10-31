@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   文件窗口（二级窗口，设计负责人）。照原型 prototype/launcher.html #fw（docs/design.md「文件窗口」）。
   默认 880 × 580，可改大小（最小 640 × 420）。顶栏 56；左侧分类 116；中间结果（行高 50）；右侧预览 268（可关）；底栏 38。
@@ -15,8 +15,6 @@
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryTemplate" x:DataType="files:CategoryItem">
             <Grid Height="32" Padding="10,0,10,0" Margin="0,0,0,2" Background="Transparent" CornerRadius="{StaticResource PaneRadiusControl}">
-                <Border Visibility="{x:Bind SelectedVisibility, Mode=OneWay}" Margin="-10,0,-10,0" CornerRadius="{StaticResource PaneRadiusControl}"
-                        Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"/>
                 <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center" FontWeight="{x:Bind Weight, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
                 <TextBlock Text="{x:Bind CountText, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -31,8 +29,6 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Border Grid.ColumnSpan="3" Margin="-10,0,-10,0" Visibility="{x:Bind SelectedVisibility, Mode=OneWay}" CornerRadius="{StaticResource PaneRadiusItem}"
-                        Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"/>
                 <Border Width="32" Height="32" CornerRadius="8" Background="{x:Bind Tile}">
                     <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White"/>
                 </Border>
@@ -77,10 +73,10 @@
             <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" PlaceholderText="搜索文件和文件夹"
                      FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                      IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnTextChanged"/>
-            <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="32" Height="32" Click="OnPin" ToolTipService.ToolTip="总在最前">
+            <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="总在最前">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="32" Height="32" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
+            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>
@@ -95,16 +91,33 @@
             <!-- 左侧分类（Tab / Shift+Tab 切换） -->
             <Border BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0">
                 <ScrollViewer VerticalScrollBarVisibility="Hidden" Padding="6,8,6,8">
-                    <ItemsControl x:Name="Rail" ItemTemplate="{StaticResource CategoryTemplate}" IsTabStop="False" Tapped="OnRailTapped"/>
+                    <Grid>
+                        <!-- 悬停层在下、选中层在上，都是滑动高亮（同启动器） -->
+                        <Canvas x:Name="RailHover" IsHitTestVisible="False"/>
+                        <Canvas x:Name="RailHighlight" IsHitTestVisible="False"/>
+                        <ItemsControl x:Name="Rail" ItemTemplate="{StaticResource CategoryTemplate}" IsTabStop="False" Tapped="OnRailTapped"
+                                      PointerMoved="OnRailPointerMoved" PointerExited="OnRailPointerExited"/>
+                    </Grid>
                 </ScrollViewer>
             </Border>
 
             <!-- 结果：虚拟化，滚到接近底部再要下一批 -->
             <Grid Grid.Column="1">
-                <ScrollViewer x:Name="ListScroller" Padding="8,6,8,6" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ViewChanged="OnListScrolled" IsTabStop="False">
-                    <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource FileTemplate}" Tapped="OnListTapped" DoubleTapped="OnListDoubleTapped"
-                                   PointerPressed="OnListPressed" PointerMoved="OnListMoved" PointerReleased="OnListReleased"/>
+                <!-- 系统滚动条隐藏，右边画一条 Pane 自己的细滚动条（滚动或鼠标在列表上时出现，可拖） -->
+                <ScrollViewer x:Name="ListScroller" Padding="8,6,8,6" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" ViewChanged="OnListScrolled" IsTabStop="False"
+                              PointerEntered="OnListPointerEntered" PointerExited="OnListPointerExited" SizeChanged="OnListSizeChanged">
+                    <Grid>
+                        <Canvas x:Name="ListHighlight" IsHitTestVisible="False"/>
+                        <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource FileTemplate}" Tapped="OnListTapped" DoubleTapped="OnListDoubleTapped"
+                                       PointerPressed="OnListPressed" PointerMoved="OnListMoved" PointerReleased="OnListReleased"/>
+                    </Grid>
                 </ScrollViewer>
+                <Border x:Name="ScrollTrack" Width="12" HorizontalAlignment="Right" Margin="0,6,1,6" Background="Transparent" Visibility="Collapsed"
+                        PointerEntered="OnThumbEntered" PointerExited="OnThumbExited" PointerPressed="OnThumbPressed" PointerMoved="OnThumbMoved"
+                        PointerReleased="OnThumbReleased" PointerCaptureLost="OnThumbCaptureLost" PointerWheelChanged="OnThumbWheel">
+                    <Border x:Name="ScrollThumb" Width="4" HorizontalAlignment="Center" VerticalAlignment="Top" CornerRadius="2"
+                            Background="{ThemeResource PaneText3Brush}" Opacity="0"/>
+                </Border>
                 <TextBlock x:Name="Empty" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20,60,20,0" TextAlignment="Center" TextWrapping="Wrap" LineHeight="24"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
             </Grid>
@@ -158,7 +171,7 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Button x:Name="SortButton" Style="{StaticResource PaneIconButton}" Width="NaN" Height="26" Padding="6,0,6,0" CornerRadius="6" Click="OnSort" VerticalAlignment="Center"
+            <Button x:Name="SortButton" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="6,0,6,0" CornerRadius="6" Click="OnSort" VerticalAlignment="Center"
                     ToolTipService.ToolTip="换排序">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="sliders" Width="13" Height="13" VerticalAlignment="Center"/>

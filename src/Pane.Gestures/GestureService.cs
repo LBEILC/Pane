@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 namespace Pane.Gestures;
 
-public sealed record HookStatistics(ulong Events,double MeanMicroseconds,double MaxMicroseconds,int Error,int UnhookSucceeded);
+public sealed record HookStatistics(ulong Events,double MeanMicroseconds,double MaxMicroseconds,int Error,int UnhookSucceeded){public ulong ReinstallCount {get;init;}};
 
 public sealed class GestureService : IGestureService
 {
@@ -201,13 +201,20 @@ public sealed class GestureService : IGestureService
                 session=null;trail.Writer.TryWrite(new(button,e.X,e.Y,TrailPhase.End));break;
             case 5:
                 session?.End(true);session=null;
-                if(!observe){bool ok=Win.PaneReplay(e.Value)!=0;Outcome(new(ok?GestureOutcomeKind.ReplayedClick:GestureOutcomeKind.Failed,null,ok?null:"补发点击失败"));}
+                if(!observe){bool ok=Win.PaneReplayAt(e.Value,e.X,e.Y,e.Dpi)!=0;Outcome(new(ok?GestureOutcomeKind.ReplayedClick:GestureOutcomeKind.Failed,null,ok?null:"补发点击失败"));}
                 trail.Writer.TryWrite(new(button,e.X,e.Y,TrailPhase.End));break;
             case 6:session?.End(true);session=null;trail.Writer.TryWrite(new(button,e.X,e.Y,TrailPhase.End));SuperPanelRequested?.Invoke(this,new(e.X,e.Y,(GestureButton)e.Value));break;
+            case 8:
+                try{
+                    string root=Environment.GetEnvironmentVariable("PANE_DATA_DIR")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Pane");
+                    string folder=Path.Combine(root,"logs");Directory.CreateDirectory(folder);
+                    File.AppendAllText(Path.Combine(folder,"hook.log"),$"{DateTimeOffset.UtcNow:O} {(e.Value switch {1=>"raw-input-without-hook",3=>"replay-rate-circuit-breaker",4=>"reinstall-rate-circuit-breaker",_=>"slow-hook-callback"})}\n");
+                }catch(IOException){}catch(UnauthorizedAccessException){}
+                break;
             case 7:session?.End(true);session=null;trail.Writer.TryWrite(new(button,e.X,e.Y,TrailPhase.End));break;
         }
     }
-    public HookStatistics Statistics(){Win.PaneStats(out var n,out var mean,out var max,out var error,out var unhook);return new(n,mean,max,error,unhook);}
+    public HookStatistics Statistics(){Win.PaneStats(out var n,out var mean,out var max,out var error,out var unhook);return new(n,mean,max,error,unhook){ReinstallCount=Win.PaneReinstallCount()};}
     public async ValueTask DisposeAsync()
     {
         stop=true;wake.Set();if(!started){wake.Dispose();return;}Win.PaneCancelCommands();

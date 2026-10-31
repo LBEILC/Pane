@@ -26,7 +26,7 @@
                 </Grid.RowDefinitions>
                 <StackPanel x:Name="SideTitle" Orientation="Horizontal" Spacing="10" Padding="8,0,8,16" Background="Transparent">
                     <Image x:Name="Logo" Width="26" Height="26"/>
-                    <TextBlock Text="Pane 设置" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="15" FontWeight="SemiBold"
+                    <TextBlock Text="Pane 设置" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
                                Foreground="{ThemeResource PaneText1Brush}"/>
                 </StackPanel>
                 <Grid Grid.Row="1">
@@ -47,7 +47,7 @@
             </Grid.RowDefinitions>
             <Grid x:Name="Head" Padding="24,20,14,12" Background="Transparent">
                 <StackPanel Margin="0,0,40,0">
-                    <TextBlock x:Name="SectionTitle" FontFamily="{StaticResource PaneFontDisplay}" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                    <TextBlock x:Name="SectionTitle" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
                     <TextBlock x:Name="SectionDesc" Margin="0,4,0,0" TextWrapping="Wrap"
                                FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>

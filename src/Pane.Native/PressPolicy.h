@@ -19,7 +19,7 @@ struct PressPolicy {
  bool paused=false,fullscreen=true,superFullscreen=true;
  std::vector<PressRule> rules;
 };
-struct PressIdentity {std::wstring path,windowClass;};
+struct PressIdentity {std::wstring path,windowClass;bool higherIntegrity=false,integrityKnown=false;};
 inline PressIdentity pressIdentity(const PolicyGeometry& g,bool needPath){
  PressIdentity result;wchar_t cls[256]{};
  if(GetClassNameW(g.window,cls,256))result.windowClass=cls;

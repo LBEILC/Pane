@@ -37,9 +37,7 @@
                                    FontFamily="{x:Bind SubtitleFont}" FontSize="{StaticResource PaneTextXs}"
                                    Foreground="{ThemeResource PaneText3Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                     </StackPanel>
-                    <Border Grid.Column="2" Style="{StaticResource PaneKbdBorder}" VerticalAlignment="Center" Visibility="{x:Bind HotkeyVisibility}">
-                        <TextBlock Style="{StaticResource PaneKbdText}" Text="{x:Bind Hotkey}"/>
-                    </Border>
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center" Visibility="{x:Bind HotkeyVisibility}" c:KeyCombo.Text="{x:Bind Hotkey}"/>
                 </Grid>
             </DataTemplate>
 
@@ -64,7 +62,7 @@
             <!-- 算式：大号结果 + 说明 -->
             <DataTemplate x:Key="CalcTemplate" x:DataType="launcher:LauncherRow">
                 <StackPanel Orientation="Horizontal" Spacing="10" Padding="12,10,12,12" Background="Transparent">
-                    <TextBlock Text="{x:Bind CalcText}" FontFamily="{StaticResource PaneFontDisplay}" FontSize="26" FontWeight="SemiBold"
+                    <TextBlock Text="{x:Bind CalcText}" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextHero}" FontWeight="SemiBold"
                                Foreground="{ThemeResource PaneText1Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxWidth="440"/>
                     <TextBlock Text="Enter 复制结果" VerticalAlignment="Bottom" Margin="0,0,0,4"
                                FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>

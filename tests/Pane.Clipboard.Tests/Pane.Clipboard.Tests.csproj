@@ -8,6 +8,6 @@
     <Compile Include="../../src/Pane.App/Contracts/Clipboard.cs" Link="Contracts/Clipboard.cs"/>
     <Compile Include="../../src/Pane.App/Contracts/Launcher.cs" Link="Contracts/Launcher.cs"/>
     <Compile Include="../../src/Pane.App/Contracts/Selection.cs" Link="Contracts/Selection.cs"/>
-    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)"/>
+    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)"/><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>
   <Compile Include="../../src/Pane.App/Hosting/ShellHotkeyBindings.cs" Link="ShellHotkeyBindings.cs"/></ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../src/Pane.App/Services/PasteTransfer.cs" Link="PasteTransfer.cs"/></ItemGroup></Project>

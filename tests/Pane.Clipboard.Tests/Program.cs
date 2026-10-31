@@ -15,6 +15,7 @@ static partial class Program
     static PaneSettings Defaults()=>new(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Ctrl,32)),new(new(KeyModifiers.Ctrl,86)));
     static async Task Main(string[] args)
     {
+        if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}
         string native=Path.GetFullPath(args[0]);
         NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(),(name,_,_)=>name=="Pane.Native.dll"?NativeLibrary.Load(native):0);
         if(args.Length>1&&args[1]=="seed"){
@@ -73,6 +74,7 @@ static partial class Program
         settings.Load();Check(!settings.Current.Clipboard.RecordText&&!settings.Current.Clipboard.RecordFiles&&settings.Current.Clipboard.Limit==200&&settings.Current.Clipboard.ExcludedPrograms[0]=="BLOCKED.EXE","new settings roundtrip");
         using(var source=new WindowsClipboardSource(settings,true)){source.Captured+=_=>throw new Exception("observe read content");source.Start();await Task.Delay(150);Check(source.Registered,"native register");source.Dispose();Check(source.Removed,"native unregister and thread join");}
         await SwitchTests();
+        PasteTests();
         Console.WriteLine($"PASS clipboard assertions={checks};systemClipboardRead=0;systemClipboardWrite=0;listenerStopped=1");
     }
     internal static byte[] Png(int width,int height,int seed)

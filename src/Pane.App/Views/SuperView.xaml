@@ -47,10 +47,10 @@
                     </Border>
                     <TextBlock x:Name="AutoDirection" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
-                    <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="6" Click="OnCopyTranslation" ToolTipService.ToolTip="复制译文">
+                    <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="6" Click="OnCopyTranslation" ToolTipService.ToolTip="复制译文">
                         <c:PaneIcon Glyph="paste" Width="14" Height="14"/>
                     </Button>
-                    <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="6" Click="OnOpenTranslate" ToolTipService.ToolTip="在翻译窗口里继续（Tab）">
+                    <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="6" Click="OnOpenTranslate" ToolTipService.ToolTip="在翻译窗口里继续（Tab）">
                         <c:PaneIcon Glyph="external" Width="14" Height="14"/>
                     </Button>
                 </Grid>
@@ -68,7 +68,7 @@
                 </Grid.ColumnDefinitions>
                 <TextBlock x:Name="LongText" VerticalAlignment="Center" TextWrapping="Wrap"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
-                <Button Grid.Column="1" Style="{StaticResource PaneTextButton}" Height="28" CornerRadius="14" Content="翻译" Click="OnTranslateLong"/>
+                <Button Grid.Column="1" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Content="翻译" Click="OnTranslateLong"/>
             </Grid>
         </Border>
 

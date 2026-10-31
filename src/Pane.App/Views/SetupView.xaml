@@ -28,7 +28,7 @@
         <StackPanel x:Name="Welcome" Grid.RowSpan="2" Padding="44,0,44,28" VerticalAlignment="Center">
             <Image x:Name="Logo" Width="72" Height="72" HorizontalAlignment="Center"/>
             <TextBlock Text="Pane" Margin="0,14,0,0" HorizontalAlignment="Center"
-                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="26" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextHero}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
             <TextBlock x:Name="VersionText" Margin="0,2,0,0" HorizontalAlignment="Center"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
             <TextBlock x:Name="Tagline" Text="启动器、剪贴板和鼠标手势，一个轻巧的常驻小工具。" Margin="0,10,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
@@ -60,7 +60,7 @@
                             <TextBlock x:Name="PathText" Margin="0,2,0,0" TextWrapping="Wrap"
                                        FontFamily="{StaticResource PaneFontMono}" FontSize="11" Foreground="{ThemeResource PaneText3Brush}"/>
                         </StackPanel>
-                        <Button x:Name="ChangePath" Grid.Column="1" Style="{StaticResource PaneTextButton}" MinHeight="30" CornerRadius="15" Padding="14,0,14,0"
+                        <Button x:Name="ChangePath" Grid.Column="1" Style="{StaticResource PaneTextButton}" MinHeight="{StaticResource PaneControlSm}" CornerRadius="14" Padding="14,0,14,0"
                                 VerticalAlignment="Center" Content="更改" Click="OnChangePath"/>
                     </Grid>
                 </StackPanel>
@@ -77,7 +77,7 @@
         <StackPanel x:Name="Working" Grid.RowSpan="2" Padding="44,0,44,44" VerticalAlignment="Center" Visibility="Collapsed">
             <Image x:Name="WorkingLogo" Width="56" Height="56" HorizontalAlignment="Center"/>
             <TextBlock x:Name="WorkingTitle" Margin="0,16,0,0" HorizontalAlignment="Center"
-                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
             <Grid Margin="0,18,0,0" Width="300" Height="6" HorizontalAlignment="Center">
                 <Border CornerRadius="3" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"/>
                 <Border x:Name="ProgressFill" CornerRadius="3" Width="0" HorizontalAlignment="Left" Background="{StaticResource PaneAccentBrush}"/>
@@ -92,7 +92,7 @@
                 <c:PaneIcon Glyph="check" Width="28" Height="28" StrokeWidth="2.4" Foreground="White"/>
             </Border>
             <TextBlock x:Name="DoneTitle" Margin="0,16,0,0" HorizontalAlignment="Center"
-                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
             <StackPanel Margin="0,16,0,0" Spacing="8" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
                     <Border Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}" Text="Alt"/></Border>
@@ -113,22 +113,22 @@
             </StackPanel>
             <StackPanel Margin="0,24,0,0" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                 <Button Style="{StaticResource PanePrimaryButton}" MinWidth="160" Content="打开 Pane" Click="OnLaunch"/>
-                <Button Style="{StaticResource PaneTextButton}" MinHeight="40" Padding="20,0,20,0" CornerRadius="20" FontSize="{StaticResource PaneTextMd}" Content="完成" Click="OnClose"/>
+                <Button Style="{StaticResource PaneTextButton}" MinHeight="{StaticResource PaneControlLg}" Padding="20,0,20,0" CornerRadius="20" FontSize="{StaticResource PaneTextMd}" Content="完成" Click="OnClose"/>
             </StackPanel>
         </StackPanel>
 
         <!-- 没装上 -->
         <StackPanel x:Name="Failed" Grid.RowSpan="2" Padding="44,0,44,40" VerticalAlignment="Center" Visibility="Collapsed">
-            <c:PaneIcon Glyph="warn" Width="40" Height="40" HorizontalAlignment="Center" Foreground="#FFF5A524"/>
+            <c:PaneIcon Glyph="warn" Width="40" Height="40" HorizontalAlignment="Center" Foreground="{StaticResource PaneWarningBrush}"/>
             <TextBlock x:Name="FailedTitle" Margin="0,14,0,0" HorizontalAlignment="Center"
-                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                       FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
             <TextBlock x:Name="ErrorText" Margin="0,10,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText2Brush}"/>
             <TextBlock x:Name="KeptText" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
             <StackPanel Margin="0,24,0,0" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                 <Button Style="{StaticResource PanePrimaryButton}" MinWidth="140" Content="再试一次" Click="OnInstall"/>
-                <Button Style="{StaticResource PaneTextButton}" MinHeight="40" Padding="20,0,20,0" CornerRadius="20" FontSize="{StaticResource PaneTextMd}" Content="关闭" Click="OnClose"/>
+                <Button Style="{StaticResource PaneTextButton}" MinHeight="{StaticResource PaneControlLg}" Padding="20,0,20,0" CornerRadius="20" FontSize="{StaticResource PaneTextMd}" Content="关闭" Click="OnClose"/>
             </StackPanel>
         </StackPanel>
 

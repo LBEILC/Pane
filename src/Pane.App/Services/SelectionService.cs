@@ -97,12 +97,11 @@ internal sealed class SelectionActions : ISelectionActions
 {
     public Task SearchWebAsync(string text,CancellationToken token){token.ThrowIfCancellationRequested();Process.Start(new ProcessStartInfo("https://www.bing.com/search?q="+Uri.EscapeDataString(text)){UseShellExecute=true})?.Dispose();return Task.CompletedTask;}
     public Task CopyAsync(string text,CancellationToken token)=>Sta.Run(()=>{token.ThrowIfCancellationRequested();Write(text);return true;});
-    public Task ReplaceSelectionAsync(string text,nint window,CancellationToken token)=>Sta.Run(()=>{
-        token.ThrowIfCancellationRequested();if(!SelectionNative.SetForegroundWindow(window))throw new InvalidOperationException("无法切回原窗口");
-        Write(text);long end=Environment.TickCount64+1500;
-        while(SelectionNative.ModifiersDown()){token.ThrowIfCancellationRequested();if(Environment.TickCount64>=end)throw new TimeoutException("修饰键尚未松开");Thread.Sleep(10);}
-        if(SelectionNative.GetForegroundWindow()!=window)throw new InvalidOperationException("原窗口已失去焦点");SelectionNative.Chord(0x56);return true;
-    });
+    public Task ReplaceSelectionAsync(string text,nint window,CancellationToken token)
+    {
+        long started=Environment.TickCount64; var platform=new Pane.Services.Clipboard.WindowsPastePlatform();
+        return Sta.Run(()=>{new Clipboard.PasteTransfer(platform,Clipboard.PasteTransfer.WriteLog).Run(window,()=>Write(text),token,started);return true;});
+    }
     static void Write(string text){if(SelectionNative.PaneClipboardWrite(text)==0)throw new InvalidOperationException("无法写入剪贴板");}
 }
 internal static class SelectionNative
@@ -116,14 +115,14 @@ internal static class SelectionNative
     [DllImport(Dll)] internal static extern void PaneClipboardRelease(nint data);
     [DllImport(Dll)] internal static extern int PaneClipboardRestore(nint data);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipboardTextAlloc(out nint text);
-    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipboardWrite(string text);
-    [DllImport(Dll)] static extern int PaneKey(ushort key,int down,int unicode);
+    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipboardWrite(string text);
+    [DllImport(Dll,SetLastError=true)] internal static extern int PaneKey(ushort key,int down,int unicode);
     [DllImport("ole32.dll")] internal static extern int OleInitialize(nint reserved);
     [DllImport("ole32.dll")] internal static extern void OleUninitialize();
     [DllImport("user32.dll")] internal static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] internal static extern uint GetClipboardSequenceNumber();
-    [DllImport("user32.dll")] internal static extern bool SetForegroundWindow(nint window);
+    [DllImport("user32.dll",SetLastError=true)] internal static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
     internal static bool ModifiersDown()=>new[]{16,17,18,91,92}.Any(k=>(GetAsyncKeyState(k)&0x8000)!=0);
-    internal static void Chord(ushort key){long end=Environment.TickCount64+100;while(ModifiersDown()){if(Environment.TickCount64>=end)throw new InvalidOperationException("修饰键尚未松开");Thread.Sleep(5);}try{if(PaneKey(17,1,0)==0||PaneKey(key,1,0)==0)throw new InvalidOperationException("输入被系统拒绝");}finally{PaneKey(key,0,0);PaneKey(17,0,0);}}
+    internal static void Chord(ushort key){long end=Environment.TickCount64+100;while(ModifiersDown()){if(Environment.TickCount64>=end)throw new TimeoutException("修饰键尚未松开");Thread.Sleep(5);}try{if(PaneKey(17,1,0)==0||PaneKey(key,1,0)==0)throw new InvalidOperationException("输入被系统拒绝");}finally{PaneKey(key,0,0);PaneKey(17,0,0);}}
 }

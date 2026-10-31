@@ -10,7 +10,21 @@ public enum SelectionFailure { None, Empty, Unsupported, Elevated, Timeout, Clip
 
 /// <param name="Text">读到的文字；失败时为 null。</param>
 /// <param name="SourceWindow">选区所在的顶层窗口（粘贴替换时切回它）。</param>
-public sealed record SelectionResult(string? Text, nint SourceWindow, SelectionFailure Failure);
+public sealed record SelectionResult(string? Text, nint SourceWindow, SelectionFailure Failure)
+{
+    /// <summary>
+    /// 选中的是文件（040，设计加）：前台是资源管理器或桌面、且选中了文件或文件夹时给完整路径（按资源管理器里的显示顺序），
+    /// 这时 Text 为 null、Failure 为 None，超级面板换成文件动作。其他情况为 null。
+    /// </summary>
+    public IReadOnlyList<string>? Files { get; init; }
+}
+
+/// <summary>读资源管理器 / 桌面里选中的文件（040，设计加），不借用剪贴板，不需要那个窗口在前台。</summary>
+public interface IFileSelection
+{
+    /// <summary><paramref name="window"/> 是资源管理器窗口或桌面时，返回它当前选中的文件和文件夹（显示顺序）；不是、或没选中时返回空。</summary>
+    Task<IReadOnlyList<string>> ReadAsync(nint window, CancellationToken cancellationToken);
+}
 
 public interface ISelectionReader
 {

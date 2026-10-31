@@ -48,6 +48,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     {
         this.history = history;
         InitializeComponent();
+        Controls.PaneCaret.Attach(Input);
         highlight = new SlidingHighlight(HighlightLayer);
         chipHighlight = new SlidingHighlight(ChipHighlightLayer, size => size.Height / 2);
         Chips.ItemsSource = chips;

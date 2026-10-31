@@ -70,6 +70,8 @@ internal static class Win
     [DllImport(Dll)] internal static extern void PaneStats(out ulong count,out double mean,out double max,out int error,out int unhook);
     [DllImport(Dll)] internal static extern int PaneKey(ushort key,int down,int unicode);
     [DllImport(Dll)] internal static extern int PaneReplay(int button);
+    [DllImport(Dll)] internal static extern int PaneReplayAt(int button,int x,int y,uint dpi);
+    [DllImport(Dll)] internal static extern ulong PaneReinstallCount();
     [DllImport(Dll)] internal static extern int PaneWindow(nint window,int action);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneExplorer(nint target,StringBuilder output,int capacity);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneSelection(nint target,StringBuilder output,int capacity);

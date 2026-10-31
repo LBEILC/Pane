@@ -73,21 +73,19 @@
                                    FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
                                    Foreground="{ThemeResource PaneText3Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                         <Grid Grid.Column="3" VerticalAlignment="Center">
-                            <Border Style="{StaticResource PaneKbdBorder}" HorizontalAlignment="Right" VerticalAlignment="Center"
-                                    Visibility="{x:Bind HotkeyVisibility}" Opacity="{x:Bind HotkeyOpacity, Mode=OneWay}">
-                                <TextBlock Style="{StaticResource PaneKbdText}" Text="{x:Bind Hotkey}"/>
-                            </Border>
+                            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" c:KeyCombo.Text="{x:Bind Hotkey}"
+                                        Visibility="{x:Bind HotkeyVisibility}" Opacity="{x:Bind HotkeyOpacity, Mode=OneWay}"/>
                             <StackPanel Orientation="Horizontal" Spacing="2" Opacity="{x:Bind ActionsOpacity, Mode=OneWay}"
                                         IsHitTestVisible="{x:Bind ActionsHitTest, Mode=OneWay}">
-                                <Button Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="7"
+                                <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
                                         Click="{x:Bind Send}" ToolTipService.ToolTip="交给启动器（Tab）">
                                     <c:PaneIcon Glyph="R" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>
-                                <Button Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="7"
+                                <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
                                         Click="{x:Bind TogglePin}" ToolTipService.ToolTip="{x:Bind PinTip}">
                                     <c:PaneIcon Glyph="pin" IsFilled="{x:Bind Pinned}" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>
-                                <Button Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="7"
+                                <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
                                         Click="{x:Bind Delete}" ToolTipService.ToolTip="删除">
                                     <c:PaneIcon Glyph="close" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>

@@ -41,6 +41,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         this.ai = ai;
         this.output = output;
         InitializeComponent();
+        Controls.PaneCaret.Attach(Input);
         KeyHints.Fill(Hints, [(["Enter"], "发送"), (["Shift", "+", "Enter"], "换行"), (["Esc"], "停止生成 / 清空")], HintLabelProto, KbdProto);
         Hints.Children.Add(new TextBlock { Text = "只保留这一次对话", VerticalAlignment = VerticalAlignment.Center, FontFamily = HintLabelProto.FontFamily, FontSize = HintLabelProto.FontSize, Foreground = HintLabelProto.Foreground });
         PreviewKeyDown += OnKeyDown;
@@ -119,7 +120,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         foreach (var m in models.Take(30))
         {
             bool on = m.Id == current || current is null && m.DisplayName == modelName;
-            var row = new Grid { Height = 32, Padding = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), ColumnSpacing = 8 };
+            var row = new Grid { Height = PaneTokens.ControlMd, Padding = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), ColumnSpacing = 8 };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.Children.Add(new TextBlock { Text = m.DisplayName, VerticalAlignment = VerticalAlignment.Center, FontFamily = BodyProto.FontFamily, FontSize = 13, Foreground = BodyProto.Foreground, FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal });
@@ -284,7 +285,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
 
     Button MiniButton(string glyph, string tip, Action click)
     {
-        var b = new Button { Style = IconButtonProto.Style, Width = 26, Height = 26, Content = new PaneIcon { Glyph = glyph, Width = 14, Height = 14 } };
+        var b = new Button { Style = IconButtonProto.Style, Width = PaneTokens.ControlXs, Height = PaneTokens.ControlXs, Content = new PaneIcon { Glyph = glyph, Width = 14, Height = 14 } };
         ToolTipService.SetToolTip(b, tip);
         b.Click += (_, _) => click();
         return b;

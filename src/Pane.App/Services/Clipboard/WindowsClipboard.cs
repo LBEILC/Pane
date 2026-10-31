@@ -71,18 +71,13 @@ internal sealed class WindowsClipboardImages:IClipboardImages
         }finally{File.Delete(input);File.Delete(temporary);File.Delete(small);}
     }
 }
-public sealed class ClipboardTargetClosedException():InvalidOperationException("目标窗口已关闭");
-public sealed class ClipboardPermissionException():UnauthorizedAccessException("系统拒绝切换窗口或发送输入");
 internal sealed class WindowsClipboardWriter:IClipboardWriter
 {
-    public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)=>Sta.Run(()=>{
-        token.ThrowIfCancellationRequested();if(!NativeClip.IsWindow(target))throw new ClipboardTargetClosedException();
-        Write(entry,plainText);if(!SelectionNative.SetForegroundWindow(target))throw new ClipboardPermissionException();
-        long deadline=Environment.TickCount64+1500;
-        while(SelectionNative.ModifiersDown()){token.ThrowIfCancellationRequested();if(Environment.TickCount64>=deadline)throw new TimeoutException("等待修饰键松开超时");Thread.Sleep(10);}
-        token.ThrowIfCancellationRequested();if(!NativeClip.IsWindow(target))throw new ClipboardTargetClosedException();if(SelectionNative.GetForegroundWindow()!=target)throw new ClipboardPermissionException();
-        try{SelectionNative.Chord(0x56);}catch(InvalidOperationException){throw new ClipboardPermissionException();}return true;
-    });
+    public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)
+    {
+        long started=Environment.TickCount64; var platform=new Pane.Services.Clipboard.WindowsPastePlatform();
+        return Sta.Run(()=>{new PasteTransfer(platform,PasteTransfer.WriteLog).Run(target,()=>Write(entry,plainText),token,started);return true;});
+    }
     internal static void Write(ClipEntry entry,bool plainText=false)
     {
         string? files=null,image=null,text=entry.Text;
@@ -116,7 +111,7 @@ internal static class NativeClip
     [DllImport(Dll)] internal static extern int PaneClipStop(nint listener,out int count);
     [DllImport(Dll)] internal static extern int PaneClipImageAlloc(out nint output,out int length);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveImage(string input,string full,string thumb,out int width,out int height);
-    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars);
+    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveDialog(string source,string name);
     [DllImport("user32.dll")] internal static extern bool OpenClipboard(nint owner);
     [DllImport("user32.dll")] internal static extern bool CloseClipboard();

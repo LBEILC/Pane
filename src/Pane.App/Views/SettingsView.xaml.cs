@@ -411,6 +411,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Row("再次呼出时", "上次输入的文字怎么处理",
                 Seg([("Clear", "清空"), ("OneMinute", "1 分钟内保留"), ("Always", "一直保留")], l.KeepInput.ToString(),
                     v => SaveLauncher(x => x with { KeepInput = Enum.Parse<KeepInputMode>(v) }))),
+            Row("没输入时显示", l.Home == LauncherHome.Nothing ? "呼出时只有一行搜索栏" : "最近打开过的应用和固定的应用",
+                Seg([("RecentAndPinned", "最近和固定"), ("PinnedOnly", "只显示固定"), ("Nothing", "都不显示")], l.Home.ToString(),
+                    v => { SaveLauncher(x => x with { Home = Enum.Parse<LauncherHome>(v) }); Later(); })),
             Row("复制后自动带入", "复制后这么久内呼出，刚复制的内容作为附件带入；不会清空剪贴板",
                 Seg([("0", "关闭"), ("1", "1 秒"), ("3", "3 秒"), ("5", "5 秒")], l.AutoAttachSeconds.ToString(),
                     v => SaveLauncher(x => x with { AutoAttachSeconds = int.Parse(v) }))));
@@ -504,7 +507,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     // 设置页里的输入框：控件底色 + 细描边的圆角框（网页搜索表单、添加应用搜索共用）
     TextBox Field(string placeholder, double width) => new()
     {
-        PlaceholderText = placeholder, Width = width, Height = 32, Padding = new Thickness(10, 6, 10, 0),
+        PlaceholderText = placeholder, Width = width, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 6, 10, 0),
         FontFamily = SmallStrongProto.FontFamily, FontSize = SmallStrongProto.FontSize,
     };
 
@@ -693,7 +696,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         content.Children.Add(Text(text, on ? SmallStrongProto : SmallProto));
         var chip = new Border
         {
-            Height = 30, CornerRadius = new CornerRadius(15), Padding = new Thickness(12, 0, 12, 0), BorderThickness = new Thickness(1),
+            Height = PaneTokens.ControlSm, CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2), Padding = new Thickness(12, 0, 12, 0), BorderThickness = new Thickness(1),
             Background = on ? SelectedProto.Background : FillProto.Background, BorderBrush = on ? Accent() : FillProto.BorderBrush,
             Opacity = on ? 1 : 0.7, Child = content,
         };
@@ -1216,7 +1219,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var box = new PasswordBox
         {
-            PlaceholderText = setup.ApiKeyMask == null ? "sk-…" : "输入新的 Key 替换", Width = 220, Height = 32, Padding = new Thickness(10, 6, 10, 0),
+            PlaceholderText = setup.ApiKeyMask == null ? "sk-…" : "输入新的 Key 替换", Width = 220, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 6, 10, 0),
             FontFamily = SmallStrongProto.FontFamily, FontSize = SmallStrongProto.FontSize,
         };
         void Save()
@@ -1286,7 +1289,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             foreach (var m in models.Where(m => q.Length == 0 || q == current || m.Id.Contains(q, StringComparison.OrdinalIgnoreCase) || m.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase)).Take(12))
             {
                 var chip = Chip(m.DisplayName == m.Id ? m.Id : $"{m.DisplayName}（{m.Id}）");
-                chip.Height = 26;
+                chip.Height = PaneTokens.ControlSm;
                 chip.CornerRadius = new CornerRadius(13);
                 if (m.Id == current) chip.BorderBrush = Accent();
                 chip.Tapped += (_, _) => { Commit(m.Id); Later(0); };
@@ -1358,14 +1361,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (aiModels is not { } models) return row;
         var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6, Margin = new Thickness(14, 0, 14, 10) };
         var main = Chip("和主模型相同");
-        main.Height = 26; main.CornerRadius = new CornerRadius(13);
+        main.Height = PaneTokens.ControlSm; main.CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2);
         if (current.Length == 0) main.BorderBrush = Accent();
         main.Tapped += (_, _) => { Commit(""); Later(0); };
         chips.Children.Add(main);
         foreach (var m in models.Take(12))
         {
             var chip = Chip(m.DisplayName == m.Id ? m.Id : $"{m.DisplayName}（{m.Id}）");
-            chip.Height = 26; chip.CornerRadius = new CornerRadius(13);
+            chip.Height = PaneTokens.ControlSm; chip.CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2);
             if (m.Id == current) chip.BorderBrush = Accent();
             chip.Tapped += (_, _) => { Commit(m.Id); Later(0); };
             chips.Children.Add(chip);
@@ -2252,7 +2255,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         if (glyph != null) content.Children.Add(new PaneIcon { Glyph = glyph, Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center, Foreground = LabelProto.Foreground });
         content.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
-        var b = new Button { Style = ButtonProto.Style, Height = 30, Content = content };
+        var b = new Button { Style = ButtonProto.Style, Height = PaneTokens.ControlSm, Content = content };
         b.Click += (_, _) => click();
         return b;
     }

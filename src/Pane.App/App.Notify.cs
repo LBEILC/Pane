@@ -19,6 +19,7 @@ public sealed partial class App
         Win32Exception { NativeErrorCode: 1223 } => null,                     // 用户在 UAC 提示里点了「否」
         Pane.Services.Clipboard.ClipboardTargetClosedException => "原来的窗口已经关了",
         Pane.Services.Clipboard.ClipboardPermissionException or UnauthorizedAccessException => "没有权限往这个窗口输入（它可能以管理员身份运行）",
+        Pane.Services.Clipboard.ClipboardFocusException => "没能切回原来的窗口，内容已经复制好了，按 Ctrl+V 就能贴",
         TimeoutException => "等太久了，稍后再试",
         FileNotFoundException or DirectoryNotFoundException or Win32Exception { NativeErrorCode: 2 or 3 } => "找不到这个文件或程序",
         _ when HasChinese(e.Message) => e.Message.TrimEnd('。', '.'),        // 服务自己写的中文原因直接用

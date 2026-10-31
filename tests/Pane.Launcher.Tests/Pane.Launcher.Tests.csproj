@@ -4,7 +4,7 @@
     <Compile Include="../../src/Pane.App/Contracts/Files.cs" Link="Contracts/Files.cs" />
     <Compile Include="../../src/Pane.App/Services/Icons/*.cs" Link="Icons/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Services/Launcher/*.cs" Link="Launcher/%(Filename)%(Extension)" />
-    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" /><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>
     <Compile Include="../../src/Pane.App/Contracts/Launcher.cs" Link="Contracts/Launcher.cs" />
     <Compile Include="../../src/Pane.App/Contracts/AppIcons.cs" Link="Contracts/AppIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Clipboard.cs" Link="Contracts/Clipboard.cs" />

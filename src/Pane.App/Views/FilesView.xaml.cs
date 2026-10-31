@@ -5,6 +5,7 @@
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -28,6 +29,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     readonly List<FileRow> rows = [];
     readonly DispatcherQueueTimerHolder debounce, previewDebounce;
     readonly PaneSwitch previewSwitch;
+    readonly SlidingHighlight listHighlight, railHighlight, railHover;
     FileCategory category = FileCategory.All;
     FileSort sort = FileSort.Relevance;
     int selected = -1, total;
@@ -40,6 +42,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         this.search = search;
         this.output = output;
         InitializeComponent();
+        Controls.PaneCaret.Attach(Input);
         Rail.ItemsSource = categories;
         categories[0].IsSelected = true;
         debounce = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(120), () => _ = Search());
@@ -47,6 +50,14 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         previewSwitch = new PaneSwitch(true, SwitchProto.Background, SwitchProto.BorderBrush, AccentProto.Background) { RenderTransform = new ScaleTransform { ScaleX = 0.8, ScaleY = 0.8, CenterY = 11 } };
         previewSwitch.Toggled += (_, on) => SetPreviewVisible(on);
         PreviewToggle.Children.Add(previewSwitch);
+        // 选中和悬停都是滑动高亮（同启动器，2026-10-31 用户提：原来没有悬停态、点了也没有动效）
+        listHighlight = new SlidingHighlight(ListHighlight);
+        railHighlight = new SlidingHighlight(RailHighlight, _ => ((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft);
+        railHover = new SlidingHighlight(RailHover, _ => ((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft, hover: true);
+        List.ElementPrepared += (_, a) => { if (a.Index == selected && a.Element is FrameworkElement el) DispatcherQueue.TryEnqueue(() => listHighlight.MoveTo(el, animate: false)); };
+        Rail.Loaded += (_, _) => MoveRailHighlight(animate: false);
+        thumbFade = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(900), () => { if (!overThumb && !draggingThumb) FadeThumb(0); });
+        ElementCompositionPreview.GetElementVisual(ScrollThumb).Opacity = 0;
         KeyHints.Fill(Hints, [(["Enter"], "打开"), (["Ctrl", "+", "Enter"], "打开所在文件夹"), (["Esc"], "清空")], HintLabelProto, KbdProto);
         PreviewKeyDown += OnKeyDown;   // 先于输入框拿到方向键、Tab、Enter
         Loaded += (_, _) => HideDelete();
@@ -60,8 +71,10 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         focusPath = focus;
         SelectCategory(FileCategory.All, search: false);
-        if (Input.Text != query) Input.Text = query;   // TextChanged 会搜
-        else _ = Search();
+        // 直接搜，不等 TextChanged：窗口还没进可视树时改文字，TextChanged 偶尔不来，结果区一直是空的（2026-10-31 实测）
+        Input.Text = query;
+        debounce.Stop();
+        _ = Search();
         Input.SelectionStart = Input.Text.Length;
     }
 
@@ -150,15 +163,19 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     void Bind()
     {
+        listHighlight.Hide();
         List.ItemsSource = null;
         List.ItemsSource = rows;
         ListScroller.ChangeView(null, 0, null, true);
         TotalText.Text = rows.Count == 0 ? "" : $"共 {total:N0} 个";
+        DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, UpdateThumb);
     }
 
     // 滚到离底部不到 5 行时要下一批
     async void OnListScrolled(object? sender, ScrollViewerViewChangedEventArgs e)
     {
+        UpdateThumb();
+        if (!draggingThumb) ShowThumb();
         if (ListScroller.VerticalOffset + ListScroller.ViewportHeight < ListScroller.ExtentHeight - RowHeight * 5) return;
         await LoadMore();
     }
@@ -178,6 +195,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
             var offset = ListScroller.VerticalOffset;
             List.ItemsSource = rows.ToList();
             ListScroller.ChangeView(null, offset, null, true);
+            DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, UpdateThumb);
         }
         catch (OperationCanceledException) { }
         catch (Exception) { }   // 后面的批次失败就停在已有的结果上
@@ -198,8 +216,22 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         category = c;
         foreach (var item in categories) item.IsSelected = item.Category == c;
+        MoveRailHighlight(animate: true);
         if (search) _ = Search();
     }
+
+    void MoveRailHighlight(bool animate)
+    {
+        if (Rail.ContainerFromIndex(categories.FindIndex(x => x.Category == category)) is FrameworkElement el) railHighlight.MoveTo(el, animate);
+    }
+
+    void OnRailPointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        for (var d = e.OriginalSource as DependencyObject; d is not null && d != Rail; d = VisualTreeHelper.GetParent(d))
+            if (d is ContentPresenter { DataContext: CategoryItem } el) { railHover.MoveTo(el); return; }
+    }
+
+    void OnRailPointerExited(object sender, PointerRoutedEventArgs e) => railHover.Hide();
 
     void OnRailTapped(object sender, TappedRoutedEventArgs e)
     {
@@ -224,13 +256,16 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     // ---------------- 选中与预览 ----------------
 
-    void Select(int index)
+    void Select(int index, bool scroll = true)
     {
-        if (rows.Count == 0) { selected = -1; UpdatePreview(); return; }
+        if (rows.Count == 0) { selected = -1; listHighlight.Hide(); UpdatePreview(); return; }
         index = Math.Clamp(index, 0, rows.Count - 1);
-        if (selected >= 0 && selected < rows.Count) rows[selected].IsSelected = false;
+        bool had = selected >= 0 && selected < rows.Count;
+        if (had) rows[selected].IsSelected = false;
         selected = index;
         rows[selected].IsSelected = true;
+        if (List.TryGetElement(index) is FrameworkElement el) listHighlight.MoveTo(el, animate: had);
+        if (!scroll) { UpdatePreview(); return; }
         // 行高固定：直接按下标算位置滚进视野
         double top = index * RowHeight, bottom = top + RowHeight, y = ListScroller.VerticalOffset, view = ListScroller.ViewportHeight;
         if (top < y) ListScroller.ChangeView(null, top, null, true);
@@ -349,6 +384,10 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     async void OnListMoved(object sender, PointerRoutedEventArgs e)
     {
+        // 悬停即选中，高亮滑过去（同启动器）；预览有 80ms 防抖，划过去不会连着加载
+        if (pressRow is null && e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Mouse && RowAt(e.OriginalSource) is { } hovered && hovered.Index != selected)
+            Select(hovered.Index, scroll: false);
+        ShowThumb();
         if (pressRow is not { } row) return;
         var p = e.GetCurrentPoint(List);
         if (!p.Properties.IsLeftButtonPressed) { pressRow = null; return; }
@@ -415,6 +454,98 @@ public sealed partial class FilesView : UserControl, ISecondaryView
             case VirtualKey.W when ctrl: CloseRequested?.Invoke(this, EventArgs.Empty); break;
             default: return;
         }
+        e.Handled = true;
+    }
+
+    // ---------------- 滚动条 ----------------
+    // 系统滚动条带上下箭头、和玻璃不搭：隐藏它，画一条 4px 圆角细条。滚动、鼠标在列表上时淡入，900ms 不动就淡出；
+    // 鼠标移到细条上变宽，可以拖动，点在空白处直接跳过去（2026-10-31 用户提）
+    readonly DispatcherQueueTimerHolder thumbFade;
+    bool overThumb, draggingThumb;
+    double dragStartY, dragStartOffset, thumbOpacity;
+
+    void OnListSizeChanged(object sender, SizeChangedEventArgs e) => UpdateThumb();
+    void OnListPointerEntered(object sender, PointerRoutedEventArgs e) => ShowThumb();
+    void OnListPointerExited(object sender, PointerRoutedEventArgs e) => thumbFade.Restart();
+
+    void UpdateThumb()
+    {
+        double view = ListScroller.ViewportHeight, extent = ListScroller.ExtentHeight;
+        if (view <= 0 || extent <= view + 1) { ScrollTrack.Visibility = Visibility.Collapsed; return; }
+        ScrollTrack.Visibility = Visibility.Visible;
+        double track = ScrollTrack.ActualHeight > 0 ? ScrollTrack.ActualHeight : view;
+        double thumb = Math.Max(28, track * view / extent);
+        ScrollThumb.Height = thumb;
+        ScrollThumb.Margin = new Thickness(0, (track - thumb) * ListScroller.VerticalOffset / (extent - view), 0, 0);
+    }
+
+    void ShowThumb()
+    {
+        if (ScrollTrack.Visibility != Visibility.Visible) return;
+        FadeThumb(1);
+        thumbFade.Restart();
+    }
+
+    void FadeThumb(double to)
+    {
+        if (Math.Abs(thumbOpacity - to) < 0.01) return;
+        thumbOpacity = to;
+        var visual = ElementCompositionPreview.GetElementVisual(ScrollThumb);
+        var fade = visual.Compositor.CreateScalarKeyFrameAnimation();
+        fade.InsertKeyFrame(1, (float)to, PaneSwitch.Ease(visual.Compositor, "PaneEaseSmooth"));
+        fade.Duration = TimeSpan.FromMilliseconds(GlassParameters.Token("PaneDurFast") * ((App)Application.Current).Glass.Current.MotionSpeed + 1);
+        visual.StartAnimation("Opacity", fade);
+    }
+
+    void ThumbWide(bool wide) { ScrollThumb.Width = wide ? 6 : 4; ScrollThumb.CornerRadius = new CornerRadius(wide ? 3 : 2); }
+    void OnThumbEntered(object sender, PointerRoutedEventArgs e) { overThumb = true; ThumbWide(true); FadeThumb(1); }
+    void OnThumbExited(object sender, PointerRoutedEventArgs e) { overThumb = false; if (!draggingThumb) { ThumbWide(false); thumbFade.Restart(); } }
+
+    void OnThumbPressed(object sender, PointerRoutedEventArgs e)
+    {
+        var y = e.GetCurrentPoint(ScrollTrack).Position.Y;
+        double top = ScrollThumb.Margin.Top, thumb = ScrollThumb.Height;
+        // 点在细条外：先让细条中心跳到点击处，再从这里开始拖
+        if (y < top || y > top + thumb) ScrollTo(y - thumb / 2);
+        draggingThumb = true;
+        dragStartY = y;
+        dragStartOffset = ListScroller.VerticalOffset;
+        ScrollTrack.CapturePointer(e.Pointer);
+        e.Handled = true;
+    }
+
+    void OnThumbMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!draggingThumb) return;
+        double view = ListScroller.ViewportHeight, extent = ListScroller.ExtentHeight, track = ScrollTrack.ActualHeight, thumb = ScrollThumb.Height;
+        if (track - thumb <= 0) return;
+        var y = e.GetCurrentPoint(ScrollTrack).Position.Y;
+        ListScroller.ChangeView(null, dragStartOffset + (y - dragStartY) * (extent - view) / (track - thumb), null, true);
+        UpdateThumb();
+    }
+
+    void ScrollTo(double thumbTop)
+    {
+        double view = ListScroller.ViewportHeight, extent = ListScroller.ExtentHeight, track = ScrollTrack.ActualHeight, thumb = ScrollThumb.Height;
+        if (track - thumb <= 0) return;
+        ListScroller.ChangeView(null, Math.Clamp(thumbTop, 0, track - thumb) * (extent - view) / (track - thumb), null, true);
+        UpdateThumb();
+    }
+
+    void OnThumbReleased(object sender, PointerRoutedEventArgs e) { EndThumbDrag(); ScrollTrack.ReleasePointerCapture(e.Pointer); }
+    void OnThumbCaptureLost(object sender, PointerRoutedEventArgs e) => EndThumbDrag();
+
+    void EndThumbDrag()
+    {
+        if (!draggingThumb) return;
+        draggingThumb = false;
+        if (!overThumb) ThumbWide(false);
+        thumbFade.Restart();
+    }
+
+    void OnThumbWheel(object sender, PointerRoutedEventArgs e)
+    {
+        ListScroller.ChangeView(null, ListScroller.VerticalOffset - e.GetCurrentPoint(ScrollTrack).Properties.MouseWheelDelta, null);
         e.Handled = true;
     }
 

@@ -17,13 +17,16 @@ public sealed class SlidingHighlight
     readonly CompositionSpriteShape shape;
     readonly ShapeVisual visual;
     readonly Func<Size, double> radius;
+    readonly bool hover;
     bool visible;
 
     /// <param name="layer">放在列表下面、和列表同一坐标系的空元素（通常是 Canvas）。</param>
     /// <param name="radius">按高亮尺寸给圆角；不给就用令牌 PaneRadiusItem。</param>
-    public SlidingHighlight(FrameworkElement layer, Func<Size, double>? radius = null)
+    /// <param name="hover">悬停层：只用 --fill-hover 淡填充、不描边，叠在选中层下面跟着鼠标走（文件窗口左侧分类）。</param>
+    public SlidingHighlight(FrameworkElement layer, Func<Size, double>? radius = null, bool hover = false)
     {
         this.layer = layer;
+        this.hover = hover;
         this.radius = radius ?? (_ => ((CornerRadius)Application.Current.Resources["PaneRadiusItem"]).TopLeft);
         compositor = ElementCompositionPreview.GetElementVisual(layer).Compositor;
         geometry = compositor.CreateRoundedRectangleGeometry();
@@ -94,7 +97,7 @@ public sealed class SlidingHighlight
     void ApplyColors()
     {
         var theme = (ResourceDictionary)GlassParameters.Tokens.ThemeDictionaries[layer.ActualTheme == ElementTheme.Dark ? "Dark" : "Light"];
-        shape.FillBrush = compositor.CreateColorBrush((Windows.UI.Color)theme["PaneFillSelectedColor"]);
-        shape.StrokeBrush = compositor.CreateColorBrush((Windows.UI.Color)theme["PaneStrokeColor"]);
+        shape.FillBrush = compositor.CreateColorBrush((Windows.UI.Color)theme[hover ? "PaneFillHoverColor" : "PaneFillSelectedColor"]);
+        shape.StrokeBrush = compositor.CreateColorBrush(hover ? Microsoft.UI.Colors.Transparent : (Windows.UI.Color)theme["PaneStrokeColor"]);
     }
 }

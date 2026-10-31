@@ -38,7 +38,7 @@ public sealed partial class GlassPanel : IDisposable
     readonly Grid root;
     readonly bool interactive;
     readonly bool demo=Environment.GetEnvironmentVariable("PANE_DEMO")=="1";
-    internal bool Settled=>!animating&&!resizing&&!rectAnimating;
+    internal bool Settled=>!animating&&!resizing&&!rectAnimating&&!revealing;
     internal bool Active=>!disposing&&(Shown||!Settled||pendingFocus);
     internal event Action? TickRequested;
     internal readonly nint Visual,Input;
@@ -129,7 +129,11 @@ public sealed partial class GlassPanel : IDisposable
         if(Placement==PanelPlacement.Tray&&!Shown){var s=view.PreferredSize;Width=targetWidth=Math.Max(minWidth,s.Width);Height=targetHeight=Math.Max(minHeight,s.Height);resizing=false;}
         var point=PlaceForShow(px,py,near);int x=point.X,y=point.Y;
         if(!Shown&&!animating){scale=(float)GlassParameters.Token("PaneEnterScale");opacity=0;}
-        Layout(x-(int)(48*dpi),y-(int)(48*dpi));Shown=true;Animate();
+        // 设计改（2026-10-31，issue 3）：设置窗口和二级窗口每次打开都是新建的，页面重，从打开到第一次画上屏幕要一两百毫秒（慢机器更久）；
+        // 原来淡入从打开那一刻就开始计时，窗口露面时已经淡完，看着就是「从全透明直接跳到半透明」。
+        // 新建的窗口第一次显示时先隐身，等内容和玻璃都画好一帧再现身、开始淡入；常驻面板（启动器等）不多等
+        Layout(x-(int)(48*dpi),y-(int)(48*dpi));Shown=true;
+        if(!shownOnce&&!revealing){shownOnce=true;Cloak(true);revealing=true;Reveal(++revealVersion);}else if(!revealing)Animate();
         Native.ShowWindow(Visual,4);Native.ShowWindow(Input,4);Native.SetWindowPos(Visual,settingsWindow&&!demo?0:-1,0,0,0,0,0x13);Native.SetWindowPos(Input,settingsWindow&&!demo?0:-1,0,0,0,0,0x13);
         // 两次独立置顶不能保证 owner 与 owned 窗口连续；背景可能插在中间。
         // 显式以输入窗定位视觉窗，并禁止系统联动调整所有者的 Z 序。
@@ -179,7 +183,26 @@ public sealed partial class GlassPanel : IDisposable
         Native.GetWindowRect(Visual,out var v);Native.GetWindowRect(Input,out var i);
         return $"material={MaterialAttached};opacity={opacity};scale={scale};dpi={dpi};visual=0x{Visual:X};input=0x{Input:X};visualRect={v.Left},{v.Top},{v.Right},{v.Bottom};inputRect={i.Left},{i.Top},{i.Right},{i.Bottom}";
     }
-    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;minimizing=false;Animate();}
+    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;minimizing=false;if(revealing){revealing=false;revealVersion++;Cloak(false);}Animate();}
+    // 隐身显示（DWMWA_CLOAK）：窗口照常显示、照常合成，只是不画到屏幕上
+    bool revealing,shownOnce;int revealVersion;
+    void Cloak(bool on){int v=on?1:0;Native.DwmSetWindowAttribute(Visual,13,ref v,4);Native.DwmSetWindowAttribute(Input,13,ref v,4);}
+    async void Reveal(int version)
+    {
+        try
+        {
+            // 内容（XAML）画出一帧、玻璃（系统合成器）提交一帧；最多等 400 毫秒，超时照常出现
+            var xaml=new System.Threading.Tasks.TaskCompletionSource();
+            void Rendered(object? sender,object e){if(root.IsLoaded)xaml.TrySetResult();}
+            CompositionTarget.Rendering+=Rendered;
+            try{await System.Threading.Tasks.Task.WhenAny(System.Threading.Tasks.Task.WhenAll(compositor.RequestCommitAsync().AsTask(),xaml.Task),System.Threading.Tasks.Task.Delay(400));}
+            finally{CompositionTarget.Rendering-=Rendered;}
+            await compositor.RequestCommitAsync();
+        }
+        catch(Exception){}
+        if(version!=revealVersion||disposing||!revealing)return;
+        revealing=false;Cloak(false);Animate();
+    }
     /// <summary>二级窗口再次展开：没开就打开；已经开着就还原（最小化时）、提到前台并聚焦，位置大小不动。</summary>
     public void BringToFront(bool activate=true)
     {

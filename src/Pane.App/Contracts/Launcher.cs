@@ -57,6 +57,23 @@ public interface ILauncherSearch
 }
 
 /// <summary>
+/// 终端命令（037）：输入以 > 开头时，SearchAsync 先给「在终端里运行」，后面跟最多 6 条补全（最近运行过的命令、PATH 里的程序名），
+/// 补全项 Id 写成 "complete:&lt;完整命令&gt;"、Group「补全」；界面按 Tab 把它填进输入框，Enter 直接运行它（走 ExecuteAsync）。
+/// </summary>
+public interface ITerminalHistory
+{
+    /// <summary>清空记住的命令（设置 → 启动器 → 记住终端命令 旁的「清空」）。</summary>
+    void Clear();
+}
+
+/// <summary>网页搜索建议（037）：只在用户用搜索关键字搜网页时调用（界面已防抖）；取不到、超时（1 秒）或站点不支持都返回空，不抛异常。</summary>
+public interface IWebSuggestions
+{
+    /// <summary>最多 8 条，按站点给的顺序。不支持的站点（没有公开建议接口）直接返回空。</summary>
+    Task<IReadOnlyList<string>> SuggestAsync(Pane.Settings.SearchEngine engine, string query, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// 启动器的附件（复制后 3 秒内呼出自动带入，或从剪贴板「交给启动器」）上的非 AI 动作。
 /// 动作 Id：文件 open / reveal / copy-path；图片 save-image / copy-image；文字 web-search。
 /// 附件就是剪贴板条目（<see cref="ClipEntry"/>）；带入附件不清空系统剪贴板。

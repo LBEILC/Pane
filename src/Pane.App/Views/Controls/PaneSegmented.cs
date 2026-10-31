@@ -30,7 +30,7 @@ public sealed partial class PaneSegmented : UserControl
         {
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var text = new TextBlock { Text = this.options[i].Label, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = strongProto.FontFamily, FontSize = strongProto.FontSize };
-            var item = new Border { Height = 28, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Child = text };
+            var item = new Border { Height = PaneTokens.ControlMd - 4, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Child = text };
             Grid.SetColumn(item, i);
             int index = i;
             item.Tapped += (_, _) => Select(index, true);

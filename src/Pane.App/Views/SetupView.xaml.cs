@@ -102,7 +102,7 @@ public sealed partial class SetupView : UserControl, IPanelView
         if (check.Error is { } error)
         {
             PathText.Text = $"{check.Path}：{error}";
-            PathText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0xE5, 0x48, 0x4D));
+            PathText.Foreground = PaneTokens.Danger;
             InstallButton.IsEnabled = false;
             return;
         }

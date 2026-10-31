@@ -1,9 +1,16 @@
 #pragma once
 #include <cstdint>
 #include <cmath>
+#include <atomic>
 
 namespace pane {
-constexpr uintptr_t InputTag = 0x50414E45303130ULL;
+// 发送标记限制为 32 位，兼容旧版完整值及其截断值。
+constexpr uintptr_t InputTag = 0x45303130UL;
+constexpr bool ownInput(uintptr_t tag) { return tag==InputTag || tag==0x50414E45303130ULL; }
+// 与发送线程共享；计数支持并发发送，标记负责异步到达的事件。
+inline std::atomic<unsigned> simulatingInput=0;
+inline std::atomic<bool> inputBypass=false;
+struct SimulationScope {SimulationScope(){simulatingInput++;}~SimulationScope(){simulatingInput--;}};
 enum Kind { Move, Down, Up, Wheel, Tick };
 enum Signal { None, Begin, Point, Modifier, End, Replay, Super, Cancel };
 struct Input { Kind kind; int button=0,x=0,y=0,wheel=0; uint64_t time=0; uintptr_t tag=0; bool injected=false; };
@@ -13,7 +20,7 @@ struct Capture {
  int active=0,blockedUps=0,sx=0,sy=0,wheelRemainder=0; uint64_t started=0,lastMove=0;
  bool moved=false,modified=false,cancelled=false,panel=false,gestureEnabled=false;
  Decision feed(Input i,bool blocked=false) {
-  if(i.tag==InputTag)return {};
+  if(ownInput(i.tag))return {};
   if(i.kind==Up&&(blockedUps&i.button)){blockedUps&=~i.button;return {true,None,0};}
   if(!active){
    if(i.kind!=Down||blocked||(!(enabled&i.button)&&i.button!=superButton))return {};

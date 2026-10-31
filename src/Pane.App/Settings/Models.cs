@@ -1,9 +1,18 @@
 namespace Pane.Settings;
 [Flags] public enum KeyModifiers { None=0, Ctrl=1, Alt=2, Shift=4, Win=8 }
 public enum ThemeMode { System, Light, Dark }
-public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } }
+public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } }
 // 软件内更新（设计加，2026-10-30，023）：AutoUpdate 开着就自动检查并在后台下载，下载好后提示重启更新
 public sealed record UpdateSettings(bool AutoUpdate=true);
+// 批量重命名（设计加，2026-10-31，040）：存下来的规则组合（预设）；LastRules = 上次执行时的规则，下次打开窗口接着用
+public sealed record RenamePreset(string Name, Pane.Contracts.RenameRule[] Rules);
+public sealed record RenameSettings
+{
+    RenamePreset[] presets=[];
+    public RenamePreset[] Presets { get=>presets; init=>presets=value??[]; }
+    Pane.Contracts.RenameRule[] lastRules=[];
+    public Pane.Contracts.RenameRule[] LastRules { get=>lastRules; init=>lastRules=value??[]; }
+}
 public enum SuperPanelButton { Middle=2, X1=4, X2=8 }
 public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton TriggerButton=SuperPanelButton.X1, int HoldMilliseconds=400, bool PauseInFullscreen=true, bool ClipboardFallback=true)
 {
@@ -24,9 +33,14 @@ public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey);
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
+// 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
+public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing }
 public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=null,
     bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.Clear,
-    int AutoAttachSeconds=3, int FileResultCount=8)
+    int AutoAttachSeconds=3, int FileResultCount=8, LauncherHome Home=LauncherHome.RecentAndPinned,
+    // 设计加（2026-10-31，037）：RememberCommands = 记住 > 运行过的最近 20 条命令用来补全（空格开头的不记）；
+    // WebSuggestions = 用搜索关键字搜网页时（如「bd 天气」）向那个站点取搜索建议，平时打字不联网
+    bool RememberCommands=true, bool WebSuggestions=true)
 {
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
@@ -63,6 +77,8 @@ public enum IconMode { Auto, ForceMask, Raw }
 public sealed record IconSettings
 {
     public bool MaskByDefault { get; init; }=true;
+    // 文件和文件夹用系统图标（设计加，2026-10-31，036）：false = Pane 的彩色类型图标（默认），true = 跟资源管理器一样
+    public bool SystemFileIcons { get; init; }
     Dictionary<string,IconMode> overrides=[];
     public Dictionary<string,IconMode> Overrides { get=>overrides; init=>overrides=value??[]; }
     Dictionary<string,string> customIcons=[];

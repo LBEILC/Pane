@@ -36,6 +36,7 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
         this.ai = ai;
         this.output = output;
         InitializeComponent();
+        Controls.PaneCaret.Attach(Source);
         debounce = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(600), () => _ = Translate(force: false));
         KeyHints.Fill(Hints, [(["Ctrl", "+", "Enter"], "立即翻译"), (["Esc"], "清空")], HintLabelProto, KbdProto);
         PreviewKeyDown += OnKeyDown;

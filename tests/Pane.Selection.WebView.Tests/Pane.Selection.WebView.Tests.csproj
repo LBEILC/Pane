@@ -6,7 +6,7 @@
     <Compile Include="../../src/Pane.App/Services/SelectionService.cs" Link="SelectionService.cs" />
     <Compile Include="../../src/Pane.App/Services/SelectionLog.cs" Link="SelectionLog.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Selection.cs" Link="Selection.cs" />
-    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" />
+    <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" /><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>
     <Compile Include="../../src/Pane.App/Hosting/RuntimeMode.cs" Link="RuntimeMode.cs" />
   </ItemGroup>
-</Project>
+<ItemGroup><Compile Include="../../src/Pane.App/Services/PasteTransfer.cs" Link="PasteTransfer.cs"/></ItemGroup></Project>
