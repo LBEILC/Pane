@@ -31,6 +31,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
     const string Placeholder = "搜索应用、文件，或输入任何文字";
     // 设置 → 启动器：「复制后自动带入」时长、「再次呼出时」怎么处理上次输入、动作行
     static Settings.LauncherSettings Options => ((App)Application.Current).Store.Current.Launcher;
+    // AI 总开关（issue 8）：关掉后动作行、附件动作里的 AI 条目都不出现
+    static bool AiOn => ((App)Application.Current).Store.Current.Ai.Enabled;
     DateTimeOffset hiddenAt = DateTimeOffset.MinValue;
 
     readonly ILauncherSearch search;
@@ -217,14 +219,14 @@ public sealed partial class LauncherView : UserControl, IPanelView
         }
         else
         {
-            foreach (var act in ai.Actions)
+            foreach (var act in AiOn ? ai.Actions : [])
                 items.Add(new("ai:" + act.Id, LauncherItemKind.Ai, "AI", act.Name,
                     act.Id == "translate" ? "自动判断：中文译成英文，其他译成中文" : "处理附件里的文字", new(act.Glyph)));
             items.Add(new("web-search", LauncherItemKind.Action, "其他", "网页搜索", "默认搜索引擎", new("globe")));
         }
         var q = query.Trim();
         if (q.Length > 0) items = items.Where(i => i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (q.Length > 0 && a.Kind != ClipKind.Image && a.Kind != ClipKind.Files)
+        if (q.Length > 0 && AiOn && a.Kind != ClipKind.Image && a.Kind != ClipKind.Files)
             items.Add(new("ai:ask", LauncherItemKind.Ai, "AI", $"问 AI：“{q}”", "连同附件文字一起发送", new("ai")));
         return items;
     }
@@ -237,6 +239,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         var items = new List<LauncherItem>();
         foreach (var id in Options.ActionRow)
         {
+            if (!AiOn && id.StartsWith("ai:", StringComparison.Ordinal)) continue;
             (string name, string glyph)? a = id switch
             {
                 "ai:translate" => ("翻译", "translate"),
@@ -526,6 +529,21 @@ public sealed partial class LauncherView : UserControl, IPanelView
         double Center(FrameworkElement e) => e.TransformToVisual(ResultsContent).TransformPoint(new Point(e.ActualWidth / 2, 0)).X;
     }
 
+    // 左右键：在同一行格子里走，到行首再按左回到行尾、到行尾再按右回到行首（issue 6）
+    void MoveInLine(int dir)
+    {
+        if (selected < 0 || ContainerOf(rows[selected]) is not { } cur) return;
+        var section = sections.FirstOrDefault(s => s.Rows.Contains(rows[selected]));
+        if (section is null) return;
+        double top = TopOf(cur);
+        var line = section.Rows.Where(r => ContainerOf(r) is { } el && Math.Abs(TopOf(el) - top) < 4).OrderBy(r => r.Index).ToList();
+        if (line.Count < 2) return;
+        int i = line.FindIndex(r => r.Index == selected);
+        Select(line[(i + dir + line.Count) % line.Count].Index);
+    }
+
+    double TopOf(FrameworkElement e) => e.TransformToVisual(ResultsContent).TransformPoint(new Point(0, 0)).Y;
+
     bool SelectedIsTile => selected >= 0 && selected < rows.Count && sections.FirstOrDefault(s => s.Rows.Contains(rows[selected]))?.Kind == LauncherSectionKind.Tiles;
 
     void ShowNumbers(bool show) { foreach (var r in rows) r.ShowNumber = show; }
@@ -569,8 +587,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
         {
             case VirtualKey.Down: MoveLine(1); break;
             case VirtualKey.Up: MoveLine(-1); break;
-            case VirtualKey.Right when SelectedIsTile: Select(selected + 1); break;
-            case VirtualKey.Left when SelectedIsTile: Select(selected - 1); break;
+            case VirtualKey.Right when SelectedIsTile: MoveInLine(1); break;
+            case VirtualKey.Left when SelectedIsTile: MoveInLine(-1); break;
             case VirtualKey.Enter: _ = Execute(selected, false, ctrl); break;
             case VirtualKey.Tab: _ = Execute(selected, true, false); break;
             case VirtualKey.Back when Input.Text.Length == 0 && attachment is not null:

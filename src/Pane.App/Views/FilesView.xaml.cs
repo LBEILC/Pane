@@ -165,7 +165,9 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         listHighlight.Hide();
         List.ItemsSource = null;
-        List.ItemsSource = rows;
+        // 界面只拿副本（issue 7）：ItemsRepeater 记着列表长度，List 改了不会通知它。原来直接给 rows，
+        // 下次搜索先清空 rows 再等结果，这期间一滚动 / 重新排版，它就按旧长度取行，越界崩溃（打字快、输入法改词时常见）
+        List.ItemsSource = rows.ToList();
         ListScroller.ChangeView(null, 0, null, true);
         TotalText.Text = rows.Count == 0 ? "" : $"共 {total:N0} 个";
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, UpdateThumb);

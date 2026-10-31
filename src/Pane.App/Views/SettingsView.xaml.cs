@@ -1163,6 +1163,11 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderAi()
     {
         var a = app.Store.Current.Ai;
+        // AI 总开关（issue 8，照原型 settings.js）：关掉后只留这一行
+        Group("基本", Row("启用 AI", a.Enabled ? "不用 AI 时可以关掉"
+                : "已关闭：启动器和超级面板里不再出现翻译、问 AI 等 AI 动作；下面的配置都还在",
+            Switch(a.Enabled, v => { SaveAi(x => x with { Enabled = v }); Later(); })));
+        if (!a.Enabled) return;
         var setup = app.AiSetup;
         bool api = a.Provider == AiProvider.Api;
         var rows = new List<FrameworkElement>

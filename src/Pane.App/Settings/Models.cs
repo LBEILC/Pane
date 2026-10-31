@@ -45,9 +45,14 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
     SearchEngine[] searchEngines=DefaultSearchEngines();
-    public SearchEngine[] SearchEngines { get=>searchEngines; init=>searchEngines=value??DefaultSearchEngines(); }
+    // 设计改（2026-11-01，issue 8）：默认加上 Google。存过的列表如果和旧默认完全一样（没改过），读进来时换成新默认；改过的不动
+    public SearchEngine[] SearchEngines { get=>searchEngines; init=>searchEngines=value==null||IsOldDefault(value)?DefaultSearchEngines():value; }
+    static bool IsOldDefault(SearchEngine[] v)=>v.Length==4&&v[0]==new SearchEngine("必应","bing","https://www.bing.com/search?q={query}")
+        &&v[1]==new SearchEngine("百度","bd","https://www.baidu.com/s?wd={query}")&&v[2]==new SearchEngine("GitHub","gh","https://github.com/search?q={query}")
+        &&v[3]==new SearchEngine("哔哩哔哩","b","https://search.bilibili.com/all?keyword={query}");
     static SearchEngine[] DefaultSearchEngines()=>[
         new("必应", "bing", "https://www.bing.com/search?q={query}"),
+        new("Google", "g", "https://www.google.com/search?q={query}"),
         new("百度", "bd", "https://www.baidu.com/s?wd={query}"),
         new("GitHub", "gh", "https://github.com/search?q={query}"),
         new("哔哩哔哩", "b", "https://search.bilibili.com/all?keyword={query}")];

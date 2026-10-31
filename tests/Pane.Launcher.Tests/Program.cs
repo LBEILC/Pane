@@ -28,7 +28,10 @@ static partial class Program
             File.WriteAllText(Path.Combine(directory,"settings.json"),old);
         }
         store.Load();var l=store.Current.Launcher;
-        Check(corrupt==0&&l.HideOnBlur&&l.KeepInput==KeepInputMode.Clear&&l.AutoAttachSeconds==3&&l.FileResultCount==8&&l.Favorites.Length==0&&l.PinnedApps.Length==0&&l.SearchEngines.Length==4&&l.DefaultEngine=="bing","old settings defaults without recovery");
+        Check(corrupt==0&&l.HideOnBlur&&l.KeepInput==KeepInputMode.Clear&&l.AutoAttachSeconds==3&&l.FileResultCount==8&&l.Favorites.Length==0&&l.PinnedApps.Length==0&&l.SearchEngines.Length==5&&l.SearchEngines[1].Keyword=="g"&&l.DefaultEngine=="bing","old settings defaults without recovery");
+        // issue 8：存过的搜索站点和旧默认（4 个）完全一样 → 补上 Google；改过的不动
+        SearchEngine[] oldDefault=[new("必应","bing","https://www.bing.com/search?q={query}"),new("百度","bd","https://www.baidu.com/s?wd={query}"),new("GitHub","gh","https://github.com/search?q={query}"),new("哔哩哔哩","b","https://search.bilibili.com/all?keyword={query}")];
+        Check((l with{SearchEngines=oldDefault}).SearchEngines.Length==5&&(l with{SearchEngines=oldDefault[..3]}).SearchEngines.Length==3,"old default engines gain Google, custom lists kept");
         store.Save(defaults with{Launcher=l with{HideOnBlur=false,KeepInput=KeepInputMode.Always,AutoAttachSeconds=0,FileResultCount=12,Favorites=[new(@"C:\测试\银行.txt",false)],PinnedApps=["app:2","app:1"],DefaultEngine="gh"}});store.Load();
         Check(!store.Current.Launcher.HideOnBlur&&store.Current.Launcher.KeepInput==KeepInputMode.Always&&store.Current.Launcher.FileResultCount==12&&store.Current.Launcher.Favorites.Length==1&&store.Current.Launcher.DefaultEngine=="gh","new fields roundtrip");
         foreach(var invalid in new[]{l with{FileResultCount=7},l with{AutoAttachSeconds=2},l with{DefaultEngine="missing"},l with{SearchEngines=[new("bad","x","file:///x?{query}")]}}){try{store.Save(defaults with{Launcher=invalid});throw new Exception("accepted invalid settings");}catch(ArgumentException){checks++;}}

@@ -12,6 +12,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include "BoundedOpen.h"
 using Microsoft::WRL::ComPtr;
 #define API extern "C" __declspec(dllexport)
 namespace {
@@ -134,12 +135,35 @@ API int PaneEverythingPage(const wchar_t* query,int offset,int limit,int sort,Fi
  DestroyWindow(h);if(!q.done)return -1;*total=static_cast<int>((std::min)(q.total,static_cast<DWORD>(INT_MAX)));
  for(size_t i=0;i<q.names.size();i++)callback(q.names[i].c_str(),q.folders[i].c_str(),q.kinds[i],q.sizes[i],q.dates[i]);return 1;
 }
-API int PaneLauncherOpen(const wchar_t* target,int packaged){
+namespace {
+int launcherOpen(const wchar_t* target,int packaged){
  Apartment apartment;AllowSetForegroundWindow(ASFW_ANY);
  if(packaged){ComPtr<IApplicationActivationManager> manager;DWORD pid=0;if(FAILED(CoCreateInstance(CLSID_ApplicationActivationManager,nullptr,CLSCTX_LOCAL_SERVER,IID_PPV_ARGS(&manager))))return 0;CoAllowSetForegroundWindow(manager.Get(),nullptr);auto hr=manager->ActivateApplication(target,nullptr,AO_NONE,&pid);if(SUCCEEDED(hr)&&pid)AllowSetForegroundWindow(pid);return SUCCEEDED(hr);}
- SHELLEXECUTEINFOW info{sizeof(info)};info.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC;info.lpVerb=L"open";info.lpFile=target;info.nShow=SW_SHOWNORMAL;
+ // 文件属性查询也在受限工作线程内，网络路径不可达时不会占住调用者。
+ DWORD attributes=GetFileAttributesW(target);
+ if(attributes!=INVALID_FILE_ATTRIBUTES&&(attributes&FILE_ATTRIBUTE_DIRECTORY)){
+  wchar_t windows[32768]{};UINT length=GetWindowsDirectoryW(windows,32768);
+  if(!length||length>=32768)return 0;
+  std::wstring explorer=std::wstring(windows)+L"\\explorer.exe",folder=target;
+  const auto root=std::filesystem::path(folder).root_path().wstring();
+  while(folder.size()>root.size()&&(folder.back()==L'\\'||folder.back()==L'/'))folder.pop_back();
+  // Explorer 使用自己的命令行解析器，根目录保留原来的单个分隔符。
+  std::wstring command=L"\""+explorer+L"\" \""+folder+L"\"";
+  STARTUPINFOW startup{sizeof(startup)};PROCESS_INFORMATION process{};
+  if(!CreateProcessW(explorer.c_str(),command.data(),nullptr,nullptr,FALSE,0,nullptr,nullptr,&startup,&process))return 0;
+  AllowSetForegroundWindow(process.dwProcessId);CloseHandle(process.hThread);CloseHandle(process.hProcess);return 1;
+ }
+ SHELLEXECUTEINFOW info{sizeof(info)};info.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC|SEE_MASK_FLAG_NO_UI;info.lpVerb=L"open";info.lpFile=target;info.nShow=SW_SHOWNORMAL;
  PIDLIST_ABSOLUTE item=nullptr;if(wcsncmp(target,L"::",2)==0&&SUCCEEDED(SHParseDisplayName(target,nullptr,&item,0,nullptr))){info.fMask|=SEE_MASK_IDLIST;info.lpIDList=item;info.lpFile=nullptr;}
  bool ok=ShellExecuteExW(&info)!=0;if(info.hProcess){AllowSetForegroundWindow(GetProcessId(info.hProcess));CloseHandle(info.hProcess);}CoTaskMemFree(item);return ok;
+}
+}
+API int PaneLauncherOpen(const wchar_t* target,int packaged){
+ if(!target||!*target)return 0;
+ // 保持工作槽存活到进程结束，超时任务仍可能引用它。
+ static auto* operation=new BoundedOpen;
+ try {return operation->run([value=std::wstring(target),packaged]{return launcherOpen(value.c_str(),packaged);});}
+ catch(...) {return 0;}
 }
 API int PaneLauncherReveal(const wchar_t* path){Apartment apartment;PIDLIST_ABSOLUTE item=nullptr;if(FAILED(SHParseDisplayName(path,nullptr,&item,0,nullptr)))return 0;auto hr=SHOpenFolderAndSelectItems(item,0,nullptr,0);CoTaskMemFree(item);return SUCCEEDED(hr);}
 extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int);

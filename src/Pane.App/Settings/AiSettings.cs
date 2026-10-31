@@ -4,6 +4,8 @@ public enum AiProvider { Api, ChatGpt }
 public sealed record AiActionSettings(string Id, string Name, string Glyph, string PromptTemplate);
 public sealed record AiSettings
 {
+    /// <summary>AI 总开关（设计加，2026-11-01，issue 8）：关掉后启动器、超级面板里的 AI 动作全部隐藏，选中外文也不自动翻译；其余配置保留。</summary>
+    public bool Enabled { get; init; } = true;
     public AiProvider Provider { get; init; }
     public string ApiBaseUrl { get; init; }="https://api.openai.com/v1";
     public string? ApiModel { get; init; }

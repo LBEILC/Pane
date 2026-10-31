@@ -85,6 +85,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         var list = new List<SuperAction>();
         foreach (var id in ids)
         {
+            if (!AiOptions.Enabled && id.StartsWith("ai:", StringComparison.Ordinal)) continue;   // AI 总开关关着（issue 8）
             SuperAction? a = id switch
             {
                 "search" => new("search", "搜索", "globe", false),
@@ -158,7 +159,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         autoResult = "";
         AutoBox.Visibility = LongBox.Visibility = Visibility.Collapsed;
         // 设计预览：PANE_DESIGN_AUTO=1 不管设置都当打开
-        bool on = AiOptions.AutoTranslateSelection || Environment.GetEnvironmentVariable("PANE_DESIGN_AUTO") == "1";
+        bool on = AiOptions.Enabled && AiOptions.AutoTranslateSelection || Environment.GetEnvironmentVariable("PANE_DESIGN_AUTO") == "1";
         autoMode = on && text is not null && ai.Status == AiStatus.Ready && !Languages.IsChinese(text) && text.Trim().Length > 0;
         if (autoMode && text!.Length > AutoLimit)
         {
