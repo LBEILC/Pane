@@ -14,7 +14,7 @@ public sealed partial class App
         set{
             if(folderJump!=null)folderJump.MenuRequested-=OnFolderJumpMenu;
             folderJump=value;
-            if(value!=null)value.MenuRequested+=OnFolderJumpMenu;
+            if(value!=null){value.MenuRequested+=OnFolderJumpMenu;value.Apply(Store.Current.FolderJump);}   // 046：设置（开关、组合键、自动跳转）
         }
     }
     FolderJumpView? jumpView;

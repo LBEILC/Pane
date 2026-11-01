@@ -41,6 +41,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("clipboard", "剪贴板", "clipboard", "记录什么、保留多久，以及隐私保护。", RenderClipboard),
             new("gesture", "鼠标手势", "gesture", "按住右键画方向，执行对应动作。", RenderGesture),
             new("superpanel", "超级面板", "pointer", "选中文字后长按鼠标侧键呼出，就地翻译、总结；短按侧键照常后退 / 前进。", RenderSuper),
+            new("dialog", "文件对话框", "folder", "在「打开 / 另存为」对话框里一键跳到资源管理器开着的文件夹。", RenderFolderJump),
             new("ai", "AI", "ai", "翻译、提问和快捷动作用的 AI 服务。", RenderAi),
             new("icons", "图标", "app", "应用图标的遮罩规则和逐个应用的设置；文件图标用 Pane 风格还是系统的。", RenderIcons),
             new("about", "关于", "info", "版本、数据位置和开源组件。", RenderAbout),
@@ -623,9 +624,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Render();
         });
         var cleared = (DateTime.Now - clearedAt).TotalSeconds < 4;
-        Group("数据",
+        var rows = new List<FrameworkElement>
+        {
             cleared ? Row("清空剪贴板历史", null, Status(true, "已清空，固定的条目保留了"), clear)
-                    : Row("清空剪贴板历史", clearArmed ? "未固定的记录会全部删除，不能撤销" : "已固定的条目会保留", clear));
+                    : Row("清空剪贴板历史", clearArmed ? "未固定的记录会全部删除，不能撤销" : "已固定的条目会保留", clear),
+        };
+        // 历史存不进硬盘时（045，用户 2026-11-01 遇到：重启后历史退回早上）在这里说清楚，不要等重启丢了才发现
+        if (app.ClipboardHistory.StorageProblem is { } problem)
+            rows.Insert(0, Row("历史没能保存", "重启 Pane 后这段时间复制的内容会丢；详细记录在数据目录的 logs 里", Status(false, problem)));
+        Group("数据", rows.ToArray());
     }
 
     // 用 Pane 替换 Win+V（2026-10-30，原型 settings.js winvDialog）：打开 / 关闭都先就地说明要改什么、要不要现在重启资源管理器，
@@ -1963,6 +1970,32 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     void SaveSuper(Func<SuperPanelSettings, SuperPanelSettings> change) =>
         app.Store.Save(app.Store.Current with { SuperPanel = change(app.Store.Current.SuperPanel) });
+
+    // 文件对话框跳转（2026-11-01，046，用户：Ctrl+G 也要能在设置里调）。两个组合键只在「打开 / 另存为」对话框在前台时注册，
+    // 所以不和启动器、剪贴板的全局热键比较，只防两个互相重复；被占用的提示来自服务上次注册的结果。关掉总开关时其余各项变灰（同超级面板）
+    void RenderFolderJump()
+    {
+        var f = app.Store.Current.FolderJump;
+        var jump = Hotkey(f.Jump, f.Menu, h => SaveFolderJump(x => x with { JumpHotkey = h == FolderJumpSettings.DefaultJump ? null : h }));
+        var menu = Hotkey(f.Menu, f.Jump, h => SaveFolderJump(x => x with { MenuHotkey = h == FolderJumpSettings.DefaultMenu ? null : h }));
+        var auto = Switch(f.AutoJump, v => SaveFolderJump(x => x with { AutoJump = v }));
+        var recent = Switch(f.ShowRecent, v => SaveFolderJump(x => x with { ShowRecent = v }));
+        foreach (var c in new Control[] { jump, menu, auto, recent }) Enable(c, f.Enabled);
+        var problem = f.Enabled ? app.FolderJump?.HotkeyProblem : null;
+        Group("基本",
+            Row("启用对话框跳转", f.Enabled ? "只在「打开 / 另存为」对话框在前台时接管下面两个快捷键，别的程序里不受影响" : "已关闭：两个快捷键都还给对话框",
+                Switch(f.Enabled, v => { SaveFolderJump(x => x with { Enabled = v }); Later(); })));
+        Group("快捷键",
+            problem != null ? Row("跳到当前文件夹", "换一个组合，或者在占用它的程序里改掉", Status(false, problem), jump)
+                            : Row("跳到当前文件夹", "跳到最近用过的资源管理器窗口所在的文件夹；没开资源管理器时弹出菜单", jump),
+            Row("选择文件夹", "在对话框旁边弹出菜单，从开着的和最近用过的文件夹里选", menu));
+        Group("行为",
+            Row("对话框打开时自动跳过去", "新打开的对话框直接跳到最近用过的资源管理器文件夹；只跳这一次，之后照常操作", auto),
+            Row("菜单里列出最近用过的文件夹", "来自 Windows 的最近使用记录，最多 8 个；关掉后菜单里只有开着的资源管理器文件夹", recent));
+    }
+
+    void SaveFolderJump(Func<FolderJumpSettings, FolderJumpSettings> change) =>
+        app.Store.Save(app.Store.Current with { FolderJump = change(app.Store.Current.FolderJump) });
 
     // 选一个程序（.exe），返回完整路径（引擎按完整路径匹配）
     async Task<string?> PickProgram()

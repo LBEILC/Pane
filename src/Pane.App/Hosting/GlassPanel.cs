@@ -72,7 +72,9 @@ public sealed partial class GlassPanel : IDisposable
         if(!settingsWindow)transient.Add(this);
         if(settingsWindow)AppIcon.Apply(Input);   // 设置窗口在任务栏上有按钮：给它 Pane 的图标，不然是系统默认的程序图标
         Native.SetLayeredWindowAttributes(Visual,0,255,2);if(!interactive)Native.SetLayeredWindowAttributes(Input,0,255,2);
-        foreach(var h in new[]{Visual,Input}){int noRound=1,noBorder=-2;Native.DwmSetWindowAttribute(h,33,ref noRound,4);Native.DwmSetWindowAttribute(h,34,ref noBorder,4);}
+        // 设计改（2026-11-01，issue 3 录屏）：关掉系统的窗口过渡动画（DWMWA_TRANSITIONS_FORCEDISABLED）。出现、收起、最小化、还原都由这里自己做；
+        // 有的电脑上系统会给有任务栏按钮的内容窗（设置、安装、二级窗口）另播一段「淡入 + 缩放」，播完之前玻璃窗不画，看着就是内容先到、玻璃突然跳出来
+        foreach(var h in new[]{Visual,Input}){int noRound=1,noBorder=-2,noTransition=1;Native.DwmSetWindowAttribute(h,33,ref noRound,4);Native.DwmSetWindowAttribute(h,34,ref noBorder,4);Native.DwmSetWindowAttribute(h,3,ref noTransition,4);}
         int enable=1;Marshal.ThrowExceptionForHR(Native.DwmSetWindowAttribute(Visual,17,ref enable,4));
         // 设计改（2026-10-31，用户录屏）：任务栏缩略图上悬停时系统「速览」只亮出有任务栏按钮的内容窗，玻璃窗被当成别的窗口淡掉，只剩文字。
         // 玻璃窗排除在速览外又会在速览别的程序时留下一块玻璃，所以干脆不让这扇窗速览（缩略图本身正常，不受影响）

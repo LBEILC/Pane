@@ -46,6 +46,18 @@ public sealed class ClipboardSample : IClipboardHistory
             T(ClipKind.Link, "https://www.example.com/blog/acrylic-material-deep-dive", "Edge", 2900),
             T(ClipKind.Text, "WiFi：Pane-Studio-5G", "记事本", 4300),
         ];
+        // 截图核对用：PANE_DESIGN_CLIP_IMAGES=「缩略图路径|原图宽|原图高;…」时，再插几条用真实位图的图片条目（固定在最前，看各种比例的排版）
+        var real = Environment.GetEnvironmentVariable("PANE_DESIGN_CLIP_IMAGES");
+        if (!string.IsNullOrEmpty(real))
+        {
+            int ago = 0;
+            foreach (var item in real.Split(';', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var p = item.Split('|');
+                entries.Add(new((id++).ToString(), ClipKind.Image, null, null, new ClipPicture(p[0]), int.Parse(p[1]), int.Parse(p[2]),
+                    "截图工具", Sources["截图工具"], now.AddMinutes(-ago++), true));   // 固定，排在最前面
+            }
+        }
     }
 
     public event EventHandler? Changed;

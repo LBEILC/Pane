@@ -53,7 +53,7 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
                 if(File.Exists(target)||NativeClip.PaneClipSourceIcon(path,target)==1)icon=target;
             }
             Captured?.Invoke(new(text,files,png,program,string.IsNullOrWhiteSpace(display)?program:display,icon,exclude,history,cloud,own));
-        }catch(Exception){Failures++;}finally{if(opened)NativeClip.CloseClipboard();}
+        }catch(Exception e){Failures++;new ClipboardLog(settings.DirectoryPath).Write("capture-failed",e);}finally{if(opened)NativeClip.CloseClipboard();}
     }
     static bool Has(string name)=>NativeClip.IsClipboardFormatAvailable(NativeClip.RegisterClipboardFormatW(name));
     static int? Flag(string name){uint format=NativeClip.RegisterClipboardFormatW(name);if(!NativeClip.IsClipboardFormatAvailable(format))return null;var handle=NativeClip.GetClipboardData(format);if(NativeClip.GlobalSize(handle)<4)return 0;var p=NativeClip.GlobalLock(handle);if(p==0)return 0;try{return Marshal.ReadInt32(p);}finally{NativeClip.GlobalUnlock(handle);}}
@@ -62,6 +62,28 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
 }
 internal sealed class WindowsClipboardImages:IClipboardImages
 {
+    public (int Width,int Height)? Thumbnail(string path,string thumbnail)
+    {
+        string temporary=thumbnail+".tmp";
+        try{
+            if(!LocalImage(path))return null;
+            var file=new FileInfo(path);if(!file.Exists||file.Length>50L*1024*1024)return null;
+            if(NativeClip.PaneClipSaveImage(path,null,temporary,out int width,out int height)!=1)return null;
+            File.Move(temporary,thumbnail,true);return(width,height);
+        }catch(Exception){return null;}
+        finally{try{File.Delete(temporary);}catch(Exception){}}
+    }
+    internal static bool LocalImage(string path)
+    {
+        // 拒绝 UNC、设备路径、映射网络盘和重解析点，避免后台解码访问远端。
+        if(!Path.IsPathFullyQualified(path)||path.StartsWith(@"\\")||path.StartsWith("//"))return false;
+        if(Path.GetExtension(path).ToLowerInvariant() is not (".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".heic"))return false;
+        string root=Path.GetPathRoot(path)!;
+        if(new DriveInfo(root).DriveType==DriveType.Network)return false;
+        for(string? part=path;part!=null&&part.Length>=root.Length;part=Path.GetDirectoryName(part))
+            if((File.GetAttributes(part)&FileAttributes.ReparsePoint)!=0)return false;
+        return true;
+    }
     public (int Width,int Height) Save(byte[] png,string full,string thumbnail)
     {
         string input=full+".input",temporary=full+".tmp",small=thumbnail+".tmp";
@@ -110,7 +132,7 @@ internal static class NativeClip
     [DllImport(Dll)] internal static extern nint PaneClipListen(Callback callback);
     [DllImport(Dll)] internal static extern int PaneClipStop(nint listener,out int count);
     [DllImport(Dll)] internal static extern int PaneClipImageAlloc(out nint output,out int length);
-    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveImage(string input,string full,string thumb,out int width,out int height);
+    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveImage(string input,string? full,string thumb,out int width,out int height);
     [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveDialog(string source,string name);
     [DllImport("user32.dll")] internal static extern bool OpenClipboard(nint owner);

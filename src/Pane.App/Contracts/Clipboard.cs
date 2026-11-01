@@ -17,7 +17,7 @@ public sealed record ClipEntry(
     ClipKind Kind,
     string? Text,                         // 文本类的正文；Image 时是说明（如「截图」）；Files 时为 null
     IReadOnlyList<string>? Files,         // Files：完整路径，界面只显示文件名
-    ClipPicture? Thumbnail,               // Image：缩略图
+    ClipPicture? Thumbnail,               // Image：缩略图；Files：复制的文件里有图片时，第一张图片的缩略图（045），ImageWidth / ImageHeight 同时给原图尺寸
     int? ImageWidth,
     int? ImageHeight,
     string Source,                        // 来源程序的显示名（如「微信」）
@@ -45,4 +45,10 @@ public interface IClipboardHistory
     void Delete(string id);
     /// <summary>清空未固定的条目（设置页「清空历史」）。已固定的保留。</summary>
     void ClearUnpinned();
+
+    /// <summary>
+    /// 历史存不进硬盘时的原因（045）：一句给用户看的中文，如「保存失败：文件被占用（已重试 12 次）」；正常时为 null。
+    /// 设置页剪贴板分区显示它；变化时触发 <see cref="Changed"/>。
+    /// </summary>
+    string? StorageProblem => null;
 }

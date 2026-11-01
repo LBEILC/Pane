@@ -28,7 +28,7 @@ public sealed class SettingsStore
         Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json");
         if(!File.Exists(path)) return;
-        try { var value=JsonSerializer.Deserialize(File.ReadAllText(path),SettingsJson.Default.PaneSettings) ?? throw new JsonException(); Validate(value); Current=value; }
+        try { var value=JsonSerializer.Deserialize(File.ReadAllText(path),SettingsJson.Default.PaneSettings) ?? throw new JsonException(); value=Normalize(value); Validate(value); Current=value; }
         catch(Exception e) when(e is JsonException or ArgumentException or NotSupportedException) {
             var backup=path+".bad-"+Guid.NewGuid().ToString("N"); File.Move(path,backup); Current=defaults; CorruptFile?.Invoke(this,backup);
         }
@@ -36,12 +36,19 @@ public sealed class SettingsStore
     }
     public void Save(PaneSettings value)
     {
-        Validate(value); Directory.CreateDirectory(DirectoryPath);
+        value=Normalize(value); Validate(value); Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json"); var temp=path+".tmp";
         using(var stream=new FileStream(temp,FileMode.Create,FileAccess.Write,FileShare.None)) {
             JsonSerializer.Serialize(stream,value,SettingsJson.Default.PaneSettings); stream.Flush(true);
         }
         File.Move(temp,path,true); Current=value; Changed?.Invoke(this,EventArgs.Empty);
+    }
+    static PaneSettings Normalize(PaneSettings value) => value with { FolderJump=NormalizeFolderJump(value.FolderJump) };
+    internal static FolderJumpSettings NormalizeFolderJump(FolderJumpSettings value)
+    {
+        const KeyModifiers mask=KeyModifiers.Ctrl|KeyModifiers.Alt|KeyModifiers.Shift|KeyModifiers.Win;
+        static bool ValidKey(Hotkey? key) => key is null || ((key.Modifiers & mask)!=0 && (key.Modifiers & ~mask)==0 && key.VirtualKey is >0 and <=255);
+        return value with { JumpHotkey=ValidKey(value.JumpHotkey)?value.JumpHotkey:null, MenuHotkey=ValidKey(value.MenuHotkey)?value.MenuHotkey:null };
     }
     static void Validate(PaneSettings s)
     {

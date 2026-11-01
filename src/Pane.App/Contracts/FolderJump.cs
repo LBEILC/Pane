@@ -3,6 +3,7 @@
 // - 「打开 / 另存为」对话框在前台时按 Ctrl+G：直接跳到最近激活过的资源管理器窗口所在的文件夹；没有开着的资源管理器就弹出下面的菜单。
 // - Ctrl+Shift+G：在对话框旁边弹出菜单，列出开着的资源管理器文件夹和最近用过的文件夹，选一个跳过去。
 // - 只在文件对话框前台时接管这两个组合键，其他程序里的 Ctrl+G 不受影响。
+// - 设置 → 文件对话框（046）：可整个关掉、改两个组合键、打开对话框时自动跳、菜单里不列最近文件夹。
 namespace Pane.Contracts;
 
 public enum FolderJumpSource { Explorer, Recent }
@@ -26,4 +27,17 @@ public interface IFolderJump
 
     /// <summary>让对话框跳到这个文件夹；对话框文件名框里原来的文字保留。对话框已经关了就什么都不做。</summary>
     Task JumpAsync(nint dialog, string path, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 设置（046）：总开关、两个组合键（<see cref="Pane.Settings.FolderJumpSettings.Jump"/> / <see cref="Pane.Settings.FolderJumpSettings.Menu"/>）、
+    /// 对话框打开时自动跳转、菜单里列不列最近文件夹。宿主启动时和设置变化时调用；立即生效（对话框正在前台时按新组合重新注册）。
+    /// </summary>
+    void Apply(Pane.Settings.FolderJumpSettings settings) { }
+
+    /// <summary>
+    /// 最近一次在对话框里注册快捷键失败的说明，如「Ctrl+G 被其他程序占用」；之后注册成功或改了组合就清掉，没问题为 null。
+    /// 设置页显示；变化时触发 <see cref="ProblemChanged"/>（可能在后台线程）。
+    /// </summary>
+    string? HotkeyProblem => null;
+    event EventHandler? ProblemChanged { add { } remove { } }
 }

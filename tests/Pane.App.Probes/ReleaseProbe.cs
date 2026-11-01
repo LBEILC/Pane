@@ -20,6 +20,9 @@ public sealed partial class App
     void StartReleaseProbe(){
         if(!ReleaseProbeEnabled)return;
         releaseProbe=Task.Run(async()=>{
+            if(Environment.GetEnvironmentVariable("PANE_CLIPBOARD_PROBE")=="045"){
+                await RunClipboardPersistenceProbe();return;
+            }
             while(!cancellation.IsCancellationRequested){
                 try {
                     using var pipe=new NamedPipeServerStream("Pane-release-probe-"+Environment.ProcessId,PipeDirection.Out,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
@@ -31,5 +34,41 @@ public sealed partial class App
                 }catch(OperationCanceledException){break;}catch(IOException){}
             }
         });
+    }
+    async Task RunClipboardPersistenceProbe()
+    {
+        // 显式夹具标记、隔离数据、观察模式三者缺一不可；不经过系统剪贴板。
+        string data=Store.DirectoryPath;
+        if(!IsProduction||!ReleaseProbeEnabled||
+            string.Equals(Path.GetFullPath(data).TrimEnd('\\'),Path.GetFullPath(Pane.Settings.SettingsStore.ProductionDirectory).TrimEnd('\\'),StringComparison.OrdinalIgnoreCase)||
+            !File.Exists(Path.Combine(data,"045-fixture"))||Store.Current.General.StartWithWindows||Store.Current.Update.AutoUpdate||
+            File.Exists(Path.Combine(data,"winv-original.json")))throw new InvalidOperationException("045 探针需要安全隔离夹具");
+        string result=Path.Combine(data,"045-result.txt");
+        try{
+            await clipboardService!.Ready.WaitAsync(TimeSpan.FromSeconds(15));
+            int loaded=clipboardService.Snapshot().Count;
+            var watch=System.Diagnostics.Stopwatch.StartNew();
+            while(!ready){if(watch.Elapsed.TotalSeconds>30)throw new TimeoutException();await Task.Delay(50);}
+            byte[] png=File.ReadAllBytes(Path.Combine(data,"045-fixture.png"));
+            clipboardService.Capture(new(Text:"045 synthetic text\0"));
+            clipboardService.Capture(new(Files:[Path.Combine(data,"045-fixture.png")]));
+            clipboardService.Capture(new(Png:png));
+            int expected=loaded+3;
+            string index=Path.Combine(data,"clipboard","history.json");watch.Restart();
+            while(true){
+                if(watch.Elapsed.TotalSeconds>15)throw new TimeoutException();
+                if(File.Exists(index)){
+                    var stored=new Pane.Services.Clipboard.ClipboardStorage().Load(index);
+                    if(stored.Length==expected&&(Environment.GetEnvironmentVariable("PANE_CLIPBOARD_PROBE_BASELINE")=="1"||stored.Any(e=>e.Entry.Kind==Pane.Contracts.ClipKind.Files&&e.Entry.Thumbnail!=null)))break;
+                }
+                await Task.Delay(25);
+            }
+            double saveMs=watch.Elapsed.TotalMilliseconds;
+            await Task.Delay(2000);
+            using var process=System.Diagnostics.Process.GetCurrentProcess();var cpu=process.TotalProcessorTime;
+            await Task.Delay(5000);process.Refresh();double cpuMs=(process.TotalProcessorTime-cpu).TotalMilliseconds;
+            File.WriteAllText(result,$"production={IsProduction};loaded={loaded};saved={expected};storageFailures={clipboardService.StorageFailures};saveMs={saveMs:F2};idleWindowMs=5000;idleCpuMs={cpuMs:F3};systemClipboardRead=0;systemClipboardWrite=0;startupRegistry=stub;autoUpdate=False;winvJournal=False");
+        }catch(Exception e){File.WriteAllText(result,"failed="+e.GetType().Name);Environment.ExitCode=1;}
+        finally{queue.TryEnqueue(Shutdown);}
     }
 }

@@ -90,6 +90,7 @@ public sealed partial class App
         var q=Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY");
         switch(Environment.GetEnvironmentVariable("PANE_DESIGN_OPEN")){
             case "files":ShowFiles(q??"报价",null);break;
+            case "clipboard":Command("show-clipboard");break;
             case "translate":ShowTranslate(q??"Glassmorphism relies on background blur, translucency and a subtle highlight border.");break;
             case "tray":{var m=GlassPanel.MonitorFromPoint(new GlassPanel.Point(),1);var info=new GlassPanel.MonitorInfo{Size=System.Runtime.InteropServices.Marshal.SizeOf<GlassPanel.MonitorInfo>()};GlassPanel.GetMonitorInfoW(m,ref info);ShowTrayMenu($"{info.Monitor.Right-140},{info.Monitor.Bottom-24}");break;}/* 演示：模拟任务栏右下角的托盘图标 */
             case "folder-jump":/* 演示：屏幕中间偏左上，像对话框文件名框的左下角 */

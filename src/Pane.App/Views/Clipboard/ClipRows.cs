@@ -50,7 +50,8 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         ClipKind.Link => "link",
         ClipKind.Color => "drop",
         ClipKind.Image => "image",
-        ClipKind.Files => "folder",
+        // 文件：复制的是图片（服务给了缩略图）用图片图标；看着都是文件夹（没有扩展名）用文件夹；其余用文档（原来一律是文件夹）
+        ClipKind.Files => Thumb is not null ? "image" : (Entry.Files ?? []).All(f => !System.IO.Path.HasExtension(f)) ? "folder" : "doc",
         _ => "text",
     };
     public string SourceGlyph => Entry.SourceIcon?.Glyph ?? "app";
@@ -60,7 +61,16 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public Visibility TextVisibility => V(Entry.Kind is ClipKind.Text or ClipKind.Link);
     public Visibility CodeVisibility => V(Entry.Kind == ClipKind.Code);
     public Visibility ColorVisibility => V(Entry.Kind == ClipKind.Color);
-    public Visibility ImageVisibility => V(Entry.Kind == ClipKind.Image);
+    public Visibility ThumbVisibility => V(Thumb is not null);
+
+    // 缩略图框：按原图比例。行内容宽约 290；宽图铺满一行（高按比例，最矮 56，太扁的裁两边），
+    // 不够宽的图限高 ThumbMaxHeight、宽按比例靠左
+    const double ThumbRowWidth = 290, ThumbMaxHeight = 140, ThumbMinHeight = 56;
+    double Ratio => Entry.ImageWidth is int w && w > 0 && Entry.ImageHeight is int h && h > 0 ? (double)w / h : 16.0 / 9;
+    bool ThumbFillsRow => Ratio >= ThumbRowWidth / ThumbMaxHeight;
+    public double ThumbHeight => ThumbFillsRow ? Math.Max(ThumbMinHeight, Math.Round(ThumbRowWidth / Ratio)) : ThumbMaxHeight;
+    public double ThumbWidth => ThumbFillsRow ? double.NaN : Math.Max(ThumbMinHeight, Math.Round(ThumbMaxHeight * Ratio));
+    public HorizontalAlignment ThumbAlign => ThumbFillsRow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
     public Visibility FilesVisibility => V(Entry.Kind == ClipKind.Files);
     public Visibility PinVisibility => V(Entry.Pinned);
     public Visibility SourceVisibility => V(SourceBrush is not null);

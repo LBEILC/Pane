@@ -68,7 +68,7 @@ public sealed partial class App : Application
             var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry());Autostart=autostart;autostart.Align();
             aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;
             Glass=new GlassParameters(Store.Current.General);
-            Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(Store.Current);ApplySuperSettings();};
+            Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(Store.Current);ApplySuperSettings();folderJump?.Apply(Store.Current.FolderJump);};
             if(Enum.TryParse<ThemeMode>(Environment.GetEnvironmentVariable("PANE_THEME"),true,out var theme))Glass.Apply(Glass.Current with {Theme=theme});
             if(!demo){FileSelection=new Pane.Services.FileSelection();Renamer=new Pane.Services.Rename.BatchRenamer();}
             selectionReader=new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),()=>Store.Current.SuperPanel.ClipboardFallback,files:FileSelection as Pane.Services.FileSelection);

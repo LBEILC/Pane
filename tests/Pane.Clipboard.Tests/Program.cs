@@ -18,6 +18,13 @@ static partial class Program
         if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}
         string native=Path.GetFullPath(args[0]);
         NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(),(name,_,_)=>name=="Pane.Native.dll"?NativeLibrary.Load(native):0);
+        if(args is [_,"production-fixture",var fixture]){
+            string directory=Path.GetFullPath(fixture);if(Directory.Exists(directory))throw new InvalidOperationException("夹具目标已存在");
+            Directory.CreateDirectory(directory);var store=new SettingsStore(directory,Defaults());
+            store.Save(Defaults() with{Update=new(false)});
+            File.WriteAllText(Path.Combine(directory,"045-fixture"),"synthetic");
+            File.WriteAllBytes(Path.Combine(directory,"045-fixture.png"),Png(1280,720,45));return;
+        }
         if(args.Length>1&&args[1]=="seed"){
             string directory=Path.GetFullPath(args[2]);if(Directory.Exists(Path.Combine(directory,"clipboard")))throw new InvalidOperationException("夹具目标已存在");
             var store=new SettingsStore(directory,Defaults());var source=new FakeSource();using var history=new ClipboardHistory(store,source,new FakeWriter(),new WindowsClipboardImages());await history.Ready;
@@ -74,6 +81,8 @@ static partial class Program
         settings.Load();Check(!settings.Current.Clipboard.RecordText&&!settings.Current.Clipboard.RecordFiles&&settings.Current.Clipboard.Limit==200&&settings.Current.Clipboard.ExcludedPrograms[0]=="BLOCKED.EXE","new settings roundtrip");
         using(var source=new WindowsClipboardSource(settings,true)){source.Captured+=_=>throw new Exception("observe read content");source.Start();await Task.Delay(150);Check(source.Registered,"native register");source.Dispose();Check(source.Removed,"native unregister and thread join");}
         await SwitchTests();
+        await PersistenceTests();
+        await FileThumbnailTests();
         PasteTests();
         Console.WriteLine($"PASS clipboard assertions={checks};systemClipboardRead=0;systemClipboardWrite=0;listenerStopped=1");
     }

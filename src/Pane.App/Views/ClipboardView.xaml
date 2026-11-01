@@ -38,9 +38,10 @@
                         <TextBlock clip:ClipMatch.Source="{x:Bind Body}" VerticalAlignment="Center"
                                    FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
                     </StackPanel>
-                    <!-- 图片：缩略图 -->
-                    <Border Height="76" CornerRadius="8" Background="{x:Bind Thumb}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
-                            Visibility="{x:Bind ImageVisibility}"/>
+                    <!-- 图片（以及复制的单个图片文件）：按原图比例显示，宽图铺满一行、竖图限高靠左（2026-11-01 用户：一条横条看不出竖图） -->
+                    <Border Width="{x:Bind ThumbWidth}" Height="{x:Bind ThumbHeight}" HorizontalAlignment="{x:Bind ThumbAlign}" CornerRadius="8"
+                            Background="{x:Bind Thumb}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
+                            Visibility="{x:Bind ThumbVisibility}"/>
                     <!-- 文件：每行一个文件名 -->
                     <ItemsControl ItemsSource="{x:Bind FileLines}" Visibility="{x:Bind FilesVisibility}" IsTabStop="False">
                         <ItemsControl.ItemTemplate>

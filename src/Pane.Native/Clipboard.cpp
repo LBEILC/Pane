@@ -71,7 +71,7 @@ API int PaneClipSaveImage(const wchar_t* input,const wchar_t* full,const wchar_t
  Apartment apartment;auto f=Factory();if(!f)return 0;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> frame;ComPtr<IWICBitmapScaler> scale;
  HRESULT hr=f->CreateDecoderFromFilename(input,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder);if(SUCCEEDED(hr))hr=decoder->GetFrame(0,&frame);
  UINT w=0,h=0;if(SUCCEEDED(hr))hr=frame->GetSize(&w,&h);if(!w||!h||w>INT_MAX||h>INT_MAX)return 0;*width=static_cast<int>(w);*height=static_cast<int>(h);
- if(SUCCEEDED(hr))hr=Save(f.Get(),frame.Get(),full);if(SUCCEEDED(hr))hr=f->CreateBitmapScaler(&scale);double k=std::min(1.0,320.0/std::max(w,h));
+ if(SUCCEEDED(hr)&&full)hr=Save(f.Get(),frame.Get(),full);if(SUCCEEDED(hr))hr=f->CreateBitmapScaler(&scale);double k=std::min(1.0,640.0/std::max(w,h));
  if(SUCCEEDED(hr))hr=scale->Initialize(frame.Get(),std::max(1u,static_cast<UINT>(w*k)),std::max(1u,static_cast<UINT>(h*k)),WICBitmapInterpolationModeFant);
  if(SUCCEEDED(hr))hr=Save(f.Get(),scale.Get(),thumb);return SUCCEEDED(hr);
 }

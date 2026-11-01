@@ -5,20 +5,28 @@
 #include <algorithm>
 
 namespace pane::folderjump {
-struct Control { HWND window; HWND parent; std::wstring type; int id; };
+struct Control { HWND window; HWND parent; std::wstring type; int id; bool visible=true; };
 inline HWND Filename(const std::wstring& type, const std::vector<Control>& controls) {
     if(type!=L"#32770")return nullptr;
-    bool shell=false,types=false,accept=false;
-    HWND edit=nullptr;
+    bool shell=false,accept=false;
     for(const auto& c:controls){
-        shell|=c.type==L"SHELLDLL_DefView";
-        types|=c.type==L"ComboBox"&&c.id==0x470;
-        accept|=c.type==L"Button"&&c.id==IDOK;
-        if(c.type!=L"Edit")continue;
-        if(c.id==0x480)edit=c.window;
-        for(const auto& p:controls)if(p.window==c.parent&&p.type==L"ComboBox"&&p.id==0x47c)edit=c.window;
+        shell|=c.visible&&c.type==L"SHELLDLL_DefView";
+        accept|=c.visible&&c.type==L"Button"&&c.id==IDOK;
     }
-    return shell&&types&&accept?edit:nullptr;
+    if(!shell||!accept)return nullptr;
+    for(const auto& c:controls)if(c.visible&&c.type==L"Edit"&&c.id==0x480)return c.window;
+    for(const auto& c:controls)if(c.visible&&c.type==L"Edit")
+        for(const auto& p:controls)if(p.visible&&p.window==c.parent&&p.type==L"ComboBox"&&p.id==0x47c)return c.window;
+    // 另存为的文件类型框没有 Edit；地址栏使用自己的非零 ID。
+    // 只接受 FloatNotifySink 下唯一的可见文件名候选，歧义时不接管。
+    HWND candidate=nullptr;
+    for(const auto& c:controls)if(c.visible&&c.type==L"Edit"&&c.id==1001)
+        for(const auto& p:controls)if(p.visible&&p.window==c.parent&&p.type==L"ComboBox"&&p.id==0)
+            for(const auto& sink:controls)if(sink.visible&&sink.window==p.parent&&sink.type==L"FloatNotifySink"){
+                if(candidate)return nullptr;
+                candidate=c.window;
+            }
+    return candidate;
 }
 // 注册与注销都在接收 WM_HOTKEY 的线程执行，失败的键不会被当作已注册。
 struct Hotkeys {
@@ -37,10 +45,11 @@ inline std::wstring Key(std::wstring path){
     if(!path.empty())CharLowerBuffW(path.data(),static_cast<DWORD>(path.size()));
     return path;
 }
-template<class Exists> std::vector<Entry> Select(std::vector<Entry> entries,Exists exists){
+template<class Exists> std::vector<Entry> Select(std::vector<Entry> entries,Exists exists,bool showRecent=true){
     std::stable_sort(entries.begin(),entries.end(),[](const Entry& a,const Entry& b){return a.recent!=b.recent?!a.recent:a.order>b.order;});
     std::vector<Entry> result;std::vector<std::wstring> seen;int recent=0;
     for(auto& e:entries){
+        if(e.recent&&!showRecent)continue;
         // 仅接受绝对文件系统目录；虚拟 Shell 位置和文件都过滤。
         if(e.path.empty()||!((e.path.size()>2&&e.path[1]==L':'&&e.path[2]==L'\\')||e.path.rfind(L"\\\\",0)==0)||!exists(e.path))continue;
         auto key=Key(e.path);if(std::find(seen.begin(),seen.end(),key)!=seen.end())continue;
