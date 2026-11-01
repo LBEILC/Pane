@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  文件对话框跳转菜单（设计负责人，038）。样式照托盘菜单（prototype/tray.html）：宽 340、内边距 6、每项高 40。
+  「打开 / 另存为」对话框在前台时按 Ctrl+Shift+G（或按 Ctrl+G 但没有开着的资源管理器）弹出，贴着对话框文件名框的左下角（PanelPlacement.Tray 的算法）。
+  两组：开着的资源管理器（最近激活的在前）、最近用过的文件夹；每项是文件夹图标 + 名字 + 完整路径，右边前 9 项给数字键帽。
+  ↑↓ 选、Enter / 数字键 / 点一下跳过去；失去焦点 / 点外面 / Esc 收起。
+-->
+<UserControl
+    x:Class="Pane.Views.FolderJumpView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="True" UseSystemFocusVisuals="False">
+
+    <Grid>
+        <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
+        <StackPanel x:Name="Root" Width="340" Padding="6" VerticalAlignment="Top"/>
+
+        <!-- 样板：代码里建行时取字体、颜色 -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="LabelProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="NameProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="PathProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <Border x:Name="KbdProto" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

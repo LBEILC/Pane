@@ -24,6 +24,7 @@ public sealed partial class App : Application
     public SettingsStore Store {get;private set;}=null!;
     public GlassParameters Glass {get;internal set;}=null!;   // 安装模式由 SetupHost 设成它自己的那份
     public Pane.Contracts.IFileSearchStatus FileSearchStatus {get;private set;}=null!;
+    public Pane.Contracts.IFileIcons FileIcons {get;private set;}=new Pane.Services.Icons.EmptyFileIcons();
     Pane.Services.Launcher.LauncherSearch? launcherSearch;
     public Pane.Contracts.IClipboardHistory ClipboardHistory {get;private set;}=null!;
     Pane.Services.Clipboard.ClipboardHistory? clipboardService;
@@ -62,17 +63,20 @@ public sealed partial class App : Application
         try {
             GlassParameters.InitializeResources(Resources);queue.EnsureSystemDispatcherQueue();manager=WindowsXamlManager.InitializeForCurrentThread();
             string data=RuntimeMode.Current.DataDirectory;
+            FileIcons=demo?new Pane.DesignData.FileIconsSample(data):new Pane.Services.Icons.FileIcons(data);   /* 设计：演示模式按扩展名取真实系统图标 */
             Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
             var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry());Autostart=autostart;autostart.Align();
             aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;
             Glass=new GlassParameters(Store.Current.General);
             Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(Store.Current);ApplySuperSettings();};
             if(Enum.TryParse<ThemeMode>(Environment.GetEnvironmentVariable("PANE_THEME"),true,out var theme))Glass.Apply(Glass.Current with {Theme=theme});
-            selectionReader=new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),()=>Store.Current.SuperPanel.ClipboardFallback);
+            if(!demo){FileSelection=new Pane.Services.FileSelection();Renamer=new Pane.Services.Rename.BatchRenamer();}
+            selectionReader=new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),()=>Store.Current.SuperPanel.ClipboardFallback,files:FileSelection as Pane.Services.FileSelection);
             Pane.Contracts.ISelectionActions actions=demo?new Pane.DesignData.SelectionActionsSample():new Pane.Services.SelectionActions();
             int startupLevel=MemoryStartupLevel();LauncherView? launcher=null;
             if(!demo&&startupLevel>=5){shell=new ShellHost(Command,Store.Current);shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
             StartWinV();
+            if(!demo&&startupLevel>=5)FolderJump=new Pane.Services.FolderJumpService();
             hotkeysReadyMs=(DateTime.UtcNow-System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
             if(!demo&&startupLevel>=6)StartGestures(data);
             if(demo)ClipboardHistory=new Pane.DesignData.ClipboardSample();
@@ -81,6 +85,7 @@ public sealed partial class App : Application
             if(startupLevel>=1){
             Files=demo?new Pane.DesignData.FileSearchSample():new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(),new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
             if(!demo)launcherSearch=new(Store,new Pane.Services.Launcher.WindowsAppCatalog(data),everything,new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
+            if(!demo){WebSuggestions=new Pane.Services.Launcher.WebSuggestions(()=>Store.Current.Launcher.WebSuggestions);TerminalHistory=launcherSearch!.TerminalHistory;}
             launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),new Pane.Services.Clipboard.LauncherClipboardHistory(ClipboardHistory,Store));panels.Add("launcher",new("启动器",launcher,launcher,Glass));
             panels["launcher"].PositionStore=Store;panels["launcher"].HideOnBlur=()=>Store.Current.Launcher.HideOnBlur;WireSecondary(launcher,actions);/* 设计接线：二级窗口 */}
             if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new("剪贴板",clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
@@ -175,10 +180,12 @@ public sealed partial class App : Application
         Clean(()=>selectionCancellation?.Cancel());Clean(()=>gestureService?.DisposeAsync().AsTask().GetAwaiter().GetResult());
         if(controlsEnabled&&gestureService!=null)Clean(()=>File.WriteAllText(output+".gesture-stopped",$"unhook={gestureService.Statistics().UnhookSucceeded};pause={gestureService.RegisteredHotkeyCount}"));
         Clean(()=>shell?.Dispose());
+        Clean(()=>(FolderJump as IDisposable)?.Dispose());
         if(shell?.CleanupSucceeded==false||ReleaseProbeEnabled&&gestureService?.Statistics().UnhookSucceeded!=1)Environment.ExitCode=1;
         Clean(()=>clipboardService?.Dispose());if(clipboardSource?.Removed==false||clipboardService?.StorageFailures>0)Environment.ExitCode=1;
         if(controlsEnabled&&clipboardSource!=null)Clean(()=>File.WriteAllText(output+".clipboard-stopped",$"registered={clipboardSource.Registered};removed={clipboardSource.Removed};notifications={clipboardSource.Notifications};failures={clipboardSource.Failures};storageFailures={clipboardService?.StorageFailures}"));
-        Clean(()=>aiService?.Dispose());Clean(()=>launcherSearch?.Dispose());Clean(CloseEmptyIsland);Clean(()=>settings?.Dispose());foreach(var w in secondaries.Values.ToArray())Clean(w.Dispose);
+        Clean(()=>(FileIcons as IDisposable)?.Dispose());
+        Clean(()=>(WebSuggestions as IDisposable)?.Dispose());Clean(()=>aiService?.Dispose());Clean(()=>launcherSearch?.Dispose());Clean(CloseEmptyIsland);Clean(()=>settings?.Dispose());foreach(var w in secondaries.Values.ToArray())Clean(w.Dispose);
         foreach(var panel in panels.Values)Clean(panel.Dispose);
         Clean(()=>gestures?.Dispose());Clean(()=>background?.Close());Clean(()=>Glass?.Dispose());Clean(()=>manager?.Dispose());
         if(controlsEnabled)Clean(()=>File.WriteAllText(output+".stopped",Environment.ExitCode!=0?"cleanup-failed":"hotkeys=0;tray=0;panels=0"));Exit();

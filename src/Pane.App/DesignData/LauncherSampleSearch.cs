@@ -50,8 +50,23 @@ public sealed class LauncherSampleSearch : ILauncherSearch
         new("重启", "chongqi", "cq", "命令", "restart"),
         new("关机", "guanji", "gj", "命令", "power"),
         new("清空回收站", "qingkonghuishouzhan", "qkhsz", "命令", "trash"),
+        new("注销", "zhuxiao logoff sign out", "zx", "命令", "logout"),
+        new("休眠", "xiumian hibernate", "xm", "命令", "moon"),
         new("打开剪贴板历史", "dakaijiantieban", "dkjtb", "Pane", "clipboard"),
     ];
+    // 系统设置和组件（037）：拼音里顺带放别名和英文名，演示「PATH」「环境变量」都能搜到
+    static readonly Entry[] SystemSettings =
+    [
+        new("编辑系统环境变量", "bianjixitonghuanjingbianliang huanjingbianliang xitongbianliang path environment", "bjxthjbl", "系统属性 · 高级", "gear"),
+        new("设备管理器", "shebeiguanliqi device manager devmgmt", "sbglq", "管理工具", "monitor"),
+        new("编辑组策略", "bianjizucelve gpedit group policy", "bjzcl", "管理工具 · 需要管理员权限", "shield"),
+        new("Windows 更新", "windows gengxin update", "wgx", "设置", "refresh"),
+        new("蓝牙和其他设备", "lanya bluetooth", "ly", "设置", "gear"),
+        new("程序和功能", "chengxuhegongneng xiezai uninstall", "cxhgn", "控制面板", "app"),
+        new("服务", "fuwu services", "fw", "管理工具", "gear"),
+    ];
+    static readonly string[] History = ["git status", "git log --oneline -20", "python -m http.server 8000", "ping 1.1.1.1"];
+    static readonly string[] Programs = ["python", "pwsh", "ping", "git", "node"];
     static readonly string[] Recents = ["微信", "Visual Studio Code", "Microsoft Edge", "终端", "网易云音乐", "截图工具", "记事本", "设置"];
     static readonly string[] Pinned = ["文件资源管理器", "计算器", "腾讯会议", "Photoshop"];
 
@@ -67,12 +82,24 @@ public sealed class LauncherSampleSearch : ILauncherSearch
             foreach (var n in Pinned) items.Add(Tile(Apps.First(a => a.Name == n), "已固定"));
             return Task.FromResult(new LauncherResult(items, true));
         }
+        if (t.StartsWith('>'))
+        {
+            var cmd = t[1..].Trim();
+            if (cmd.Length == 0) { items.Add(new("terminal:hint", LauncherItemKind.Action, "终端", "输入要在终端里运行的命令", "按 Ctrl+Shift+Enter 以管理员身份运行", new("terminal"))); return Task.FromResult(new LauncherResult(items, false)); }
+            items.Add(new("terminal:" + cmd, LauncherItemKind.Action, "终端", "在终端里运行", cmd, new("terminal"), Hotkey: "Enter"));
+            var first = cmd.Split(' ')[0];
+            foreach (var c in History.Where(h => h.StartsWith(cmd, StringComparison.OrdinalIgnoreCase) && h != cmd)
+                         .Concat(cmd.Contains(' ') ? [] : Programs.Where(n => n.StartsWith(first, StringComparison.OrdinalIgnoreCase) && n != first)).Take(6))
+                items.Add(new("complete:" + c, LauncherItemKind.Action, "补全", c, History.Contains(c) ? "最近运行过" : "程序", new(History.Contains(c) ? "refresh" : "terminal")));
+            return Task.FromResult(new LauncherResult(items, false));
+        }
         var v = Calc(raw);
         if (v is not null) items.Add(new("calc", LauncherItemKind.Calculation, "计算", v, t + " =", new("equal")));
         Pick(Apps, LauncherItemKind.App, "应用", 14);
         Pick(Files, LauncherItemKind.File, "文件", 3);
         int fileTotal = Files.Count(e => Match(e, q) is not null) * 4;   // 假数据：假装 Everything 还有更多
         Pick(Commands, LauncherItemKind.Command, "命令", 3);
+        Pick(SystemSettings, LauncherItemKind.Command, "设置", 4);
         items.Add(new("ai:translate", LauncherItemKind.Ai, "AI", $"翻译“{t}”", "用 AI 翻译", new("translate")));
         items.Add(new("ai:ask", LauncherItemKind.Ai, "AI", $"问 AI：“{t}”", "单轮回答，可以复制或粘贴", new("ai"), Hotkey: "Tab"));
         items.Add(new("web", LauncherItemKind.Web, "网页", $"在网页中搜索“{t}”", "默认搜索引擎", new("search")));

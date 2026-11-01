@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsAotCompatible>true</IsAotCompatible></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/Pane.App/Contracts/FileIcons.cs" Link="Contracts/FileIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Files.cs" Link="Contracts/Files.cs" />
     <Compile Include="../../src/Pane.App/Services/Icons/*.cs" Link="Icons/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Services/Launcher/*.cs" Link="Launcher/%(Filename)%(Extension)" />

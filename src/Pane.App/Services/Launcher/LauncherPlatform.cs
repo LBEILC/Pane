@@ -80,21 +80,25 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
 internal interface ILauncherExecutor
 {
     Task OpenAsync(string target,bool packaged,CancellationToken token);
+    Task OpenComponentAsync(string target,CancellationToken token)=>OpenAsync(target,false,token);
     Task RevealAsync(string path,CancellationToken token);
     Task CopyAsync(string value,CancellationToken token);
     Task CommandAsync(string id,CancellationToken token);
 }
 internal sealed class WindowsLauncherExecutor(Action<string> showPanel):ILauncherExecutor
 {
-    static Task Run(Func<int> action,CancellationToken token)=>Task.Run(()=>{token.ThrowIfCancellationRequested();if(action()==0)throw new InvalidOperationException("系统未能完成操作");},token);
+    internal static void CheckResult(int result){if(result==-1223)throw new System.ComponentModel.Win32Exception(1223);if(result==0)throw new InvalidOperationException("系统未能完成操作");}
+    static Task Run(Func<int> action,CancellationToken token)=>Task.Run(()=>{token.ThrowIfCancellationRequested();CheckResult(action());},token);
     public Task OpenAsync(string target,bool packaged,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherOpen(target,packaged?1:0),token);
+    // 内置系统组件可能等待用户回应 UAC；保留普通文件打开的超时，组件不按该超时判失败。
+    public Task OpenComponentAsync(string target,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherOpen(target,2),token);
     public Task RevealAsync(string path,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherReveal(path),token);
     public Task CopyAsync(string value,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherCopy(value),token);
     public Task CommandAsync(string id,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if(id is "clipboard" or "settings"){showPanel("show-"+id);return Task.CompletedTask;}
-        int command=id switch{"lock"=>0,"sleep"=>1,"restart"=>2,"shutdown"=>3,"recycle"=>4,_=>throw new NotSupportedException(id)};
+        int command=id switch{"lock"=>0,"sleep"=>1,"restart"=>2,"shutdown"=>3,"recycle"=>4,"logoff"=>5,"hibernate"=>6,_=>throw new NotSupportedException(id)};
         return Run(()=>LauncherNative.PaneLauncherCommand(command),token);
     }
 }

@@ -104,6 +104,12 @@ public sealed record ImportPreview(
 
 public interface IWGesturesImporter
 {
-    ImportPreview? Preview(string? directory = null);  // null = 自动查找；找不到返回 null
+    /// <summary>
+    /// null = 自动查找；找不到返回 null。043 起参数也可以是文件：<c>gestures.wg2</c> / <c>gestures.wg</c>（1～3 版格式）或 WGestures 导出的 <c>.wgb</c>。
+    /// <see cref="ImportPreview.SourceDirectory"/> 存的就是这个参数（自动查找时是找到的数据目录）。
+    /// </summary>
+    ImportPreview? Preview(string? directory = null);
     GestureConfig Import(ImportPreview preview, bool keepTrailColors);
+    /// <summary>最近一次自动查找找过的位置（043）：没找到时界面列给用户看。</summary>
+    IReadOnlyList<string> SearchedLocations => [];
 }

@@ -64,7 +64,9 @@ public sealed partial class App
     public GestureServiceState? GestureState=>gestureService?.State;
     public void SaveGestures(GestureConfig config){GestureConfigStore.Validate(config);GestureConfigStore.Save(GesturePath,config);gestureService?.Apply(config);ApplyGestureDisplay();}
     public void ResetGestures()=>SaveGestures(GestureConfigStore.Defaults);
-    public ImportPreview? PreviewWGestures()=>new WGesturesImporter().Preview(null);
+    /// <summary>预览 WGestures 的配置：path 为 null 自动查找，也可以是用户选的文件（043）。没找到时 <see cref="WGesturesSearched"/> 是找过的位置。</summary>
+    public ImportPreview? PreviewWGestures(string? path=null){var importer=new WGesturesImporter();var preview=importer.Preview(path);WGesturesSearched=importer.SearchedLocations;return preview;}
+    public IReadOnlyList<string> WGesturesSearched {get;private set;}=[];
     public void ImportWGestures(ImportPreview preview)=>SaveGestures(new WGesturesImporter().Import(preview,true));
     void ImportGestures(string source){
         try{var importer=new WGesturesImporter();var preview=importer.Preview(string.IsNullOrWhiteSpace(source)?null:source.Trim())??throw new InvalidDataException("未找到 WGestures 配置");

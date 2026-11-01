@@ -18,6 +18,7 @@ internal static partial class Program
         string directory=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
         var store=new SettingsStore(directory,Defaults());
         var settings=new AiSettings();
+        await ProxyReasoningTests(directory);
         Check(AiProtocol.Prompt(settings,new("translate","你好",null,null)).Contains("英文"),"auto han");
         Check(AiProtocol.Prompt(settings,new("translate","hi",null,null)).Contains("中文"),"auto latin");
         Check(AiProtocol.Prompt(settings,new("translate","中A",null,null)).Contains("英文"),"auto half");

@@ -51,6 +51,6 @@ static partial class Program
 
     static async Task OriginalCommandTests(LauncherSearch service,FakeExecutor fake){
         LauncherResult result;
-        foreach(var command in new[]{"锁屏","睡眠","重启","关机","清空回收站","打开剪贴板历史","Pane 设置"}){result=await service.SearchAsync(command,default);var item=result.Items.First(i=>i.Kind==LauncherItemKind.Command);await service.ExecuteAsync(item,default);Check(fake.Calls.Last().StartsWith("command:"),"fake command "+command);}
+        foreach(var command in new[]{"锁屏","睡眠","重启","关机","清空回收站","打开剪贴板历史","Pane 设置"}){result=await service.SearchAsync(command,default);var item=result.Items.First(i=>i.Id.StartsWith("command:",StringComparison.Ordinal));await service.ExecuteAsync(item,default);Check(fake.Calls.Last().StartsWith("command:"),"fake command "+command);}
     }
 }

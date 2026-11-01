@@ -39,13 +39,14 @@ static partial class Program
         try{await firstWork;}catch(OperationCanceledException){}
         await secondWork;
         Check(Exited(first.LastProcessId)&&Exited(queued.LastProcessId)&&queued.Outcome=="completed","queued worker starts after predecessor exits");
+        Check(PinyinTable.Loads==loads,"index worker does not load pinyin in parent");
         var store=new SettingsStore(directory,Defaults());var timer=Stopwatch.StartNew();
         using(var service=new LauncherSearch(store,new CachedSlowIndex(provider),new FakeFiles(),new FakeExecutor())){
             var result=await service.SearchAsync("wx",default);
             Check(result.Items.Count(i=>i.Group=="应用")==2&&!service.Indexing.IsCompleted,"second startup searchable before rebuild");
             Console.WriteLine($"cached firstSearchMs={timer.Elapsed.TotalMilliseconds:F3};indexPending={!service.Indexing.IsCompleted}");
         }
-        Check(PinyinTable.Loads==loads,"parent pinyin load delta zero");
+        Check(PinyinTable.Loads==loads+2,"settings and extra commands load their existing pinyin tables");
         string target=Path.Combine(directory,"fixture.exe"),cache=Path.Combine(directory,"launcher-icons");Directory.CreateDirectory(cache);File.WriteAllText(target,"v1");
         int extracts=0;int Extract(string path){extracts++;File.WriteAllText(path,File.ReadAllText(target));return 1;}
         string old=IconCache.Key("same-app",target),oldPath=IconCache.GetOrCreate(cache,old,Extract,out _)!;

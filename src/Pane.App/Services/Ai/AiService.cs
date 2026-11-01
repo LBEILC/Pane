@@ -14,7 +14,8 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     readonly SecretStore secrets;
     readonly AiEndpoints endpoints;
     readonly object gate=new();
-    readonly Dictionary<string,HttpClient> clients=[];
+    readonly Dictionary<(AiProxyMode Mode,string Url),HttpClient> clients=[];
+    readonly HashSet<(AiProvider Provider,string Endpoint,string Model)> unsupportedReasoning=[];
     readonly CancellationTokenSource lifetime=new();
     CancellationTokenSource session=new();
     string? key;
@@ -43,15 +44,45 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public IReadOnlyList<AiAction> Actions=>store.Current.Ai.Actions.Select(a=>new AiAction(a.Id,a.Name,a.Glyph,a.PromptTemplate)).ToArray();
     public string? ApiKeyMask {get{var value=key;return value==null?null:value.Length<=8?"••••":value[..4]+"…"+value[^4..];}}
     public void SaveApiKey(string value){value=value.Trim();if(value.Any(char.IsControl))throw new AiCredentialException("API Key 格式无效");lock(gate){secrets.Write("ai-key.bin",value.Length==0?null:value);key=value.Length==0?null:value;}Notify();}
-    HttpClient Client(AiSettings settings)
+    internal static SocketsHttpHandler CreateHandler(AiSettings settings)
     {
-        lock(gate){ObjectDisposedException.ThrowIf(lifetime.IsCancellationRequested,this);string proxy=settings.ProxyUrl??"";
+        var handler=new SocketsHttpHandler{AllowAutoRedirect=false,UseCookies=false,PooledConnectionIdleTimeout=TimeSpan.FromSeconds(30)};
+        if(settings.Proxy==AiProxyMode.None)handler.UseProxy=false;
+        if(settings.Proxy==AiProxyMode.Custom){
+            var uri=new Uri(settings.ProxyUrl!);
+            // .NET 的 socks5 已把域名交给代理解析；socks5h 是同一行为的别名。
+            var address=new UriBuilder(uri){Scheme=uri.Scheme=="socks5h"?"socks5":uri.Scheme,UserName="",Password=""};
+            var proxy=new WebProxy(address.Uri);
+            if(uri.UserInfo.Length>0){var parts=uri.UserInfo.Split(':',2);proxy.Credentials=new NetworkCredential(Uri.UnescapeDataString(parts[0]),parts.Length==2?Uri.UnescapeDataString(parts[1]):"");}
+            handler.Proxy=proxy;
+        }
+        return handler;
+    }
+    internal HttpClient Client(AiSettings settings)
+    {
+        lock(gate){ObjectDisposedException.ThrowIf(lifetime.IsCancellationRequested,this);var proxy=(settings.Proxy,settings.Proxy==AiProxyMode.Custom?settings.ProxyUrl??"":"");
             if(!clients.TryGetValue(proxy,out var client)){
-                var handler=new SocketsHttpHandler{AllowAutoRedirect=false,PooledConnectionIdleTimeout=TimeSpan.FromSeconds(30)};
-                if(settings.ProxyUrl!=null)handler.Proxy=new WebProxy(settings.ProxyUrl);
-                clients[proxy]=client=new HttpClient(handler){Timeout=Timeout.InfiniteTimeSpan};
+                var handler=CreateHandler(settings);
+                clients[proxy]=client=new HttpClient(endpoints.WrapHandler?.Invoke(handler)??handler){Timeout=Timeout.InfiniteTimeSpan};
             }return client;
         }
+    }
+    public async Task TestProxyAsync(CancellationToken cancellationToken)
+    {
+        var settings=store.Current.Ai;
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token);
+        timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        // 只探测地址，不发送认证、正文，也不跟随重定向。
+        using var request=new HttpRequestMessage(HttpMethod.Head,settings.Provider==AiProvider.ChatGpt?endpoints.Probe:settings.ApiBaseUrl);
+        try{
+            using var response=await Client(settings).SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
+            if(response.StatusCode==HttpStatusCode.ProxyAuthenticationRequired)throw new AiNetworkException("代理拒绝连接，请检查代理认证");
+            if((int)response.StatusCode>=500)throw new AiNetworkException("目标连不上，请检查服务地址");
+            // 401、403、404、405 等响应也证明目标 HTTP 服务可达。
+        }catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested){throw new AiNetworkException("连接超时，请检查网络和代理");}
+        catch(HttpRequestException e){
+            throw new AiNetworkException(e.HttpRequestError==HttpRequestError.ProxyTunnelError?"代理拒绝连接，请检查代理设置":settings.Proxy==AiProxyMode.Custom&&e.HttpRequestError is HttpRequestError.ConnectionError or HttpRequestError.NameResolutionError?"连不上代理，请检查代理地址和端口":"目标连不上，请检查服务地址和网络");
+        }catch(IOException){throw new AiNetworkException("目标连不上，连接已中断");}
     }
     internal async Task<HttpResponseMessage> Send(HttpRequestMessage request,AiSettings settings,CancellationToken ct)
     {
@@ -65,11 +96,12 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         catch(JsonException){return default;}
         catch(IOException){throw new AiNetworkException("AI 连接中断，请重试");}
     }
-    async Task<HttpResponseMessage> Authorized(AiSettings settings,string path,byte[]? body,CancellationToken ct)
+    async Task<HttpResponseMessage> Authorized(AiSettings settings,string path,byte[]? body,CancellationToken ct,Func<JsonElement,byte[]?>? retryBody=null)
     {
         bool chat=settings.Provider==AiProvider.ChatGpt;
-        for(int attempt=0;;attempt++){
-            var bearer=chat?(await Access(settings,ct,attempt>0)).AccessToken:key;
+        bool refreshed=false;
+        for(;;){
+            var bearer=chat?(await Access(settings,ct)).AccessToken:key;
             if(string.IsNullOrEmpty(bearer))throw new AiCredentialException("还没配置 AI 服务");
             using var request=new HttpRequestMessage(body==null?HttpMethod.Get:HttpMethod.Post,(chat?endpoints.Api:settings.ApiBaseUrl).TrimEnd('/')+path);
             request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",bearer);
@@ -77,8 +109,9 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             if(body!=null){request.Content=new ByteArrayContent(body);request.Content.Headers.ContentType=new("application/json");}
             var response=await Send(request,settings,ct);
             if(response.IsSuccessStatusCode)return response;
-            using(response){if(chat&&response.StatusCode==HttpStatusCode.Unauthorized&&attempt==0)continue;
+            using(response){if(chat&&response.StatusCode==HttpStatusCode.Unauthorized&&!refreshed){refreshed=true;await Access(settings,ct,true);continue;}
                 var bodyError=await Json(response,ct);
+                if(response.StatusCode==HttpStatusCode.BadRequest&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
                 if(chat&&bodyError.ValueKind==JsonValueKind.Object&&bodyError.TryGetProperty("error",out var detail)&&AiProtocol.String(detail,"code")=="subscription_sharing_user_not_eligible"){
                     lock(gate)SaveLogin(login with{PlanDenied=true});Notify();
                 }
@@ -117,7 +150,13 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         string? model=modelId??(chat?settings.ChatGptModel:settings.ApiModel);
         if(chat&&model==null){lock(gate){if(modelsSource==ModelSource(settings))model=models.FirstOrDefault()?.Id;}model??=(await Models(settings,ct)).FirstOrDefault()?.Id;}
         if(string.IsNullOrWhiteSpace(model))throw new AiCredentialException("请先在设置里选择模型");
-        using var response=await Authorized(settings,chat?"/responses":"/chat/completions",AiProtocol.Body(model,messages,chat),ct);
+        var capability=(settings.Provider,chat?endpoints.Api:settings.ApiBaseUrl.TrimEnd('/'),model);
+        AiReasoningEffort effort;lock(gate)effort=unsupportedReasoning.Contains(capability)?AiReasoningEffort.Default:settings.Reasoning;
+        using var response=await Authorized(settings,chat?"/responses":"/chat/completions",AiProtocol.Body(model,messages,chat,effort),ct,error=>{
+            if(effort==AiReasoningEffort.Default||!AiProtocol.UnsupportedReasoning(error))return null;
+            lock(gate)unsupportedReasoning.Add(capability);
+            return AiProtocol.Body(model,messages,chat);
+        });
         using var stream=await response.Content.ReadAsStreamAsync(ct);using var reader=new StreamReader(stream,Encoding.UTF8);
         var frame=new StringBuilder();bool firstText=true;
         while(true){
@@ -153,6 +192,8 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
 
 internal sealed record AiEndpoints
 {
+    internal Func<SocketsHttpHandler,HttpMessageHandler>? WrapHandler {get;init;}
+    internal string Probe {get;init;}="https://chatgpt.com";
     internal string Issuer {get;init;}="https://auth.openai.com";
     internal string Api {get;init;}="https://api.openai.com/v1";
     internal Action<string> OpenBrowser {get;init;}=url=>System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url){UseShellExecute=true});

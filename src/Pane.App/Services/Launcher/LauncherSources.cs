@@ -49,9 +49,10 @@ internal abstract class EntrySource(string group,int order,string prefix):Launch
 {
     public override int Limit(SourceContext c)=>3;
     protected abstract SearchEntry[] Entries(SourceContext c);
+    protected virtual NameMatch? Match(SearchEntry entry,string query)=>entry.Name.Match(query);
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();if(c.Query.Length==0)return Rows([]);
-        return Rows(Entries(c).Select(e=>(Entry:e,Match:e.Name.Match(c.Query))).Where(x=>x.Match!=null).OrderByDescending(x=>x.Match!.Score).Take(Limit(c)).Select(x=>new LauncherItem(x.Entry.Id,x.Entry.Kind,Group,x.Entry.Name.Name,x.Entry.Subtitle,new(x.Entry.Glyph),x.Match!.Spans)));
+        return Rows(Entries(c).Select(e=>(Entry:e,Match:Match(e,c.Query))).Where(x=>x.Match!=null).OrderByDescending(x=>x.Match!.Score).Take(Limit(c)).Select(x=>new LauncherItem(x.Entry.Id,x.Entry.Kind,Group,x.Entry.Name.Name,x.Entry.Subtitle,new(x.Entry.Glyph),x.Match!.Spans)));
     }
 }
 internal sealed class FavoriteSource(ILauncherExecutor executor):EntrySource("常用",2,"favorite:")
@@ -61,7 +62,10 @@ internal sealed class FavoriteSource(ILauncherExecutor executor):EntrySource("�
 }
 internal sealed class CommandSource(ILauncherExecutor executor):EntrySource("命令",4,"command:")
 {
-    protected override SearchEntry[] Entries(SourceContext c)=>c.Snapshot.Commands;
+    static readonly SearchEntry Rename=new("rename",LauncherItemKind.Command,new PinyinTable().Create("批量重命名"),"命令","pencil");
+    static readonly SearchName EnglishRename=new("rename","rename".Select((c,i)=>new NameToken(i,1,[c.ToString()],[c.ToString()])).ToArray());
+    protected override SearchEntry[] Entries(SourceContext c)=>[..c.Snapshot.Commands.Where(e=>e.Id!="rename"),Rename];
+    protected override NameMatch? Match(SearchEntry entry,string query)=>base.Match(entry,query)??(entry.Id=="rename"&&EnglishRename.Match(query) is {} alias?alias with{Spans=[]}:null);
     // TODO(design): 关机、重启由 LauncherView 在调用 ExecuteAsync 前确认（沿用 013）。
     public override Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token)=>executor.CommandAsync(item.Id[8..],token);
 }

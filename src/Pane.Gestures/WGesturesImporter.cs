@@ -6,34 +6,74 @@ namespace Pane.Gestures;
 
 public sealed class WGesturesImporter : IWGesturesImporter
 {
+    readonly string localAppData;
+    public WGesturesImporter() : this(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)) { }
+    internal WGesturesImporter(string localAppData) => this.localAppData = localAppData;
+    public IReadOnlyList<string> SearchedLocations { get; private set; } = [];
+
     public ImportPreview? Preview(string? directory = null)
     {
         directory ??= FindDirectory();
         if (directory is null) return null;
-        var (config, unsupported, version) = Read(directory, true);
-        using var source=JsonDocument.Parse(File.ReadAllText(Path.Combine(directory,"gestures.wg2")));
-        return new(directory, version, source.RootElement.GetProperty("Global").GetProperty("GestureIntents").GetArrayLength(), config.Apps.Count,
+        var (config, unsupported, version, globalCount) = Read(directory, true);
+        return new(directory, version, globalCount, config.Apps.Count,
             config.Apps.Count(a => a.Mode == AppRuleMode.Disabled), unsupported,
             config.Settings.TrailColors.Any(p=>GestureConfigStore.Empty.Settings.TrailColors[p.Key]!=p.Value));
     }
     public GestureConfig Import(ImportPreview preview, bool keepTrailColors) => Read(preview.SourceDirectory, keepTrailColors).Config;
 
-    static string? FindDirectory()
+    string? FindDirectory()
     {
-        var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YingDev.com", "WGestures");
-        if (!Directory.Exists(root)) return null;
-        return Directory.EnumerateDirectories(root).OrderByDescending(d => Version.TryParse(Path.GetFileName(d), out var v) ? v : new Version())
-            .FirstOrDefault(d => File.Exists(Path.Combine(d, "gestures.wg2")) && File.Exists(Path.Combine(d, "config.plist")));
+        var roots = new List<string> { Path.Combine(localAppData, "YingDev.com", "WGestures") };
+        var packages = Path.Combine(localAppData, "Packages");
+        var searched = new List<string> { roots[0], Path.Combine(packages, "*WGestures*", "LocalCache", "Local", "YingDev.com", "WGestures") };
+        foreach (var package in Directories(packages).Where(p => Path.GetFileName(p).Contains("WGestures", StringComparison.OrdinalIgnoreCase)))
+            roots.Add(Path.Combine(package, "LocalCache", "Local", "YingDev.com", "WGestures"));
+        var candidates = new List<string>();
+        foreach (var root in roots)
+        {
+            if (!searched.Contains(root)) searched.Add(root);
+            foreach (var directory in Directories(root))
+            {
+                searched.Add(directory);
+                candidates.AddRange(GestureFiles(directory));
+            }
+        }
+        SearchedLocations = searched.AsReadOnly();
+        return Path.GetDirectoryName(Newest(candidates));
     }
 
-    static (GestureConfig Config, List<UnsupportedItem> Unsupported, string Version) Read(string directory, bool colors)
+    static string[] Directories(string root)
     {
-        using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(directory, "gestures.wg2")));
+        try { return Directory.Exists(root) ? Directory.GetDirectories(root) : []; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return []; }
+    }
+    static IEnumerable<string> GestureFiles(string directory) => new[] { "gestures.wg2", "gestures.wg" }
+        .Select(name => Path.Combine(directory, name)).Where(File.Exists);
+    static string? Newest(IEnumerable<string> files) => files.OrderByDescending(File.GetLastWriteTimeUtc)
+        .ThenBy(p => p, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+
+    static (GestureConfig Config, List<UnsupportedItem> Unsupported, string Version, int GlobalCount) Read(string path, bool colors)
+    {
+        try { return ReadCore(path, colors); }
+        catch (Exception e) when (Path.GetExtension(path).Equals(".wgb", StringComparison.OrdinalIgnoreCase)
+            && e is JsonException or XmlException or KeyNotFoundException or InvalidOperationException or FormatException)
+        {
+            throw new InvalidDataException($"不是 WGestures 导出的文件：{path}", e);
+        }
+    }
+
+    static (GestureConfig Config, List<UnsupportedItem> Unsupported, string Version, int GlobalCount) ReadCore(string path, bool colors)
+    {
+        var source = ReadSource(path);
+        using var gestureStream = new MemoryStream(source.Gestures);
+        using var textReader = new StreamReader(gestureStream);
+        using var doc = JsonDocument.Parse(textReader.ReadToEnd());
         var root = doc.RootElement;
         var unsupported = new List<UnsupportedItem>();
         string version = Text(root, "FileVersion");
-        if (version != "3") throw new InvalidDataException($"不支持 WGestures 文件版本 {version}");
-        var global = Bindings(root.GetProperty("Global"), "全局", unsupported);
+        if (version is not ("1" or "2" or "3")) throw new InvalidDataException($"不支持 WGestures 文件 {source.Name} 的版本 {version}");
+        var global = Bindings(root.GetProperty("Global"), "全局", unsupported, version);
         var apps = new List<AppRule>();
         foreach (var prop in root.GetProperty("Apps").EnumerateObject())
         {
@@ -42,12 +82,19 @@ public sealed class WGesturesImporter : IWGesturesImporter
             if (enabled && !Bool(a, "InheritGlobalGestures", true))
                 unsupported.Add(new(prop.Name, "程序规则", "不继承全局的独立规则暂无法用接口草案表达"));
             apps.Add(new(Text(a, "ExecutablePath", prop.Name), null,
-                enabled ? AppRuleMode.InheritAndOverride : AppRuleMode.Disabled, Bindings(a, prop.Name, unsupported)));
+                enabled ? AppRuleMode.InheritAndOverride : AppRuleMode.Disabled, Bindings(a, prop.Name, unsupported, version)));
         }
-        using var reader = XmlReader.Create(Path.Combine(directory, "config.plist"), new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, XmlResolver = null });
-        var elements = XDocument.Load(reader).Root!.Element("dict")!.Elements().ToArray();
         var settings = new Dictionary<string, XElement>();
-        for (int i = 0; i + 1 < elements.Length; i += 2) settings[elements[i].Value] = elements[i + 1];
+        if (source.Config is not null)
+        {
+            using var stream = new MemoryStream(source.Config);
+            using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, XmlResolver = null });
+            var plist = XDocument.Load(reader).Root;
+            if (plist?.Name != "plist" || plist.Element("dict") is not XElement dict)
+                throw new XmlException("WGestures 设置文件缺少 plist/dict");
+            var elements = dict.Elements().ToArray();
+            for (int i = 0; i + 1 < elements.Length; i += 2) settings[elements[i].Value] = elements[i + 1];
+        }
         bool Flag(string key, bool fallback) => settings.TryGetValue(key, out var e) ? e.Name.LocalName == "true" : fallback;
         int Number(string key, int fallback) => settings.TryGetValue(key, out var e) && int.TryParse(e.Value, out var n) ? n : fallback;
         var defaults = GestureConfigStore.Empty.Settings;
@@ -72,19 +119,29 @@ public sealed class WGesturesImporter : IWGesturesImporter
             Flag("PathTrackerStayTimeout", false) ? Number("PathTrackerStayTimeoutMillis", 1200) : null,
             hotkey, palette), global, apps);
         GestureConfigStore.Validate(config);
-        return (config, unsupported, version);
+        return (config, unsupported, version, root.GetProperty("Global").GetProperty("GestureIntents").GetArrayLength());
     }
 
-    static List<GestureBinding> Bindings(JsonElement app, string where, List<UnsupportedItem> unsupported)
+    static (byte[] Gestures, byte[]? Config, string Name) ReadSource(string path)
+    {
+        if (Path.GetExtension(path).Equals(".wgb", StringComparison.OrdinalIgnoreCase) && !Directory.Exists(path))
+            return WGesturesArchive.Read(path);
+        string file = Directory.Exists(path) ? Newest(GestureFiles(path)) ?? throw new FileNotFoundException("未找到 WGestures 手势文件", path) : path;
+        string config = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(file))!, "config.plist");
+        return (File.ReadAllBytes(file), File.Exists(config) ? File.ReadAllBytes(config) : null, file);
+    }
+
+    static List<GestureBinding> Bindings(JsonElement app, string where, List<UnsupportedItem> unsupported, string version)
     {
         var result = new List<GestureBinding>();
-        foreach (var b in app.GetProperty("GestureIntents").EnumerateArray())
+        foreach (var entry in app.GetProperty("GestureIntents").EnumerateArray())
         {
+            var b = version == "1" ? entry.GetProperty("Value") : entry;
             string name = Text(b, "Name");
             try
             {
                 var g = b.GetProperty("Gesture");
-                var pattern = new GesturePattern((GestureButton)g.GetProperty("GestureButton").GetInt32(),
+                var pattern = new GesturePattern((GestureButton)(g.GetProperty("GestureButton").GetInt32() + (version == "3" ? 0 : 1)),
                     g.GetProperty("Dirs").EnumerateArray().Select(d => (GestureDirection)d.GetInt32()).ToArray(),
                     (GestureModifier)g.GetProperty("Modifier").GetInt32());
                 bool immediate = Bool(b, "ExecuteOnModifier", false);

@@ -23,11 +23,11 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid Width="32" Height="32">
-                        <Border CornerRadius="8" Background="{x:Bind Gradient}" Visibility="{x:Bind ColoredVisibility}"/>
-                        <Border CornerRadius="8" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1" Visibility="{x:Bind PlainVisibility}"/>
-                        <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White" Visibility="{x:Bind ColoredVisibility}"/>
-                        <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource PaneText2Brush}" Visibility="{x:Bind PlainVisibility}"/>
-                        <Image Width="32" Height="32" Source="{x:Bind Picture}" Visibility="{x:Bind PictureVisibility}"/>
+                        <Border CornerRadius="8" Background="{x:Bind Gradient}" Visibility="{x:Bind ColoredVisibility, Mode=OneWay}"/>
+                        <Border CornerRadius="8" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1" Visibility="{x:Bind PlainVisibility, Mode=OneWay}"/>
+                        <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White" Visibility="{x:Bind ColoredVisibility, Mode=OneWay}"/>
+                        <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource PaneText2Brush}" Visibility="{x:Bind PlainVisibility, Mode=OneWay}"/>
+                        <Image Width="32" Height="32" Source="{x:Bind Picture, Mode=OneWay}" Visibility="{x:Bind PictureVisibility, Mode=OneWay}"/>
                     </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                         <TextBlock c:MatchText.Source="{x:Bind Match}"

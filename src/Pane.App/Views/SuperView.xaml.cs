@@ -3,6 +3,7 @@
 // 选中外文自动翻译（2026-10-30，原型 launcher.html #sp，设置 → AI 里打开）：弹出就翻、不防抖，单个单词也翻；
 // 超过约 2000 字不自动翻，给「翻译」按钮；中文照旧。自动翻译时动作换成 复制译文 / 翻译窗口 / 问 AI / 总结 / 复制原文 / 搜索。
 // Tab：到翻译窗口继续（自动翻译、翻译结果卡片时）。
+// 选中的是文件（040）：动作换成 批量重命名 / 复制路径 / 复制名称（每行一个），不自动翻译。
 using System.ComponentModel;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
@@ -21,7 +22,9 @@ namespace Pane.Views;
 
 public sealed partial class SuperAction : INotifyPropertyChanged
 {
-    public SuperAction(string id, string name, string glyph, bool ai) { Id = id; Name = name; Glyph = glyph; IsAi = ai; }
+    public SuperAction(string id, string name, string glyph, bool ai, double width = 56) { Id = id; Name = name; Glyph = glyph; IsAi = ai; ItemWidth = width; }
+    /// <summary>格子宽：平时 6 个各 56；选中文件时只有 3 个，加宽到 84（「批量重命名」放得下）。</summary>
+    public double ItemWidth { get; }
     public string Id { get; }
     public string Name { get; }
     public string Glyph { get; }
@@ -52,6 +55,10 @@ public sealed partial class SuperView : UserControl, IPanelView
     public event Action<string>? OpenTranslate;
     /// <summary>问 AI：打开对话窗口，选中的文字放进输入框，等你写问题。</summary>
     public event Action<string>? OpenChat;
+    /// <summary>批量重命名：打开重命名窗口，带上选中的文件。</summary>
+    public event Action<IReadOnlyList<string>>? OpenRename;
+    readonly List<SuperAction> fileActions = [new("rename", "批量重命名", "pencil", false, 84), new("copy-path", "复制路径", "link", false, 84), new("copy-name", "复制名称", "copy", false, 84)];
+    IReadOnlyList<string>? files;
     int selected;
     bool activate;
     double lastHeight;
@@ -118,9 +125,25 @@ public sealed partial class SuperView : UserControl, IPanelView
         // 设计预览：PANE_DESIGN_SELECTION 指定选中文字（"-" 表示没读到）；宿主没给选区时用演示文字
         var preview = Environment.GetEnvironmentVariable("PANE_DESIGN_SELECTION");
         var sel = selection ?? (preview == "-" ? new SelectionResult(null, 0, SelectionFailure.Empty)
+                              : preview == "files" ? new SelectionResult(null, 0, SelectionFailure.None) { Files = RenameSample.Photos }
                                               : new SelectionResult(string.IsNullOrEmpty(preview) ? DemoSelection : preview, 0, SelectionFailure.None));
         selection = null; // 每次呼出由宿主重新给
         current = sel;
+        files = sel.Files is { Count: > 0 } f ? f : null;
+        QuoteBox.Visibility = files is null ? Visibility.Visible : Visibility.Collapsed;
+        FileBox.Visibility = files is null ? Visibility.Collapsed : Visibility.Visible;
+        if (files is not null)
+        {
+            ShowFiles(files);
+            StartAuto(null);
+            SetItems(fileActions);
+            foreach (var a in items) a.Enabled = true;
+            highlight.Hide();
+            selected = 0;
+            UpdateLayout();
+            Select(0);
+            return;
+        }
         var has = !string.IsNullOrWhiteSpace(sel.Text);
         QuoteText.Text = has ? sel.Text! : sel.Failure switch
         {
@@ -139,6 +162,35 @@ public sealed partial class SuperView : UserControl, IPanelView
     }
 
     SelectionResult current = new(null, 0, SelectionFailure.Empty);
+
+    // 文件头：第一项的类型决定图标和颜色；标题说「N 个文件」或「N 个文件和文件夹」；副标题前三个名字
+    void ShowFiles(IReadOnlyList<string> list)
+    {
+        static bool IsFolder(string p) => System.IO.Directory.Exists(p);
+        var first = list[0];
+        var category = Services.Launcher.FileSearch.Category(System.IO.Path.GetFileName(first), IsFolder(first));
+        var tile = Files.FileKinds.Brush(category);
+        FileTile1.Background = FileTile2.Background = FileTile3.Background = tile;
+        FileGlyph.Glyph = Files.FileKinds.Glyph(category);
+        int folders = list.Take(200).Count(IsFolder);
+        FileTitle.Text = list.Count == 1 ? System.IO.Path.GetFileName(first)
+            : $"{list.Count} 个" + (folders == 0 ? "文件" : folders == Math.Min(list.Count, 200) ? "文件夹" : "文件和文件夹");
+        FileNames.Text = list.Count == 1 ? System.IO.Path.GetDirectoryName(first) ?? ""
+            : string.Join("、", list.Take(3).Select(System.IO.Path.GetFileName)) + (list.Count > 3 ? " 等" : "");
+    }
+
+    async Task ExecuteFile(int index)
+    {
+        if (files is null || index < 0 || index >= items.Count) return;
+        Select(index);
+        var id = items[index].Id;
+        var list = files;
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+        if (id == "rename") { OpenRename?.Invoke(list); return; }
+        var text = string.Join(Environment.NewLine, id == "copy-path" ? list : list.Select(p => System.IO.Path.GetFileName(p)));
+        try { await actions.CopyAsync(text, CancellationToken.None); }
+        catch (Exception e) { ((App)Application.Current).ReportFailure(id == "copy-path" ? "复制路径" : "复制名称", e); }
+    }
 
     public void OnShown()
     {
@@ -239,6 +291,7 @@ public sealed partial class SuperView : UserControl, IPanelView
 
     async Task Execute(int index)
     {
+        if (files is not null) { await ExecuteFile(index); return; }
         if (index < 0 || index >= items.Count || current.Text is not { } text || !items[index].Enabled) return;
         Select(index);
         var a = items[index];
@@ -277,8 +330,8 @@ public sealed partial class SuperView : UserControl, IPanelView
         var hasResult = ResultArea.Visibility == Visibility.Visible && Card.Result.Length > 0;
         switch (e.Key)
         {
-            case VirtualKey.Left when current.Text is not null: Select(selected - 1); break;
-            case VirtualKey.Right when current.Text is not null: Select(selected + 1); break;
+            case VirtualKey.Left when current.Text is not null || files is not null: Select(selected - 1); break;
+            case VirtualKey.Right when current.Text is not null || files is not null: Select(selected + 1); break;
             case >= VirtualKey.Number1 and <= VirtualKey.Number6 when !ctrl: _ = Execute(e.Key - VirtualKey.Number1); break;
             case VirtualKey.Enter when hasResult: _ = Replace(); break;
             case VirtualKey.Enter: _ = Execute(selected); break;

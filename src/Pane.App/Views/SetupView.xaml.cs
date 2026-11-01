@@ -94,10 +94,8 @@ public sealed partial class SetupView : UserControl, IPanelView
     // 选文件夹：服务负责补上 \Pane、检查能不能写（要管理员权限的、已有别的文件的都拒绝），返回最终路径或原因
     async void OnChangePath(object sender, RoutedEventArgs e)
     {
-        var picker = new Windows.Storage.Pickers.FolderPicker();
-        picker.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-        if ((await picker.PickSingleFolderAsync())?.Path is not { } folder) return;
+        var owner = Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId);
+        if (await FolderPicker.PickFolderAsync(owner, null, null) is not { } folder) return;
         var check = setup.CheckInstallPath(folder);
         if (check.Error is { } error)
         {

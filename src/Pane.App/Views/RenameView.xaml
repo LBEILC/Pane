@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  批量重命名窗口（二级窗口，设计负责人，040）。照原型 prototype/rename.html #rw。
+  默认 940 × 600，可改大小（最小 760 × 440）。顶栏 56；左边规则 336（叠加、拖动排序、可单独关）；右边实时预览（行高 40，改动的部分加粗加底）；底栏 54。
+  入口：超级面板选中文件时「批量重命名」、启动器「批量重命名」命令和文件附件的动作。
+  失去焦点不关；Ctrl+Enter 执行，Ctrl+Z 撤销刚才那次，Esc 收起展开的面板，Ctrl+W 关。
+-->
+<UserControl
+    x:Class="Pane.Views.RenameView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:Pane.Views"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="False">
+
+    <UserControl.Resources>
+        <!-- 预览行：类型图标 26、原名、箭头、新名、右端（问题标签 / 移出按钮） -->
+        <DataTemplate x:Key="RowTemplate" x:DataType="views:RenameRow">
+            <Grid Height="40" Padding="8,0,8,0" ColumnSpacing="10" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="26"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto" MinWidth="24"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="26" Height="26" CornerRadius="7" Background="{x:Bind Tile}">
+                    <c:PaneIcon Width="14" Height="14" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White"/>
+                </Border>
+                <TextBlock Grid.Column="1" Text="{x:Bind OldName, Mode=OneWay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText2Brush}"
+                           ToolTipService.ToolTip="{x:Bind OldName, Mode=OneWay}"/>
+                <c:PaneIcon Grid.Column="2" Glyph="R" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText3Brush}"/>
+                <TextBlock Grid.Column="3" views:RenameDiff.Source="{x:Bind Diff, Mode=OneWay}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" ToolTipService.ToolTip="{x:Bind NewName, Mode=OneWay}"/>
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Border Height="18" Padding="7,0,7,0" CornerRadius="9" Background="{x:Bind TagBackground, Mode=OneWay}" Visibility="{x:Bind TagVisibility, Mode=OneWay}"
+                            ToolTipService.ToolTip="{x:Bind TagTip, Mode=OneWay}">
+                        <TextBlock Text="{x:Bind Tag, Mode=OneWay}" VerticalAlignment="Center" LineHeight="18" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
+                                   Foreground="{x:Bind TagForeground, Mode=OneWay}"/>
+                    </Border>
+                    <Border Tag="drop" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="6" Background="Transparent"
+                            Opacity="{x:Bind DropOpacity, Mode=OneWay}" ToolTipService.ToolTip="不改这个（移出列表）">
+                        <c:PaneIcon Glyph="close" Width="13" Height="13" Foreground="{ThemeResource PaneText3Brush}"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="54"/>
+        </Grid.RowDefinitions>
+
+        <!-- 顶栏：类型标签、文件在哪、预设、添加文件、总在最前、关闭。空白处可拖动窗口（宿主处理） -->
+        <Grid x:Name="Head" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Height="28" Padding="8,0,10,0" CornerRadius="14" VerticalAlignment="Center"
+                    Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:PaneIcon Glyph="pencil" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="批量重命名" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="WhereText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <Button x:Name="PresetButton" Grid.Column="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Padding="10,0,8,0" Click="OnPresets"
+                    ToolTipService.ToolTip="存过的规则组合">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <c:PaneIcon Glyph="bookmark" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="预设" VerticalAlignment="Center"/>
+                    <c:PaneIcon x:Name="PresetChevron" Glyph="chev-d" Width="12" Height="12" VerticalAlignment="Center" Foreground="{ThemeResource PaneText3Brush}" RenderTransformOrigin="0.5,0.5">
+                        <c:PaneIcon.RenderTransform><RotateTransform x:Name="PresetChevronTurn"/></c:PaneIcon.RenderTransform>
+                    </c:PaneIcon>
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnAddFiles" ToolTipService.ToolTip="添加文件…">
+                <c:PaneIcon Glyph="plus" Width="16" Height="16"/>
+            </Button>
+            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="总在最前">
+                <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
+            </Button>
+            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
+                <c:PaneIcon Glyph="close" Width="16" Height="16"/>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="336"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左：预设（展开时）、规则卡片、添加规则 -->
+            <ScrollViewer x:Name="RulesScroller" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0"
+                          VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Padding="10,10,10,12">
+                    <Border x:Name="PresetBox" Visibility="Collapsed" Margin="0,0,0,10" Padding="10,8,8,10" CornerRadius="{StaticResource PaneRadiusItem}"
+                            Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="点一下换成这组规则" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                            <c:WrapPanel x:Name="PresetList" HorizontalSpacing="6" VerticalSpacing="6"/>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel x:Name="RulesPanel" Spacing="8"/>
+                    <Button x:Name="AddRuleButton" Margin="0,8,0,0" HorizontalAlignment="Stretch" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlMd}" Click="OnAddRule">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:PaneIcon x:Name="AddRuleIcon" Glyph="plus" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}" RenderTransformOrigin="0.5,0.5">
+                                <c:PaneIcon.RenderTransform><RotateTransform x:Name="AddRuleTurn"/></c:PaneIcon.RenderTransform>
+                            </c:PaneIcon>
+                            <TextBlock x:Name="AddRuleText" Text="添加规则" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- 添加规则：就地展开七种规则（不弹菜单），点一种加到最后 -->
+                    <Grid x:Name="KindGrid" Visibility="Collapsed" Margin="0,6,0,0" ColumnSpacing="6" RowSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- 右：预览 -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="38"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid Padding="16,0,12,0" ColumnSpacing="10" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="36"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="16"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="1" Text="原名" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                    <TextBlock Grid.Column="3" Text="新名" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                    <Button x:Name="SortButton" Grid.Column="4" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlXs}" MinHeight="0" CornerRadius="12" Padding="10,0,10,0"
+                            FontSize="{StaticResource PaneTextXs}" Click="OnSort" ToolTipService.ToolTip="序号按这个顺序编（点一下换）">
+                        <TextBlock x:Name="SortText" Text="原顺序"/>
+                    </Button>
+                </Grid>
+                <Grid x:Name="PreviewArea" Grid.Row="1" AllowDrop="True" Background="Transparent" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
+                    <ScrollViewer x:Name="PreviewScroller" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="8,6,8,10">
+                        <Grid>
+                            <Canvas x:Name="RowHoverLayer" IsHitTestVisible="False"/>
+                            <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource RowTemplate}" PointerMoved="OnListPointerMoved" PointerExited="OnListPointerExited" Tapped="OnListTapped"/>
+                        </Grid>
+                    </ScrollViewer>
+                    <StackPanel x:Name="EmptyBox" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="24,0,24,0">
+                        <Border Width="52" Height="52" CornerRadius="14" HorizontalAlignment="Center"
+                                Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                            <c:PaneIcon Glyph="folder-plus" Width="24" Height="24" Foreground="{ThemeResource PaneText2Brush}"/>
+                        </Border>
+                        <TextBlock Text="没有选中文件" HorizontalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+                        <TextBlock Text="在资源管理器里选中文件再打开，或者把文件拖到这里" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
+                                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                        <Button HorizontalAlignment="Center" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnAddFiles">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:PaneIcon Glyph="plus" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                                <TextBlock Text="添加文件…" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <Border x:Name="DropHint" Margin="8" Opacity="0" IsHitTestVisible="False" CornerRadius="{StaticResource PaneRadiusItem}"
+                            Background="{ThemeResource PaneFillHoverBrush}" BorderBrush="{ThemeResource PaneText3Brush}" BorderThickness="2">
+                        <TextBlock Text="松开就加进来" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- 底栏：汇总、撤销、存为预设、执行 -->
+        <Grid Grid.Row="2" Padding="16,0,12,0" ColumnSpacing="10" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel x:Name="Summary" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center"/>
+            <Button x:Name="UndoButton" Grid.Column="1" Visibility="Collapsed" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnUndo">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:PaneIcon Glyph="undo" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="撤销" VerticalAlignment="Center"/>
+                    <StackPanel c:KeyCombo.Text="Ctrl+Z" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Grid Grid.Column="2">
+                <Button x:Name="SaveButton" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnSavePreset">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:PaneIcon Glyph="bookmark" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                        <TextBlock Text="存为预设" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <StackPanel x:Name="SaveBox" Visibility="Collapsed" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Border x:Name="SaveNameFrame" CornerRadius="{StaticResource PaneRadiusControl}" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                        <TextBox x:Name="SaveName" Width="160" Height="{StaticResource PaneControlSm}" MinHeight="0" Padding="10,5,10,0" PlaceholderText="给这组规则起个名字"
+                                 FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" IsSpellCheckEnabled="False" KeyDown="OnSaveNameKey"/>
+                    </Border>
+                    <Button Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Content="保存" Click="OnSaveConfirm"/>
+                </StackPanel>
+            </Grid>
+            <Button x:Name="GoButton" Grid.Column="3" Style="{StaticResource PanePrimaryButton}" Height="{StaticResource PaneControlMd}" MinHeight="0" CornerRadius="16" Padding="18,0,14,0"
+                    FontSize="{StaticResource PaneTextSm}" Click="OnGo" ToolTipService.ToolTip="Ctrl+Enter">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock x:Name="GoText" Text="重命名" VerticalAlignment="Center"/>
+                    <TextBlock Text="Ctrl+Enter" VerticalAlignment="Center" Opacity="0.7" FontSize="{StaticResource PaneTextXs}" FontWeight="Normal"/>
+                </StackPanel>
+            </Button>
+        </Grid>
+
+        <!-- 样板：代码里建控件时取字体、颜色 -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="SmallProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="SmallStrongProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="XsProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="MonoProto" FontFamily="{StaticResource PaneFontMono}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="Text2Proto" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="Text3Proto" Foreground="{ThemeResource PaneText3Brush}"/>
+            <Border x:Name="FillProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="SelectedProto" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="HoverProto" Background="{ThemeResource PaneFillHoverBrush}"/>
+            <Border x:Name="AccentProto" Background="{StaticResource PaneAccentBrush}"/>
+            <Border x:Name="MatchProto" Background="{ThemeResource PaneMatchBackgroundBrush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

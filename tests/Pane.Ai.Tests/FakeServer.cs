@@ -18,6 +18,8 @@ internal sealed class FakeServer:IAsyncDisposable
     public int Refreshes,Revocations;
     public bool RefreshFails;
     public bool ModelsAsChat;
+    public readonly List<(string Path,string Body)> Requests=[];
+    public string[] LastHeaders=[];
     public TaskCompletionSource Disconnected=new(TaskCreationOptions.RunContinuationsAsynchronously);
     public TaskCompletionSource Connected=new(TaskCreationOptions.RunContinuationsAsynchronously);
     public Task? CallbackTask;
@@ -36,6 +38,14 @@ internal sealed class FakeServer:IAsyncDisposable
             var headers=Encoding.ASCII.GetString(bytes.ToArray()).Split("\r\n");var path=headers[0].Split(' ')[1];int length=0;
             foreach(var h in headers)if(h.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))length=int.Parse(h.Split(':')[1]);
             var body=new byte[length];await stream.ReadExactlyAsync(body,stop.Token);LastBody=Encoding.UTF8.GetString(body);LastPath=path;
+            LastHeaders=headers;Requests.Add((path,LastBody));
+            if(Mode=="probe-timeout"){await Task.Delay(Timeout.Infinite,stop.Token);return;}
+            if(Mode.StartsWith("reasoning")&&path is "/responses" or "/chat/completions"){
+                bool has=LastBody.Contains("\"reasoning");
+                if(has||Mode=="reasoning-always"){
+                    await Reply(stream,400,Mode=="reasoning-message"?"{\"error\":{\"message\":\"This model does not support reasoning_effort\"}}":"{\"error\":{\"param\":\"reasoning_effort\"}}");return;
+                }
+            }
             if(path=="/.well-known/openid-configuration"){await Reply(stream,200,new JsonObject{["issuer"]=Url,["jwks_uri"]=Url+"/keys",["revocation_endpoint"]=Url+"/revoke"}.ToJsonString());return;}
             if(path=="/keys"){var p=rsa.ExportParameters(false);await Reply(stream,200,new JsonObject{["keys"]=new JsonArray(new JsonObject{["kty"]="RSA",["kid"]="test",["n"]=B64(p.Modulus!),["e"]=B64(p.Exponent!)})}.ToJsonString());return;}
             if(path=="/revoke"){Revocations++;await Reply(stream,200,"{}");return;}

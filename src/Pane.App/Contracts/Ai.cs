@@ -72,6 +72,12 @@ public interface IAiSetup
     /// <summary>用当前设置发一个极小的请求，确认地址、Key / 登录、模型都能用。失败抛 AiException。</summary>
     Task TestAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// 用当前代理设置连一下当前服务（042）：API 方式连接口地址，ChatGPT 方式连 chatgpt.com；3 秒超时，不发送用户数据和 Key。
+    /// 失败抛 AiNetworkException，消息是给用户看的中文原因（连不上代理 / 代理拒绝 / 超时 / 目标连不上）。默认实现退回「测试连接」。
+    /// </summary>
+    Task TestProxyAsync(CancellationToken cancellationToken) => TestAsync(cancellationToken);
+
     /// <summary>ChatGPT 账号；没登录为 null。</summary>
     AiAccount? Account { get; }
 

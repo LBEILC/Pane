@@ -8,6 +8,10 @@ internal static class LucideIcons
 {
     public static readonly System.Collections.Generic.Dictionary<string, string> Data = new()
     {
+        ["1"] = "M 17 7 L 7 17 M 17 17 H 7 V 7", // arrow-down-left
+        ["3"] = "M 7 7 l 10 10 M 17 7 v 10 H 7", // arrow-down-right
+        ["7"] = "M 7 17 V 7 h 10 M 17 17 L 7 7", // arrow-up-left
+        ["9"] = "M 7 7 h 10 v 10 M 7 17 L 17 7", // arrow-up-right
         ["search"] = "M 21 21 l -4.34 -4.34 M 3 11 A 8 8 0 1 0 19 11 A 8 8 0 1 0 3 11 Z", // search
         ["clipboard"] = "M 9 2 H 15 A 1 1 0 0 1 16 3 V 5 A 1 1 0 0 1 15 6 H 9 A 1 1 0 0 1 8 5 V 3 A 1 1 0 0 1 9 2 Z M 16 4 h 2 a 2 2 0 0 1 2 2 v 14 a 2 2 0 0 1 -2 2 H 6 a 2 2 0 0 1 -2 -2 V 6 a 2 2 0 0 1 2 -2 h 2", // clipboard
         ["gesture"] = "M 12 2 H 12 A 7 7 0 0 1 19 9 V 15 A 7 7 0 0 1 12 22 H 12 A 7 7 0 0 1 5 15 V 9 A 7 7 0 0 1 12 2 Z M 12 6 v 4", // mouse
@@ -66,9 +70,16 @@ internal static class LucideIcons
         ["D"] = "M 12 5 v 14 M 19 12 l -7 7 l -7 -7", // arrow-down
         ["L"] = "M 12 19 l -7 -7 l 7 -7 M 19 12 H 5", // arrow-left
         ["R"] = "M 5 12 h 14 M 12 5 l 7 7 l -7 7", // arrow-right
-        ["7"] = "M 7 17 V 7 h 10 M 17 17 L 7 7", // arrow-up-left
-        ["9"] = "M 7 7 h 10 v 10 M 7 17 L 17 7", // arrow-up-right
-        ["1"] = "M 17 7 L 7 17 M 17 17 H 7 V 7", // arrow-down-left
-        ["3"] = "M 7 7 l 10 10 M 17 7 v 10 H 7", // arrow-down-right
+        ["pencil"] = "M 21.174 6.812 a 1 1 0 0 0 -3.986 -3.987 L 3.842 16.174 a 2 2 0 0 0 -0.5 0.83 l -1.321 4.352 a 0.5 0.5 0 0 0 0.623 0.622 l 4.353 -1.32 a 2 2 0 0 0 0.83 -0.497 z M 15 5 l 4 4", // pencil
+        ["replace"] = "M 14 4 a 1 1 0 0 1 1 -1 M 15 10 a 1 1 0 0 1 -1 -1 M 21 4 a 1 1 0 0 0 -1 -1 M 21 9 a 1 1 0 0 1 -1 1 M 3 7 l 3 3 l 3 -3 M 6 10 V 5 a 2 2 0 0 1 2 -2 h 2 M 4 14 H 9 A 1 1 0 0 1 10 15 V 20 A 1 1 0 0 1 9 21 H 4 A 1 1 0 0 1 3 20 V 15 A 1 1 0 0 1 4 14 Z", // replace
+        ["insert"] = "M 12 20 h -1 a 2 2 0 0 1 -2 -2 a 2 2 0 0 1 -2 2 H 6 M 13 8 h 7 a 2 2 0 0 1 2 2 v 4 a 2 2 0 0 1 -2 2 h -7 M 5 16 H 4 a 2 2 0 0 1 -2 -2 v -4 a 2 2 0 0 1 2 -2 h 1 M 6 4 h 1 a 2 2 0 0 1 2 2 a 2 2 0 0 1 2 -2 h 1 M 9 6 v 12", // text-cursor-input
+        ["hash"] = "M 4 9 L 20 9 M 4 15 L 20 15 M 10 3 L 8 21 M 16 3 L 14 21", // hash
+        ["eraser"] = "M 21 21 H 8 a 2 2 0 0 1 -1.42 -0.587 l -3.994 -3.999 a 2 2 0 0 1 0 -2.828 l 10 -10 a 2 2 0 0 1 2.829 0 l 5.999 6 a 2 2 0 0 1 0 2.828 L 12.834 21 M 5.082 11.09 l 8.828 8.828", // eraser
+        ["case"] = "M 2 16 l 4.039 -9.69 a 0.5 0.5 0 0 1 0.923 0 L 11 16 M 22 9 v 7 M 3.304 13 h 6.392 M 15 12.5 A 3.5 3.5 0 1 0 22 12.5 A 3.5 3.5 0 1 0 15 12.5 Z", // case-sensitive
+        ["ext"] = "M 6 22 a 2 2 0 0 1 -2 -2 V 4 a 2 2 0 0 1 2 -2 h 8 a 2.4 2.4 0 0 1 1.704 0.706 l 3.588 3.588 A 2.4 2.4 0 0 1 20 8 v 12 a 2 2 0 0 1 -2 2 z M 14 2 v 5 a 1 1 0 0 0 1 1 h 5 M 11 18 h 2 M 12 12 v 6 M 9 13 v -0.5 a 0.5 0.5 0 0 1 0.5 -0.5 h 5 a 0.5 0.5 0 0 1 0.5 0.5 v 0.5", // file-type
+        ["calendar"] = "M 8 2 v 3 M 16 2 v 3 M 5 3 H 19 A 2 2 0 0 1 21 5 V 19 A 2 2 0 0 1 19 21 H 5 A 2 2 0 0 1 3 19 V 5 A 2 2 0 0 1 5 3 Z M 3 9 h 18", // calendar
+        ["undo"] = "M 9 14 L 4 9 l 5 -5 M 4 9 h 10.5 a 5.5 5.5 0 0 1 5.5 5.5 a 5.5 5.5 0 0 1 -5.5 5.5 H 11", // undo-2
+        ["copy"] = "M 10 8 H 20 A 2 2 0 0 1 22 10 V 20 A 2 2 0 0 1 20 22 H 10 A 2 2 0 0 1 8 20 V 10 A 2 2 0 0 1 10 8 Z M 4 16 c -1.1 0 -2 -0.9 -2 -2 V 4 c 0 -1.1 0.9 -2 2 -2 h 10 c 1.1 0 2 0.9 2 2", // copy
+        ["bookmark"] = "M 17 3 a 2 2 0 0 1 2 2 v 15 a 1 1 0 0 1 -1.496 0.868 l -4.512 -2.578 a 2 2 0 0 0 -1.984 0 l -4.512 2.578 A 1 1 0 0 1 5 20 V 5 a 2 2 0 0 1 2 -2 z", // bookmark
     };
 }

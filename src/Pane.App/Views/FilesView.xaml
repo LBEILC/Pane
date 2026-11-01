@@ -29,9 +29,12 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <Border Width="32" Height="32" CornerRadius="8" Background="{x:Bind Tile}">
-                    <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White"/>
-                </Border>
+                <Grid Width="32" Height="32">
+                    <Border CornerRadius="8" Background="{x:Bind Tile}" Visibility="{x:Bind TileVisibility, Mode=OneWay}">
+                        <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White"/>
+                    </Border>
+                    <Image Width="32" Height="32" Source="{x:Bind SystemIcon, Mode=OneWay}" Visibility="{x:Bind SystemIconVisibility, Mode=OneWay}"/>
+                </Grid>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                     <TextBlock c:MatchText.Source="{x:Bind Match}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                                Foreground="{ThemeResource PaneText1Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
@@ -137,6 +140,7 @@
                             <Border x:Name="ThumbTile" Width="64" Height="64" CornerRadius="16" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <c:PaneIcon x:Name="ThumbGlyph" Width="32" Height="32" StrokeWidth="2" Foreground="White"/>
                             </Border>
+                            <Image x:Name="ThumbSystem" Width="64" Height="64" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
                             <Image x:Name="ThumbImage" Stretch="UniformToFill" Visibility="Collapsed"/>
                         </Grid>
                     </Border>

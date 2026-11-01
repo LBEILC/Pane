@@ -58,6 +58,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
     public event Action<string, string?>? OpenFiles;
     /// <summary>翻译窗口：带上要翻译的文字。</summary>
     public event Action<string>? OpenTranslate;
+    /// <summary>批量重命名（040）：文件附件给出文件；命令不带文件，宿主读呼出前那个资源管理器窗口（第二个参数）里选中的。</summary>
+    public event Action<IReadOnlyList<string>?, nint>? OpenRename;
     /// <summary>AI 对话窗口：要直接发出的问题，或带过去的一问一答（「继续对话」）。</summary>
     public event Action<string?, IReadOnlyList<AiChatMessage>?>? OpenChat;
     /// <summary>文件格 Ctrl+Enter「打开所在文件夹」用；宿主设置（021 之前演示模式用假服务）。</summary>
@@ -84,6 +86,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         Sections.Tapped += OnResultsTapped;
         Card.ContentGrew += (_, _) => RequestHeight();
         Card.SizeChanged += (_, _) => RequestHeight();
+        Icons.Ready += OnIconReady;
     }
 
     /// <summary>剪贴板「交给启动器」：宿主先调用这个，再显示启动器。</summary>
@@ -211,6 +214,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
             items.Add(new("open", LauncherItemKind.Action, "文件", "打开", System.IO.Path.GetFileName(first), new("folder")));
             items.Add(new("reveal", LauncherItemKind.Action, "文件", "打开所在文件夹", "文件资源管理器", new("folder")));
             items.Add(new("copy-path", LauncherItemKind.Action, "文件", "复制路径", $"{a.Files?.Count ?? 0} 个路径", new("link")));
+            items.Add(new("rename", LauncherItemKind.Action, "文件", "批量重命名", $"{a.Files?.Count ?? 0} 个文件", new("pencil")));
         }
         else if (a.Kind == ClipKind.Image)
         {
@@ -288,6 +292,44 @@ public sealed partial class LauncherView : UserControl, IPanelView
         if (cts.IsCancellationRequested) return;
         partialShown = true;   // 部分结果还在队列里没画的，就不画了
         Render(result, query, attachmentMode: false, keepSelection: shownQuery == query.Trim());
+        _ = Suggest(query.Trim(), cts);
+    }
+
+    // ---------------- 网页搜索建议（037） ----------------
+
+    const int MaxSettings = 4;
+    LauncherResult? lastResult;
+    (string Query, IReadOnlyList<string> Items) suggested = ("", []);
+
+    /// <summary>「关键字 空格 内容」，关键字是设置里的某个搜索站点；内容不能是空的。</summary>
+    static (Settings.SearchEngine Engine, string Text)? KeywordQuery(string q)
+    {
+        int space = q.IndexOf(' ');
+        if (space <= 0) return null;
+        var text = q[(space + 1)..].Trim();
+        if (text.Length == 0) return null;
+        return Options.SearchEngines.FirstOrDefault(e => string.Equals(e.Keyword, q[..space], StringComparison.OrdinalIgnoreCase)) is { } engine ? (engine, text) : null;
+    }
+
+    static LauncherItem WebItem(Settings.SearchEngine engine, string text, string title, string? hotkey) =>
+        new("web:" + engine.UrlTemplate.Replace("{query}", Uri.EscapeDataString(text), StringComparison.Ordinal), LauncherItemKind.Web, "网页", title, null, new("search"), Hotkey: hotkey);
+
+    // 只在用关键字搜网页时才向那个站点要建议（平时打字不联网）；停手 150 ms 再要，回来时输入没变才补上
+    async Task Suggest(string q, CancellationTokenSource cts)
+    {
+        if (KeywordQuery(q) is not { } web || !Options.WebSuggestions || ((App)Application.Current).WebSuggestions is not { } service) return;
+        var key = web.Engine.Keyword + " " + web.Text;
+        if (suggested.Query == key) return;
+        try
+        {
+            await Task.Delay(150, cts.Token);
+            var items = await service.SuggestAsync(web.Engine, web.Text, cts.Token);
+            if (cts.IsCancellationRequested || shownQuery != q || items.Count == 0 || lastResult is not { } r) return;
+            suggested = (key, items.Take(8).ToList());
+            Render(r, q, attachmentMode: false, keepSelection: true);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception) { /* 建议取不到就不显示，不打扰 */ }
     }
 
     void Render(LauncherResult result, string query, bool attachmentMode, bool keepSelection = false)
@@ -323,16 +365,40 @@ public sealed partial class LauncherView : UserControl, IPanelView
                 Add(sections[^1], item, LauncherCell.Attachment);
             }
         }
+        else if (q.StartsWith('>'))
+        {
+            // 终端（037）：「在终端里运行」一组，补全一组；不出应用和文件
+            foreach (var item in result.Items.Where(i => i.Group is "终端" or "补全"))
+            {
+                if (sections.Count == 0 || sections[^1].Label != item.Group) Section(item.Group, LauncherSectionKind.List);
+                Add(sections[^1], item, LauncherCell.Command);
+            }
+        }
+        else if (KeywordQuery(q) is { } web)
+        {
+            // 用搜索关键字搜网页（「bd 天气」）：只出网页一组，第一项就是用这个站点搜，下面跟站点给的搜索建议（037）
+            var s = Section(web.Engine.Name, LauncherSectionKind.List);
+            Add(s, WebItem(web.Engine, web.Text, $"用 {web.Engine.Name} 搜「{web.Text}」", "Enter"), LauncherCell.Command);
+            if (suggested.Query == web.Engine.Keyword + " " + web.Text)
+                foreach (var text in suggested.Items.Where(t => t != web.Text)) Add(s, WebItem(web.Engine, text, text, null), LauncherCell.Command);
+        }
         else if (q.Length > 0)
         {
             // 服务给的 AI / 网页两组不用了（动作行代替）
             foreach (var item in result.Items.Where(i => i.Kind == LauncherItemKind.Calculation).Take(1))
                 Add(Section("", LauncherSectionKind.Calc), item, LauncherCell.Calc);
-            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command).Take(MaxApps).ToList();
+            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command && i.Group != "设置").Take(MaxApps).ToList();
             if (apps.Count > 0)
             {
                 var s = Section("应用", LauncherSectionKind.Tiles);
                 foreach (var item in apps) Add(s, item, item.Kind == LauncherItemKind.App ? LauncherCell.App : LauncherCell.Command);
+            }
+            // 系统设置和组件（037）：名字长，排成列表，在应用后面、动作行前面
+            var settings = result.Items.Where(i => i.Kind == LauncherItemKind.Command && i.Group == "设置").Take(MaxSettings).ToList();
+            if (settings.Count > 0)
+            {
+                var s = Section("设置", LauncherSectionKind.List);
+                foreach (var item in settings) Add(s, item, LauncherCell.Command);
             }
             var actions = ActionItems();
             if (actions.Count > 0)
@@ -347,12 +413,14 @@ public sealed partial class LauncherView : UserControl, IPanelView
             {
                 var s = Section("文件", LauncherSectionKind.List);
                 foreach (var item in favorites.Concat(files.Take(MaxFiles))) Add(s, item, LauncherCell.File);
+                if (Pane.Views.Files.SystemIcons.Enabled) foreach (var r in s.Rows) r.SetSystemIcon(FileIcon(r));
                 int total = Math.Max(result.FileTotal, files.Count);
                 if (total > MaxFiles)
                     Add(s, new("files:more", LauncherItemKind.Action, "文件", $"在文件窗口里查看全部 {total:N0} 个", null, new("external")), LauncherCell.More);
             }
         }
 
+        lastResult = result;
         Sections.ItemsSource = sections;
         ResultsArea.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Foot.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -397,6 +465,11 @@ public sealed partial class LauncherView : UserControl, IPanelView
         {
             LauncherCell.Calc => ($"复制 {item.Title}", [(["Enter"], "复制")]),
             LauncherCell.App => ($"打开 {item.Title}", [(["Enter"], "打开")]),
+            LauncherCell.Command when item.Id == "terminal:hint" => ("输入命令后按 Enter 在终端里运行", []),
+            LauncherCell.Command when item.Group == "终端" => ($"在终端里运行 {item.Subtitle}", [(["Enter"], "运行"), (["Ctrl", "+", "Shift", "+", "Enter"], "以管理员身份运行")]),
+            LauncherCell.Command when item.Group == "补全" => ($"运行 {item.Title}", [(["Tab"], "填进输入框"), (["Enter"], "运行"), (["Ctrl", "+", "Shift", "+", "Enter"], "以管理员身份")]),
+            LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? $"搜「{item.Title}」" : item.Title, [(["Enter"], "搜索"), (["Tab"], "填进输入框")]),
+            LauncherCell.Command when item.Group == "设置" => ($"打开 {item.Title}", [(["Enter"], "打开")]),
             LauncherCell.Command => (item.Title, [(["Enter"], "执行")]),
             LauncherCell.File => ($"打开 {item.Title}", [(["Enter"], "打开"), (["Ctrl", "+", "Enter"], "打开所在文件夹"), (["Tab"], "在文件窗口里看")]),
             LauncherCell.More => ($"在文件窗口里搜「{q}」", [(["Enter"], "打开文件窗口")]),
@@ -589,7 +662,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
             case VirtualKey.Up: MoveLine(-1); break;
             case VirtualKey.Right when SelectedIsTile: MoveInLine(1); break;
             case VirtualKey.Left when SelectedIsTile: MoveInLine(-1); break;
-            case VirtualKey.Enter: _ = Execute(selected, false, ctrl); break;
+            case VirtualKey.Enter: _ = Execute(selected, false, ctrl, Down(VirtualKey.Shift)); break;
             case VirtualKey.Tab: _ = Execute(selected, true, false); break;
             case VirtualKey.Back when Input.Text.Length == 0 && attachment is not null:
                 SetAttachment(null); _ = Refresh(string.Empty); break; // 空输入时退格去掉附件
@@ -631,7 +704,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
     // 关机、重启：第一次 Enter 只把副标题换成确认提示，3 秒内再按一次才执行（013 约定由界面确认）
     LauncherRow? armed;
     Microsoft.UI.Dispatching.DispatcherQueueTimer? armTimer;
-    static bool NeedsConfirm(LauncherItem item) => item.Kind == LauncherItemKind.Command && item.Title is "关机" or "重启";
+    static bool NeedsConfirm(LauncherItem item) => item.Kind == LauncherItemKind.Command && item.Title is "关机" or "重启" or "注销";
 
     LauncherRow? failed;
 
@@ -692,12 +765,24 @@ public sealed partial class LauncherView : UserControl, IPanelView
         return System.IO.Path.Combine(item.Subtitle ?? "", item.Title);
     }
 
-    async Task Execute(int index, bool tab, bool ctrl)
+    async Task Execute(int index, bool tab, bool ctrl, bool shift = false)
     {
         if (index < 0 || index >= rows.Count) return;
         var row = rows[index];
         var item = row.Item;
         var q = shownQuery;
+
+        // Tab：补全项填进输入框（037）；网页建议填成「关键字 建议」接着改
+        if (tab && item.Id.StartsWith("complete:", StringComparison.Ordinal)) { Fill(">" + item.Id["complete:".Length..]); return; }
+        if (tab && item.Kind == LauncherItemKind.Web && KeywordQuery(q) is { } kw) { Fill($"{kw.Engine.Keyword} {(item.Hotkey is null ? item.Title : kw.Text)}"); return; }
+        if (item.Id == "terminal:hint") return;   // 只有 > 时的提示项
+        // 终端项 Ctrl+Shift+Enter：以管理员身份运行（走系统 UAC）
+        if (ctrl && shift && item.Group is "终端" or "补全")
+        {
+            try { await search.ExecuteElevatedAsync(item, CancellationToken.None); CloseRequested?.Invoke(this, EventArgs.Empty); }
+            catch (Exception e) { if (App.FailureReason(e) is { } reason) ShowFailure(row, $"运行失败：{reason}"); }
+            return;
+        }
 
         // 展开成二级窗口的几种
         switch (row.Cell)
@@ -730,6 +815,15 @@ public sealed partial class LauncherView : UserControl, IPanelView
                 break;
         }
 
+        // 批量重命名：命令（040，Id = rename）和文件附件的动作都由界面打开重命名窗口
+        if (item.Id == "rename" && item.Kind is LauncherItemKind.Command or LauncherItemKind.Action)
+        {
+            var files = attachment is { Kind: ClipKind.Files, Files: { } f } ? f : null;
+            var window = previousWindow;
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+            OpenRename?.Invoke(files, window);
+            return;
+        }
         if (NeedsConfirm(item) && !Confirmed(row)) return;
         if (item.Kind == LauncherItemKind.Ai) { RunAi(item.Id.StartsWith("ai:", StringComparison.Ordinal) ? item.Id[3..] : item.Id); return; }
         try
@@ -751,6 +845,23 @@ public sealed partial class LauncherView : UserControl, IPanelView
             return;
         }
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    // 系统文件图标（036）：没缓存的后台去取，好了补到还显示着的那一行
+    static Pane.Contracts.IFileIcons Icons => ((App)Application.Current).FileIcons;
+    static string? FileIcon(LauncherRow r) => r.Cell == LauncherCell.File ? Icons.TryGet(FilePath(r.Item), r.Item.Kind == LauncherItemKind.Folder) : null;
+    void OnIconReady(object? sender, string path) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!Pane.Views.Files.SystemIcons.Enabled) return;
+        foreach (var r in rows)
+            if (r.Cell == LauncherCell.File && string.Equals(FilePath(r.Item), path, StringComparison.OrdinalIgnoreCase)) r.SetSystemIcon(FileIcon(r));
+    });
+
+    void Fill(string text)
+    {
+        Input.Text = text;
+        Input.SelectionStart = text.Length;
+        Input.Focus(FocusState.Programmatic);
     }
 
     // ---------------- 小工具 ----------------

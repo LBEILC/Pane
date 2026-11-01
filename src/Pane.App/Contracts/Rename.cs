@@ -5,11 +5,11 @@ namespace Pane.Contracts;
 /// <summary>
 /// Replace：把 Find 换成 Text（Regex 时 Text 里可用 $1）；Insert：在 Position 插入 Text；
 /// Number：在 Position 插入序号（Start 起、每次加 Step、补零到 Digits 位，序号和名字之间加 Separator）；
-/// Remove：从 Index 起删 Count 个字（FromEnd 时从末尾往前数）；Case：改大小写；
+/// Remove：从第 Index 个字起往后删 Count 个（FromEnd 时从倒数第 Index 个字起往前删）；Case：改大小写；
 /// Extension：扩展名换成 Text（不带点；空 = 去掉扩展名）；Date：在 Position 插入文件日期（DateSource、DateFormat，后面加 Separator）。
 /// </summary>
 public enum RenameRuleKind { Replace, Insert, Number, Remove, Case, Extension, Date }
-/// <summary>Index：从开头数第 Index 个字之前（FromEnd 时从末尾数）。</summary>
+/// <summary>Index：插在第 Index 个字前面（FromEnd 时插在倒数第 Index 个字后面，所以 1 = 末尾）。Index 从 1 数（2026-11-01 定）。</summary>
 public enum RenamePosition { Start, End, Index }
 /// <summary>Title：每个词首字母大写，其余小写。</summary>
 public enum RenameCase { Lower, Upper, Title }
@@ -28,7 +28,8 @@ public sealed record RenameRule(RenameRuleKind Kind)
     public bool Regex { get; init; }
     public bool MatchCase { get; init; }
     public RenamePosition Position { get; init; } = RenamePosition.End;
-    public int Index { get; init; }
+    /// <summary>从 1 数，见 <see cref="RenamePosition.Index"/> 和 Remove；小于 1 按 1 算，超出名字长度按名字长度算。</summary>
+    public int Index { get; init; } = 1;
     public bool FromEnd { get; init; }
     public int Count { get; init; } = 1;
     public int Start { get; init; } = 1;

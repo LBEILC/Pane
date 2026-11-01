@@ -64,6 +64,9 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         Input.GotFocus += (_, _) => HideDelete();
         ShowEmpty();
         UpdatePreview();
+        // 窗口关掉就释放，取消订阅免得服务一直引用它
+        Icons.Ready += OnIconReady;
+        Unloaded += (_, _) => Icons.Ready -= OnIconReady;
     }
 
     /// <summary>打开（或复用）窗口时宿主调用：带上查询文字，focus 是要选中的文件（启动器里文件格按 Tab）。</summary>
@@ -159,7 +162,34 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         }
     }
 
-    void Append(IEnumerable<FileHit> hits) { foreach (var h in hits) rows.Add(new FileRow(h, rows.Count)); }
+    void Append(IEnumerable<FileHit> hits)
+    {
+        bool system = SystemIcons.Enabled;
+        foreach (var h in hits)
+        {
+            var row = new FileRow(h, rows.Count);
+            if (system) row.SetSystemIcon(Icons.TryGet(h.Path, h.Category == FileCategory.Folder));
+            rows.Add(row);
+        }
+    }
+
+    // 系统文件图标（036）：没缓存的后台去取，好了按路径补到行上（可能在后台线程触发）
+    static Pane.Contracts.IFileIcons Icons => ((App)Application.Current).FileIcons;
+    void OnIconReady(object? sender, string path) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (!SystemIcons.Enabled) return;
+        foreach (var r in rows)
+            if (string.Equals(r.Hit.Path, path, StringComparison.OrdinalIgnoreCase)) r.SetSystemIcon(Icons.TryGet(path, r.Hit.Category == FileCategory.Folder));
+        if (Current is { } c && string.Equals(c.Hit.Path, path, StringComparison.OrdinalIgnoreCase)) UpdateThumbIcon(c.Hit);
+    });
+
+    void UpdateThumbIcon(FileHit hit)
+    {
+        var icon = SystemIcons.Enabled ? SystemIcons.Load(Icons.TryGet(hit.Path, hit.Category == FileCategory.Folder)) : null;
+        ThumbSystem.Source = icon;
+        ThumbSystem.Visibility = icon is null ? Visibility.Collapsed : Visibility.Visible;
+        ThumbTile.Visibility = icon is null ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     void Bind()
     {
@@ -291,6 +321,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         PreviewName.Text = hit.Name;
         ThumbTile.Background = FileKinds.Brush(hit.Category);
         ThumbGlyph.Glyph = FileKinds.Glyph(hit.Category);
+        UpdateThumbIcon(hit);
         ThumbImage.Source = null;
         ThumbImage.Visibility = Visibility.Collapsed;
         ThumbBox.Visibility = Visibility.Visible;

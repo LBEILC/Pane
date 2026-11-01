@@ -95,18 +95,24 @@ API int PaneLauncherPackagePath(const wchar_t* id,wchar_t* output,int capacity){
  if(GetPackagesByPackageFamily(family.c_str(),&count,names.data(),&length,buffer.data())!=ERROR_SUCCESS)return 0;
  for(UINT32 i=0;i<count;i++){UINT32 size=static_cast<UINT32>(capacity);if(GetPackagePathByFullName(names[i],&size,output)==ERROR_SUCCESS)return 1;}return 0;
 }
-API int PaneLauncherIcon(const wchar_t* parsing,const wchar_t* output){
+static int shellIcon(const wchar_t* parsing,const wchar_t* output,int size){
  Apartment apartment;
  ComPtr<IShellItemImageFactory> item;HRESULT found=SHCreateItemFromParsingName(parsing,nullptr,IID_PPV_ARGS(&item));if(FAILED(found))return static_cast<int>(found);
- HBITMAP bitmap=nullptr;found=item->GetImage({256,256},SIIGBF_ICONONLY,&bitmap);if(FAILED(found))return static_cast<int>(found);
+ HBITMAP bitmap=nullptr;found=item->GetImage({size,size},SIIGBF_ICONONLY,&bitmap);if(FAILED(found))return static_cast<int>(found);
  ComPtr<IWICImagingFactory> factory;ComPtr<IWICBitmap> image;ComPtr<IWICStream> stream;ComPtr<IWICBitmapEncoder> encoder;ComPtr<IWICBitmapFrameEncode> frame;
  HRESULT hr=CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&factory));
  if(SUCCEEDED(hr))hr=factory->CreateBitmapFromHBITMAP(bitmap,nullptr,WICBitmapUsePremultipliedAlpha,&image);
  if(SUCCEEDED(hr))hr=factory->CreateStream(&stream);if(SUCCEEDED(hr))hr=stream->InitializeFromFilename(output,GENERIC_WRITE);
  if(SUCCEEDED(hr))hr=factory->CreateEncoder(GUID_ContainerFormatPng,nullptr,&encoder);if(SUCCEEDED(hr))hr=encoder->Initialize(stream.Get(),WICBitmapEncoderNoCache);
  if(SUCCEEDED(hr))hr=encoder->CreateNewFrame(&frame,nullptr);if(SUCCEEDED(hr))hr=frame->Initialize(nullptr);
- if(SUCCEEDED(hr))hr=frame->WriteSource(image.Get(),nullptr);if(SUCCEEDED(hr))hr=frame->Commit();if(SUCCEEDED(hr))hr=encoder->Commit();DeleteObject(bitmap);return SUCCEEDED(hr)?1:static_cast<int>(hr);
+ // 文件图标固定输出 64 px；Shell 可能只返回较小的原始图标，保留 alpha 后缩放。
+ ComPtr<IWICBitmapScaler> scaled;
+ if(SUCCEEDED(hr)&&size==64)hr=factory->CreateBitmapScaler(&scaled);
+ if(SUCCEEDED(hr)&&scaled)hr=scaled->Initialize(image.Get(),64,64,WICBitmapInterpolationModeFant);
+ if(SUCCEEDED(hr))hr=frame->WriteSource(scaled?static_cast<IWICBitmapSource*>(scaled.Get()):static_cast<IWICBitmapSource*>(image.Get()),nullptr);if(SUCCEEDED(hr))hr=frame->Commit();if(SUCCEEDED(hr))hr=encoder->Commit();DeleteObject(bitmap);return SUCCEEDED(hr)?1:static_cast<int>(hr);
 }
+API int PaneLauncherIcon(const wchar_t* parsing,const wchar_t* output){return shellIcon(parsing,output,256);}
+API int PaneFileIcon(const wchar_t* path,const wchar_t* output){return shellIcon(path,output,64);}
 API int PaneEverythingVersion(int* version){auto h=endpoint();if(!h)return 0;for(int i=0;i<4;i++){DWORD_PTR v=0;if(!SendMessageTimeoutW(h,WM_USER,static_cast<WPARAM>(i),0,SMTO_ABORTIFHUNG,30,&v))return -1;version[i]=static_cast<int>(v);}return version[0]>1||(version[0]==1&&version[1]>=4)?1:-1;}
 using FileCallback=void(__cdecl*)(const wchar_t*,const wchar_t*,int);
 API int PaneEverythingQuery(const wchar_t* query,int limit,FileCallback callback){
@@ -155,14 +161,15 @@ int launcherOpen(const wchar_t* target,int packaged){
  }
  SHELLEXECUTEINFOW info{sizeof(info)};info.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC|SEE_MASK_FLAG_NO_UI;info.lpVerb=L"open";info.lpFile=target;info.nShow=SW_SHOWNORMAL;
  PIDLIST_ABSOLUTE item=nullptr;if(wcsncmp(target,L"::",2)==0&&SUCCEEDED(SHParseDisplayName(target,nullptr,&item,0,nullptr))){info.fMask|=SEE_MASK_IDLIST;info.lpIDList=item;info.lpFile=nullptr;}
- bool ok=ShellExecuteExW(&info)!=0;if(info.hProcess){AllowSetForegroundWindow(GetProcessId(info.hProcess));CloseHandle(info.hProcess);}CoTaskMemFree(item);return ok;
+ bool ok=ShellExecuteExW(&info)!=0;DWORD error=ok?ERROR_SUCCESS:GetLastError();if(info.hProcess){AllowSetForegroundWindow(GetProcessId(info.hProcess));CloseHandle(info.hProcess);}CoTaskMemFree(item);return !ok&&error==ERROR_CANCELLED?-ERROR_CANCELLED:static_cast<int>(ok);
 }
 }
 API int PaneLauncherOpen(const wchar_t* target,int packaged){
  if(!target||!*target)return 0;
  // 保持工作槽存活到进程结束，超时任务仍可能引用它。
  static auto* operation=new BoundedOpen;
- try {return operation->run([value=std::wstring(target),packaged]{return launcherOpen(value.c_str(),packaged);});}
+ // 模式 2 只由内置系统组件入口使用，允许用户在 UAC 中停留；普通文件仍受 5 秒上限保护。
+ try {return operation->run([value=std::wstring(target),packaged]{return launcherOpen(value.c_str(),packaged==1);},packaged==2?INFINITE:5000);}
  catch(...) {return 0;}
 }
 API int PaneLauncherReveal(const wchar_t* path){Apartment apartment;PIDLIST_ABSOLUTE item=nullptr;if(FAILED(SHParseDisplayName(path,nullptr,&item,0,nullptr)))return 0;auto hr=SHOpenFolderAndSelectItems(item,0,nullptr,0);CoTaskMemFree(item);return SUCCEEDED(hr);}
@@ -170,6 +177,8 @@ extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int);
 API int PaneLauncherCopy(const wchar_t* value){return PaneClipWrite(value,nullptr,nullptr,0); }
 API int PaneLauncherCommand(int command){
  if(command==0)return LockWorkStation();if(command==1)return SetSuspendState(FALSE,FALSE,FALSE);
+ if(command==5)return ExitWindowsEx(EWX_LOGOFF,SHTDN_REASON_MAJOR_APPLICATION|SHTDN_REASON_FLAG_PLANNED);
+ if(command==6)return SetSuspendState(TRUE,FALSE,FALSE);
  if(command==4)return SUCCEEDED(SHEmptyRecycleBinW(nullptr,nullptr,0));
  if(command!=2&&command!=3)return 0;
  HANDLE token=nullptr;if(!OpenProcessToken(GetCurrentProcess(),TOKEN_ADJUST_PRIVILEGES|TOKEN_QUERY,&token))return 0;

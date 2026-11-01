@@ -54,11 +54,19 @@ public interface ILauncherSearch
 
     /// <summary>执行一项（打开应用 / 文件、运行命令、复制计算结果……）。AI 类条目由界面自己处理，不走这里。</summary>
     Task ExecuteAsync(LauncherItem item, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 以管理员身份执行（037，2026-11-01 设计加）：终端项（「在终端里运行」和补全项）按 Ctrl+Shift+Enter 时调用，走系统 UAC，
+    /// 用户在 UAC 里点「否」静默（错误码 1223）。其他项没有管理员方式，照常执行。
+    /// </summary>
+    Task ExecuteElevatedAsync(LauncherItem item, CancellationToken cancellationToken) => ExecuteAsync(item, cancellationToken);
 }
 
 /// <summary>
 /// 终端命令（037）：输入以 > 开头时，SearchAsync 先给「在终端里运行」，后面跟最多 6 条补全（最近运行过的命令、PATH 里的程序名），
 /// 补全项 Id 写成 "complete:&lt;完整命令&gt;"、Group「补全」；界面按 Tab 把它填进输入框，Enter 直接运行它（走 ExecuteAsync）。
+/// 「在终端里运行」那一项 Group「终端」、副标题是命令本身；输入只有 > 时给一条提示项，Id 写成 "terminal:hint"、Group「终端」、
+/// 标题「输入要在终端里运行的命令」，界面不执行它（2026-11-01 设计定）。系统设置和组件的 Group 是「设置」，界面排成列表。
 /// </summary>
 public interface ITerminalHistory
 {

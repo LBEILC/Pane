@@ -42,7 +42,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("gesture", "鼠标手势", "gesture", "按住右键画方向，执行对应动作。", RenderGesture),
             new("superpanel", "超级面板", "pointer", "选中文字后长按鼠标侧键呼出，就地翻译、总结；短按侧键照常后退 / 前进。", RenderSuper),
             new("ai", "AI", "ai", "翻译、提问和快捷动作用的 AI 服务。", RenderAi),
-            new("icons", "应用图标", "app", "统一图标外形：遮罩规则和逐个应用的设置。", RenderIcons),
+            new("icons", "图标", "app", "应用图标的遮罩规则和逐个应用的设置；文件图标用 Pane 风格还是系统的。", RenderIcons),
             new("about", "关于", "info", "版本、数据位置和开源组件。", RenderAbout),
         ];
         current = sections[0];
@@ -468,8 +468,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
             return ListRow("globe", label, e.UrlTemplate, true, tail.ToArray());
         }).ToList();
         engines.Add(addingEngine ? Reveal("engine", [EngineForm()]) : AddRow(Button("添加搜索站点", "plus", () => { addingEngine = true; revealKey = "engine"; Render(); })));
+        engines.Insert(0, Row("搜索建议", "用关键字搜网页时（比如「bd 天气」）向那个站点要搜索建议；平时打字不联网",
+            Switch(l.WebSuggestions, v => SaveLauncher(x => x with { WebSuggestions = v }))));
         Group("网页搜索", engines.ToArray(), "地址里用 {query} 代表搜索词；在启动器输入「关键字 空格 搜索词」直接用这个站点搜。");
+
+        // 终端命令（037）：> 开头在终端里运行；记住最近 20 条用来补全
+        var clearHistory = Button("清空", "trash", () => { app.TerminalHistory?.Clear(); terminalCleared = true; Render(); });
+        Enable(clearHistory, !terminalCleared);
+        Group("终端命令", [Row("记住运行过的命令", terminalCleared ? "已清空" : "最近 20 条，用来补全；以空格开头的命令不记",
+                Switch(l.RememberCommands, v => SaveLauncher(x => x with { RememberCommands = v })), clearHistory)],
+            "在启动器里输入 > 加命令：Enter 在终端里运行，Ctrl+Shift+Enter 以管理员身份运行。");
     }
+    bool terminalCleared;
 
     void SaveLauncher(Func<LauncherSettings, LauncherSettings> change) =>
         app.Store.Save(app.Store.Current with { Launcher = change(app.Store.Current.Launcher) });
@@ -489,10 +499,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var owner = Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId);
         if (folder)
         {
-            var picker = new Windows.Storage.Pickers.FolderPicker();
-            picker.FileTypeFilter.Add("*");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, owner);
-            return await picker.PickSingleFolderAsync() is { } d ? new FavoriteEntry(d.Path, true) : null;
+            return await FolderPicker.PickFolderAsync(owner, null, null) is { } path ? new FavoriteEntry(path, true) : null;
         }
         var open = new Windows.Storage.Pickers.FileOpenPicker();
         open.FileTypeFilter.Add("*");
@@ -931,6 +938,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         _ => "什么都不做",
     };
 
+    IReadOnlyList<string> importSearched = [];
     // 从 WGestures 导入：先预览（只读它的配置文件），确认后整套替换
     void RenderImport()
     {
@@ -951,20 +959,36 @@ public sealed partial class SettingsView : UserControl, IPanelView
         }
         else
         {
-            var find = Button("查找配置", "search", () =>
+            void Load(string? path)
             {
                 try
                 {
-                    importPreview = app.PreviewWGestures();
-                    if (importPreview == null) { importStatus = "没找到 WGestures 的配置"; importOk = false; }
-                    else importStatus = null;
+                    importPreview = app.PreviewWGestures(path);
+                    if (importPreview == null) { importStatus = "没找到 WGestures 的配置"; importOk = false; importSearched = app.WGesturesSearched; }
+                    else { importStatus = null; importSearched = []; }
                 }
-                catch (Exception e) { importStatus = "读不出 WGestures 的配置：" + e.Message; importOk = false; }
+                catch (Exception e) { importStatus = "读不出 WGestures 的配置：" + e.Message; importOk = false; importSearched = []; }
                 Render();
+            }
+            var find = Button("查找配置", "search", () => Load(null));
+            // 找不到时手动选（043）：WGestures 数据目录里的 gestures.wg2 / gestures.wg，或在 WGestures 里「导出」的 .wgb
+            var pick = Button("选择文件…", "folder", async () =>
+            {
+                try
+                {
+                    var picker = new Windows.Storage.Pickers.FileOpenPicker();
+                    foreach (var ext in new[] { ".wg2", ".wg", ".wgb" }) picker.FileTypeFilter.Add(ext);
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
+                    if (await picker.PickSingleFileAsync() is { } file) Load(file.Path);
+                }
+                catch (Exception e) { importStatus = "选不了文件：" + (App.FailureReason(e) ?? e.Message); importOk = false; Render(); }
             });
             row = importStatus != null
-                ? Row("从 WGestures 导入", null, Status(importOk, importStatus), find)
-                : Row("从 WGestures 导入", "读取 WGestures 的手势、程序规则和轨迹颜色；不会改动 WGestures 本身", find);
+                ? Row("从 WGestures 导入", null, Status(importOk, importStatus), find, pick)
+                : Row("从 WGestures 导入", "读取 WGestures 的手势、程序规则和轨迹颜色；不会改动 WGestures 本身", find, pick);
+            if (importSearched.Count > 0)
+                row = new StackPanel { Children = { row, Row("找过这些位置", string.Join("\n", importSearched.Take(6)) + (importSearched.Count > 6 ? "\n…" : "")
+                    + "\n在 WGestures 里用「导出」存一个 .wgb 文件，再点「选择文件…」也可以") } };
         }
         // 恢复默认：点一下先问一句，再点「恢复」才替换
         var reset = resetConfirm
@@ -1009,6 +1033,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
         };
         if (catalog.Rebuilding) rows.Add(Row("正在重新生成图标", "在后台进行，十几秒后启动器里就是新图标", Status(true, "生成中")));
         Group("遮罩", rows.ToArray());
+
+        // 文件图标（036，评论区建议）：默认仍是 Pane 的彩色类型图标；选「系统」和资源管理器一样。只影响文件窗口和启动器里的文件行
+        Group("文件图标", Row("文件和文件夹", s.SystemFileIcons ? "和资源管理器里一样的系统图标；第一次见到的类型要等一下才出来" : "Pane 的彩色类型图标，一眼看出是文档、表格还是图片",
+            Seg([("pane", "Pane 风格"), ("system", "系统")], s.SystemFileIcons ? "system" : "pane", v => { SaveIcons(x => x with { SystemFileIcons = v == "system" }); Later(); })));
 
         var apps = catalog.Apps().ToDictionary(a => a.Id);
         var ids = s.Overrides.Keys.Union(s.CustomIcons.Keys)
@@ -1155,7 +1183,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     // 联网操作（拉模型、测试、登录）的状态：只在本次打开设置窗口期间保留
     IReadOnlyList<AiModel>? aiModels;
-    string? aiBusy;                           // "models" / "test" / "signin"
+    string? aiBusy;                           // "models" / "test" / "signin" / "proxy"
+    string? aiLast;                           // aiResult 是哪一项的结果（测试代理的结果只显示在代理那一行）
+    bool proxyCustomPending;                  // 选了「自定义」还没填地址
     (bool Ok, string Text)? aiResult;
     string? aiFieldError;
     CancellationTokenSource? signIn;
@@ -1166,7 +1196,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         // AI 总开关（issue 8，照原型 settings.js）：关掉后只留这一行
         Group("基本", Row("启用 AI", a.Enabled ? "不用 AI 时可以关掉"
                 : "已关闭：启动器和超级面板里不再出现翻译、问 AI 等 AI 动作；下面的配置都还在",
-            Switch(a.Enabled, v => { SaveAi(x => x with { Enabled = v }); Later(); })));
+            Switch(a.Enabled, v => { SaveAi(x => x with { Disabled = !v }); Later(); })));
         if (!a.Enabled) return;
         var setup = app.AiSetup;
         bool api = a.Provider == AiProvider.Api;
@@ -1192,9 +1222,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
             rows.Add(ModelRow(a, api));
             var test = Button(aiBusy == "test" ? "测试中…" : "测试", null, () => _ = RunAi("test", async t => { await setup.TestAsync(t); return "连接正常"; }));
             Enable(test, aiBusy == null);
-            rows.Add(aiResult is { } r ? Row("测试连接", null, Status(r.Ok, r.Text), test) : Row("测试连接", "用现在的设置发一个很小的请求", test));
+            rows.Add(aiResult is { } r && aiLast != "proxy" ? Row("测试连接", null, Status(r.Ok, r.Text), test) : Row("测试连接", "用现在的设置发一个很小的请求", test));
         }
         if (aiFieldError != null) rows.Add(Row("没有保存", null, Status(false, aiFieldError)));
+        // 思考程度（042，用户提）：ChatGPT 的推理模型等支持；不支持的模型服务自动去掉这个参数
+        rows.Add(Row("思考程度", a.Reasoning == AiReasoningEffort.Default ? "用服务的默认；只对支持思考的模型有效，不支持的自动忽略" : "越深回答越慢、越费额度；只对支持思考的模型有效，不支持的自动忽略",
+            Seg([("Default", "默认"), ("Low", "低"), ("Medium", "中"), ("High", "高")], a.Reasoning.ToString(),
+                v => { SaveAi(x => x with { Reasoning = Enum.Parse<AiReasoningEffort>(v) }); Later(); })));
         Group("服务", rows.ToArray());
 
         RenderAiActions(a);
@@ -1210,12 +1244,39 @@ public sealed partial class SettingsView : UserControl, IPanelView
                     v => SaveAi(x => x with { TranslateTarget = v }))),
             TranslationModelRow(a),
             Row("超级面板选中外文自动翻译", configured ? "选中外文、超级面板一弹出就翻译，单个单词也翻；超过约 2000 字不自动翻；中文照旧只显示动作" : "先在上面配置好 AI 服务", autoSwitch));
-        Group("网络",
-            [Row("代理", "空着就跟随系统代理；填了就用这个 HTTP 代理（如 http://127.0.0.1:7890）",
-                CommitField("跟随系统", 240, a.ProxyUrl ?? "", v =>
-                    v.Length == 0 ? Try(() => SaveAi(x => x with { ProxyUrl = null }))
-                    : Uri.TryCreate(v, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" ? Try(() => SaveAi(x => x with { ProxyUrl = v }))
-                    : "代理地址要以 http:// 或 https:// 开头"))],
+        // 代理（042）：跟随系统 / 不走代理 / 自定义（http、socks5）；选「自定义」后填了地址才算数
+        var mode = proxyCustomPending ? AiProxyMode.Custom : a.Proxy;
+        var network = new List<FrameworkElement>
+        {
+            Row("代理", mode switch
+                {
+                    AiProxyMode.None => "直接连接，不管系统有没有设代理",
+                    AiProxyMode.Custom => "用下面这个代理；支持 http 和 socks5",
+                    _ => "和浏览器一样，用系统设置里的代理",
+                },
+                Seg([("System", "跟随系统"), ("None", "不走代理"), ("Custom", "自定义")], mode.ToString(), v =>
+                {
+                    var m = Enum.Parse<AiProxyMode>(v);
+                    proxyCustomPending = m == AiProxyMode.Custom && a.ProxyUrl == null;
+                    if (!proxyCustomPending) SaveAi(x => x with { ProxyMode = m });
+                    if (aiLast == "proxy") aiResult = null;
+                    Later();
+                })),
+        };
+        if (mode == AiProxyMode.Custom)
+            network.Add(Row("代理地址", "比如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891",
+                CommitField("http://127.0.0.1:7890", 260, a.ProxyUrl ?? "", v =>
+                {
+                    if (v.Length == 0) return "填上代理地址，或者换回「跟随系统」";
+                    if (!AiSettings.ValidProxy(v)) return "代理地址要以 http://、https:// 或 socks5:// 开头";
+                    var error = Try(() => SaveAi(x => x with { ProxyUrl = v, ProxyMode = AiProxyMode.Custom }));
+                    if (error == null) proxyCustomPending = false;
+                    return error;
+                })));
+        var proxyTest = Button(aiBusy == "proxy" ? "测试中…" : "测试", null, () => _ = RunAi("proxy", async t => { await app.AiSetup.TestProxyAsync(t); return "能连上"; }));
+        Enable(proxyTest, aiBusy == null && !proxyCustomPending);
+        network.Add(aiResult is { } pr && aiLast == "proxy" ? Row("测试代理", null, Status(pr.Ok, pr.Text), proxyTest) : Row("测试代理", "按上面的代理连一下 AI 服务，不发送任何内容", proxyTest));
+        Group("网络", network.ToArray(),
             "只在你主动触发时，才把那一段文字发给上面配置的服务；不会自动发送剪贴板内容。Key 和登录信息用 Windows 数据保护加密保存在本机。");
     }
 
@@ -1462,6 +1523,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         if (aiBusy != null) return;
         aiBusy = what;
+        aiLast = what;
         aiResult = null;
         Render();
         try

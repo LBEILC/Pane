@@ -3,6 +3,7 @@
   超级面板（设计负责人）。照原型 #superpanel：宽 360、内边距 12；
   选中文字引用（两行、左边竖线）→（选中外文且打开了自动翻译时）自动翻译 → 六个动作 → AI 结果卡片（小号）。
   动作：平时是 翻译 总结 润色 解释 搜索 复制；自动翻译时换成 复制译文 翻译窗口 问 AI 总结 复制原文 搜索（原型 launcher.html #sp）。
+  选中的是文件（资源管理器 / 桌面，040）：引用换成叠放的文件图标 + 数量和名字，动作换成 批量重命名 复制路径 复制名称（原型 rename.html #sp）。
   长按鼠标侧键出现在鼠标右下方（宿主放置）。
 -->
 <UserControl
@@ -15,7 +16,7 @@
 
     <UserControl.Resources>
         <DataTemplate x:Key="ActionTemplate" x:DataType="views:SuperAction">
-            <StackPanel Width="56" Padding="2,8,2,6" Spacing="5" Background="Transparent" Opacity="{x:Bind ItemOpacity, Mode=OneWay}">
+            <StackPanel Width="{x:Bind ItemWidth}" Padding="2,8,2,6" Spacing="5" Background="Transparent" Opacity="{x:Bind ItemOpacity, Mode=OneWay}">
                 <c:PaneIcon Glyph="{x:Bind Glyph}" Width="19" Height="19" HorizontalAlignment="Center" Foreground="{ThemeResource PaneText1Brush}"/>
                 <TextBlock Text="{x:Bind Name}" HorizontalAlignment="Center"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText1Brush}"/>
@@ -25,10 +26,33 @@
 
     <StackPanel x:Name="Root" Width="360" Padding="12" VerticalAlignment="Top"><!-- 顶对齐：否则被面板撑高后量出来的就是面板高度，结果卡片收起后不会变矮 -->
         <!-- 选中的文字 -->
-        <Border Padding="10,2,0,2" BorderThickness="2,0,0,0" BorderBrush="{ThemeResource PaneText3Brush}">
+        <Border x:Name="QuoteBox" Padding="10,2,0,2" BorderThickness="2,0,0,0" BorderBrush="{ThemeResource PaneText3Brush}">
             <TextBlock x:Name="QuoteText" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" LineHeight="19"
                        Foreground="{ThemeResource PaneText2Brush}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis"/>
         </Border>
+
+        <!-- 选中的是文件：三张叠放的类型图标（后两张转一点、淡一点）+「N 个文件」+ 前三个名字 -->
+        <Grid x:Name="FileBox" Visibility="Collapsed" Padding="4,4,6,2" ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="40"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid Width="40" Height="40">
+                <Border x:Name="FileTile1" CornerRadius="9" Opacity="0.55" RenderTransformOrigin="0.5,0.5">
+                    <Border.RenderTransform><CompositeTransform Rotation="-10" TranslateX="-5" TranslateY="2"/></Border.RenderTransform>
+                </Border>
+                <Border x:Name="FileTile2" CornerRadius="9" Opacity="0.8" RenderTransformOrigin="0.5,0.5">
+                    <Border.RenderTransform><CompositeTransform Rotation="7" TranslateX="4" TranslateY="-1"/></Border.RenderTransform>
+                </Border>
+                <Border x:Name="FileTile3" CornerRadius="9" BorderBrush="#2EFFFFFF" BorderThickness="1">
+                    <c:PaneIcon x:Name="FileGlyph" Width="19" Height="19" StrokeWidth="2" Foreground="White"/>
+                </Border>
+            </Grid>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                <TextBlock x:Name="FileTitle" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                <TextBlock x:Name="FileNames" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            </StackPanel>
+        </Grid>
 
         <!-- 选中外文自动翻译（设置 → AI 里打开；原型 .sp-tr）：标签、语言方向、复制译文、到翻译窗口继续；译文逐字流出 -->
         <Border x:Name="AutoBox" Margin="0,10,0,0" Padding="12,8,8,10" Visibility="Collapsed" CornerRadius="{StaticResource PaneRadiusItem}"

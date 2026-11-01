@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 namespace Pane.Settings;
 [JsonSerializable(typeof(PaneSettings))]
 [JsonSerializable(typeof(GlassCommand))]
+[JsonSerializable(typeof(RenameSettings))]
 [JsonSourceGenerationOptions(WriteIndented=true, UseStringEnumConverter=true)]
 internal partial class SettingsJson : JsonSerializerContext { }
 public sealed class SettingsStore
@@ -44,6 +45,7 @@ public sealed class SettingsStore
     }
     static void Validate(PaneSettings s)
     {
+        if(s.Rename.Presets.Length>30||!ValidRules(s.Rename.LastRules)||s.Rename.Presets.Any(p=>p==null||string.IsNullOrWhiteSpace(p.Name)||!ValidRules(p.Rules)))throw new ArgumentException("重命名设置无效");
         if(s.Ai==null)throw new ArgumentException("AI 设置无效");
         s.Ai.Validate();
         if(s.Version!=1||s.General==null||s.Launcher?.Hotkey==null||s.Clipboard?.Hotkey==null) throw new ArgumentException("设置版本或结构无效");
@@ -60,5 +62,6 @@ public sealed class SettingsStore
         if(g.AccentColor==null||g.AccentColor.Length!=9||g.AccentColor[0]!='#'||!uint.TryParse(g.AccentColor.AsSpan(1),System.Globalization.NumberStyles.HexNumber,null,out _)) throw new ArgumentException("主题色无效");
         foreach(var v in new[]{g.GlassLight,g.GlassDark}) if(v==null||!Valid(v.TintOpacity,1)||!Valid(v.LuminosityOpacity,1)||!Valid(v.Saturation,2)||!Valid(v.Highlight,1)||!Valid(v.Shadow,1)||!Valid(v.ExtraBlur,250)) throw new ArgumentException("玻璃参数无效");
     }
+    static bool ValidRules(Pane.Contracts.RenameRule[]? rules)=>rules!=null&&rules.Length<=20&&rules.All(r=>r!=null&&Enum.IsDefined(r.Kind)&&Enum.IsDefined(r.Position)&&Enum.IsDefined(r.Case)&&Enum.IsDefined(r.DateSource)&&r.Find!=null&&r.Text!=null&&r.Separator!=null&&r.DateFormat!=null);
     static bool Valid(double v,double max)=>double.IsFinite(v)&&v>=0&&v<=max;
 }

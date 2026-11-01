@@ -60,6 +60,20 @@ public static class FileKinds
     }
 }
 
+/// <summary>系统文件图标（036）：服务给的 64 px PNG，同一张只解码一次。</summary>
+public static class SystemIcons
+{
+    static readonly Dictionary<string, Microsoft.UI.Xaml.Media.Imaging.BitmapImage> cache = new(StringComparer.OrdinalIgnoreCase);
+    public static bool Enabled => ((App)Application.Current).Store.Current.Icons.SystemFileIcons;
+    public static ImageSource? Load(string? png)
+    {
+        if (string.IsNullOrEmpty(png)) return null;
+        if (cache.TryGetValue(png, out var hit)) return hit;
+        if (cache.Count > 500) cache.Clear();
+        return cache[png] = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage { DecodePixelWidth = 64, DecodePixelType = Microsoft.UI.Xaml.Media.Imaging.DecodePixelType.Physical, UriSource = new Uri(png) };
+    }
+}
+
 // 注意：x:Bind 的属性名不要和所在页面上元素的 x:Name 重名（如 CountText），否则 XAML 编译器内部崩溃（WMC9999，错误文本还丢失）
 public sealed partial class CategoryItem : INotifyPropertyChanged
 {
@@ -89,6 +103,17 @@ public sealed partial class FileRow : INotifyPropertyChanged
     public string Size => Hit.Category == FileCategory.Folder ? "文件夹" : FileKinds.Size(Hit.Size);
     public string Glyph => FileKinds.Glyph(Hit.Category);
     public Brush Tile => FileKinds.Brush(Hit.Category);
+    /// <summary>系统图标（设置 → 外观 → 文件图标：系统，036）；还没取到时为 null，先显示彩色类型图块。</summary>
+    public ImageSource? SystemIcon { get; private set; }
+    public void SetSystemIcon(string? png)
+    {
+        var image = SystemIcons.Load(png);
+        if (ReferenceEquals(image, SystemIcon)) return;
+        SystemIcon = image;
+        Changed(nameof(SystemIcon)); Changed(nameof(SystemIconVisibility)); Changed(nameof(TileVisibility));
+    }
+    public Visibility SystemIconVisibility => SystemIcon is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility TileVisibility => SystemIcon is null ? Visibility.Visible : Visibility.Collapsed;
     bool selected;
     public bool IsSelected { get => selected; set { if (selected == value) return; selected = value; Changed(nameof(SelectedVisibility)); } }
     public Visibility SelectedVisibility => selected ? Visibility.Visible : Visibility.Collapsed;

@@ -6,6 +6,16 @@ if(!$Report){$Report=Join-Path $repo 'out/payload-audit.json'}
 $metadata=Get-Content -LiteralPath $PackageMetadata -Encoding UTF8 -Raw | ConvertFrom-Json
 $assets=Get-Content -LiteralPath (Join-Path $repo 'src/Pane.App/obj/project.assets.json') -Encoding UTF8 -Raw | ConvertFrom-Json
 $cache=@($assets.packageFolders.PSObject.Properties.Name)[0]
+# NRBF 读取器经 NativeAOT 链接，不会作为独立 DLL 出现在载荷文件归属表中。
+$nrbf=@($assets.libraries.PSObject.Properties | Where-Object {$_.Name -like 'System.Formats.Nrbf/*'})
+if($nrbf.Count -ne 1){throw '无法确定 NRBF 包版本'}
+$nrbfFolder=Join-Path $cache $nrbf[0].Value.path
+[xml]$nuspec=Get-Content -LiteralPath (Join-Path $nrbfFolder 'system.formats.nrbf.nuspec') -Encoding UTF8 -Raw
+if($nuspec.package.metadata.license.InnerText -ne 'MIT'){throw 'NRBF 许可已变化，需重新核对'}
+if((Get-FileHash -LiteralPath (Join-Path $nrbfFolder 'THIRD-PARTY-NOTICES.TXT')).Hash -ne (Get-FileHash -LiteralPath (Join-Path $repo 'src/Pane.App/ThirdParty/dotnet-NOTICES.txt')).Hash){throw 'NRBF 上游 notices 与随包文件不一致'}
+$inventory=Get-Content -LiteralPath (Join-Path $repo 'THIRD_PARTY_NOTICES.md') -Encoding UTF8 -Raw
+$nrbfVersion=$nrbf[0].Name.Split('/')[1]
+if($inventory -notmatch ('(?m)^\| System\.Formats\.Nrbf,.*\| '+[regex]::Escape($nrbfVersion)+' \| MIT.*`dotnet-LICENSE\.txt`, `dotnet-NOTICES\.txt`')){throw '第三方清单缺少当前 NRBF 版本及许可'}
 $candidates=@{}
 foreach($library in $assets.libraries.PSObject.Properties){
     if($library.Value.type -ne 'package'){continue}
@@ -16,7 +26,7 @@ foreach($library in $assets.libraries.PSObject.Properties){
     }
 }
 $own=@('Pane.App.exe','Pane.Maintenance.exe','Pane.Native.dll','Pane.Effect.dll','resources.pri','Assets/pane.ico','Assets/pane-app.svg','LauncherData/pinyin.tsv','LauncherData/Unicode-LICENSE.txt')
-$notices=@{'LICENSE'='LICENSE';'THIRD_PARTY_NOTICES.md'='THIRD_PARTY_NOTICES.md'}
+$notices=@{'LICENSE'='LICENSE';'LICENSE-EXCEPTION.md'='LICENSE-EXCEPTION.md';'THIRD_PARTY_NOTICES.md'='THIRD_PARTY_NOTICES.md'}
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $repo 'src/Pane.App/ThirdParty') -File){$notices['ThirdParty/'+$file.Name]='src/Pane.App/ThirdParty/'+$file.Name}
 $rows=@(foreach($file in Get-ChildItem -LiteralPath $metadata.stage -Recurse -File){
     $path=$file.FullName.Substring($metadata.stage.TrimEnd('\','/').Length+1).Replace('\','/')
@@ -57,4 +67,5 @@ try {
 New-Item -ItemType Directory -Force -Path (Split-Path ([IO.Path]::GetFullPath($Report)) -Parent)|Out-Null
 [pscustomobject]@{version=$metadata.version;files=$rows.Count;embeddedZipVerified=$true;entries=$rows} | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $Report -Encoding UTF8
 Write-Host "payload=$($rows.Count); licenses=$($notices.Count); embeddedZipVerified=True"
+Write-Host "NativeAOT component=$($nrbf[0].Name); license=MIT; sharedNoticesVerified=True"
 $rows | ForEach-Object {$_.packages} | Group-Object | ForEach-Object {Write-Host "$($_.Name): $($_.Count)"}

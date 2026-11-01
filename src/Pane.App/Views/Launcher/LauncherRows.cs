@@ -22,7 +22,7 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
         Cell = cell;
         Number = number;
         Match = new MatchedText(item.Title, item.Highlights);
-        Picture = Load(item.Icon.ImagePath);
+        picture = Load(item.Icon.ImagePath);
         if (item.Icon.GradientFrom is { } from && item.Icon.GradientTo is { } to)
         {
             // 原型 linear-gradient(135deg, from, to)
@@ -45,7 +45,7 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     public void SetWarning(string? text) { if (warning == text) return; warning = text; Changed(nameof(Subtitle)); Changed(nameof(SubtitleVisibility)); }
     public Visibility SubtitleVisibility => string.IsNullOrEmpty(Subtitle) ? Visibility.Collapsed : Visibility.Visible;
     /// <summary>文件的路径用等宽字体（原型 .row .s）；其余用界面字体。</summary>
-    public FontFamily SubtitleFont => Cell == LauncherCell.File && warning is null ? Mono : Pane.Hosting.GlassParameters.UiFont;
+    public FontFamily SubtitleFont => (Cell == LauncherCell.File || Item.Group == "终端" && Item.Id != "terminal:hint") && warning is null ? Mono : Pane.Hosting.GlassParameters.UiFont;   // 文件路径、终端命令用等宽
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, Microsoft YaHei UI");
     public string Glyph => Item.Icon.Glyph;
     public string? Hotkey => Item.Hotkey;
@@ -53,7 +53,15 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     public string CalcText => "= " + Item.Title;
     public Brush? Gradient { get; }
     /// <summary>真实应用图标（服务给的位图路径）。有它就不画 Lucide 图块。</summary>
-    public ImageSource? Picture { get; }
+    public ImageSource? Picture => picture;
+    ImageSource? picture;
+    /// <summary>文件行换成系统图标（036）：取到了就补上，图块换成图片。</summary>
+    public void SetSystemIcon(string? png)
+    {
+        if (Pane.Views.Files.SystemIcons.Load(png) is not { } image || ReferenceEquals(image, picture)) return;
+        picture = image;
+        Changed(nameof(Picture)); Changed(nameof(PictureVisibility)); Changed(nameof(ColoredVisibility)); Changed(nameof(PlainVisibility));
+    }
 
     public Visibility PictureVisibility => Picture is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ColoredVisibility => Picture is null && Gradient is not null ? Visibility.Visible : Visibility.Collapsed;

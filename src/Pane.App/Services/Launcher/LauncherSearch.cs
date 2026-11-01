@@ -16,6 +16,8 @@ internal sealed record LauncherSnapshot(IndexedApp[] Apps,SearchEntry[] Favorite
 }
 internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
 {
+    readonly TerminalService terminal;
+    public ITerminalHistory TerminalHistory=>terminal.History;
     readonly SettingsStore store;readonly ILauncherIndex index;readonly ILauncherSource[] sources;readonly ILauncherExecutor executor;
     readonly object sync=new();readonly CancellationTokenSource lifetime=new();
     LauncherSnapshot snapshot=LauncherSnapshot.Empty;
@@ -33,11 +35,13 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
     // 保留宿主已有接线；Shell 枚举只在子进程中调用。
     public LauncherSearch(SettingsStore store,WindowsAppCatalog catalog,ILauncherFiles files,ILauncherExecutor executor)
         :this(store,new ProcessLauncherIndex(store.DirectoryPath),files,executor) { }
-    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor)
+    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null)
     {
         var started=System.Diagnostics.Stopwatch.StartNew();
         this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();
-        sources=[new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
+        environment??=new LauncherEnvironment();process??=new LaunchProcess();
+        terminal=new(store,environment,process,programs);
+        sources=[new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
         var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
         try{if(File.Exists(path))uses=JsonSerializer.Deserialize(File.ReadAllText(path),LauncherJson.Default.DictionaryStringAppUse)??[];}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
@@ -106,7 +110,7 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
     SourceContext Context(string query){Dictionary<string,AppUse> usage;lock(sync)usage=new(uses);return new(query.Trim(),Volatile.Read(ref snapshot),store.Current.Launcher,usage);}
     public async Task<LauncherResult> SearchAsync(string query,CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();RefreshIndex();var context=Context(query);
+        cancellationToken.ThrowIfCancellationRequested();if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
         var pending=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
         var groups=await Task.WhenAll(pending).ConfigureAwait(false);cancellationToken.ThrowIfCancellationRequested();
         var rows=groups.SelectMany(g=>g).Where(item=>store.Current.Clipboard.Enabled||item.Id!="command:clipboard").ToArray();
@@ -126,9 +130,10 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
     internal static string BuildUrl(SearchEngine engine,string text)=>engine.UrlTemplate.Replace("{query}",Uri.EscapeDataString(text),StringComparison.Ordinal);
     public Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
+        cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename")return Task.CompletedTask;if(TerminalService.Owns(item))return terminal.ExecuteAsync(item,false,cancellationToken);var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         return source.ExecuteAsync(item,Context(""),cancellationToken);
     }
+    public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):ExecuteAsync(item,token);
     void RecordUse(string id){
         lock(sync){var use=uses.GetValueOrDefault(id);uses[id]=new(Math.Min((use?.Count??0),int.MaxValue-1)+1,DateTimeOffset.UtcNow);Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");File.WriteAllText(path+".tmp",JsonSerializer.Serialize(uses,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);}
     }
@@ -146,5 +151,5 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
         if(actionId=="web-search"&&attachment.Text!=null){await executor.OpenAsync(BuildUrl(DefaultEngine(store.Current.Launcher),attachment.Text),false,cancellationToken);return;}
         throw new NotSupportedException(actionId);
     }
-    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;lifetime.Cancel();}indexing.GetAwaiter().GetResult();lifetime.Dispose();}
+    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;lifetime.Cancel();}indexing.GetAwaiter().GetResult();terminal.Dispose();lifetime.Dispose();}
 }

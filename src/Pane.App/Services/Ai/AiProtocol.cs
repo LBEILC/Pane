@@ -56,10 +56,23 @@ internal static class AiProtocol
         }catch(Exception e) when(e is JsonException or InvalidOperationException){throw new AiNetworkException("AI 返回格式无效，请稍后重试");}
     }
     internal static byte[] Body(string model,string prompt,bool chat)=>Body(model,[new(AiChatRole.User,prompt)],chat);
-    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,bool chat)
+    internal static bool UnsupportedReasoning(JsonElement body)
+    {
+        var error=body.ValueKind==JsonValueKind.Object&&body.TryGetProperty("error",out var e)?e:body;
+        var param=String(error,"param");
+        if(param is "reasoning" or "reasoning_effort"||param?.StartsWith("reasoning.",StringComparison.Ordinal)==true)return true;
+        var message=(String(error,"message")??(error.ValueKind==JsonValueKind.String?error.GetString():null)??"").ToLowerInvariant();
+        return (message.Contains("reasoning")||message.Contains("思考"))&&
+            (message.Contains("unsupported")||message.Contains("not support")||message.Contains("unknown")||message.Contains("unrecognized")||message.Contains("not allowed")||message.Contains("不支持")||message.Contains("不识别"));
+    }
+    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,bool chat,AiReasoningEffort reasoning=AiReasoningEffort.Default)
     {
         using var stream=new MemoryStream();using(var w=new Utf8JsonWriter(stream)){
             w.WriteStartObject();w.WriteString("model",model);w.WriteBoolean("stream",true);
+            if(reasoning!=AiReasoningEffort.Default){
+                string effort=reasoning switch{AiReasoningEffort.Low=>"low",AiReasoningEffort.Medium=>"medium",AiReasoningEffort.High=>"high",_=>throw new ArgumentOutOfRangeException(nameof(reasoning))};
+                if(chat){w.WriteStartObject("reasoning");w.WriteString("effort",effort);w.WriteEndObject();}else w.WriteString("reasoning_effort",effort);
+            }
             if(chat){w.WriteBoolean("store",false);w.WriteString("instructions",SystemPrompt);}
             w.WriteStartArray(chat?"input":"messages");
             if(!chat){w.WriteStartObject();w.WriteString("role","system");w.WriteString("content",SystemPrompt);w.WriteEndObject();}

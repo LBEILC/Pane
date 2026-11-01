@@ -23,7 +23,7 @@ static partial class Program
         // 013 只运行纯逻辑测试，禁止真实导入和外部命令执行。
         bool unitOnly=args.Contains("--unit-only");
         string output=args.Length>0&&!unitOnly?args[0]:Path.Combine(AppContext.BaseDirectory,"results");Directory.CreateDirectory(output);
-        Recognizer();Matching();Sessions();Commands();QueueTests();Config(output);Defaults(output);Import(output);if(!unitOnly){RealImport(output);HarmlessCommand(output);}
+        Recognizer();Matching();Sessions();Commands();QueueTests();Config(output);Defaults(output);Import(output);ImportCompatibility(output);if(!unitOnly){RealImport(output);HarmlessCommand(output);}
         Console.WriteLine($"PASS managed assertions={checks}; realInput=0; clipboard=0; volume=0");
     }
     static GestureDirection[] Recognize(GesturePoint[] points,double dpi=96,bool diagonal=false)

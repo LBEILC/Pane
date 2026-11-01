@@ -215,7 +215,7 @@ public static class ClipMatch
         var text = t.Text;
         var q = t.Query;
         if (q.Length == 0) { block.Inlines.Add(new Run { Text = text }); return; }
-        var highlighter = new TextHighlighter { Background = MatchBrush(block) };
+        var highlighter = new TextHighlighter { Background = MatchBrush(block), Foreground = block.Foreground };   // 不给前景色时高亮段用系统默认（黑色），深色下看不见
         int at = 0;
         while (true)
         {

@@ -16,6 +16,8 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--037")){await SystemTerminalTests(args.Contains("--live"));return;}
+        if(args.Contains("--file-icons")){await FileIconTests();return;}
         if(args.Contains("--files-performance")){await FilePerformance();return;}
         if(args.Contains("--probe")){await Probe();return;}
         ApplicationNameTests();
@@ -49,6 +51,7 @@ static partial class Program
         Check(!(await service.SearchAsync("剪贴板",default)).Items.Any(i=>i.Id=="command:clipboard"),"clipboard command disabled immediately");
         store.Save(store.Current with{Clipboard=store.Current.Clipboard with{Enabled=true}});
         Check((await service.SearchAsync("剪贴板",default)).Items.Any(i=>i.Id=="command:clipboard"),"clipboard command reenabled immediately");
+        foreach(var query in new[]{"批量重命名","plcmm","rename","重命名","rena","RENAME"}){var rename=(await service.SearchAsync(query,default)).Items.Single(i=>i.Id=="rename");Check(rename.Kind==LauncherItemKind.Command&&rename.Group=="命令"&&rename.Icon.Glyph=="pencil","rename command "+query);int calls=fake.Calls.Count;await service.ExecuteAsync(rename,default);Check(fake.Calls.Count==calls,"rename execution stays in UI");}
         LauncherResult result;
         var clip=new ClipEntry("fixture",ClipKind.Files,null,[@"C:\fixture\one.txt",@"C:\fixture\two.txt"],null,null,null,"test",null,DateTimeOffset.UtcNow,false);
         await service.RunAsync("open",clip,default);Check(fake.Calls.TakeLast(2).SequenceEqual([@"open:C:\fixture\one.txt:False",@"open:C:\fixture\two.txt:False"]),"all attached files open through fake");
@@ -61,7 +64,7 @@ static partial class Program
         store.Save(store.Current with{Launcher=store.Current.Launcher with{Favorites=[new(@"C:\new\记事本.txt",false)]}});await service.Indexing;Check((await service.SearchAsync("jsb",default)).Items.Any(i=>i.Group=="常用"),"settings refresh favorites");
         store.Save(store.Current with{Launcher=store.Current.Launcher with{Favorites=Enumerable.Range(0,5).Select(i=>new FavoriteEntry(@"C:\new\微信"+i+".txt",false)).ToArray()}});await service.Indexing;
         files.ReturnRow=true;result=await service.SearchAsync("wx",default);Check(result.FileTotal==234,"launcher file total");Check(result.Items.Count(i=>i.Group=="常用")==3,"favorite cap");
-        string[] groups=["计算","应用","常用","文件","命令","AI","网页"];var order=result.Items.Select(i=>Array.IndexOf(groups,i.Group)).ToArray();Check(order.SequenceEqual(order.Order()),"group order");
+        string[] groups=["计算","应用","设置","常用","文件","命令","AI","网页"];var order=result.Items.Select(i=>Array.IndexOf(groups,i.Group)).ToArray();Check(order.SequenceEqual(order.Order()),"group order");
         files.Delay=1000;using(var cancelled=new CancellationTokenSource(20)){var timer=Stopwatch.StartNew();try{await service.SearchAsync("wx",cancelled.Token);throw new Exception("no in-flight cancellation");}catch(OperationCanceledException){Check(timer.ElapsedMilliseconds<200,"in-flight cancellation prompt");}}files.Delay=0;
         var perfStore=new SettingsStore(Path.Combine(directory,"performance"),defaults);using var perf=new LauncherSearch(perfStore,new FixtureIndex(new FakeCatalog(1000)),new FakeFiles(),fake);await perf.Indexing;
         string[] queries=["wx","weixin","app","test","not-found","应用","999","1+2","gh 中文","abc"];
