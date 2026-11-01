@@ -207,10 +207,10 @@ void AutomaticDialog(int mode,const std::wstring& start,const std::wstring& targ
         if(mode==3||mode==4||mode==6){
             ShowWindow(edit,SW_HIDE);service.Apply(config);
             Check(service.pending==window&&service.timer!=0,"unready dialog has bounded retry");
-            if(mode==4){Sleep(1050);service.TryAutomatic();Check(!service.pending&&!service.timer,"readiness deadline stops timer");}
-            ShowWindow(edit,SW_SHOW);service.TryAutomatic();
+            if(mode==4){Sleep(2050);service.TryPending();Check(!service.pending&&!service.timer,"readiness deadline stops timer");}
+            ShowWindow(edit,SW_SHOW);service.TryPending();
         }else service.Apply(config);
-        while(service.pending){Sleep(40);service.TryAutomatic();}
+        while(service.pending){Sleep(40);service.TryPending();}
         fixtureForeground=nullptr;service.Foreground(nullptr);fixtureForeground=window;service.Foreground(window);
         repeats=autoJumps;
         config.jump={MOD_ALT,'J'};service.Apply(config);
@@ -236,6 +236,47 @@ void AutomaticDialog(int mode,const std::wstring& start,const std::wstring& targ
     logFile<<"auto mode="<<mode<<" requests="<<autoRequests<<" jumps="<<autoJumps<<" navigated="<<navigated<<std::endl;
 }
 unsigned long long Cpu(){FILETIME creation{},exit{},kernel{},user{};GetProcessTimes(GetCurrentProcess(),&creation,&exit,&kernel,&user);return (static_cast<unsigned long long>(kernel.dwHighDateTime)<<32)+kernel.dwLowDateTime+(static_cast<unsigned long long>(user.dwHighDateTime)<<32)+user.dwLowDateTime;}
+void DelayedRecognition(const std::wstring& root){
+    WNDCLASSW wc{};wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"SHELLDLL_DefView";
+    RegisterClassW(&wc);
+    auto log=root+L"\\recognition.log";SetEnvironmentVariableW(L"PANE_FOLDER_JUMP_LOG",log.c_str());
+    for(int mode=0;mode<6;mode++){
+        HWND window=CreateWindowExW(0,L"#32770",L"fixture",WS_OVERLAPPEDWINDOW|WS_VISIBLE,0,0,200,160,nullptr,nullptr,wc.hInstance,nullptr);
+        Check(window!=nullptr,"delayed fixture creates dialog before children");
+        SetForegroundWindow(window);fixtureForeground=window;
+        int requests=autoRequests;
+        Service service(AutomaticTrigger);service.foreground=FixtureForeground;automaticService=&service;fixtureExplorers.clear();
+        Configuration config;config.automatic=mode==1;service.Apply(config);
+        Check(service.pending==window&&service.timer&&!service.keys.dialog,"unrecognized foreground waits regardless of auto setting");
+        auto started=GetTickCount64();
+        auto pump=[&](int ms){auto until=GetTickCount64()+ms;while(GetTickCount64()<until){MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){
+            if(msg.message==WM_TIMER&&service.timer&&msg.wParam==service.timer)service.TryPending();
+            else{TranslateMessage(&msg);DispatchMessageW(&msg);}
+        }Sleep(5);}};
+        pump(300);
+        if(mode==2){pump(1800);Check(!service.pending&&!service.timer,"timeout removes retry timer");service.Foreground(window);Check(!service.timer,"duplicate foreground notification cannot restart timed out wait");}
+        if(mode==3){fixtureForeground=nullptr;service.Foreground(nullptr);Check(!service.pending&&!service.timer,"foreground departure cancels immediately");}
+        if(mode==4){DestroyWindow(window);service.Destroyed(window);Check(!service.pending&&!service.timer,"destroy cancels immediately");}
+        if(mode==5){auto deadline=service.deadline;auto timer=service.timer;config.automatic=true;service.Apply(config);Check(service.pendingAutomatic&&service.deadline==deadline&&service.timer==timer,"enabling auto joins existing bounded wait");config.automatic=false;service.Apply(config);Check(service.pending==window&&service.timer,"turning auto off keeps recognition wait");}
+        if(mode!=4){
+            auto shell=CreateWindowExW(0,L"SHELLDLL_DefView",L"",WS_CHILD|WS_VISIBLE,0,0,50,50,window,nullptr,wc.hInstance,nullptr);
+            auto accept=CreateWindowExW(0,L"Button",L"",WS_CHILD|WS_VISIBLE,0,60,40,20,window,reinterpret_cast<HMENU>(IDOK),wc.hInstance,nullptr);
+            auto edit=CreateWindowExW(0,L"Edit",L"",WS_CHILD|WS_VISIBLE,0,90,100,20,window,reinterpret_cast<HMENU>(0x480),wc.hInstance,nullptr);
+            Check(shell&&accept&&edit,"fixture creates delayed child controls");
+            pump(150);
+            bool recognized=mode==0||mode==1||mode==5;
+            Check((service.keys.dialog==window)==recognized,"only active bounded wait recognizes delayed controls");
+            if(recognized)Check(service.keys.direct&&service.keys.menu,"delayed recognition really registers both hotkeys");
+            Check(autoRequests-requests==(mode==1?1:0),"automatic request only when enabled");
+            logFile<<"delayed mode="<<mode<<" elapsedMs="<<GetTickCount64()-started<<std::endl;
+        }
+        Check(!service.pending&&!service.timer,"settled recognition leaves no timer");
+        config.enabled=false;service.Apply(config);if(IsWindow(window))DestroyWindow(window);fixtureForeground=nullptr;
+    }
+    SetEnvironmentVariableW(L"PANE_FOLDER_JUMP_LOG",nullptr);
+    std::ifstream file{std::filesystem::path(log)};std::string content((std::istreambuf_iterator<char>(file)),{});file.close();
+    Check(content.find("delayed recognition succeeded elapsedMs=")!=std::string::npos,"delayed diagnostic includes elapsed milliseconds");DeleteFileW(log.c_str());
+}
 void Conflict(const std::wstring& root){
     auto path=root+L"\\hotkeys.log";SetEnvironmentVariableW(L"PANE_FOLDER_JUMP_LOG",path.c_str());
     bool blocked=RegisterHotKey(nullptr,99,MOD_CONTROL|MOD_NOREPEAT,'G')!=FALSE;Check(blocked,"fixture reserves Ctrl+G on hidden desktop");
@@ -282,6 +323,6 @@ int wmain(int argc,wchar_t** argv){
     CreateDirectoryW(root.c_str(),nullptr);CreateDirectoryW(target.c_str(),nullptr);
     for(int kind=0;kind<8;kind++)RealDialog(kind,root,target);
     Check(!PaneFolderJumpTo(nullptr,target.c_str()),"closed dialog ignored");
-    Lifecycle();for(int mode=0;mode<8;mode++)AutomaticDialog(mode,root,target);Conflict(root);Idle();RemoveDirectoryW(target.c_str());RemoveDirectoryW(root.c_str());
+    Lifecycle();for(int mode=0;mode<8;mode++)AutomaticDialog(mode,root,target);DelayedRecognition(root);Conflict(root);Idle();RemoveDirectoryW(target.c_str());RemoveDirectoryW(root.c_str());
     logFile<<"assertions="<<assertions<<" failures="<<failures<<std::endl;return failures?1:0;
 }

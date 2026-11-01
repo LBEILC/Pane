@@ -15,6 +15,16 @@ static class FolderJumpSettingsTests
         var old="{"+string.Join(",",json.RootElement.EnumerateObject().Where(p=>p.Name!="FolderJump").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()))+"}";
         File.WriteAllText(Path.Combine(root,"settings.json"),old);store.Load();
         Check(store.Current.FolderJump==new FolderJumpSettings(),"old file gets folder jump defaults");
+        Check(!store.Current.FolderJump.MenuWhenMany,"old settings default to direct jump");
+        store.Save(defaults with {FolderJump=new(MenuWhenMany:true)});store.Load();
+        Check(store.Current.FolderJump.MenuWhenMany,"multiple Explorer preference roundtrip");
+        foreach(bool many in new[]{false,true})
+            foreach(int entries in new[]{0,1,2,3})
+            {
+                Check(FolderJumpService.ShouldRequestMenu(1,many,entries)==(entries==0||(many&&entries>=2)),"Jump menu routing");
+                Check(!FolderJumpService.ShouldRequestMenu(3,many,entries),"automatic never requests menu");
+                Check(FolderJumpService.ShouldRequestMenu(2,many,entries),"explicit menu always requests menu");
+            }
         store.Save(defaults with {FolderJump=new(false,new(KeyModifiers.Alt,74),new(KeyModifiers.Win|KeyModifiers.Shift,75),true,false)});store.Load();
         Check(store.Current.FolderJump==new FolderJumpSettings(false,new(KeyModifiers.Alt,74),new(KeyModifiers.Win|KeyModifiers.Shift,75),true,false),"all folder settings roundtrip");
         store.Save(defaults with {FolderJump=new(JumpHotkey:new(KeyModifiers.None,74),MenuHotkey:new(KeyModifiers.None,75))});

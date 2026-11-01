@@ -72,9 +72,11 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
                 if (!Active(version) || GetForegroundWindow() != dialog) return;
                 if (command is 1 or 3)
                 {
-                    var first = Entries(false).FirstOrDefault(e => e.Source == FolderJumpSource.Explorer);
+                    var explorers = Entries(false).Where(e => e.Source == FolderJumpSource.Explorer).ToArray();
+                    var first = explorers.FirstOrDefault();
                     if (GetForegroundWindow() != dialog) return;
-                    if (first != null) { await JumpCore(dialog, first.Path, CancellationToken.None, command == 3, version); return; }
+                    if (first != null && !ShouldRequestMenu(command, settings.MenuWhenMany, explorers.Length))
+                    { await JumpCore(dialog, first.Path, CancellationToken.None, command == 3, version); return; }
                     if (command == 3) return;
                 }
                 lock (gate)
@@ -83,6 +85,9 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
             catch { /* 外部窗口已退出或 Shell 暂不可用时静默放弃。 */ }
         });
     }
+
+    internal static bool ShouldRequestMenu(int command, bool menuWhenMany, int explorerCount) =>
+        command == 2 || (command == 1 && (explorerCount == 0 || (menuWhenMany && explorerCount >= 2)));
 
     public IReadOnlyList<FolderJumpEntry> Entries() => Entries(null);
 

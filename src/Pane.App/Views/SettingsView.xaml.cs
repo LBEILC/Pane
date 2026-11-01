@@ -1980,7 +1980,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var menu = Hotkey(f.Menu, f.Jump, h => SaveFolderJump(x => x with { MenuHotkey = h == FolderJumpSettings.DefaultMenu ? null : h }));
         var auto = Switch(f.AutoJump, v => SaveFolderJump(x => x with { AutoJump = v }));
         var recent = Switch(f.ShowRecent, v => SaveFolderJump(x => x with { ShowRecent = v }));
-        foreach (var c in new Control[] { jump, menu, auto, recent }) Enable(c, f.Enabled);
+        // 047（用户：开了三个资源管理器，Ctrl+G 只跳其中一个）：默认跳最近用过的那个（同 Listary），想自己挑的改成弹菜单
+        var many = Seg([("recent", "跳到最近用过的"), ("menu", "弹出菜单让我选")], f.MenuWhenMany ? "menu" : "recent", v => SaveFolderJump(x => x with { MenuWhenMany = v == "menu" }));
+        foreach (var c in new Control[] { jump, menu, many, auto, recent }) Enable(c, f.Enabled);
         var problem = f.Enabled ? app.FolderJump?.HotkeyProblem : null;
         Group("基本",
             Row("启用对话框跳转", f.Enabled ? "只在「打开 / 另存为」对话框在前台时接管下面两个快捷键，别的程序里不受影响" : "已关闭：两个快捷键都还给对话框",
@@ -1990,6 +1992,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                             : Row("跳到当前文件夹", "跳到最近用过的资源管理器窗口所在的文件夹；没开资源管理器时弹出菜单", jump),
             Row("选择文件夹", "在对话框旁边弹出菜单，从开着的和最近用过的文件夹里选", menu));
         Group("行为",
+            Row("开着多个资源管理器时", f.MenuWhenMany ? "弹出菜单从开着的文件夹里选；只开着一个时照常直接跳" : "直接跳到最后点过的那个窗口；想挑别的用「选择文件夹」", many),
             Row("对话框打开时自动跳过去", "新打开的对话框直接跳到最近用过的资源管理器文件夹；只跳这一次，之后照常操作", auto),
             Row("菜单里列出最近用过的文件夹", "来自 Windows 的最近使用记录，最多 8 个；关掉后菜单里只有开着的资源管理器文件夹", recent));
     }

@@ -115,7 +115,8 @@ struct Service {
     Hotkeys keys;std::mutex mutex;std::map<HWND,unsigned long long> activated;unsigned long long sequence=0;
     std::function<bool(int,KeyBinding)> registerKey=RegisterKey;
     std::function<void(int)> unregisterKey=[](int id){UnregisterHotKey(nullptr,id);};
-    Configuration config;std::set<HWND> seen;HWND pending=nullptr;ULONGLONG deadline=0;UINT_PTR timer=0;int problem=0;
+    Configuration config;std::set<HWND> seen;HWND pending=nullptr;ULONGLONG deadline=0,started=0;UINT_PTR timer=0;int problem=0;
+    HWND observedForeground=nullptr;bool pendingAutomatic=false,waitingRecognition=false;
     // 异步跳转线程只读取快照；销毁通知和首次捕获由事件线程维护。
     std::map<HWND,InitialFilename> initialFilenames;
     // 隐藏桌面夹具可替换查询；生产始终重新读取真实前台。
@@ -136,18 +137,24 @@ struct Service {
         },unregisterKey);
         if(dialog)Problem(failed);
     }
-    void TryAutomatic(){
+    void TryPending(){
         if(!pending)return;HWND window=pending;
-        if(!config.enabled||!config.automatic||foreground()!=window||!IsWindow(window)||GetTickCount64()>=deadline){CancelPending();return;}
+        if(!config.enabled||foreground()!=window||!IsWindow(window)||GetTickCount64()>=deadline){CancelPending();return;}
         auto edit=Filename(window);if(!edit)return;
+        if(waitingRecognition){
+            Diagnostic(L"delayed recognition succeeded elapsedMs="+std::to_wstring(GetTickCount64()-started));
+            waitingRecognition=false;
+        }
+        Register(window);
+        if(!pendingAutomatic||!config.automatic){CancelPending();return;}
         std::wstring text;if(!ReadFilename(edit,text))return;
         {std::lock_guard<std::mutex> lock(mutex);initialFilenames.emplace(window,InitialFilename{edit,text});}
-        Register(window);
         CancelPending();
         trigger(window,3,0,0);
     }
     void Foreground(HWND){
         if(!config.enabled)return;auto window=foreground();auto name=Class(window);
+        bool entered=observedForeground!=window;observedForeground=window;
         if(pending&&pending!=window)CancelPending();
         if(name==L"CabinetWClass"||name==L"ExploreWClass"){
             std::lock_guard<std::mutex> lock(mutex);
@@ -156,25 +163,29 @@ struct Service {
         }
         auto dialog=Filename(window)?window:nullptr;
         if(dialog!=keys.dialog||(!dialog&&name==L"#32770"))Diagnostic(dialog?L"foreground recognized=1":L"foreground recognized=0");
-        if(config.automatic&&name==L"#32770"&&seen.insert(window).second){
-            pending=window;deadline=GetTickCount64()+1000;
-            timer=SetTimer(nullptr,0,40,nullptr);TryAutomatic();
-            if(!timer&&pending)CancelPending();
-        }
         Register(dialog);
+        bool automatic=config.automatic&&name==L"#32770"&&seen.insert(window).second;
+        // 设置变化沿用当前识别窗口期，不增加第二个计时器或延长截止时间。
+        if(pending&&automatic)pendingAutomatic=true;
+        if(!pending&&name==L"#32770"&&((!dialog&&entered)||automatic)){
+            pending=window;started=GetTickCount64();deadline=started+2000;
+            pendingAutomatic=automatic;waitingRecognition=!dialog;
+            TryPending();
+            if(pending){timer=SetTimer(nullptr,0,40,nullptr);if(!timer)CancelPending();}
+        }
     }
-    void Destroyed(HWND window){seen.erase(window);{std::lock_guard<std::mutex> lock(mutex);initialFilenames.erase(window);}if(pending==window)CancelPending();if(keys.dialog==window)Register(nullptr);}
+    void Destroyed(HWND window){seen.erase(window);{std::lock_guard<std::mutex> lock(mutex);initialFilenames.erase(window);}if(pending==window)CancelPending();if(keys.dialog==window)Register(nullptr);if(observedForeground==window)observedForeground=nullptr;}
     void Apply(Configuration next){
         bool changed=!(config.jump==next.jump)||!(config.menu==next.menu);
         if(changed||!next.enabled)Register(nullptr);
         if(changed||!next.enabled)Problem(0);config=next;
         if(!config.enabled){
-            CancelPending();if(hook)UnhookWinEvent(hook);hook=nullptr;
+            CancelPending();observedForeground=nullptr;if(hook)UnhookWinEvent(hook);hook=nullptr;
             if(destroyHook)UnhookWinEvent(destroyHook);destroyHook=nullptr;return;
         }
         for(auto i=seen.begin();i!=seen.end();)if(!IsWindow(*i))i=seen.erase(i);else ++i;
         {std::lock_guard<std::mutex> lock(mutex);for(auto i=initialFilenames.begin();i!=initialFilenames.end();)if(!IsWindow(i->first))i=initialFilenames.erase(i);else ++i;}
-        if(!config.automatic)CancelPending();
+        if(!config.automatic)pendingAutomatic=false;
         if(!hook)hook=SetWinEventHook(EVENT_SYSTEM_FOREGROUND,EVENT_SYSTEM_FOREGROUND,nullptr,[](HWINEVENTHOOK,DWORD,HWND window,LONG,LONG,DWORD,DWORD){if(current)current->Foreground(window);},0,0,WINEVENT_OUTOFCONTEXT);
         if(!destroyHook)destroyHook=SetWinEventHook(EVENT_OBJECT_DESTROY,EVENT_OBJECT_DESTROY,nullptr,[](HWINEVENTHOOK,DWORD,HWND window,LONG object,LONG child,DWORD,DWORD){if(current&&object==OBJID_WINDOW&&child==CHILDID_SELF)current->Destroyed(window);},0,0,WINEVENT_OUTOFCONTEXT);
         Foreground(foreground());
@@ -187,7 +198,7 @@ struct Service {
         Apply(config);SetEvent(ready);
         while(GetMessageW(&msg,nullptr,0,0)>0){
             if(msg.message==WM_APP+46){auto request=reinterpret_cast<ApplyRequest*>(msg.lParam);Apply(request->config);SetEvent(request->done);}
-            else if(msg.message==WM_TIMER&&timer&&msg.wParam==timer)TryAutomatic();
+            else if(msg.message==WM_TIMER&&timer&&msg.wParam==timer)TryPending();
             else if(msg.message==WM_HOTKEY&&config.enabled&&keys.dialog&&foreground()==keys.dialog){
                 auto edit=Filename(keys.dialog);RECT r{};
                 if(edit&&GetWindowRect(edit,&r))trigger(keys.dialog,static_cast<int>(msg.wParam),r.left,r.bottom);

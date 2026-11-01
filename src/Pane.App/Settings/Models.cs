@@ -3,8 +3,8 @@ namespace Pane.Settings;
 public enum ThemeMode { System, Light, Dark }
 public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); } }
 // 文件对话框跳转（设计加，2026-11-01，046）：用户要能在设置里调。Ctrl+G / Ctrl+Shift+G 可改（null = 默认组合）；
-// AutoJump = 对话框刚打开时自动跳到最近用过的资源管理器文件夹（只跳一次）；ShowRecent = 菜单里列出最近用过的文件夹
-public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=null, Hotkey? MenuHotkey=null, bool AutoJump=false, bool ShowRecent=true)
+// AutoJump = 对话框刚打开时自动跳到最近用过的资源管理器文件夹（只跳一次）；ShowRecent = 菜单里列出最近用过的文件夹；MenuWhenMany（047）= 开着多个资源管理器时 Ctrl+G 改为弹菜单让用户选
+public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=null, Hotkey? MenuHotkey=null, bool AutoJump=false, bool ShowRecent=true, bool MenuWhenMany=false)
 {
     public static readonly Hotkey DefaultJump=new(KeyModifiers.Ctrl,(ushort)'G'), DefaultMenu=new(KeyModifiers.Ctrl|KeyModifiers.Shift,(ushort)'G');
     [System.Text.Json.Serialization.JsonIgnore] public Hotkey Jump=>JumpHotkey??DefaultJump;
