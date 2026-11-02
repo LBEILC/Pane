@@ -7,6 +7,7 @@
 <UserControl
     x:Class="Pane.Views.ChatView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:loc="using:Pane.Localization"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:c="using:Pane.Views.Controls"
     IsTabStop="False">
@@ -31,26 +32,26 @@
                     Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:PaneIcon Glyph="ai" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
-                    <TextBlock Text="AI 对话" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Common_AiChat}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
             </Border>
             <Button x:Name="ModelButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="10,0,8,0" CornerRadius="14" Click="OnModel"
-                    ToolTipService.ToolTip="换模型（只对这次对话）">
+                    ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_ChangeModel}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock x:Name="ModelText" VerticalAlignment="Center" MaxWidth="200" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"/>
                     <c:PaneIcon x:Name="ModelChevron" Glyph="chev-d" Width="13" Height="13" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="新对话（Ctrl+N）" VerticalAlignment="Center">
+            <Button Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_NewChatHint}" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="plus" Width="13" Height="13" VerticalAlignment="Center" Foreground="{ThemeResource PaneText1Brush}"/>
-                    <TextBlock Text="新对话" VerticalAlignment="Center"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Ai_Chat_NewChat}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="总在最前">
+            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
+            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>
@@ -62,10 +63,10 @@
         <!-- 空状态：两个示例问题 -->
         <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
             <TextBlock TextAlignment="Center" LineHeight="24" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"
-                       Text="新的对话&#x0a;只保留到关掉窗口为止"/>
+                       Text="{x:Bind loc:Strings.Ai_Chat_Empty}"/>
             <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-                <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="玻璃上的文字怎么保持清晰" Click="OnSuggestion"/>
-                <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="写一个防抖函数" Click="OnSuggestion"/>
+                <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Ai_Chat_ExampleClarity}" Click="OnSuggestion"/>
+                <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Ai_Chat_ExampleDebounce}" Click="OnSuggestion"/>
             </StackPanel>
         </StackPanel>
 
@@ -84,11 +85,11 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="Input" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="0" MaxHeight="140" Padding="0,2,0,2" VerticalAlignment="Center"
-                         PlaceholderText="问点什么…" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
+                         PlaceholderText="{x:Bind loc:Strings.Ai_Chat_QuestionPlaceholder}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                          SelectionHighlightColor="{StaticResource PaneAccentBrush}" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                          ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnInputChanged"/>
                 <Button x:Name="SendButton" Grid.Column="1" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" CornerRadius="16" Padding="0" VerticalAlignment="Bottom" Click="OnSend"
-                        Background="{StaticResource PaneAccentBrush}" Style="{StaticResource PanePrimaryButton}" MinHeight="{StaticResource PaneControlMd}" ToolTipService.ToolTip="发送（Enter）">
+                        Background="{StaticResource PaneAccentBrush}" Style="{StaticResource PanePrimaryButton}" MinHeight="{StaticResource PaneControlMd}" ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_SendHint}">
                     <Grid Width="16" Height="16">
                         <Viewbox x:Name="SendIcon">
                             <Path Data="M5,12 L12,5 L19,12 M12,19 V5" Stroke="White" StrokeThickness="2.2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="24" Height="24"/>

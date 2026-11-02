@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Pane.Contracts;
@@ -64,7 +65,7 @@ internal sealed class WinVReplacement : IWinVReplacement
         // 后台宿主重新注册成功也记录下来；不在热键线程等待文件 IO。
         await gate.WaitAsync().ConfigureAwait(false);
         try { if (journal.Enabled && !journal.Restoring) Save(); }
-        catch (Exception e) { Error = "Win+V 状态保存失败：" + e.Message; }
+        catch (Exception e) { Error = string.Format(Strings.Settings_WinV_StateSaveError, e.Message); }
         finally { gate.Release(); Changed?.Invoke(this, EventArgs.Empty); }
     }
     public WinVReplacement(string directory, IWinVRegistry registry, IWinVExplorer explorer, IWinVHotkey hotkey)
@@ -74,8 +75,8 @@ internal sealed class WinVReplacement : IWinVReplacement
         if (loaded) return;
         if (File.Exists(file))
         {
-            journal = JsonSerializer.Deserialize(File.ReadAllText(file), WinVJson.Default.WinVJournal) ?? throw new IOException("替换记录无效");
-            if (journal.Version != 1 || journal.Hotkeys == null || journal.History == null) throw new IOException("替换记录版本或内容无效");
+            journal = JsonSerializer.Deserialize(File.ReadAllText(file), WinVJson.Default.WinVJournal) ?? throw new IOException(Strings.Settings_WinV_InvalidRecord);
+            if (journal.Version != 1 || journal.Hotkeys == null || journal.History == null) throw new IOException(Strings.Settings_WinV_InvalidRecordVersion);
         }
         loaded = true;
     }
@@ -93,7 +94,7 @@ internal sealed class WinVReplacement : IWinVReplacement
         catch (Exception e) when (e is not OperationCanceledException)
         {
             // TODO(design): 请复核系统操作失败的文案。
-            Error = "Win+V 设置未完成：" + e.Message;
+            Error = string.Format(Strings.Settings_WinV_SetupError, e.Message);
         }
         finally { gate.Release(); Changed?.Invoke(this, EventArgs.Empty); }
     }
@@ -122,16 +123,16 @@ internal sealed class WinVReplacement : IWinVReplacement
         bool registered = await hotkey.SetAsync(true);
         State = registered ? WinVState.On : WinVState.Pending;
         if (registered) { journal.MayHaveReleased = true; Save(); }
-        else Error = "Win+V 被其他程序或系统占用，替换尚未生效。";
+        else Error = Strings.Settings_WinV_Occupied;
     }
     public Task EnableAsync(bool restartExplorer, CancellationToken cancellationToken) => Run(async () =>
     {
-        if (journal.Restoring) throw new IOException("请先完成系统快捷键恢复");
+        if (journal.Restoring) throw new IOException(Strings.Settings_WinV_RestoreFirst);
         if (State == WinVState.On) return;
         if (!journal.Enabled)
         {
             var original = registry.Read(false);
-            if (original.Exists && original.Text == null) throw new IOException("DisabledHotkeys 不是字符串");
+            if (original.Exists && original.Text == null) throw new IOException(Strings.Settings_WinV_InvalidHotkeys);
             journal = new() { Version = 1, Enabled = true, Hotkeys = original, Explorer = explorer.Identity,
                 HotkeysTouched = !(original.Text ?? "").Contains('V', StringComparison.OrdinalIgnoreCase) };
             Save(); // 先落盘，再触碰系统；崩溃后可以重复恢复。
@@ -188,7 +189,7 @@ internal sealed class WinVReplacement : IWinVReplacement
     }, cancellationToken);
     public Task SetSystemHistoryDisabledAsync(bool disabled, CancellationToken cancellationToken) => Run(() =>
     {
-        if (!journal.Enabled || journal.Restoring) throw new IOException("请先开启 Win+V 替换");
+        if (!journal.Enabled || journal.Restoring) throw new IOException(Strings.Settings_WinV_EnableRequired);
         if (disabled && !journal.HistoryTouched)
         { journal.History = registry.Read(true); journal.HistoryTouched = true; Save(); }
         if (disabled) { Save(); registry.Write(true, new(true, Number: 0)); historyDisabled = true; }

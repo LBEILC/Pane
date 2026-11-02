@@ -44,17 +44,17 @@ static partial class Program
         context=context with{Query="权限"};ranked=await source.SearchAsync(context,default);Check(ranked.First().Id=="system:privacy-videos","同分按使用次数排序");
         var table=new PinyinTable();var app=new IndexedApp("app:display",table.Create("显示设置"),"fake",false,null);
         var appContext=context with{Query="显示设置",Snapshot=new([app],[],[])};var appRows=await new ApplicationSource(executor,_=>{}).SearchAsync(appContext,default);
-        var rows=(await service.SearchAsync("显示设置",default)).Items;Check(rows.FindIndex(i=>i.Group=="设置")<rows.FindIndex(i=>i.Group=="文件"),"设置在文件之前");Check(new ApplicationSource(executor,_=>{}).Order<source.Order&&appRows.Count==1,"应用在设置之前");
+        var rows=(await service.SearchAsync("显示设置",default)).Items;Check(rows.FindIndex(i=>i.Group==LauncherGroups.Settings)<rows.FindIndex(i=>i.Group==LauncherGroups.Files),"设置在文件之前");Check(new ApplicationSource(executor,_=>{}).Order<source.Order&&appRows.Count==1,"应用在设置之前");
         platform.Missing.Add("gpedit.msc");var unavailable=new SystemSettingsSource(executor,process,platform,_=>{});Check(!(await unavailable.SearchAsync(context with{Query="组策略"},default)).Any(i=>i.Id=="system:gpedit.msc"),"过滤缺失组件");
         foreach(var query in new[]{"注销","zhuxiao","zx","logoff","sign out"})Check((await service.SearchAsync(query,default)).Items.Any(i=>i.Id=="command:logoff"),"注销匹配:"+query);
         foreach(var query in new[]{"休眠","xiumian","xm","hibernate"})Check((await service.SearchAsync(query,default)).Items.Any(i=>i.Id=="command:hibernate"),"休眠匹配:"+query);
         platform.HibernateAvailable=false;Check((await new ExtraCommandSource(executor,platform).SearchAsync(context with{Query="休眠"},default)).Count==0,"过滤不可用休眠");
-        foreach(var id in new[]{"command:logoff","command:hibernate"}){await service.ExecuteAsync(new(id,LauncherItemKind.Command,"命令","","",new("moon")),default);Check(executor.Calls[^1]==id,"系统命令假执行器:"+id);}
+        foreach(var id in new[]{"command:logoff","command:hibernate"}){await service.ExecuteAsync(new(id,LauncherItemKind.Command,LauncherGroups.Commands,"","",new("moon")),default);Check(executor.Calls[^1]==id,"系统命令假执行器:"+id);}
         foreach(var q in new[]{">","> ",">   "})Check((await service.SearchAsync(q,default)).Items[0].Id=="terminal:hint","空命令:"+q);
         var hint=(await service.SearchAsync(">",default)).Items[0];int before=process.Requests.Count;await service.ExecuteAsync(hint,default);Check(process.Requests.Count==before,"提示项不执行");
         string command="echo \"a b\" & echo %PATH% | find \"a\"";
-        var terminal=(await service.SearchAsync(">"+command,default)).Items[0];Check(terminal.Subtitle==command&&terminal.Group=="终端"&&terminal.Hotkey=="Enter","终端项契约");
-        before=files.Calls;var result=await service.SearchAsync(">py",default);Check(files.Calls==before&&result.Items.All(i=>i.Group is "终端" or "补全"),"终端不查其他来源");Check(result.Items.Any(i=>i.Title=="python")&&result.Items.Count<=7,"程序名前缀和数量上限");
+        var terminal=(await service.SearchAsync(">"+command,default)).Items[0];Check(terminal.Subtitle==command&&terminal.Group==LauncherGroups.Terminal&&terminal.Hotkey=="Enter","终端项契约");
+        before=files.Calls;var result=await service.SearchAsync(">py",default);Check(files.Calls==before&&result.Items.All(i=>i.Group is LauncherGroups.Terminal or LauncherGroups.Completion),"终端不查其他来源");Check(result.Items.Any(i=>i.Title=="python")&&result.Items.Count<=7,"程序名前缀和数量上限");
         Check((await service.SearchAsync(">python a",default)).Items.Count==1,"只补第一词");
         await service.ExecuteAsync(terminal,default);var request=process.Requests[^1];Check(request.FileName.EndsWith("wt.exe")&&request.Arguments.SequenceEqual(["-w","0","new-tab","-d",platform.Home,"--",@"C:\Windows\System32\cmd.exe","/k",command])&&request.WorkingDirectory==platform.Home&&!request.Elevated,"wt 参数数组与原始命令");
         platform.Missing.Add("wt.exe");await service.ExecuteElevatedAsync(terminal,default);request=process.Requests[^1];Check(request.FileName.EndsWith("cmd.exe")&&request.Arguments.SequenceEqual(["/k",command])&&request.Elevated,"cmd 管理员参数");

@@ -12,8 +12,8 @@ internal static class IconRenderer
     static extern int PaneIconDecode(string path,[Out] byte[] pixels);
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)]
     static extern int PaneIconEncode(string path,byte[] pixels,int size);
-    public static IconAnalysis Load(string path){var pixels=new byte[256*256*4];if(PaneIconDecode(path,pixels)!=1)throw new IOException("图标解码失败");return Analyze(pixels);}
-    public static void Save(string path,byte[] pixels){if(PaneIconEncode(path,pixels,Size)!=1)throw new IOException("图标编码失败");}
+    public static IconAnalysis Load(string path){var pixels=new byte[256*256*4];if(PaneIconDecode(path,pixels)!=1)throw new IOException("图标解码失败");return Analyze(pixels);} // 不翻译：异常
+    public static void Save(string path,byte[] pixels){if(PaneIconEncode(path,pixels,Size)!=1)throw new IOException("图标编码失败");} // 不翻译：异常
     public static IconAnalysis Analyze(byte[] d){
         d=RemoveFaintFrame(d);
         int x0=256,y0=256,x1=-1,y1=-1;

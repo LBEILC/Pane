@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Runtime.InteropServices;
 using Pane.Contracts;
 using Pane.Settings;
@@ -49,9 +50,9 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
     {
         // 原生 Apply 同步等待事件线程，此处不能拿 gate 或同步调用界面。
         var value = settings;
-        var next = x == 0 ? null : string.Join("、", new[] {
+        var next = x == 0 ? null : string.Format(Strings.Settings_Hotkey_Occupied, string.Join("、", new[] {
             (x & 1) != 0 ? HotkeyText(value.Jump) : null,
-            (x & 2) != 0 ? HotkeyText(value.Menu) : null }.Where(n => n != null)) + " 被其他程序占用";
+            (x & 2) != 0 ? HotkeyText(value.Menu) : null }.Where(n => n != null)));
         if (Interlocked.Exchange(ref problem, next) != next)
             _ = Task.Run(() => ProblemChanged?.Invoke(this, EventArgs.Empty));
     }
@@ -154,7 +155,7 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
         0x24 => "Home", 0x23 => "End", 0x21 => "PgUp", 0x22 => "PgDn",
         0x25 => "←", 0x26 => "↑", 0x27 => "→", 0x28 => "↓",
         0xC0 => "`", 0xBD => "-", 0xBB => "=", 0xDB => "[", 0xDD => "]", 0xDC => "\\", 0xBA => ";", 0xDE => "'", 0xBC => ",", 0xBE => ".", 0xBF => "/",
-        _ => $"键 {vk:X2}",
+        _ => string.Format(Strings.FolderJump_KeyCode, (object?)(vk)),
     };
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpApply(nint service, int enabled, uint jumpMods, uint jumpKey, uint menuMods, uint menuKey, int automatic);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpEntriesFiltered(nint service, EntryCallback callback, int recent);

@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 卸载界面逻辑（设计负责人）。卸载逻辑在 IUninstallService（工程，018）。
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -21,8 +22,8 @@ public sealed partial class UninstallView : UserControl, IPanelView
         InitializeComponent();
         var info = uninstall.Info;
         Logo.Source = WorkingLogo.Source = SetupArt.Logo();
-        AskTitle.Text = $"卸载 Pane {info.InstalledVersion}？";
-        DataText.Text = $"设置、剪贴板历史、手势和 AI 登录信息，共 {SetupArt.Size(info.DataBytes)}。不删的话，以后重新安装会接着用";
+        AskTitle.Text = string.Format(Strings.Setup_UninstallPrompt, (object?)(info.InstalledVersion));
+        DataText.Text = string.Format(Strings.Setup_DataDescription, (object?)(SetupArt.Size(info.DataBytes)));
         removeData = new PaneSwitch(false, FillProto.Background, FillProto.BorderBrush, AccentProto.Background);
         DataHost.Content = removeData;
         if (info.PaneRunning) RunningText.Visibility = Visibility.Visible;
@@ -38,7 +39,7 @@ public sealed partial class UninstallView : UserControl, IPanelView
         working = true;
         bool data = removeData.IsOn;
         ProgressFill.Width = 0;
-        StepText.Text = "准备中";
+        StepText.Text = Strings.Setup_Preparing;
         SetupArt.Show(this, Working);
         CloseButton.IsEnabled = false;
         var progress = new Progress<SetupProgress>(p =>
@@ -49,7 +50,7 @@ public sealed partial class UninstallView : UserControl, IPanelView
         try
         {
             await uninstall.UninstallAsync(data, progress);
-            DoneText.Text = data ? "数据也一起删掉了。" : $"你的数据还留在 {uninstall.Info.DataPath}，以后重新安装会接着用；不需要的话可以直接删掉这个文件夹。";
+            DoneText.Text = data ? Strings.Setup_DataRemoved : string.Format(Strings.Setup_DataKept, (object?)(uninstall.Info.DataPath));
             SetupArt.Show(this, Done);
         }
         catch (SetupException ex)

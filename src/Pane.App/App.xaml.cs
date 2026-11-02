@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Hosting;
 using Pane.Hosting;
@@ -64,7 +65,7 @@ public sealed partial class App : Application
             GlassParameters.InitializeResources(Resources);queue.EnsureSystemDispatcherQueue();manager=WindowsXamlManager.InitializeForCurrentThread();
             string data=RuntimeMode.Current.DataDirectory;
             FileIcons=demo?new Pane.DesignData.FileIconsSample(data):new Pane.Services.Icons.FileIcons(data);   /* 设计：演示模式按扩展名取真实系统图标 */
-            Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
+            Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();ApplyUiLanguage();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
             var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry());Autostart=autostart;autostart.Align();
             aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;
             Glass=new GlassParameters(Store.Current.General);
@@ -86,16 +87,16 @@ public sealed partial class App : Application
             Files=demo?new Pane.DesignData.FileSearchSample():new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(),new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
             if(!demo)launcherSearch=new(Store,new Pane.Services.Launcher.WindowsAppCatalog(data),everything,new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
             if(!demo){WebSuggestions=new Pane.Services.Launcher.WebSuggestions(()=>Store.Current.Launcher.WebSuggestions);TerminalHistory=launcherSearch!.TerminalHistory;}
-            launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),new Pane.Services.Clipboard.LauncherClipboardHistory(ClipboardHistory,Store));panels.Add("launcher",new("启动器",launcher,launcher,Glass));
+            launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),new Pane.Services.Clipboard.LauncherClipboardHistory(ClipboardHistory,Store));panels.Add("launcher",new(Strings.Common_Launcher,launcher,launcher,Glass));
             panels["launcher"].PositionStore=Store;panels["launcher"].HideOnBlur=()=>Store.Current.Launcher.HideOnBlur;WireSecondary(launcher,actions);/* 设计接线：二级窗口 */}
-            if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new("剪贴板",clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
-            if(startupLevel>=3){var super=new SuperView(Ai,actions);superView=super;secondaryActions??=actions;WireSuper(super);panels.Add("super",new("超级面板",super,super,Glass){Placement=PanelPlacement.Pointer});}
+            if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new(Strings.Common_Clipboard,clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
+            if(startupLevel>=3){var super=new SuperView(Ai,actions);superView=super;secondaryActions??=actions;WireSuper(super);panels.Add("super",new(Strings.Common_SuperPanel,super,super,Glass){Placement=PanelPlacement.Pointer});}
             foreach(var panel in panels.Values){WatchFrames(panel);panel.Prepare();}
             if(startupLevel>=4){gestures=new GestureOverlay(Glass);gestures.TickRequested+=WakeFrames;}/* 设计：手势轨迹与提示框，手势服务的接线由工程做 */
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
                 var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
-                using var installer=System.Diagnostics.Process.Start(start)??throw new IOException("无法启动安装程序");Shutdown();
+                using var installer=System.Diagnostics.Process.Start(start)??throw new IOException(Strings.Setup_InstallerLaunchFailed);Shutdown();
             });
             StartUpdates();/* 设计接线：软件内更新 */StartBackground();StartReleaseProbe();
             timer=queue.CreateTimer();timer.Interval=TimeSpan.FromMilliseconds(8);timer.Tick+=(_,_)=>{try{Tick();}finally{if(!NeedsFrames)timer.Stop();}};timer.Start();
@@ -116,7 +117,7 @@ public sealed partial class App : Application
         if(command=="exit"){Shutdown();return;}
         if(command=="hide"){foreach(var p in panels.Values)p.Hide();settings?.Hide();HideSecondaries();gestures?.HideAll();return;}
         if(command=="show-settings"){
-            if(settings==null){var view=new SettingsView();if(controlsEnabled)TrackSettings(view);settings=new("设置",view,view,Glass,true);WatchFrames(settings);settings.Hidden+=(_,_)=>{var old=settings;if(controlsEnabled&&old!=null){retiredSettings.Add(new WeakReference(old.View));retiredHosts.Add(new WeakReference(old));}settings=null;if(current==old)current=null;old?.Dispose();(Fonts as Pane.Services.FontCatalog)?.ClearCache();ReclaimAfterSettings();};settings.Prepare();}current=settings;
+            if(settings==null){var view=new SettingsView();if(controlsEnabled)TrackSettings(view);settings=new(Strings.Common_Settings,view,view,Glass,true);WatchFrames(settings);settings.Hidden+=(_,_)=>{var old=settings;if(controlsEnabled&&old!=null){retiredSettings.Add(new WeakReference(old.View));retiredHosts.Add(new WeakReference(old));}settings=null;if(current==old)current=null;old?.Dispose();(Fonts as Pane.Services.FontCatalog)?.ClearCache();ReclaimAfterSettings();};settings.Prepare();}current=settings;
         }else if(command.StartsWith("show-")&&panels.TryGetValue(command[5..],out var panel)){foreach(var other in panels.Values)if(other!=panel)other.Hide();current=panel;}
         else return;
         current.Show(activate:!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");
@@ -129,11 +130,11 @@ public sealed partial class App : Application
     bool Settled=>panels.Values.All(p=>p.Settled)&&(settings?.Settled??true)&&SecondariesSettled&&(gestures?.Settled??true);
     void Tick(){
         if(closing)return;
-        if(clipboardService?.Ready.IsFaulted==true)throw new InvalidOperationException("剪贴板历史初始化失败");
+        if(clipboardService?.Ready.IsFaulted==true)throw new InvalidOperationException("剪贴板历史初始化失败"); // 不翻译：日志异常
         if(controlsEnabled&&Take("exit",out _)){Shutdown();return;}
         DrainTrail();
         foreach(var panel in panels.Values)panel.Tick();settings?.Tick();TickSecondaries();gestures?.Tick();
-        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");if(IsProduction&&shell!=null){var log=new CrashLog(Store.DirectoryPath);if(log.Pending() is {} crash){shell.NotifyOnce("Pane 上次意外退出，记录在 "+crash);log.MarkNotified(crash);}}if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics)));}
+        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");if(IsProduction&&shell!=null){var log=new CrashLog(Store.DirectoryPath);if(log.Pending() is {} crash){shell.NotifyOnce(string.Format(Strings.Common_CrashLog, crash));log.MarkNotified(crash);}}if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics)));}
         if(ready)DesignOpen();
         if(!ready||!controlsEnabled)return;
         if(pendingAck!=null){if(Settled){Ack(pendingAck);pendingAck=null;}return;}
@@ -142,7 +143,7 @@ public sealed partial class App : Application
             if(cycleHiding){cycleIndex++;cycleHiding=false;cycleRecorded=false;if(cycleIndex==60){cycleIndex=-1;Ack("cycled");return;}}
             else if(current!=null&&current.Shown){
                 bool valid=current.MaterialAttached;if(!cycleRecorded)File.AppendAllText(output+".cycle-diagnostics",$"{cycleIndex+1};material={valid};clip={valid};shadow={valid};visible={valid}\n");
-                if(!valid)throw new InvalidOperationException("合成树未完整挂载");
+                if(!valid)throw new InvalidOperationException("合成树未完整挂载"); // 不翻译：诊断异常
                 cycleRecorded=true;Ack("cycle-"+(cycleIndex+1));
                 if(Environment.GetEnvironmentVariable("PANE_CYCLE_CAPTURE")=="1"&&!Take("cycle-next",out _))return;
                 current.Hide();cycleHiding=true;return;
@@ -158,12 +159,12 @@ public sealed partial class App : Application
         if(Take("gesture",out var gesture)){DemoGesture(gesture);pendingAck="gesture-shown";return;}
         if(Take("drag",out var delta)){var pair=Pair(delta);current!.SimulateDrag((int)pair.Width,(int)pair.Height);pendingAck="dragged";return;}
         if(Take("reset-position",out _)){current!.ResetPosition();pendingAck="position-reset";return;}
-        if(Take("show-at-pointer",out var pointer)){var pair=Pair(pointer);if(current?.Placement!=PanelPlacement.Pointer)throw new InvalidOperationException("当前面板不跟随鼠标");current.Show(true,(int)pair.Width,(int)pair.Height,false);pendingAck="shown-at-pointer";return;}
+        if(Take("show-at-pointer",out var pointer)){var pair=Pair(pointer);if(current?.Placement!=PanelPlacement.Pointer)throw new InvalidOperationException("当前面板不跟随鼠标");current.Show(true,(int)pair.Width,(int)pair.Height,false);pendingAck="shown-at-pointer";return;} // 不翻译：诊断异常
         if(Take("position-info",out _)){File.WriteAllText(output+".position-info-result",current!.PositionDiagnostics());return;}
         if(Take("theme",out var theme)){Store.Save(Store.Current with {General=Store.Current.General with {Theme=Enum.Parse<ThemeMode>(theme.Trim(),true)}});pendingAck="theme-applied";return;}
         if(Take("glass",out var json)){var command=JsonSerializer.Deserialize(json,SettingsJson.Default.GlassCommand)!;var g=Store.Current.General;Store.Save(Store.Current with {General=(command.Theme==ThemeMode.Dark||command.Theme==ThemeMode.System&&Glass.Dark)?g with {GlassDark=command.Parameters}:g with {GlassLight=command.Parameters}});pendingAck="glass-applied";return;}
         if(Take("radius",out var radius)){Store.Save(Store.Current with {General=Store.Current.General with {PanelRadius=double.Parse(radius,System.Globalization.CultureInfo.InvariantCulture)}});pendingAck="radius-applied";return;}
-        if(Take("resize",out var size)){if(current==null)throw new InvalidOperationException("没有当前面板");current.RequestSize(Pair(size));pendingAck="resized";return;}
+        if(Take("resize",out var size)){if(current==null)throw new InvalidOperationException("没有当前面板");current.RequestSize(Pair(size));pendingAck="resized";return;} // 不翻译：诊断异常
         if(Take("cycle",out _)){Command("hide");current=null;cycleIndex=0;cycleHiding=false;cycleRecorded=false;return;}
         if(Take("save-settings",out _)){Store.Save(Store.Current);Ack("settings-saved");}
     }

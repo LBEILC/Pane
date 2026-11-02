@@ -68,7 +68,7 @@ static partial class Program
         var migratedIndex=processed with{Metrics=processed.Metrics with{Aliases=new(){["old-app"]="app:1"}}};
         using(var search=new LauncherSearch(migrationStore,new CachedIconIndex(migratedIndex),new FakeFiles(),new FakeExecutor())){
             await search.Indexing;var home=await search.SearchAsync("",default);
-            Check(home.Items.Count(i=>i.Group=="已固定"&&i.Id=="app:1")==1&&migrationStore.Current.Launcher.PinnedApps[0]=="old-app","旧固定 Id 解析到保留应用且不改写设置");
+            Check(home.Items.Count(i=>i.Group==Pane.Contracts.LauncherGroups.Pinned&&i.Id=="app:1")==1&&migrationStore.Current.Launcher.PinnedApps[0]=="old-app","旧固定 Id 解析到保留应用且不改写设置");
             var stored=JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(migrationDir,"launcher-usage.json")),LauncherJson.Default.DictionaryStringAppUse)!;
             Check(stored.Count==1&&stored["app:1"].Count==10,"加载与重建发布后迁移次数只持久化一次");
         }

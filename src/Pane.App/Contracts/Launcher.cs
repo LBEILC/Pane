@@ -19,7 +19,7 @@ public sealed record LauncherIcon(string Glyph, string? ImagePath = null, string
 public sealed record LauncherItem(
     string Id,
     LauncherItemKind Kind,
-    string Group,                         // 分组标题：应用、文件、命令、计算、AI、网页……同组条目相邻给出
+    string Group,                         // 稳定分组标识：使用 LauncherGroups；同组条目相邻给出
     string Title,
     string? Subtitle,
     LauncherIcon Icon,
@@ -64,9 +64,9 @@ public interface ILauncherSearch
 
 /// <summary>
 /// 终端命令（037）：输入以 > 开头时，SearchAsync 先给「在终端里运行」，后面跟最多 6 条补全（最近运行过的命令、PATH 里的程序名），
-/// 补全项 Id 写成 "complete:&lt;完整命令&gt;"、Group「补全」；界面按 Tab 把它填进输入框，Enter 直接运行它（走 ExecuteAsync）。
-/// 「在终端里运行」那一项 Group「终端」、副标题是命令本身；输入只有 > 时给一条提示项，Id 写成 "terminal:hint"、Group「终端」、
-/// 标题「输入要在终端里运行的命令」，界面不执行它（2026-11-01 设计定）。系统设置和组件的 Group 是「设置」，界面排成列表。
+/// 补全项 Id 写成 "complete:&lt;完整命令&gt;"、Group 为 LauncherGroups.Completion；界面按 Tab 把它填进输入框，Enter 直接运行它（走 ExecuteAsync）。
+/// 「在终端里运行」那一项 Group 为 LauncherGroups.Terminal、副标题是命令本身；输入只有 > 时给一条提示项，Id 写成 "terminal:hint"、Group 为 LauncherGroups.Terminal、
+/// 标题「输入要在终端里运行的命令」，界面不执行它（2026-11-01 设计定）。系统设置和组件的 Group 为 LauncherGroups.Settings，界面排成列表。
 /// </summary>
 public interface ITerminalHistory
 {
@@ -103,4 +103,24 @@ public interface IFileSearchStatus
     event EventHandler? Changed;
     /// <summary>立即重新检测（设置页按钮）。</summary>
     Task RefreshAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>启动器分组的稳定标识；显示标题由界面资源提供。</summary>
+public static class LauncherGroups
+{
+    public const string Applications = "applications";
+    public const string Files = "files";
+    public const string Commands = "commands";
+    public const string Calculation = "calculation";
+    public const string Ai = "ai";
+    public const string Web = "web";
+    public const string Settings = "settings";
+    public const string Terminal = "terminal";
+    public const string Recent = "recent";
+    public const string Pinned = "pinned";
+    public const string Completion = "completion";
+    public const string Favorites = "favorites";
+    public const string Images = "images";
+    public const string Other = "other";
+    public const string Actions = "actions";
 }

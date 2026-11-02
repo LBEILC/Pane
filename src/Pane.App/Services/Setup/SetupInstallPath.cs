@@ -1,13 +1,14 @@
+using Pane.Localization;
 using Pane.Contracts;
 namespace Pane.Services.Setup;
 
 internal static class SetupInstallPath
 {
     internal const int MaxLength = 180; // 为 app 下的包内相对路径预留空间。
-    const string Permission = "这里要管理员权限，换一个位置";
-    const string FixedDisk = "请选本机的固定磁盘";
-    const string Occupied = "这个文件夹里已经有别的文件";
-    const string TooLong = "路径太长，换一个短一点的位置";
+    static string Permission => Strings.Setup_PermissionRequired;
+    static string FixedDisk => Strings.Setup_FixedDiskRequired;
+    static string Occupied => Strings.Setup_DirectoryOccupied;
+    static string TooLong => Strings.Setup_PathTooLong;
     public static InstallPathCheck Check(string folder, bool appendPane = true, bool allowExisting = false)
     {
         string target = folder;

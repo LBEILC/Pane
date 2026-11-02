@@ -7,7 +7,7 @@ namespace Pane.DesignData;
 
 public sealed class LauncherSampleSearch : ILauncherSearch
 {
-    sealed record Entry(string Name, string Py, string Ab, string Sub, string Glyph, string? From = null, string? To = null, string? Hotkey = null);
+    sealed record Entry(string Name, string Py, string Ab, string Sub, string Glyph, string? From = null, string? To = null, string? Hotkey = null, string? Id = null);
 
     static readonly Entry[] Apps =
     [
@@ -47,10 +47,10 @@ public sealed class LauncherSampleSearch : ILauncherSearch
     [
         new("锁屏", "suoping", "sp", "命令", "lock"),
         new("睡眠", "shuimian", "sm", "命令", "moon"),
-        new("重启", "chongqi", "cq", "命令", "restart"),
-        new("关机", "guanji", "gj", "命令", "power"),
+        new("重启", "chongqi", "cq", "命令", "restart", Id: "command:restart"),
+        new("关机", "guanji", "gj", "命令", "power", Id: "command:shutdown"),
         new("清空回收站", "qingkonghuishouzhan", "qkhsz", "命令", "trash"),
-        new("注销", "zhuxiao logoff sign out", "zx", "命令", "logout"),
+        new("注销", "zhuxiao logoff sign out", "zx", "命令", "logout", Id: "command:logoff"),
         new("休眠", "xiumian hibernate", "xm", "命令", "moon"),
         new("打开剪贴板历史", "dakaijiantieban", "dkjtb", "Pane", "clipboard"),
     ];
@@ -78,31 +78,31 @@ public sealed class LauncherSampleSearch : ILauncherSearch
         var items = new List<LauncherItem>();
         if (q.Length == 0)
         {
-            foreach (var n in Recents) items.Add(Tile(Apps.First(a => a.Name == n), "最近使用"));
-            foreach (var n in Pinned) items.Add(Tile(Apps.First(a => a.Name == n), "已固定"));
+            foreach (var n in Recents) items.Add(Tile(Apps.First(a => a.Name == n), LauncherGroups.Recent));
+            foreach (var n in Pinned) items.Add(Tile(Apps.First(a => a.Name == n), LauncherGroups.Pinned));
             return Task.FromResult(new LauncherResult(items, true));
         }
         if (t.StartsWith('>'))
         {
             var cmd = t[1..].Trim();
-            if (cmd.Length == 0) { items.Add(new("terminal:hint", LauncherItemKind.Action, "终端", "输入要在终端里运行的命令", "按 Ctrl+Shift+Enter 以管理员身份运行", new("terminal"))); return Task.FromResult(new LauncherResult(items, false)); }
-            items.Add(new("terminal:" + cmd, LauncherItemKind.Action, "终端", "在终端里运行", cmd, new("terminal"), Hotkey: "Enter"));
+            if (cmd.Length == 0) { items.Add(new("terminal:hint", LauncherItemKind.Action, LauncherGroups.Terminal, "输入要在终端里运行的命令", "按 Ctrl+Shift+Enter 以管理员身份运行", new("terminal"))); return Task.FromResult(new LauncherResult(items, false)); }
+            items.Add(new("terminal:" + cmd, LauncherItemKind.Action, LauncherGroups.Terminal, "在终端里运行", cmd, new("terminal"), Hotkey: "Enter"));
             var first = cmd.Split(' ')[0];
             foreach (var c in History.Where(h => h.StartsWith(cmd, StringComparison.OrdinalIgnoreCase) && h != cmd)
                          .Concat(cmd.Contains(' ') ? [] : Programs.Where(n => n.StartsWith(first, StringComparison.OrdinalIgnoreCase) && n != first)).Take(6))
-                items.Add(new("complete:" + c, LauncherItemKind.Action, "补全", c, History.Contains(c) ? "最近运行过" : "程序", new(History.Contains(c) ? "refresh" : "terminal")));
+                items.Add(new("complete:" + c, LauncherItemKind.Action, LauncherGroups.Completion, c, History.Contains(c) ? "最近运行过" : "程序", new(History.Contains(c) ? "refresh" : "terminal")));
             return Task.FromResult(new LauncherResult(items, false));
         }
         var v = Calc(raw);
-        if (v is not null) items.Add(new("calc", LauncherItemKind.Calculation, "计算", v, t + " =", new("equal")));
-        Pick(Apps, LauncherItemKind.App, "应用", 14);
-        Pick(Files, LauncherItemKind.File, "文件", 3);
+        if (v is not null) items.Add(new("calc", LauncherItemKind.Calculation, LauncherGroups.Calculation, v, t + " =", new("equal")));
+        Pick(Apps, LauncherItemKind.App, LauncherGroups.Applications, 14);
+        Pick(Files, LauncherItemKind.File, LauncherGroups.Files, 3);
         int fileTotal = Files.Count(e => Match(e, q) is not null) * 4;   // 假数据：假装 Everything 还有更多
-        Pick(Commands, LauncherItemKind.Command, "命令", 3);
-        Pick(SystemSettings, LauncherItemKind.Command, "设置", 4);
-        items.Add(new("ai:translate", LauncherItemKind.Ai, "AI", $"翻译“{t}”", "用 AI 翻译", new("translate")));
-        items.Add(new("ai:ask", LauncherItemKind.Ai, "AI", $"问 AI：“{t}”", "单轮回答，可以复制或粘贴", new("ai"), Hotkey: "Tab"));
-        items.Add(new("web", LauncherItemKind.Web, "网页", $"在网页中搜索“{t}”", "默认搜索引擎", new("search")));
+        Pick(Commands, LauncherItemKind.Command, LauncherGroups.Commands, 3);
+        Pick(SystemSettings, LauncherItemKind.Command, LauncherGroups.Settings, 4);
+        items.Add(new("ai:translate", LauncherItemKind.Ai, LauncherGroups.Ai, $"翻译“{t}”", "用 AI 翻译", new("translate")));
+        items.Add(new("ai:ask", LauncherItemKind.Ai, LauncherGroups.Ai, $"问 AI：“{t}”", "单轮回答，可以复制或粘贴", new("ai"), Hotkey: "Tab"));
+        items.Add(new("web", LauncherItemKind.Web, LauncherGroups.Web, $"在网页中搜索“{t}”", "默认搜索引擎", new("search")));
         return Task.FromResult(new LauncherResult(items, false, fileTotal));
 
         void Pick(Entry[] list, LauncherItemKind kind, string group, int limit)
@@ -112,7 +112,7 @@ public sealed class LauncherSampleSearch : ILauncherSearch
             {
                 IReadOnlyList<TextSpan>? spans = m!.Value.span is { } s ? [s] : null;
                 var glyph = kind == LauncherItemKind.File && e.Glyph == "folder" ? "folder" : e.Glyph;
-                items.Add(new(e.Name, kind, group, e.Name, e.Sub, new(glyph, DesignIcon(kind), e.From, e.To), spans, e.Hotkey));
+                items.Add(new(e.Id ?? e.Name, kind, group, e.Name, e.Sub, new(glyph, DesignIcon(kind), e.From, e.To), spans, e.Hotkey));
             }
         }
     }

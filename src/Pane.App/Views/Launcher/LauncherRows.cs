@@ -45,7 +45,7 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     public void SetWarning(string? text) { if (warning == text) return; warning = text; Changed(nameof(Subtitle)); Changed(nameof(SubtitleVisibility)); }
     public Visibility SubtitleVisibility => string.IsNullOrEmpty(Subtitle) ? Visibility.Collapsed : Visibility.Visible;
     /// <summary>文件的路径用等宽字体（原型 .row .s）；其余用界面字体。</summary>
-    public FontFamily SubtitleFont => (Cell == LauncherCell.File || Item.Group == "终端" && Item.Id != "terminal:hint") && warning is null ? Mono : Pane.Hosting.GlassParameters.UiFont;   // 文件路径、终端命令用等宽
+    public FontFamily SubtitleFont => (Cell == LauncherCell.File || Item.Group == LauncherGroups.Terminal && Item.Id != "terminal:hint") && warning is null ? Mono : Pane.Hosting.GlassParameters.UiFont;   // 文件路径、终端命令用等宽
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, Microsoft YaHei UI");
     public string Glyph => Item.Icon.Glyph;
     public string? Hotkey => Item.Hotkey;
@@ -102,6 +102,7 @@ public sealed class LauncherSection
 {
     public LauncherSection(string label, LauncherSectionKind kind, List<LauncherRow> rows) { Label = label; Kind = kind; Rows = rows; }
     public string Label { get; }
+    public string? GroupId { get; init; }
     public LauncherSectionKind Kind { get; }
     public List<LauncherRow> Rows { get; }
 }

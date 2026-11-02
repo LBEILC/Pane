@@ -6,6 +6,7 @@
 <UserControl
     x:Class="Pane.Views.SettingsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:loc="using:Pane.Localization"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:c="using:Pane.Views.Controls"
     IsTabStop="False">
@@ -26,7 +27,7 @@
                 </Grid.RowDefinitions>
                 <StackPanel x:Name="SideTitle" Orientation="Horizontal" Spacing="10" Padding="8,0,8,16" Background="Transparent">
                     <Image x:Name="Logo" Width="26" Height="26"/>
-                    <TextBlock Text="Pane 设置" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
+                    <TextBlock Text="{x:Bind loc:Strings.Settings_Title}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
                                Foreground="{ThemeResource PaneText1Brush}"/>
                 </StackPanel>
                 <Grid Grid.Row="1">
@@ -35,7 +36,7 @@
                 </Grid>
                 <TextBlock Grid.Row="2" Padding="8,12,8,0" TextWrapping="Wrap" LineHeight="19"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"
-                           Text="按 Esc 关闭。改动立即生效，自动保存。"/>
+                           Text="{x:Bind loc:Strings.Settings_SaveDescription}"/>
             </Grid>
         </Border>
 
@@ -52,7 +53,7 @@
                                FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
                 <Button x:Name="CloseButton" Style="{StaticResource PaneIconButton}" HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Margin="0,-6,0,0" Click="OnClose" ToolTipService.ToolTip="关闭（Esc）">
+                        Margin="0,-6,0,0" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseEscapeHint}">
                     <c:PaneIcon Glyph="close" Width="16" Height="16" Foreground="{ThemeResource PaneText2Brush}"/>
                 </Button>
             </Grid>

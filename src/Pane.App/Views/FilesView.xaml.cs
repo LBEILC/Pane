@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 文件窗口逻辑（设计负责人）。交互照原型 prototype/launcher.html「二级窗口：文件搜索」：
 // 输入防抖后搜；左侧分类带数量，Tab / Shift+Tab 切换；结果分批加载（每批 50，滚到接近底部再要）；
 // 上下键选中，Enter 打开，Ctrl+Enter 打开所在文件夹，可拖出；右侧预览可关；底部换排序。
@@ -58,7 +59,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         Rail.Loaded += (_, _) => MoveRailHighlight(animate: false);
         thumbFade = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(900), () => { if (!overThumb && !draggingThumb) FadeThumb(0); });
         ElementCompositionPreview.GetElementVisual(ScrollThumb).Opacity = 0;
-        KeyHints.Fill(Hints, [(["Enter"], "打开"), (["Ctrl", "+", "Enter"], "打开所在文件夹"), (["Esc"], "清空")], HintLabelProto, KbdProto);
+        KeyHints.Fill(Hints, [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Esc"], Strings.Common_Clear)], HintLabelProto, KbdProto);
         PreviewKeyDown += OnKeyDown;   // 先于输入框拿到方向键、Tab、Enter
         Loaded += (_, _) => HideDelete();
         Input.GotFocus += (_, _) => HideDelete();
@@ -99,7 +100,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         topmost = !topmost;
         PinIcon.IsFilled = topmost;   // 开着：图钉实心（状态靠形状表达）
-        ToolTipService.SetToolTip(PinButton, topmost ? "总在最前：开" : "总在最前");
+        ToolTipService.SetToolTip(PinButton, topmost ? Strings.Common_AlwaysOnTopEnabled : Strings.Common_AlwaysOnTop);
         TopmostChanged?.Invoke(this, topmost);
     }
 
@@ -124,14 +125,14 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         {
             foreach (var c in categories) c.SetCount(null);
             Bind();
-            ShowEmpty(search is null ? "文件搜索暂时用不了" : null);
+            ShowEmpty(search is null ? Strings.Files_SearchUnavailable : null);
             return;
         }
         FilePage page;
         try { page = await search.SearchAsync(new FileQuery(q, category, sort), 0, Batch, cts.Token); }
         catch (OperationCanceledException) { return; }
         catch (FileSearchUnavailableException ex) { if (cts == pending) { Bind(); ShowEmpty(ex.Message); } return; }
-        catch (Exception ex) { if (cts == pending) { Bind(); ShowEmpty("搜索失败：" + (App.FailureReason(ex) ?? "出了点问题")); } return; }
+        catch (Exception ex) { if (cts == pending) { Bind(); ShowEmpty(string.Format(Strings.Files_SearchError, App.FailureReason(ex) ?? Strings.Common_UnexpectedProblem)); } return; }
         if (cts.IsCancellationRequested) return;
         total = page.Total;
         foreach (var c in categories) c.SetCount(page.Counts?.GetValueOrDefault(c.Category));
@@ -141,7 +142,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         int focus = focusPath is { } p ? rows.FindIndex(r => string.Equals(r.Hit.Path, p, StringComparison.OrdinalIgnoreCase)) : -1;
         focusPath = null;
         Select(Math.Max(0, focus));
-        if (rows.Count == 0) ShowEmpty($"没有找到「{q}」\n换个关键词，或者在左边换个分类");
+        if (rows.Count == 0) ShowEmpty(string.Format(Strings.Files_NotFound, (object?)(q)));
         else Empty.Visibility = Visibility.Collapsed;
     }
 
@@ -199,7 +200,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         // 下次搜索先清空 rows 再等结果，这期间一滚动 / 重新排版，它就按旧长度取行，越界崩溃（打字快、输入法改词时常见）
         List.ItemsSource = rows.ToList();
         ListScroller.ChangeView(null, 0, null, true);
-        TotalText.Text = rows.Count == 0 ? "" : $"共 {total:N0} 个";
+        TotalText.Text = rows.Count == 0 ? "" : string.Format(Strings.Files_Count, (object?)(total));
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, UpdateThumb);
     }
 
@@ -236,7 +237,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     void ShowEmpty(string? message = null)
     {
-        Empty.Text = message ?? "输入文件名的一部分开始搜索\n由 Everything 提供，结果是实时的";
+        Empty.Text = message ?? Strings.Files_SearchHint;
         Empty.Visibility = Visibility.Visible;
         TotalText.Text = "";
         UpdatePreview();
@@ -274,7 +275,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     void OnSort(object sender, RoutedEventArgs e)
     {
         sort = sort == FileSort.Relevance ? FileSort.Modified : FileSort.Relevance;
-        SortText.Text = sort == FileSort.Relevance ? "按相关度" : "按修改时间";
+        SortText.Text = sort == FileSort.Relevance ? Strings.Files_SortRelevance : Strings.Files_SortModified;
         _ = Search();
         Input.Focus(FocusState.Programmatic);
     }
@@ -362,19 +363,19 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         Meta.Children.Clear();
         Meta.RowDefinitions.Clear();
-        var items = new List<(string, string)> { ("类型", FileKinds.Name(hit.Category) is var n && hit.Category != FileCategory.All ? n : "文件") };
-        if (hit.Category == FileCategory.Folder) { if (p?.FolderItems is { } count) items.Add(("内容", $"{count:N0} 项")); }
-        else items.Add(("大小", FileKinds.Size(hit.Size)));
-        if (p?.ImageWidth is { } w && p.ImageHeight is { } h) items.Add(("尺寸", $"{w} × {h}"));
-        items.Add(("修改", FileKinds.When(hit.Modified)));
-        items.Add(("位置", System.IO.Path.GetDirectoryName(hit.Path) ?? hit.Path));
-        foreach (var (label, value) in items)
+        var items = new List<(string, string, bool)> { (Strings.Files_MetaType, FileKinds.Name(hit.Category) is var n && hit.Category != FileCategory.All ? n : Strings.Common_File, false) };
+        if (hit.Category == FileCategory.Folder) { if (p?.FolderItems is { } count) items.Add((Strings.Files_MetaContents, string.Format(Strings.Files_ItemCount, (object?)(count)), false)); }
+        else items.Add((Strings.Files_MetaSize, FileKinds.Size(hit.Size), false));
+        if (p?.ImageWidth is { } w && p.ImageHeight is { } h) items.Add((Strings.Files_MetaDimensions, $"{w} × {h}", false));
+        items.Add((Strings.Files_MetaModified, FileKinds.When(hit.Modified), false));
+        items.Add((Strings.Files_MetaLocation, System.IO.Path.GetDirectoryName(hit.Path) ?? hit.Path, true));
+        foreach (var (label, value, selectable) in items)
         {
             if (value.Length == 0) continue;
             Meta.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             int r = Meta.RowDefinitions.Count - 1;
             var l = new TextBlock { Text = label, FontFamily = HintLabelProto.FontFamily, FontSize = HintLabelProto.FontSize, Foreground = HintLabelProto.Foreground };
-            var v = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, FontFamily = MetaValueProto.FontFamily, FontSize = MetaValueProto.FontSize, Foreground = MetaValueProto.Foreground, IsTextSelectionEnabled = label == "位置" };
+            var v = new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, FontFamily = MetaValueProto.FontFamily, FontSize = MetaValueProto.FontSize, Foreground = MetaValueProto.Foreground, IsTextSelectionEnabled = selectable };
             Grid.SetRow(l, r); Grid.SetRow(v, r); Grid.SetColumn(v, 1);
             Meta.Children.Add(l); Meta.Children.Add(v);
         }
@@ -386,11 +387,11 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         if (Current is not { } row || search is null) return;
         try { await action(row.Hit.Path, CancellationToken.None); }
-        catch (Exception e) { if (App.FailureReason(e) is { } reason) Empty.Text = $"{what}失败：{reason}"; }
+        catch (Exception e) { if (App.FailureReason(e) is { } reason) Empty.Text = string.Format(Strings.Common_ActionFailed, (object?)(what), (object?)(reason)); }
     }
 
-    void OnOpenSelected(object sender, RoutedEventArgs e) => _ = Run(search!.OpenAsync, "打开");
-    void OnRevealSelected(object sender, RoutedEventArgs e) => _ = Run(search!.RevealAsync, "打开所在文件夹");
+    void OnOpenSelected(object sender, RoutedEventArgs e) => _ = Run(search!.OpenAsync, Strings.Common_Open);
+    void OnRevealSelected(object sender, RoutedEventArgs e) => _ = Run(search!.RevealAsync, Strings.Common_OpenContainingFolder);
     void OnCopyPath(object sender, RoutedEventArgs e) { if (Current is { } row) _ = output.CopyAsync(row.Hit.Path, CancellationToken.None); }
 
     void OnListTapped(object sender, TappedRoutedEventArgs e)
@@ -401,7 +402,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
 
     void OnListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (RowAt(e.OriginalSource) is { } row) { Select(row.Index); _ = Run(search!.OpenAsync, "打开"); }
+        if (RowAt(e.OriginalSource) is { } row) { Select(row.Index); _ = Run(search!.OpenAsync, Strings.Common_Open); }
     }
 
     // 拖出：按住移动超过几像素才开始拖（2026-10-31）。原来行上直接开 CanDrag，鼠标单击被拖放吞掉，点结果没反应
@@ -474,7 +475,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
             case VirtualKey.Up: Select(selected - 1); break;
             case VirtualKey.PageDown: Select(selected + (int)(ListScroller.ViewportHeight / RowHeight)); break;
             case VirtualKey.PageUp: Select(selected - (int)(ListScroller.ViewportHeight / RowHeight)); break;
-            case VirtualKey.Enter when Current is not null: _ = Run(ctrl ? search!.RevealAsync : search!.OpenAsync, ctrl ? "打开所在文件夹" : "打开"); break;
+            case VirtualKey.Enter when Current is not null: _ = Run(ctrl ? search!.RevealAsync : search!.OpenAsync, ctrl ? Strings.Common_OpenContainingFolder : Strings.Common_Open); break;
             case VirtualKey.Tab:
                 int i = categories.FindIndex(c => c.Category == category);
                 SelectCategory(categories[(i + (shift ? categories.Count - 1 : 1)) % categories.Count].Category);

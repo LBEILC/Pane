@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../src/Pane.App/Localization/*.cs" Link="Localization/%(Filename)%(Extension)" />
+    <Compile Include="$(MSBuildThisFileDirectory)LocalizationTestCulture.cs" Link="LocalizationTestCulture.cs" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)../src/Pane.App/Localization/*.resx" Link="Localization/%(Filename)%(Extension)" ManifestResourceName="Pane.Localization.%(Filename)" />
+  </ItemGroup>
+  <Import Project="../src/Pane.App/Localization/Localization.targets" />
+</Project>

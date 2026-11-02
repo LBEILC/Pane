@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 批量重命名窗口的预览行（设计负责人，040）。照原型 prototype/rename.html .prow：
 // 新名里改动的部分加粗 + 中性浅底（主题色不用于文字），没改的部分用次要文字色；不变的写「不变」；有问题的整段用警示色，右端给问题标签。
 using System.ComponentModel;
@@ -122,26 +123,26 @@ public sealed partial class RenameRow : INotifyPropertyChanged
         newName = p.NewName;
         diff = p.Issue switch
         {
-            RenameIssue.Unchanged => new("不变", 0, 0, RenameDiffStyle.Same),
+            RenameIssue.Unchanged => new(Strings.Rename_Unchanged, 0, 0, RenameDiffStyle.Same),
             RenameIssue.BadPattern => new(oldName, 0, 0, RenameDiffStyle.Same),
             RenameIssue.None => RenameDiffText.Of(oldName, p.NewName),
-            _ => new(p.NewName.Length > 0 ? p.NewName : "（空）", 0, 0, RenameDiffStyle.Bad),
+            _ => new(p.NewName.Length > 0 ? p.NewName : Strings.Rename_Empty, 0, 0, RenameDiffStyle.Bad),
         };
         Changed(nameof(NewName)); Changed(nameof(Diff));
         SetTag(IssueText(p.Issue), null, danger: true);
     }
 
     /// <summary>执行之后：这一行停在「原名 → 新名」，右端写结果。</summary>
-    public void ShowResult(bool ok, string? reason) => SetTag(ok ? "已改名" : "没改成", reason, danger: !ok);
+    public void ShowResult(bool ok, string? reason) => SetTag(ok ? Strings.Rename_Renamed : Strings.Rename_Failed, reason, danger: !ok);
 
     public static string? IssueText(RenameIssue issue) => issue switch
     {
-        RenameIssue.Empty => "名字是空的",
-        RenameIssue.Invalid => "含不能用的字符",
-        RenameIssue.TooLong => "路径太长",
-        RenameIssue.Duplicate => "和别的重名",
-        RenameIssue.Exists => "已有同名文件",
-        RenameIssue.Missing => "文件已经不在了",
+        RenameIssue.Empty => Strings.Rename_EmptyName,
+        RenameIssue.Invalid => Strings.Rename_InvalidCharacters,
+        RenameIssue.TooLong => Strings.Rename_PathTooLong,
+        RenameIssue.Duplicate => Strings.Rename_DuplicateName,
+        RenameIssue.Exists => Strings.Rename_TargetExists,
+        RenameIssue.Missing => Strings.Rename_SourceMissing,
         _ => null,
     };
 

@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 手势提示框逻辑（设计负责人）。照原型 app.js「showHint」：
 // 箭头只追加新增的那几个（逐个弹出），命令名随识别结果更新；执行时整块弹一下（40% 处放大到 1.04）。
 // 何时显示、何时收起由 GestureOverlay 决定；这里只管内容和尺寸。
@@ -43,11 +44,11 @@ public sealed partial class GestureHintView : UserControl, IPanelView
         bool hasInput = hint.Arrows.Count > 0 || hint.Modifier != GestureHintModifier.None;
         var (text, strong) = hint.Kind switch
         {
-            GestureHintKind.Drawing => hint.CommandName is { } n ? (n, true) : (hasInput ? "未识别的手势" : "…", false),
-            GestureHintKind.Executed => (hint.CommandName ?? "已执行", true),
-            GestureHintKind.NotRecognized => ("未识别的手势", false),
-            GestureHintKind.Failed => ($"{hint.CommandName ?? "命令"}失败", true),
-            GestureHintKind.Cancelled => ("手势超时，已取消", false),
+            GestureHintKind.Drawing => hint.CommandName is { } n ? (n, true) : (hasInput ? Strings.Gestures_Unknown : "…", false),
+            GestureHintKind.Executed => (hint.CommandName ?? Strings.Gestures_Executed, true),
+            GestureHintKind.NotRecognized => (Strings.Gestures_Unknown, false),
+            GestureHintKind.Failed => (string.Format(Strings.Gestures_ActionFailed, (object?)(hint.CommandName ?? Strings.Gestures_Command)), true),
+            GestureHintKind.Cancelled => (Strings.Gestures_TimedOut, false),
             _ => (hint.CommandName ?? "", true),
         };
         Label.Text = text;
@@ -100,12 +101,12 @@ public sealed partial class GestureHintView : UserControl, IPanelView
     {
         var (glyph, text) = m switch
         {
-            GestureHintModifier.WheelUp => ("U", "滚轮上"),
-            GestureHintModifier.WheelDown => ("D", "滚轮下"),
-            GestureHintModifier.LeftClick => ("gesture", "左键"),
-            GestureHintModifier.MiddleClick => ("gesture", "中键"),
-            GestureHintModifier.X1Click => ("gesture", "侧键 1"),
-            _ => ("gesture", "侧键 2"),
+            GestureHintModifier.WheelUp => ("U", Strings.Gestures_WheelUp),
+            GestureHintModifier.WheelDown => ("D", Strings.Gestures_WheelDown),
+            GestureHintModifier.LeftClick => ("gesture", Strings.Gestures_LeftButton),
+            GestureHintModifier.MiddleClick => ("gesture", Strings.Gestures_MiddleButton),
+            GestureHintModifier.X1Click => ("gesture", Strings.Gestures_SideButtonOne),
+            _ => ("gesture", Strings.Gestures_SideButtonTwo),
         };
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 5, VerticalAlignment = VerticalAlignment.Center };
         row.Children.Add(new PaneIcon { Glyph = glyph, Width = 15, Height = 15, VerticalAlignment = VerticalAlignment.Center, Foreground = StrongProto.Foreground });

@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 文件对话框跳转菜单逻辑（设计负责人，038）。行在每次弹出前按 IFolderJump.Entries() 重建；
 // 选中高亮滑动（SlidingHighlight），鼠标移到哪行就选哪行；Enter / 数字键 / 点一下：先收起菜单，再让宿主跳。
 using Microsoft.UI.Xaml;
@@ -44,7 +45,7 @@ public sealed partial class FolderJumpView : UserControl, IPanelView
         {
             Root.Children.Add(new TextBlock
             {
-                Text = "没有开着的资源管理器，也没有最近用过的文件夹", Margin = new Thickness(10, 10, 10, 10), TextWrapping = TextWrapping.Wrap,
+                Text = Strings.FolderJump_Empty, Margin = new Thickness(10, 10, 10, 10), TextWrapping = TextWrapping.Wrap,
                 FontFamily = NameProto.FontFamily, FontSize = NameProto.FontSize, Foreground = PathProto.Foreground,
             });
             height += 44;
@@ -57,7 +58,7 @@ public sealed partial class FolderJumpView : UserControl, IPanelView
                 group = e.Source;
                 Root.Children.Add(new TextBlock
                 {
-                    Text = e.Source == FolderJumpSource.Explorer ? "开着的资源管理器" : "最近用过", Height = LabelHeight, Padding = new Thickness(10, 8, 10, 0),
+                    Text = e.Source == FolderJumpSource.Explorer ? Strings.FolderJump_Explorer : Strings.FolderJump_Recent, Height = LabelHeight, Padding = new Thickness(10, 8, 10, 0),
                     FontFamily = LabelProto.FontFamily, FontSize = LabelProto.FontSize, Foreground = LabelProto.Foreground,
                 });
                 height += LabelHeight;

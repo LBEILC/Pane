@@ -22,21 +22,21 @@ static partial class Program
         var home=await service.SearchAsync("",default);Check(home.IsHome&&home.Items.Select(i=>i.Id).SequenceEqual(["app:2","app:1"]),"pinned ordering");
         var result=await service.SearchAsync("wx",default);var app=result.Items.First(i=>i.Kind==LauncherItemKind.App);await service.ExecuteAsync(app,default);
         Check(fake.Calls.Last()=="open:launch:1:False","fake app executor");
-        home=await service.SearchAsync("",default);Check(home.Items[0].Group=="最近使用"&&home.Items[0].Id=="app:1","recents usage");
+        home=await service.SearchAsync("",default);Check(home.Items[0].Group==LauncherGroups.Recent&&home.Items[0].Id=="app:1","recents usage");
         result=await service.SearchAsync("微",default);Check(result.Items.First(i=>i.Kind==LauncherItemKind.App).Id=="app:1","frequency tie break");
-        using(var restored=new LauncherSearch(store,new FixtureIndex(new FakeCatalog()),files,fake)){await restored.Indexing;Check((await restored.SearchAsync("",default)).Items[0].Group=="最近使用","usage persisted");}
+        using(var restored=new LauncherSearch(store,new FixtureIndex(new FakeCatalog()),files,fake)){await restored.Indexing;Check((await restored.SearchAsync("",default)).Items[0].Group==LauncherGroups.Recent,"usage persisted");}
     }
 
     static async Task OriginalFavoriteTests(LauncherSearch service){
         LauncherResult result;
-        result=await service.SearchAsync("yh",default);Check(result.Items.Any(i=>i.Group=="常用"&&i.Highlights!.Count>0),"favorite pinyin");
+        result=await service.SearchAsync("yh",default);Check(result.Items.Any(i=>i.Group==LauncherGroups.Favorites&&i.Highlights!.Count>0),"favorite pinyin");
     }
 
     static async Task OriginalWebTests(LauncherSearch service){
         LauncherResult result;
         result=await service.SearchAsync("bing a& 中",default);var web=result.Items.Where(i=>i.Kind==LauncherItemKind.Web).ToArray();
         Check(web.Length==0,"web group removed");
-        await service.ExecuteAsync(new("web:https://example.invalid",LauncherItemKind.Web,"网页","test","",new("search")),default);
+        await service.ExecuteAsync(new("web:https://example.invalid",LauncherItemKind.Web,LauncherGroups.Web,"test","",new("search")),default);
     }
 
     static async Task OriginalCalculationTests(LauncherSearch service,FakeExecutor fake){

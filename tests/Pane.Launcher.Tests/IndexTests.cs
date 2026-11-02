@@ -43,7 +43,7 @@ static partial class Program
         var store=new SettingsStore(directory,Defaults());var timer=Stopwatch.StartNew();
         using(var service=new LauncherSearch(store,new CachedSlowIndex(provider),new FakeFiles(),new FakeExecutor())){
             var result=await service.SearchAsync("wx",default);
-            Check(result.Items.Count(i=>i.Group=="应用")==2&&!service.Indexing.IsCompleted,"second startup searchable before rebuild");
+            Check(result.Items.Count(i=>i.Group==Pane.Contracts.LauncherGroups.Applications)==2&&!service.Indexing.IsCompleted,"second startup searchable before rebuild");
             Console.WriteLine($"cached firstSearchMs={timer.Elapsed.TotalMilliseconds:F3};indexPending={!service.Indexing.IsCompleted}");
         }
         Check(PinyinTable.Loads==loads+2,"settings and extra commands load their existing pinyin tables");

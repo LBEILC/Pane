@@ -9,6 +9,9 @@ namespace Pane.Contracts;
 /// </summary>
 public enum UpdateState { Idle, Checking, UpToDate, Available, Downloading, Ready, Failed }
 
+/// <summary>失败在哪一步（State 为 Failed 时有意义）：界面据此决定「重试」是重新检查还是重新下载。</summary>
+public enum UpdateStep { Check, Download, Install }
+
 /// <param name="Version">新版本号，如 0.1.150（和 CurrentVersion 同一种写法，按数字逐段比较）。</param>
 /// <param name="Notes">更新说明（Release 正文的纯文本，去掉 Markdown 标记，最多约 2000 字）。</param>
 /// <param name="SizeBytes">安装包大小。</param>
@@ -20,6 +23,8 @@ public interface IUpdateService
     /// <summary>正在运行的版本（开发版为 "开发版"，开发版不自动检查）。</summary>
     string CurrentVersion { get; }
     UpdateState State { get; }
+    /// <summary>State 为 Failed 时，失败的是哪一步；其余状态为 null。</summary>
+    UpdateStep? FailedStep { get; }
     /// <summary>查到的最新版本；还没查过或已是最新时可以为 null。</summary>
     UpdateRelease? Latest { get; }
     /// <summary>下载进度 0～1（Downloading 时有意义）。</summary>

@@ -65,6 +65,7 @@ public sealed partial class App
         finally{WakeFrames();}
     }
     bool DiagnosticCommand(){
+        if(Take("localization-probe",out _)){File.WriteAllLines(output+".localization-result",new[]{UiLanguage}.Concat(new TrayMenuView().LocalizationProbe()));return true;}
         if(Take("frames-probe",out _)){_ = FramesProbe();return true;}
         if(Take("restart",out _)){Restart();return true;}
         if(Take("fonts-test",out _)){_ = FontsProbe();return true;}

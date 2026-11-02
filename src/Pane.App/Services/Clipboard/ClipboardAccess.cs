@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Pane.Contracts;
 using Pane.Settings;
 namespace Pane.Services.Clipboard;
@@ -5,7 +6,7 @@ namespace Pane.Services.Clipboard;
 internal static class ClipboardAccess
 {
     // TODO(design): 当前手势模型没有「打开剪贴板」动作；定义后应接入 show-clipboard 的统一入口。
-    internal const string DisabledNotice="剪贴板已关闭，可以在 设置 → 剪贴板 里打开";
+    internal static string DisabledNotice => Strings.Settings_Clipboard_DisabledNotice;
     internal static bool Allow(string command,bool enabled,Action<string> notify)
     {
         if(command!="show-clipboard"||enabled)return true;

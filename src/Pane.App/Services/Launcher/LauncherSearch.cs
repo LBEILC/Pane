@@ -140,7 +140,7 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
     public async Task RunAsync(string actionId,ClipEntry attachment,CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if(attachment.Kind==ClipKind.Image)throw new NotSupportedException("图片附件动作将在 014 实现");
+        if(attachment.Kind==ClipKind.Image)throw new NotSupportedException("图片附件动作将在 014 实现"); // 不翻译：异常
         if(attachment.Kind==ClipKind.Files&&attachment.Files is {Count:>0} paths){
             switch(actionId){
                 case "copy-path":await executor.CopyAsync(string.Join(Environment.NewLine,paths),cancellationToken);return;

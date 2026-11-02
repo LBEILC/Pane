@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 翻译窗口逻辑（设计负责人）。照原型 prototype/launcher.html「二级：翻译窗口」：
 // 边打边翻（停手 0.6 秒），Ctrl+Enter 立即翻；原文是中文翻成英文，其余翻成「翻译成」（默认跟设置，设置是自动时为中文）；
 // 点「翻译成」临时换目标语言（清空后回到自动）；⇄ 把译文放到左边接着翻。翻译用设置里单独指定的快模型。
@@ -18,7 +19,7 @@ namespace Pane.Views;
 public sealed partial class TranslateView : UserControl, ISecondaryView
 {
     static readonly (string Code, string Name)[] Langs = Languages.All;
-    const string Idle = "译文会出现在这里";
+    static string Idle => Strings.Translate_ResultPlaceholder;
 
     readonly IAiService ai;
     readonly ISelectionActions output;
@@ -38,7 +39,7 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
         InitializeComponent();
         Controls.PaneCaret.Attach(Source);
         debounce = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(600), () => _ = Translate(force: false));
-        KeyHints.Fill(Hints, [(["Ctrl", "+", "Enter"], "立即翻译"), (["Esc"], "清空")], HintLabelProto, KbdProto);
+        KeyHints.Fill(Hints, [(["Ctrl", "+", "Enter"], Strings.Translate_TranslateNow), (["Esc"], Strings.Common_Clear)], HintLabelProto, KbdProto);
         PreviewKeyDown += OnKeyDown;
         ai.StatusChanged += OnStatusChanged;
         Unloaded += (_, _) => ai.StatusChanged -= OnStatusChanged;
@@ -77,19 +78,19 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
     {
         topmost = !topmost;
         PinIcon.IsFilled = topmost;
-        ToolTipService.SetToolTip(PinButton, topmost ? "总在最前：开" : "总在最前");
+        ToolTipService.SetToolTip(PinButton, topmost ? Strings.Common_AlwaysOnTopEnabled : Strings.Common_AlwaysOnTop);
         TopmostChanged?.Invoke(this, topmost);
     }
 
     void UpdateModel() => ModelText.Text = ai.Status == AiStatus.NotConfigured || ai.TranslationModelName is null
-        ? "还没配置 AI 服务（设置 → AI）"
-        : $"翻译用模型：{ai.TranslationModelName}（设置 → AI 里换）";
+        ? Strings.Translate_NotConfigured
+        : string.Format(Strings.Translate_ModelHint, (object?)(ai.TranslationModelName));
 
     // ---------------- 翻译 ----------------
 
     void OnSourceChanged(object sender, TextChangedEventArgs e)
     {
-        CountText.Text = $"{Source.Text.Length:N0} 字";
+        CountText.Text = string.Format(Strings.Translate_CharacterCount, (object?)(Source.Text.Length));
         if (Source.Text.Trim().Length == 0) { manualTarget = null; debounce.Stop(); _ = Translate(force: false); }
         else debounce.Restart();
     }
@@ -105,22 +106,22 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
         if (!force && text == last) return;
         last = text;
         running?.Cancel();
-        if (text.Length == 0) { FromText.Text = "自动识别"; ToText.Text = NameOf(AutoTarget("")); ShowIdle(); return; }
+        if (text.Length == 0) { FromText.Text = Strings.Translate_AutoDetect; ToText.Text = NameOf(AutoTarget("")); ShowIdle(); return; }
 
         target = manualTarget ?? AutoTarget(text);
-        FromText.Text = $"自动识别：{Detect(text)}";
+        FromText.Text = string.Format(Strings.Translate_DetectedLanguage, (object?)(Detect(text)));
         ToText.Text = NameOf(target);
         ActionButton.Visibility = Visibility.Collapsed;
         if (ai.Status == AiStatus.NotConfigured)
         {
-            ShowMessage("还没配置 AI 服务，配置好就能翻译", "去设置");
+            ShowMessage(Strings.Translate_ConfigureHint, MessageAction.Settings);
             return;
         }
 
         var cts = running = new CancellationTokenSource();
         Out.Text = "";
         Out.Foreground = TextProto.Foreground;
-        StateText.Text = "正在翻译…";
+        StateText.Text = Strings.Translate_Translating;
         try
         {
             await foreach (var piece in ai.RunAsync(new AiRequest("translate", text, target, null), cts.Token))
@@ -131,9 +132,9 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
             if (cts == running) StateText.Text = "";
         }
         catch (OperationCanceledException) { }
-        catch (AiSignInRequiredException e) { if (cts == running) ShowMessage(e.Message, "去设置"); }
-        catch (AiCredentialException e) { if (cts == running) ShowMessage(e.Message, "去设置"); }
-        catch (Exception e) { if (cts == running) ShowMessage(App.FailureReason(e) ?? "翻译失败", "重试"); }
+        catch (AiSignInRequiredException e) { if (cts == running) ShowMessage(e.Message, MessageAction.Settings); }
+        catch (AiCredentialException e) { if (cts == running) ShowMessage(e.Message, MessageAction.Settings); }
+        catch (Exception e) { if (cts == running) ShowMessage(App.FailureReason(e) ?? Strings.Translate_Failed, MessageAction.Retry); }
     }
 
     void ShowIdle()
@@ -144,12 +145,15 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
         ActionButton.Visibility = Visibility.Collapsed;
     }
 
-    void ShowMessage(string message, string action)
+    enum MessageAction { Settings, Retry }
+    MessageAction messageAction;
+    void ShowMessage(string message, MessageAction action)
     {
         Out.Text = message;
         Out.Foreground = IdleProto.Foreground;
         StateText.Text = "";
-        ActionButton.Content = action;
+        messageAction = action;
+        ActionButton.Content = action == MessageAction.Settings ? Strings.Common_GoToSettings : Strings.Common_Retry;
         ActionButton.Visibility = Visibility.Visible;
     }
 
@@ -157,7 +161,7 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
 
     void OnAction(object sender, RoutedEventArgs e)
     {
-        if ((string)ActionButton.Content == "去设置") OpenSettings?.Invoke(this, EventArgs.Empty);
+        if (messageAction == MessageAction.Settings) OpenSettings?.Invoke(this, EventArgs.Empty);
         else _ = Translate(force: true);
     }
 
@@ -165,9 +169,9 @@ public sealed partial class TranslateView : UserControl, ISecondaryView
 
     void OnCopy(object sender, RoutedEventArgs e)
     {
-        if (!HasResult) { StateText.Text = "还没有译文"; return; }
+        if (!HasResult) { StateText.Text = Strings.Translate_NoResult; return; }
         _ = output.CopyAsync(Out.Text, CancellationToken.None);
-        StateText.Text = "已复制译文";
+        StateText.Text = Strings.Translate_Copied;
     }
 
     // 换目标语言：按列表轮换，跳过和原文相同的语言；只对这段文字生效，清空后回到自动

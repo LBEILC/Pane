@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -34,6 +35,7 @@ internal sealed record AppIndex(IndexedApp[] Apps,IndexMetrics Metrics);
 internal interface IAppCatalog { AppIndex Build(PinyinTable table,CancellationToken token); }
 internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProcessingStep>? steps=null):IAppCatalog
 {
+    internal static bool IsAuxiliaryName(string name) { string lower=name.ToLowerInvariant(); return lower.Contains("uninstall")||lower.Contains("unins0")||lower.Contains("卸载")||lower.Contains("卸載")||lower.Contains("帮助")||lower.Contains("幫助")||lower.Contains("說明")||lower.Contains("readme")||lower.Contains(" help")||lower.StartsWith("help"); } // 不翻译：外部数据匹配
     public AppIndex Build(PinyinTable table,CancellationToken token)
     {
         var watch=Stopwatch.StartNew();var apps=new List<IndexedApp>();var candidates=new List<CatalogEntry>();
@@ -46,7 +48,7 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
                 bool packaged=id.Contains('!');string ext=Path.GetExtension(target);
                 if(source==0&&id.Length>0)parsing="shell:AppsFolder\\"+id;
                 string lower=(name+" "+Path.GetFileName(target)).ToLowerInvariant();
-                if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(parsing)||lower.Contains("uninstall")||lower.Contains("unins0")||lower.Contains("卸载")||lower.Contains("帮助")||lower.Contains("readme")||lower.Contains(" help")||lower.StartsWith("help")||(!packaged&&ext.Length>0&&!new[]{".exe",".com",".msc",".cpl",".lnk"}.Contains(ext,StringComparer.OrdinalIgnoreCase))||source==1&&string.IsNullOrEmpty(target)&&string.IsNullOrEmpty(id)){filtered++;return;}
+                if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(parsing)||IsAuxiliaryName(lower)||(!packaged&&ext.Length>0&&!new[]{".exe",".com",".msc",".cpl",".lnk"}.Contains(ext,StringComparer.OrdinalIgnoreCase))||source==1&&string.IsNullOrEmpty(target)&&string.IsNullOrEmpty(id)){filtered++;return;}
                 string stable=AppDeduplication.StableId(AppDeduplication.Identity(id,target,args,parsing));
                 var resolved=new StringBuilder(32768);var arguments=new StringBuilder(32768);var resource=new StringBuilder(32768);
                 if(LauncherNative.PaneLauncherResolve(parsing,resolved,arguments,resource,out int iconIndex)==1){if(resolved.Length>0)target=resolved.ToString();args=arguments.ToString();}
@@ -87,7 +89,7 @@ internal interface ILauncherExecutor
 }
 internal sealed class WindowsLauncherExecutor(Action<string> showPanel):ILauncherExecutor
 {
-    internal static void CheckResult(int result){if(result==-1223)throw new System.ComponentModel.Win32Exception(1223);if(result==0)throw new InvalidOperationException("系统未能完成操作");}
+    internal static void CheckResult(int result){if(result==-1223)throw new System.ComponentModel.Win32Exception(1223);if(result==0)throw new InvalidOperationException(Strings.Common_SystemOperationFailed);}
     static Task Run(Func<int> action,CancellationToken token)=>Task.Run(()=>{token.ThrowIfCancellationRequested();CheckResult(action());},token);
     public Task OpenAsync(string target,bool packaged,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherOpen(target,packaged?1:0),token);
     // 内置系统组件可能等待用户回应 UAC；保留普通文件打开的超时，组件不按该超时判失败。
@@ -121,7 +123,7 @@ internal sealed class EverythingSearch:ILauncherFiles,IFileSearchStatus
         token.ThrowIfCancellationRequested();if(query.Length<2||!await gate.WaitAsync(0,token))return [];
         try{
             var page=await new EverythingIpc().QueryAsync(query,0,limit,1,token).ConfigureAwait(false);
-            return new LauncherFileRows(page.Items.Select(hit=>new LauncherItem("file:"+hit.Path,hit.Category==FileCategory.Folder?LauncherItemKind.Folder:LauncherItemKind.File,"文件",hit.Name,Path.GetDirectoryName(hit.Path)??"",new(hit.Category==FileCategory.Folder?"folder":"doc"),FileSearch.Highlights(hit.Name,query))).ToArray(),page.Total);
+            return new LauncherFileRows(page.Items.Select(hit=>new LauncherItem("file:"+hit.Path,hit.Category==FileCategory.Folder?LauncherItemKind.Folder:LauncherItemKind.File,LauncherGroups.Files,hit.Name,Path.GetDirectoryName(hit.Path)??"",new(hit.Category==FileCategory.Folder?"folder":"doc"),FileSearch.Highlights(hit.Name,query))).ToArray(),page.Total);
         }catch(FileSearchUnavailableException){Set(FileSearchState.Unsupported,null);return [];}
         finally{gate.Release();}
     }

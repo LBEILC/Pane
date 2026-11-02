@@ -36,7 +36,7 @@ public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton Trig
     public static string[] DefaultActions(IEnumerable<string> aiActionIds)=>[.. aiActionIds.Select(id=>"ai:"+id).Append("search").Append("copy").Take(MaxActions)];
 }
 public sealed record GlassThemeParameters(double TintOpacity, double LuminosityOpacity, double Saturation, double Highlight, double Shadow, double ExtraBlur);
-public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } }
+public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } /* 界面语言（设计加，2026-11-02，任务 048）：null = 跟随系统（繁体系统用繁体，其余用简体）；"zh-Hans" / "zh-Hant"，以后加 "en"。重启后生效 */ public string? UiLanguage { get; init; } }
 public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey);
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
@@ -55,15 +55,15 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     SearchEngine[] searchEngines=DefaultSearchEngines();
     // 设计改（2026-11-01，issue 8）：默认加上 Google。存过的列表如果和旧默认完全一样（没改过），读进来时换成新默认；改过的不动
     public SearchEngine[] SearchEngines { get=>searchEngines; init=>searchEngines=value==null||IsOldDefault(value)?DefaultSearchEngines():value; }
-    static bool IsOldDefault(SearchEngine[] v)=>v.Length==4&&v[0]==new SearchEngine("必应","bing","https://www.bing.com/search?q={query}")
-        &&v[1]==new SearchEngine("百度","bd","https://www.baidu.com/s?wd={query}")&&v[2]==new SearchEngine("GitHub","gh","https://github.com/search?q={query}")
-        &&v[3]==new SearchEngine("哔哩哔哩","b","https://search.bilibili.com/all?keyword={query}");
+    static bool IsOldDefault(SearchEngine[] v)=>v.Length==4&&v[0]==new SearchEngine("必应","bing","https://www.bing.com/search?q={query}") // 不翻译：用户数据
+        &&v[1]==new SearchEngine("百度","bd","https://www.baidu.com/s?wd={query}")&&v[2]==new SearchEngine("GitHub","gh","https://github.com/search?q={query}") // 不翻译：用户数据
+        &&v[3]==new SearchEngine("哔哩哔哩","b","https://search.bilibili.com/all?keyword={query}"); // 不翻译：用户数据
     static SearchEngine[] DefaultSearchEngines()=>[
-        new("必应", "bing", "https://www.bing.com/search?q={query}"),
+        new("必应", "bing", "https://www.bing.com/search?q={query}"), // 不翻译：用户数据
         new("Google", "g", "https://www.google.com/search?q={query}"),
-        new("百度", "bd", "https://www.baidu.com/s?wd={query}"),
+        new("百度", "bd", "https://www.baidu.com/s?wd={query}"), // 不翻译：用户数据
         new("GitHub", "gh", "https://github.com/search?q={query}"),
-        new("哔哩哔哩", "b", "https://search.bilibili.com/all?keyword={query}")];
+        new("哔哩哔哩", "b", "https://search.bilibili.com/all?keyword={query}")]; // 不翻译：用户数据
     string defaultEngine="bing";
     public string DefaultEngine { get=>defaultEngine; init=>defaultEngine=value??"bing"; }
     string[] pinnedApps=[];

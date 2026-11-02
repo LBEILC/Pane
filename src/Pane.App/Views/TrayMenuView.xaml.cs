@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -39,7 +40,7 @@ public sealed partial class TrayMenuView : UserControl, IPanelView
     public void Apply(TrayMenuState state)
     {
         var update = state.UpdateVersion is { Length: > 0 } v;
-        UpdateHead.Text = update ? $"新版本 {state.UpdateVersion} 已下载好" : "";
+        UpdateHead.Text = update ? string.Format(Strings.Tray_UpdateReady, state.UpdateVersion) : "";
         UpdateHead.Visibility = UpdateItem.Visibility = UpdateSeparator.Visibility = update ? Visibility.Visible : Visibility.Collapsed;
         Keys(LauncherKeys, state.LauncherKeys);
         Keys(ClipboardKeys, state.ClipboardKeys);

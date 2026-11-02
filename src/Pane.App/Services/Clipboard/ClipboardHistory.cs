@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -218,8 +219,8 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
     static string Problem(Exception e,int failures)
     {
         // TODO(design): 审阅其他异常的保守提示，以及从首次失败开始显示的时机。
-        string reason=e switch{UnauthorizedAccessException=>"没有写入权限",IOException when (e.HResult&0xffff) is 32 or 33=>"文件被占用",IOException=>"磁盘读写错误",_=>"程序出错（"+e.GetType().Name+"）"};   // 设计审（045）：未知异常带上类型名，用户截图反馈就能定位
-        return $"保存失败：{reason}，已失败 {failures} 次";
+        string reason=e switch{UnauthorizedAccessException=>Strings.Clipboard_StoragePermission,IOException when (e.HResult&0xffff) is 32 or 33=>Strings.Clipboard_StorageFileBusy,IOException=>Strings.Clipboard_StorageIoError,_=>string.Format(Strings.Clipboard_StorageProgramError, e.GetType().Name)};   // 设计审（045）：未知异常带上类型名，用户截图反馈就能定位
+        return string.Format(Strings.Clipboard_StorageFailed, (object?)(reason), (object?)(failures));
     }
     public void Dispose()
     {

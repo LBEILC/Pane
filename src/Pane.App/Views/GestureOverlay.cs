@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 手势的轨迹和提示框（设计负责人）：何时出现、何时收起、放在哪里。
 // 宿主（工程接线）把 Pane.Gestures 的事件翻译过来：
 //   TrailSample.Begin / Move / End → TrailBegin / TrailMove / TrailEnd（物理像素）
@@ -25,7 +26,7 @@ public sealed class GestureOverlay : IDisposable
     {
         this.glass = glass;
         // 不可交互：输入窗也是分层 + 鼠标穿透 + 不激活，提示框完全不挡鼠标、不抢焦点
-        Panel = new GlassPanel("手势提示", view, view, glass, interactive: false) { Placement = PanelPlacement.Center };
+        Panel = new GlassPanel(Strings.Gestures_HintTitle, view, view, glass, interactive: false) { Placement = PanelPlacement.Center };
         Panel.TickRequested += () => TickRequested?.Invoke();
         Panel.Prepare();
     }

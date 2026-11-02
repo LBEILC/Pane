@@ -24,7 +24,7 @@ public sealed partial class App
         if(!ready)return;
         if(positionIndex<0){
             if(!Take("positions",out _))return;
-            if(cycleIndex>=0||pendingAck!=null)throw new InvalidOperationException("positions 不能和其他演示命令同时执行");
+            if(cycleIndex>=0||pendingAck!=null)throw new InvalidOperationException("positions 不能和其他演示命令同时执行"); // 不翻译：诊断异常
             Command("hide");positionIndex=0;positionHiding=true;positionWaiting=false;
             File.WriteAllText(output+".positions-diagnostics","");
         }

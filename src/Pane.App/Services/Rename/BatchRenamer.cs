@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Pane.Contracts;
@@ -104,8 +105,8 @@ internal sealed class BatchRenamer : IBatchRenamer
                 string? error=null;string? failedPath=null;
                 foreach(int index in component){
                     var p=items[index];var target=Target(p.Path,p.NewName);
-                    if(token.IsCancellationRequested){error="操作已取消";failedPath=p.Path;break;}
-                    if(p.Issue!=RenameIssue.None||NameIssue(p.NewName,target)!=RenameIssue.None){error="预览存在问题";failedPath=p.Path;break;}
+                    if(token.IsCancellationRequested){error=Strings.Rename_Cancelled;failedPath=p.Path;break;}
+                    if(p.Issue!=RenameIssue.None||NameIssue(p.NewName,target)!=RenameIssue.None){error=Strings.Rename_PreviewInvalid;failedPath=p.Path;break;}
                     string temp=Target(p.Path,".pane-rename-"+Guid.NewGuid().ToString("N"));
                     try{MovePath(p.Path,temp);staged.Add((p,temp,target));changes.Add(new(p.Path,temp,true));}
                     catch(Exception e) when(IsFileError(e)){error=e.Message;failedPath=p.Path;break;}
@@ -115,7 +116,7 @@ internal sealed class BatchRenamer : IBatchRenamer
                     catch(Exception e) when(IsFileError(e)){error=e.Message;failedPath=s.Item.Path;break;}
                 }
                 if(error==null){journal.AddRange(changes);renamed+=staged.Count;continue;}
-                foreach(int index in component)failed.Add(new(items[index].Path,items[index].Path==failedPath?error:"关联文件重命名失败，已回退"));
+                foreach(int index in component)failed.Add(new(items[index].Path,items[index].Path==failedPath?error:Strings.Rename_RelatedRollback));
                 // 先把已落位项退回临时名称，再恢复原名；即使回退受阻也保留日志以便重试撤销。
                 for(int i=changes.Count-1;i>=0;i--){var move=changes[i];
                     try{MovePath(move.After,move.Before);changes.RemoveAt(i);}

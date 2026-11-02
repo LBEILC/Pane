@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Http;
@@ -26,6 +27,8 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     bool disposed;
     public string CurrentVersion { get; }
     public UpdateState State { get; private set; }
+    public UpdateStep? FailedStep { get; private set; }
+    UpdateStep activeStep;
     public UpdateRelease? Latest { get; private set; }
     public double DownloadProgress { get; private set; }
     public string? Error { get; private set; }
@@ -38,14 +41,14 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         CurrentVersion = version; directory = Path.Combine(data, "updates");
         this.automatic = automatic; this.install = install; source = testSource ?? ProductionSource;
         if (testSource != null && (testSource.Scheme != "http" || testSource.Host != "127.0.0.1"))
-            throw new ArgumentException("测试源必须是本机 HTTP 服务");
+            throw new ArgumentException("测试源必须是本机 HTTP 服务"); // 不翻译：测试异常
         http = new(new HttpClientHandler { UseCookies = false, UseDefaultCredentials = false, AllowAutoRedirect = false });
         http.DefaultRequestHeaders.UserAgent.ParseAdd("Pane/" + version);
         http.Timeout = TimeSpan.FromMinutes(10);
         timer = new Timer(_ => _ = TickAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(24));
     }
     async Task TickAsync() { if (!disposed && automatic()) await CheckAsync(lifetime.Token).ConfigureAwait(false); }
-    void Set(UpdateState state, string? error = null) { State = state; Error = error; Changed?.Invoke(this, EventArgs.Empty); }
+    void Set(UpdateState state, string? error = null) { State = state; Error = error; FailedStep = state == UpdateState.Failed ? activeStep : null; Changed?.Invoke(this, EventArgs.Empty); }
     public async Task CheckAsync(CancellationToken cancellationToken)
     {
         if (disposed || !await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
@@ -53,6 +56,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         try
         {
             if (DateTimeOffset.UtcNow < retryAfter) return;
+            activeStep = UpdateStep.Check;
             Set(UpdateState.Checking); LastChecked = DateTimeOffset.UtcNow;
             using var response = await GetAsync(source, cancel.Token).ConfigureAwait(false);
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancel.Token).ConfigureAwait(false));
@@ -73,7 +77,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             Set(UpdateState.Available);
             if (automatic() || File.Exists(Path.Combine(directory, name))) await DownloadCore(cancel.Token).ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? (Latest == null ? UpdateState.Idle : UpdateState.Available) : UpdateState.Failed, cancel.IsCancellationRequested ? null : "连 GitHub 超时了，稍后再试"); }
+        catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? (Latest == null ? UpdateState.Idle : UpdateState.Available) : UpdateState.Failed, cancel.IsCancellationRequested ? null : Strings.Update_CheckTimeout); }
         catch (Exception e) when (Expected(e)) { Set(UpdateState.Failed, Message(e)); }
         finally { gate.Release(); }
     }
@@ -82,13 +86,14 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         if (disposed || !await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
         try { if (Latest != null && asset != null && sums != null) await DownloadCore(cancel.Token).ConfigureAwait(false); }
-        catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? UpdateState.Available : UpdateState.Failed, cancel.IsCancellationRequested ? null : "下载超时了，稍后再试"); }
+        catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? UpdateState.Available : UpdateState.Failed, cancel.IsCancellationRequested ? null : Strings.Update_DownloadTimeout); }
         catch (Exception e) when (Expected(e)) { Set(UpdateState.Failed, Message(e)); }
         finally { gate.Release(); }
     }
     async Task DownloadCore(CancellationToken token)
     {
-        if (DateTimeOffset.UtcNow < retryAfter) { Set(UpdateState.Failed, "GitHub 暂时限制了检查次数，过一会儿再试"); return; }
+        activeStep = UpdateStep.Download;
+        if (DateTimeOffset.UtcNow < retryAfter) { Set(UpdateState.Failed, Strings.Update_RateLimited); return; }
         Directory.CreateDirectory(directory);
         string name = $"Pane-Setup-{Latest!.Version}.exe", target = Path.Combine(directory, name), partial = target + ".partial";
         readyPath = null; DownloadProgress = 0; Set(UpdateState.Downloading);
@@ -152,17 +157,17 @@ internal sealed class UpdateService : IUpdateService, IDisposable
                 if (response.Headers.RetryAfter?.Delta is {} delay && DateTimeOffset.UtcNow + delay > retryAfter) retryAfter = DateTimeOffset.UtcNow + delay;
                 if (response.Headers.TryGetValues("X-RateLimit-Reset", out var values) && long.TryParse(values.FirstOrDefault(), out long seconds))
                 { var reset = DateTimeOffset.FromUnixTimeSeconds(seconds); if (reset > retryAfter) retryAfter = reset; }
-                response.Dispose(); throw new HttpRequestException("限流", null, HttpStatusCode.TooManyRequests);
+                response.Dispose(); throw new HttpRequestException("限流", null, HttpStatusCode.TooManyRequests); // 不翻译：内部异常
             }
             if ((int)response.StatusCode is 301 or 302 or 303 or 307 or 308)
             {
                 var location = response.Headers.Location; response.Dispose();
                 url = ValidateUrl(new Uri(url, location ?? throw new InvalidDataException()).AbsoluteUri); continue;
             }
-            if (!response.IsSuccessStatusCode) { var status = response.StatusCode; response.Dispose(); throw new HttpRequestException("请求失败", null, status); }
+            if (!response.IsSuccessStatusCode) { var status = response.StatusCode; response.Dispose(); throw new HttpRequestException("请求失败", null, status); } // 不翻译：内部异常
             return response;
         }
-        throw new HttpRequestException("重定向过多");
+        throw new HttpRequestException("重定向过多"); // 不翻译：内部异常
     }
     internal static string PlainNotes(string notes)
     {
@@ -175,18 +180,19 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     // TODO(design): 请确认网络、限流、磁盘和启动失败的短句；校验失败沿用任务说明。
     static string Message(Exception e) => e switch
     {
-        InvalidDataException => "下载的文件不完整，已删除，稍后再试",
-        HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests } => "GitHub 暂时限制了检查次数，过一会儿再试",
-        HttpRequestException => "连不上 GitHub，检查网络后再试",
-        UnauthorizedAccessException or IOException => "更新包存不下来，看看磁盘空间够不够",
-        _ => "看不懂 GitHub 返回的更新信息，稍后再试"
+        InvalidDataException => Strings.Update_InvalidDownload,
+        HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests } => Strings.Update_RateLimited,
+        HttpRequestException => Strings.Update_NetworkFailed,
+        UnauthorizedAccessException or IOException => Strings.Update_StorageFailed,
+        _ => Strings.Update_InvalidResponse
     };
     public void InstallAndRestart()
     {
         if (disposed || State != UpdateState.Ready || readyPath == null) return;
+        activeStep = UpdateStep.Install;
         try { install(readyPath); }
         catch (Exception e) when (e is IOException or System.ComponentModel.Win32Exception or InvalidOperationException)
-        { Set(UpdateState.Failed, "安装程序没能启动，稍后再试"); }
+        { Set(UpdateState.Failed, Strings.Update_InstallLaunchFailed); }
     }
     public void Dispose() { if (disposed) return; disposed = true; timer.Dispose(); lifetime.Cancel(); http.Dispose(); }
 }

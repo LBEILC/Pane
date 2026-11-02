@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 设置窗口逻辑（设计负责人）。结构照原型 settings.js：SECTIONS → group() / row() 拼成分组列表。
 // 已有设置模型的项（主题、主题色、圆角、动效、玻璃参数、托盘、热键、启动器位置）直接读写 SettingsStore，改了立即生效；
 // 演示模式没有真实服务，状态用 DesignData 里的假数据。
@@ -36,15 +37,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
         InitializeComponent();
         sections =
         [
-            new("general", "通用", "gear", "启动方式、外观和动效。", RenderGeneral),
-            new("launcher", "启动器", "search", "呼出、搜索范围、常用入口和网页搜索。", RenderLauncher),
-            new("clipboard", "剪贴板", "clipboard", "记录什么、保留多久，以及隐私保护。", RenderClipboard),
-            new("gesture", "鼠标手势", "gesture", "按住右键画方向，执行对应动作。", RenderGesture),
-            new("superpanel", "超级面板", "pointer", "选中文字后长按鼠标侧键呼出，就地翻译、总结；短按侧键照常后退 / 前进。", RenderSuper),
-            new("dialog", "文件对话框", "folder", "在「打开 / 另存为」对话框里一键跳到资源管理器开着的文件夹。", RenderFolderJump),
-            new("ai", "AI", "ai", "翻译、提问和快捷动作用的 AI 服务。", RenderAi),
-            new("icons", "图标", "app", "应用图标的遮罩规则和逐个应用的设置；文件图标用 Pane 风格还是系统的。", RenderIcons),
-            new("about", "关于", "info", "版本、数据位置和开源组件。", RenderAbout),
+            new("general", Strings.Settings_General, "gear", Strings.Settings_General_Description, RenderGeneral),
+            new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher),
+            new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard),
+            new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture),
+            new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper),
+            new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump),
+            new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi),
+            new("icons", Strings.Settings_Icons, "app", Strings.Settings_Icons_Description, RenderIcons),
+            new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout),
         ];
         current = sections[0];
         // 设计预览：PANE_DESIGN_SETTINGS=分区 Id（可加 @像素 先滚下去，如 gesture@700），或 glass（通用页展开「玻璃参数（高级）」并滚到底）
@@ -186,26 +187,38 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderGeneral()
     {
         var g = app.Store.Current.General;
-        Group("启动",
+        Group(Strings.Settings_Startup,
             AutostartRow(),
-            Row("在任务栏通知区域显示图标", "关掉后仍可用热键打开设置",
+            Row(Strings.Settings_ShowTrayIcon, Strings.Settings_ShowTrayIcon_Description,
                 Switch(g.ShowTrayIcon, v => SaveGeneral(x => x with { ShowTrayIcon = v }))));
+        RenderLanguage(g);
 
         var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        foreach (var (color, name) in new[] { ("#FF5874C9", "雾蓝"), ("#FF17958B", "青碧"), ("#FF5F8F4E", "苔绿"), ("#FF4A505C", "石墨") })
+        foreach (var (color, name) in new[] { ("#FF5874C9", Strings.Settings_Accent_MistBlue), ("#FF17958B", Strings.Settings_Accent_Teal), ("#FF5F8F4E", Strings.Settings_Accent_Moss), ("#FF4A505C", Strings.Settings_Accent_Graphite) })
             swatches.Children.Add(Swatch(color, name, string.Equals(g.AccentColor, color, StringComparison.OrdinalIgnoreCase)));
-        Group("外观",
-            Row("主题", null, Seg([("System", "跟随系统"), ("Light", "浅色"), ("Dark", "深色")], g.Theme.ToString(),
+        Group(Strings.Settings_Appearance,
+            Row(Strings.Settings_Theme, null, Seg([("System", Strings.Settings_FollowSystem), ("Light", Strings.Settings_Theme_Light), ("Dark", Strings.Settings_Theme_Dark)], g.Theme.ToString(),
                 v => SaveGeneral(x => x with { Theme = Enum.Parse<ThemeMode>(v) }))),
-            Row("主题色", "只用在开关、滑块、焦点等控件上，不给文字上色", swatches),
-            Row("窗口圆角", "玻璃面板的圆角（自绘，带抗锯齿）", Seg([("8", "小 8px"), ("20", "大圆角 20px")], g.PanelRadius <= 8 ? "8" : "20",
+            Row(Strings.Settings_AccentColor, Strings.Settings_AccentColor_Description, swatches),
+            Row(Strings.Settings_PanelRadius, Strings.Settings_PanelRadius_Description, Seg([("8", Strings.Settings_PanelRadius_Small), ("20", Strings.Settings_PanelRadius_Large)], g.PanelRadius <= 8 ? "8" : "20",
                 v => SaveGeneral(x => x with { PanelRadius = double.Parse(v) }))),
-            Row("玻璃浓度", "越高越不透，背后的壁纸越淡（就是下面高级参数里的「着色浓度」）",
+            Row(Strings.Settings_GlassOpacity, Strings.Settings_GlassOpacity_Description,
                 GlassSlider(0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, null)),
-            Row("动效", "「减弱」会缩短过渡", Seg([("normal", "标准"), ("reduced", "减弱")], g.MotionSpeed < 1 ? "reduced" : "normal",
+            Row(Strings.Settings_Motion, Strings.Settings_Motion_Description, Seg([("normal", Strings.Settings_Motion_Normal), ("reduced", Strings.Settings_Motion_Reduced)], g.MotionSpeed < 1 ? "reduced" : "normal",
                 v => SaveGeneral(x => x with { MotionSpeed = v == "reduced" ? 0.5 : 1 }))));
         RenderFonts(g);
         RenderGlassAdvanced();
+    }
+
+    // 界面语言（2026-11-02，048）：语言名用各自的写法；跟随系统时按系统语言换算后和这次启动用的比较，不同才提示重启
+    void RenderLanguage(GeneralSettings g)
+    {
+        bool pending = App.ResolveUiLanguage(g.UiLanguage) != app.UiLanguage;
+        var seg = Seg([("system", Strings.Settings_FollowSystem), ("zh-Hans", "简体中文"), ("zh-Hant", "繁體中文")], g.UiLanguage ?? "system", // 不翻译：语言名用各自的写法，选错语言也认得回来
+            v => { SaveGeneral(x => x with { UiLanguage = v == "system" ? null : v }); Later(); });
+        Group(Strings.Settings_Language, pending
+            ? Row(Strings.Settings_UiLanguage, Strings.Settings_RestartRequired, seg, Button(Strings.Common_RestartNow, "refresh", app.Restart))
+            : Row(Strings.Settings_UiLanguage, Strings.Settings_UiLanguage_Description, seg));
     }
 
     // 界面字体（2026-10-30）：从本机字体里选，能写中文的排前面；每个字体用它自己显示一行预览。换了字体重启 Pane 后生效
@@ -215,20 +228,21 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderFonts(GeneralSettings g)
     {
         var chosen = g.UiFont;
-        var shown = chosen ?? $"默认（{App.DefaultUiFont}）";
+        var shown = chosen ?? string.Format(Strings.Settings_Font_Default, (object?)(app.DefaultFont));
+        var fallback = app.UiLanguage == "zh-Hant" ? Strings.Settings_Font_JhengHei : Strings.Settings_Font_YaHei;
         bool pending = chosen != app.AppliedUiFont;
         void ToggleFonts()
         {
             if (fontsOpen) Collapse("fonts", () => { fontsOpen = false; Render(); });
             else { fontsOpen = true; revealKey = "fonts"; Render(); }
         }
-        var toggle = Button(fontsOpen ? "收起" : "选择字体", fontsOpen ? "chev-d" : "chev-r", ToggleFonts);
+        var toggle = Button(fontsOpen ? Strings.Common_Collapse : Strings.Settings_Font_Choose, fontsOpen ? "chev-d" : "chev-r", ToggleFonts);
         designToggles["fonts"] = ToggleFonts;
         var rows = new List<FrameworkElement>
         {
             pending
-                ? Row("界面字体", "已保存，重启 Pane 后生效", Chip(shown), Button("立即重启", "refresh", app.Restart), toggle)
-                : Row("界面字体", "所有面板和窗口的文字；没装或缺字时用微软雅黑补上", Chip(shown), toggle),
+                ? Row(Strings.Settings_Font_Ui, Strings.Settings_RestartRequired, Chip(shown), Button(Strings.Common_RestartNow, "refresh", app.Restart), toggle)
+                : Row(Strings.Settings_Font_Ui, string.Format(Strings.Settings_Font_FallbackDescription, (object?)(fallback)), Chip(shown), toggle),
         };
         if (fontsOpen)
         {
@@ -236,11 +250,11 @@ public sealed partial class SettingsView : UserControl, IPanelView
             if (app.Fonts is null)
             {
                 // 读不到本机字体列表时（024 之前的正式版）：手填字族名
-                var box = Field("字族名，如 HarmonyOS Sans SC", 260);
+                var box = Field(Strings.Settings_Font_FamilyPlaceholder, 260);
                 box.Text = chosen ?? "";
                 void Commit() { var v = box.Text.Trim(); SaveGeneral(x => x with { UiFont = v.Length == 0 ? null : v }); Render(); }
                 box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(); e.Handled = true; } };
-                more.Add(Row("字族名", "空着就用默认；回车保存", Wrap(box), Button("保存", "check", Commit)));
+                more.Add(Row(Strings.Settings_Font_Family, Strings.Settings_Font_FamilyDescription, Wrap(box), Button(Strings.Common_Save, "check", Commit)));
             }
             else if (fonts is null)
             {
@@ -256,32 +270,32 @@ public sealed partial class SettingsView : UserControl, IPanelView
                         Later(0);
                     }
                 }
-                more.Add(Row("正在读取本机字体…", null));
+                more.Add(Row(Strings.Settings_Font_Loading, null));
             }
             else
             {
-                var search = Field("搜索字体", 220);
+                var search = Field(Strings.Settings_Font_Search, 220);
                 search.Text = fontQuery;
                 var list = new StackPanel();
                 void Fill()
                 {
                     list.Children.Clear();
                     var q = search.Text.Trim();
-                    list.Children.Add(FontRow(null, $"默认（{App.DefaultUiFont}，没装时用微软雅黑）", "Pane 启动器 · 剪贴板 · 鼠标手势", chosen is null));
+                    list.Children.Add(FontRow(null, app.UiLanguage == "zh-Hant" ? string.Format(Strings.Settings_Font_Default, (object?)(app.DefaultFont)) : string.Format(Strings.Settings_Font_DefaultFallback, (object?)(app.DefaultFont), (object?)(fallback)), Strings.Settings_Font_Sample, chosen is null));
                     var hits = fonts.Where(f => q.Length == 0 || f.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase) || f.Name.Contains(q, StringComparison.OrdinalIgnoreCase))
                         .OrderByDescending(f => f.HasChinese).ThenBy(f => f.DisplayName, StringComparer.CurrentCultureIgnoreCase).Take(40).ToList();
                     foreach (var f in hits)
-                        list.Children.Add(FontRow(f.Name, f.DisplayName, f.HasChinese ? "Pane 启动器 · 剪贴板 · 鼠标手势 Aa" : "Pane Launcher Aa（不含汉字，中文会用别的字体补）", f.Name == chosen));
-                    if (hits.Count == 0) list.Children.Add(Row($"没有找到「{q}」", null));
+                        list.Children.Add(FontRow(f.Name, f.DisplayName, f.HasChinese ? Strings.Settings_Font_SampleChinese : Strings.Settings_Font_SampleLatin, f.Name == chosen));
+                    if (hits.Count == 0) list.Children.Add(Row(string.Format(Strings.Settings_Font_NotFound, (object?)(q)), null));
                 }
                 search.TextChanged += (_, _) => { fontQuery = search.Text; Fill(); };
                 Fill();
-                more.Add(Row("本机字体", $"共 {fonts.Count} 款，能写中文的排在前面；最多列 40 个，可以搜索", Wrap(search)));
+                more.Add(Row(Strings.Settings_Font_Local, string.Format(Strings.Settings_Font_LocalDescription, (object?)(fonts.Count)), Wrap(search)));
                 more.Add(list);
             }
             rows.Add(Reveal("fonts", more));
         }
-        Group("字体", rows.ToArray(), "MiSans 不随 Pane 分发；想用的话到小米官网下载安装，再在这里选。");
+        Group(Strings.Settings_Font, rows.ToArray(), Strings.Settings_Font_InstallDescription);
 
         FrameworkElement FontRow(string? name, string label, string sample, bool on)
         {
@@ -307,7 +321,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         bool opening = glassOpen && revealKey == "glass";
         var chevron = new PaneIcon { Glyph = "chev-d", Width = 16, Height = 16, Foreground = SmallProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = glassOpen && !opening ? 180 : 0 } };
         if (opening) chevron.Loaded += (_, _) => SpinChevron(chevron, 180);
-        var header = Row("玻璃参数（高级）", glassOpen ? $"现在调的是{(app.Glass.Dark ? "深色" : "浅色")}这一套（跟随当前主题）；调好后一般不用再动" : "着色、亮度、饱和度、高光边、阴影、加强模糊", chevron);
+        var header = Row(Strings.Settings_Glass_Advanced, glassOpen ? string.Format(Strings.Settings_Glass_CurrentTheme, (object?)((app.Glass.Dark ? Strings.Settings_Glass_Dark : Strings.Settings_Glass_Light))) : Strings.Settings_Glass_Description, chevron);
         header.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
         void Toggle()
         {
@@ -321,13 +335,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         {
             var d = app.Glass.Dark ? GlassParameters.Defaults().General.GlassDark : GlassParameters.Defaults().General.GlassLight;
             rows.Add(Reveal("glass", [
-                GlassRow("着色浓度", "玻璃本身的颜色有多浓", 0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, d.TintOpacity),
-                GlassRow("亮度层", "深色压暗、浅色提亮的一层", 0, 1, 0.01, p => p.LuminosityOpacity, (p, v) => p with { LuminosityOpacity = v }, d.LuminosityOpacity),
-                GlassRow("饱和度", "背后颜色透过来的鲜艳程度", 1, 2, 0.05, p => p.Saturation, (p, v) => p with { Saturation = v }, d.Saturation),
-                GlassRow("高光边强度", "边缘的细高光和外描边", 0, 1, 0.01, p => p.Highlight, (p, v) => p with { Highlight = v }, d.Highlight),
-                GlassRow("阴影强度", "面板下面的柔和阴影", 0, 1, 0.01, p => p.Shadow, (p, v) => p with { Shadow = v }, d.Shadow),
-                GlassRow("加强模糊", "在系统模糊上再加一层，0 = 只用系统模糊；越大越占显卡", 0, 40, 1, p => p.ExtraBlur, (p, v) => p with { ExtraBlur = v }, d.ExtraBlur),
-                Row("", null, Button("全部恢复默认", "refresh", () => SaveGlass(_ => d))),
+                GlassRow(Strings.Settings_Glass_Tint, Strings.Settings_Glass_TintDescription, 0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, d.TintOpacity),
+                GlassRow(Strings.Settings_Glass_Luminosity, Strings.Settings_Glass_LuminosityDescription, 0, 1, 0.01, p => p.LuminosityOpacity, (p, v) => p with { LuminosityOpacity = v }, d.LuminosityOpacity),
+                GlassRow(Strings.Settings_Glass_Saturation, Strings.Settings_Glass_SaturationDescription, 1, 2, 0.05, p => p.Saturation, (p, v) => p with { Saturation = v }, d.Saturation),
+                GlassRow(Strings.Settings_Glass_Highlight, Strings.Settings_Glass_HighlightDescription, 0, 1, 0.01, p => p.Highlight, (p, v) => p with { Highlight = v }, d.Highlight),
+                GlassRow(Strings.Settings_Glass_Shadow, Strings.Settings_Glass_ShadowDescription, 0, 1, 0.01, p => p.Shadow, (p, v) => p with { Shadow = v }, d.Shadow),
+                GlassRow(Strings.Settings_Glass_Blur, Strings.Settings_Glass_BlurDescription, 0, 40, 1, p => p.ExtraBlur, (p, v) => p with { ExtraBlur = v }, d.ExtraBlur),
+                Row("", null, Button(Strings.Settings_Glass_ResetAll, "refresh", () => SaveGlass(_ => d))),
             ]));
         }
         Group(null, rows.ToArray());
@@ -338,7 +352,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var value = new TextBlock { Width = 36, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontFamily = MonoProto.FontFamily, FontSize = 12, Foreground = SmallProto.Foreground };
         var slider = GlassSlider(min, max, step, get, set, value);
-        var reset = IconButton("refresh", "恢复默认", () => SaveGlass(p => set(p, fallback)));
+        var reset = IconButton("refresh", Strings.Common_ResetDefaults, () => SaveGlass(p => set(p, fallback)));
         return Row(label, desc, slider, value, reset);
     }
 
@@ -370,24 +384,24 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     FrameworkElement AutostartRow()
     {
-        const string label = "开机时启动 Pane";
+        var label = Strings.Settings_Autostart;
         var auto = app.Autostart;
         var state = auto.State;
         var toggle = Switch(state is AutostartState.On or AutostartState.DisabledInTaskManager, v =>
         {
             try { auto.Set(v); autostartError = null; }
-            catch (Exception e) { autostartError = App.FailureReason(e) ?? "没有改成功"; }
+            catch (Exception e) { autostartError = App.FailureReason(e) ?? Strings.Settings_Autostart_ChangeFailed; }
             Later(0);
         });
         if (state == AutostartState.Unavailable)
         {
             Enable(toggle, false);
-            return Row(label, (auto.UnavailableReason ?? "现在不能注册") + "；装成正式版后可以打开", toggle);
+            return Row(label, string.Format(Strings.Settings_Autostart_InstallHint, auto.UnavailableReason ?? Strings.Settings_Autostart_Unavailable), toggle);
         }
-        if (autostartError != null) return Row(label, null, Status(false, "没有改成功：" + autostartError), toggle);
+        if (autostartError != null) return Row(label, null, Status(false, string.Format(Strings.Settings_Autostart_Error, autostartError)), toggle);
         if (state == AutostartState.DisabledInTaskManager)
-            return Row(label, "Pane 不会替你改回来；要开机启动，请在任务管理器的「启动应用」里重新启用", Status(false, "已在任务管理器里禁用"), toggle);
-        return Row(label, "登录 Windows 后在后台启动，只有托盘图标；按热键直接呼出", toggle);
+            return Row(label, Strings.Settings_Autostart_EnableInTaskManager, Status(false, Strings.Settings_Autostart_DisabledInTaskManager), toggle);
+        return Row(label, Strings.Settings_Autostart_Description, toggle);
     }
 
     // ================= 启动器 =================
@@ -399,24 +413,24 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var hotkey = Hotkey(s.Launcher.Hotkey, s.Clipboard.Hotkey, h => app.Store.Save(app.Store.Current with { Launcher = app.Store.Current.Launcher with { Hotkey = h } }));
         string? hotkeyDesc = conflict != null ? null : DevHotkey("launcher");
         var hotkeyRow = conflict != null
-            ? Row("呼出热键", "换一个组合，或者在占用它的程序里改掉", Status(false, ConflictText(conflict)), hotkey)
-            : Row("呼出热键", hotkeyDesc, hotkey);
+            ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
+            : Row(Strings.Settings_Hotkey, hotkeyDesc, hotkey);
         bool moved = s.Launcher.Position != null;
         var l = s.Launcher;
-        var reset = Button("恢复默认位置", "refresh", () => { SaveLauncher(x => x with { Position = null }); Render(); });
+        var reset = Button(Strings.Settings_Launcher_ResetPosition, "refresh", () => { SaveLauncher(x => x with { Position = null }); Render(); });
         Enable(reset, moved);
-        Group("呼出",
+        Group(Strings.Settings_Launcher_Activation,
             hotkeyRow,
-            Row("位置", moved ? "已记住拖动后的位置。双击启动器搜索行的空白处也能恢复" : "在鼠标所在屏幕的上部居中；拖动搜索行空白处可以挪开，会记住位置", reset),
-            Row("失去焦点时隐藏", "点到别的窗口时自动收起", Switch(l.HideOnBlur, v => SaveLauncher(x => x with { HideOnBlur = v }))),
-            Row("再次呼出时", "上次输入的文字怎么处理",
-                Seg([("Clear", "清空"), ("OneMinute", "1 分钟内保留"), ("Always", "一直保留")], l.KeepInput.ToString(),
+            Row(Strings.Settings_Launcher_Position, moved ? Strings.Settings_Launcher_PositionSaved : Strings.Settings_Launcher_PositionDefault, reset),
+            Row(Strings.Settings_Launcher_HideOnBlur, Strings.Settings_Launcher_HideOnBlurDescription, Switch(l.HideOnBlur, v => SaveLauncher(x => x with { HideOnBlur = v }))),
+            Row(Strings.Settings_Launcher_KeepInput, Strings.Settings_Launcher_KeepInputDescription,
+                Seg([("Clear", Strings.Common_Clear), ("OneMinute", Strings.Settings_Launcher_KeepOneMinute), ("Always", Strings.Settings_Launcher_KeepAlways)], l.KeepInput.ToString(),
                     v => SaveLauncher(x => x with { KeepInput = Enum.Parse<KeepInputMode>(v) }))),
-            Row("没输入时显示", l.Home == LauncherHome.Nothing ? "呼出时只有一行搜索栏" : "最近打开过的应用和固定的应用",
-                Seg([("RecentAndPinned", "最近和固定"), ("PinnedOnly", "只显示固定"), ("Nothing", "都不显示")], l.Home.ToString(),
+            Row(Strings.Settings_Launcher_Home, l.Home == LauncherHome.Nothing ? Strings.Settings_Launcher_HomeNone : Strings.Settings_Launcher_HomeRecentDescription,
+                Seg([("RecentAndPinned", Strings.Settings_Launcher_HomeRecent), ("PinnedOnly", Strings.Settings_Launcher_HomePinned), ("Nothing", Strings.Settings_Launcher_HomeHidden)], l.Home.ToString(),
                     v => { SaveLauncher(x => x with { Home = Enum.Parse<LauncherHome>(v) }); Later(); })),
-            Row("复制后自动带入", "复制后这么久内呼出，刚复制的内容作为附件带入；不会清空剪贴板",
-                Seg([("0", "关闭"), ("1", "1 秒"), ("3", "3 秒"), ("5", "5 秒")], l.AutoAttachSeconds.ToString(),
+            Row(Strings.Settings_Launcher_AutoAttach, Strings.Settings_Launcher_AutoAttachDescription,
+                Seg([("0", Strings.Common_Off), ("1", Strings.Settings_Launcher_AttachOneSecond), ("3", Strings.Settings_Launcher_AttachThreeSeconds), ("5", Strings.Settings_Launcher_AttachFiveSeconds)], l.AutoAttachSeconds.ToString(),
                     v => SaveLauncher(x => x with { AutoAttachSeconds = int.Parse(v) }))));
 
         // 演示模式没有真实服务（FileSearchStatus 为 null），状态用假数据
@@ -424,30 +438,30 @@ public sealed partial class SettingsView : UserControl, IPanelView
         // 状态对象要检测过一次才准（默认是「没有运行」）：每次打开设置窗口、第一次进这个分区时检测一次，结果通过 Changed 刷新
         if (fs != null && !everythingChecked) { everythingChecked = true; _ = fs.RefreshAsync(CancellationToken.None); }
         bool ready = fs == null ? SettingsSample.EverythingRunning : fs.State == FileSearchState.Ready;
-        string status = fs == null ? (ready ? "已连接 Everything 1.4" : "Everything 没有运行")
+        string status = fs == null ? (ready ? Strings.Settings_Everything_ConnectedLegacy : Strings.Settings_Everything_NotRunning)
             : fs.State switch
             {
-                FileSearchState.Ready => $"已连接 Everything {fs.Version}",
-                FileSearchState.Unsupported => "Everything 版本太老或连不上",
-                _ => "Everything 没有运行，文件搜索暂不可用",
+                FileSearchState.Ready => string.Format(Strings.Settings_Everything_Connected, (object?)(fs.Version)),
+                FileSearchState.Unsupported => Strings.Settings_Everything_Unavailable,
+                _ => Strings.Settings_Everything_FilesUnavailable,
             };
-        var check = Button("重新检测", "refresh", async () =>
+        var check = Button(Strings.Settings_Everything_Refresh, "refresh", async () =>
         {
             if (fs == null) { SettingsSample.EverythingRunning = !SettingsSample.EverythingRunning; Render(); return; }
             try { await fs.RefreshAsync(CancellationToken.None); } catch (OperationCanceledException) { }
             Render();
         });
-        Group("文件搜索",
+        Group(Strings.Settings_Launcher_FileSearch,
             // 2026-10-29 起启动器固定列前 3 个文件，其余在文件窗口里看，「每次显示的文件结果」一行去掉
-            Row("Everything", "文件名搜索依赖 Everything；Pane 不自建全盘索引。启动器列前 3 个，其余在文件窗口里看", Status(ready, status), check));
+            Row("Everything", Strings.Settings_Launcher_FileSearchDescription, Status(ready, status), check));
         RenderActionRow(l);
 
         var favorites = l.Favorites.Select(f => ListRow(f.IsFolder ? "folder" : "doc", FavoriteTitle(f.Path), f.Path, false,
-            IconButton("close", "移除", () => { SaveLauncher(x => x with { Favorites = x.Favorites.Where(e => e != f).ToArray() }); Render(); }))).ToList();
+            IconButton("close", Strings.Common_Remove, () => { SaveLauncher(x => x with { Favorites = x.Favorites.Where(e => e != f).ToArray() }); Render(); }))).ToList();
         favorites.Add(AddRow(
-            Button("添加文件", "plus", async () => { if (await PickFavorite(false) is { } e) AddFavorite(e); }),
-            Button("添加文件夹", "folder-plus", async () => { if (await PickFavorite(true) is { } e) AddFavorite(e); })));
-        Group("常用文件和文件夹", favorites.ToArray(), "常用的文件和文件夹在启动器里排在普通文件前面，也能用拼音搜到。");
+            Button(Strings.Settings_Launcher_AddFile, "plus", async () => { if (await PickFavorite(false) is { } e) AddFavorite(e); }),
+            Button(Strings.Settings_Launcher_AddFolder, "folder-plus", async () => { if (await PickFavorite(true) is { } e) AddFavorite(e); })));
+        Group(Strings.Settings_Launcher_Favorites, favorites.ToArray(), Strings.Settings_Launcher_FavoritesDescription);
 
         var engines = l.SearchEngines.Select(e =>
         {
@@ -455,10 +469,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             label.Children.Add(Text(e.Name, LabelProto));
             label.Children.Add(Chip(e.Keyword));
-            if (def) label.Children.Add(Chip("默认"));
+            if (def) label.Children.Add(Chip(Strings.Common_Default));
             var tail = new List<FrameworkElement>();
-            if (!def) tail.Add(Button("设为默认", null, () => { SaveLauncher(x => x with { DefaultEngine = e.Keyword }); Render(); }));
-            var del = IconButton("close", def ? "默认站点不能删" : "删除", () =>
+            if (!def) tail.Add(Button(Strings.Settings_Launcher_SetDefault, null, () => { SaveLauncher(x => x with { DefaultEngine = e.Keyword }); Render(); }));
+            var del = IconButton("close", def ? Strings.Settings_Launcher_DefaultEngineCannotDelete : Strings.Common_Delete, () =>
             {
                 if (e.Keyword == app.Store.Current.Launcher.DefaultEngine) return;
                 SaveLauncher(x => x with { SearchEngines = x.SearchEngines.Where(v => v != e).ToArray() });
@@ -468,17 +482,17 @@ public sealed partial class SettingsView : UserControl, IPanelView
             tail.Add(del);
             return ListRow("globe", label, e.UrlTemplate, true, tail.ToArray());
         }).ToList();
-        engines.Add(addingEngine ? Reveal("engine", [EngineForm()]) : AddRow(Button("添加搜索站点", "plus", () => { addingEngine = true; revealKey = "engine"; Render(); })));
-        engines.Insert(0, Row("搜索建议", "用关键字搜网页时（比如「bd 天气」）向那个站点要搜索建议；平时打字不联网",
+        engines.Add(addingEngine ? Reveal("engine", [EngineForm()]) : AddRow(Button(Strings.Settings_Launcher_AddEngine, "plus", () => { addingEngine = true; revealKey = "engine"; Render(); })));
+        engines.Insert(0, Row(Strings.Settings_Launcher_WebSuggestions, Strings.Settings_Launcher_WebSuggestionsDescription,
             Switch(l.WebSuggestions, v => SaveLauncher(x => x with { WebSuggestions = v }))));
-        Group("网页搜索", engines.ToArray(), "地址里用 {query} 代表搜索词；在启动器输入「关键字 空格 搜索词」直接用这个站点搜。");
+        Group(Strings.Settings_Launcher_WebSearch, engines.ToArray(), Strings.Settings_Launcher_WebSearchDescription);
 
         // 终端命令（037）：> 开头在终端里运行；记住最近 20 条用来补全
-        var clearHistory = Button("清空", "trash", () => { app.TerminalHistory?.Clear(); terminalCleared = true; Render(); });
+        var clearHistory = Button(Strings.Common_Clear, "trash", () => { app.TerminalHistory?.Clear(); terminalCleared = true; Render(); });
         Enable(clearHistory, !terminalCleared);
-        Group("终端命令", [Row("记住运行过的命令", terminalCleared ? "已清空" : "最近 20 条，用来补全；以空格开头的命令不记",
+        Group(Strings.Settings_Launcher_Terminal, [Row(Strings.Settings_Launcher_RememberCommands, terminalCleared ? Strings.Settings_Launcher_CommandsCleared : Strings.Settings_Launcher_CommandsDescription,
                 Switch(l.RememberCommands, v => SaveLauncher(x => x with { RememberCommands = v })), clearHistory)],
-            "在启动器里输入 > 加命令：Enter 在终端里运行，Ctrl+Shift+Enter 以管理员身份运行。");
+            Strings.Settings_Launcher_TerminalDescription);
     }
     bool terminalCleared;
 
@@ -527,26 +541,26 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     FrameworkElement EngineForm()
     {
-        var name = Field("名称", 96);
-        var key = Field("关键字", 72);
-        var url = Field("地址，用 {query} 代表搜索词", 260);
+        var name = Field(Strings.Common_Name, 96);
+        var key = Field(Strings.Settings_Launcher_EngineKeyword, 72);
+        var url = Field(Strings.Settings_Launcher_EngineAddress, 260);
         var error = Text("", DescProto);
-        var save = Button("保存", "check", () =>
+        var save = Button(Strings.Common_Save, "check", () =>
         {
             var current = app.Store.Current.Launcher;
             string n = name.Text.Trim(), k = key.Text.Trim(), u = url.Text.Trim();
-            string? problem = n.Length == 0 || k.Length == 0 || u.Length == 0 ? "三项都要填"
-                : k.Contains(' ') ? "关键字不能有空格"
-                : current.SearchEngines.Any(e => string.Equals(e.Keyword, k, StringComparison.OrdinalIgnoreCase)) ? $"关键字「{k}」已经有了"
-                : !u.Contains("{query}") ? "地址里要有 {query}"
-                : !(u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || u.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) ? "地址要以 http:// 或 https:// 开头"
+            string? problem = n.Length == 0 || k.Length == 0 || u.Length == 0 ? Strings.Settings_Launcher_EngineRequired
+                : k.Contains(' ') ? Strings.Settings_Launcher_EngineKeywordSpace
+                : current.SearchEngines.Any(e => string.Equals(e.Keyword, k, StringComparison.OrdinalIgnoreCase)) ? string.Format(Strings.Settings_Launcher_EngineKeywordDuplicate, (object?)(k))
+                : !u.Contains("{query}") ? Strings.Settings_Launcher_EngineQueryRequired
+                : !(u.StartsWith("https://", StringComparison.OrdinalIgnoreCase) || u.StartsWith("http://", StringComparison.OrdinalIgnoreCase)) ? Strings.Settings_Launcher_EngineSchemeRequired
                 : null;
             if (problem != null) { error.Text = problem; return; }
             SaveLauncher(x => x with { SearchEngines = [.. x.SearchEngines, new SearchEngine(n, k, u)] });
             addingEngine = false;
             Render();
         });
-        var cancel = Button("取消", null, () => Collapse("engine", () => { addingEngine = false; Render(); }));
+        var cancel = Button(Strings.Common_Cancel, null, () => Collapse("engine", () => { addingEngine = false; Render(); }));
         var fields = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         fields.Children.Add(Wrap(name)); fields.Children.Add(Wrap(key)); fields.Children.Add(Wrap(url)); fields.Children.Add(save); fields.Children.Add(cancel);
         var form = new StackPanel { Spacing = 6, Padding = new Thickness(14, 10, 14, 10) };
@@ -567,9 +581,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var winvOn = app.WinV is { State: not WinVState.Off };
         var master = Switch(c.Enabled, v => { SaveClipboard(x => x with { Enabled = v }); Later(); });
         if (c.Enabled && winvOn) Enable(master, false);
-        Group("基本", Row("启用剪贴板", c.Enabled
-                ? (winvOn ? "先关掉下面的「用 Pane 替换 Win+V」，才能关剪贴板" : "已经有别的剪贴板工具时可以关掉")
-                : "已关闭：不监听复制、不记录，呼出热键也不占用；以前的记录还在",
+        Group(Strings.Settings_Clipboard_Basic, Row(Strings.Settings_Clipboard_Enable, c.Enabled
+                ? (winvOn ? Strings.Settings_Clipboard_DisableWinVFirst : Strings.Settings_Clipboard_EnableDescription)
+                : Strings.Settings_Clipboard_Disabled,
             master));
         if (!c.Enabled) { RenderClipboardData(); return; }
         var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
@@ -577,30 +591,30 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var winv = app.WinV;
         var call = new List<FrameworkElement>
         {
-            conflict != null ? Row("呼出热键", "换一个组合，或者在占用它的程序里改掉", Status(false, ConflictText(conflict)), hotkey)
-                             : Row("呼出热键", DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? "Win+V 也会打开 Pane 的剪贴板" : null), hotkey),
+            conflict != null ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
+                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? Strings.Settings_Clipboard_WinVActive : null), hotkey),
         };
         if (winv != null) call.AddRange(WinVRows(winv));
-        Group("呼出", call.ToArray());
+        Group(Strings.Settings_Clipboard_Activation, call.ToArray());
 
         // 三种类型至少留一种（设置模型要求）：只剩一种时点它不响应，说明里写清楚
         int kinds = (c.RecordText ? 1 : 0) + (c.RecordImages ? 1 : 0) + (c.RecordFiles ? 1 : 0);
         var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        chips.Children.Add(ToggleChip("文本", "text", c.RecordText, kinds == 1, v => SaveClipboard(x => x with { RecordText = v })));
-        chips.Children.Add(ToggleChip("图片", "image", c.RecordImages, kinds == 1, v => SaveClipboard(x => x with { RecordImages = v })));
-        chips.Children.Add(ToggleChip("文件", "folder", c.RecordFiles, kinds == 1, v => SaveClipboard(x => x with { RecordFiles = v })));
-        Group("记录",
-            Row("记录哪些内容", kinds == 1 ? "至少记录一种" : "文本包括链接、颜色和代码", chips),
-            Row("最多保留", "已固定的条目不计入，也不会被自动清理",
-                Seg([("200", "200 条"), ("500", "500 条"), ("1000", "1000 条"), ("5000", "5000 条")], c.Limit.ToString(),
+        chips.Children.Add(ToggleChip(Strings.Common_Text, "text", c.RecordText, kinds == 1, v => SaveClipboard(x => x with { RecordText = v })));
+        chips.Children.Add(ToggleChip(Strings.Common_Image, "image", c.RecordImages, kinds == 1, v => SaveClipboard(x => x with { RecordImages = v })));
+        chips.Children.Add(ToggleChip(Strings.Common_File, "folder", c.RecordFiles, kinds == 1, v => SaveClipboard(x => x with { RecordFiles = v })));
+        Group(Strings.Settings_Clipboard_Recording,
+            Row(Strings.Settings_Clipboard_Formats, kinds == 1 ? Strings.Settings_Clipboard_OneFormatRequired : Strings.Settings_Clipboard_FormatsDescription, chips),
+            Row(Strings.Settings_Clipboard_MaxItems, Strings.Settings_Clipboard_MaxItemsDescription,
+                Seg([("200", Strings.Settings_Clipboard_LimitTwoHundred), ("500", Strings.Settings_Clipboard_LimitFiveHundred), ("1000", Strings.Settings_Clipboard_LimitThousand), ("5000", Strings.Settings_Clipboard_LimitFiveThousand)], c.Limit.ToString(),
                     v => SaveClipboard(x => x with { Limit = int.Parse(v) }))),
-            Row("连续重复只留一条", "再复制一遍同样的内容，只把原来那条的时间更新", Switch(c.Dedupe, v => SaveClipboard(x => x with { Dedupe = v }))),
-            Row("粘贴后移到最前", "下次打开剪贴板时生效；面板开着时条目不挪位置", Switch(c.MoveToTopAfterPaste, v => SaveClipboard(x => x with { MoveToTopAfterPaste = v }))));
+            Row(Strings.Settings_Clipboard_Deduplicate, Strings.Settings_Clipboard_DeduplicateDescription, Switch(c.Dedupe, v => SaveClipboard(x => x with { Dedupe = v }))),
+            Row(Strings.Settings_Clipboard_MovePastedFirst, Strings.Settings_Clipboard_MovePastedFirstDescription, Switch(c.MoveToTopAfterPaste, v => SaveClipboard(x => x with { MoveToTopAfterPaste = v }))));
 
-        var excluded = c.ExcludedPrograms.Select(name => ListRow("shield", name, "从这个程序复制的内容不记录", false,
-            IconButton("close", "移除", () => { SaveClipboard(x => x with { ExcludedPrograms = x.ExcludedPrograms.Where(v => !string.Equals(v, name, StringComparison.OrdinalIgnoreCase)).ToArray() }); Render(); }))).ToList();
-        excluded.Insert(0, Row("遵守「不进历史」标记", "密码管理器等程序复制的内容如果带这个标记，就不记录", Switch(c.HonorExcludeMarker, v => SaveClipboard(x => x with { HonorExcludeMarker = v }))));
-        excluded.Add(AddRow(Button("添加排除的程序", "plus", async () =>
+        var excluded = c.ExcludedPrograms.Select(name => ListRow("shield", name, Strings.Settings_Clipboard_ExcludedProgram, false,
+            IconButton("close", Strings.Common_Remove, () => { SaveClipboard(x => x with { ExcludedPrograms = x.ExcludedPrograms.Where(v => !string.Equals(v, name, StringComparison.OrdinalIgnoreCase)).ToArray() }); Render(); }))).ToList();
+        excluded.Insert(0, Row(Strings.Settings_Clipboard_RespectHistoryFlag, Strings.Settings_Clipboard_RespectHistoryFlagDescription, Switch(c.HonorExcludeMarker, v => SaveClipboard(x => x with { HonorExcludeMarker = v }))));
+        excluded.Add(AddRow(Button(Strings.Settings_Clipboard_AddExcludedProgram, "plus", async () =>
         {
             // 服务按程序文件名匹配（不区分大小写），只存文件名
             if (await PickProgram() is not { } exe) return;
@@ -608,14 +622,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
             SaveClipboard(x => x with { ExcludedPrograms = x.ExcludedPrograms.Any(v => string.Equals(v, name, StringComparison.OrdinalIgnoreCase)) ? x.ExcludedPrograms : [.. x.ExcludedPrograms, name] });
             Render();
         })));
-        Group("隐私", excluded.ToArray());
+        Group(Strings.Settings_Clipboard_Privacy, excluded.ToArray());
         RenderClipboardData();
     }
 
     void RenderClipboardData()
     {
         // 清空要点两次：第一次按钮变成「再点一次清空」，3 秒内不点就复原（同启动器里关机 / 重启的确认）
-        var clear = Button(clearArmed ? "再点一次清空" : "清空", "trash", () =>
+        var clear = Button(clearArmed ? Strings.Settings_Clipboard_ConfirmClear : Strings.Common_Clear, "trash", () =>
         {
             if (!clearArmed) { clearArmed = true; Render(); _ = DisarmClear(); return; }
             clearArmed = false;
@@ -626,13 +640,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var cleared = (DateTime.Now - clearedAt).TotalSeconds < 4;
         var rows = new List<FrameworkElement>
         {
-            cleared ? Row("清空剪贴板历史", null, Status(true, "已清空，固定的条目保留了"), clear)
-                    : Row("清空剪贴板历史", clearArmed ? "未固定的记录会全部删除，不能撤销" : "已固定的条目会保留", clear),
+            cleared ? Row(Strings.Settings_Clipboard_ClearHistory, null, Status(true, Strings.Settings_Clipboard_Cleared), clear)
+                    : Row(Strings.Settings_Clipboard_ClearHistory, clearArmed ? Strings.Settings_Clipboard_ClearWarning : Strings.Settings_Clipboard_PinnedRemain, clear),
         };
         // 历史存不进硬盘时（045，用户 2026-11-01 遇到：重启后历史退回早上）在这里说清楚，不要等重启丢了才发现
         if (app.ClipboardHistory.StorageProblem is { } problem)
-            rows.Insert(0, Row("历史没能保存", "重启 Pane 后这段时间复制的内容会丢；详细记录在数据目录的 logs 里", Status(false, problem)));
-        Group("数据", rows.ToArray());
+            rows.Insert(0, Row(Strings.Settings_Clipboard_StorageFailed, Strings.Settings_Clipboard_StorageFailedDescription, Status(false, problem)));
+        Group(Strings.Settings_Clipboard_Data, rows.ToArray());
     }
 
     // 用 Pane 替换 Win+V（2026-10-30，原型 settings.js winvDialog）：打开 / 关闭都先就地说明要改什么、要不要现在重启资源管理器，
@@ -652,41 +666,41 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 winvBusy = false; Render();
             }
         }
-        const string label = "用 Pane 替换 Win+V";
+        var label = Strings.Settings_WinV_Replace;
         if (winvBusy)
         {
-            yield return Row(label, null, Status(true, "正在处理…（重启资源管理器时任务栏会闪一下）"));
+            yield return Row(label, null, Status(true, Strings.Settings_WinV_Working));
             yield break;
         }
         if (winvConfirm)
         {
             // 说明一行占满宽度，问题和按钮另起一行（挤在一行时说明被压成很窄的一列）
-            yield return Row(replaced ? "恢复系统的 Win+V" : label, replaced
-                ? "把系统设置原样恢复，Win+V 回到 Windows 自带的剪贴板历史。"
-                : "Pane 会在当前用户的注册表里改一项，让资源管理器不再占用 Win+V（Explorer\\Advanced 的 DisabledHotkeys 加上 V）。不需要管理员权限；改之前记下原值，关掉时原样恢复。");
-            yield return Row("现在重启资源管理器吗？", "重启才生效，任务栏和打开的文件夹会闪一下；不重启就等下次登录",
-                Button("取消", null, () => { winvConfirm = false; Render(); }),
-                Button("下次登录", null, () => Run(t => replaced ? w.DisableAsync(false, t) : w.EnableAsync(false, t))),
-                Button("现在重启", "refresh", () => Run(t => replaced ? w.DisableAsync(true, t) : w.EnableAsync(true, t))));
+            yield return Row(replaced ? Strings.Settings_WinV_Restore : label, replaced
+                ? Strings.Settings_WinV_RestoreDescription
+                : Strings.Settings_WinV_RegistryDescription);
+            yield return Row(Strings.Settings_WinV_RestartPrompt, Strings.Settings_WinV_RestartDescription,
+                Button(Strings.Common_Cancel, null, () => { winvConfirm = false; Render(); }),
+                Button(Strings.Settings_WinV_NextLogin, null, () => Run(t => replaced ? w.DisableAsync(false, t) : w.EnableAsync(false, t))),
+                Button(Strings.Settings_WinV_RestartNow, "refresh", () => Run(t => replaced ? w.DisableAsync(true, t) : w.EnableAsync(true, t))));
             yield break;
         }
         // 关闭 Pending（资源管理器还没放开 Win+V）不用重启，直接恢复；其余先就地确认
         var toggle = Switch(replaced, _ => { if (state == WinVState.Pending) Run(t => w.DisableAsync(false, t)); else { winvConfirm = true; Render(); } });
         FrameworkElement? status = w.Error is { } err ? Status(false, err) : state switch
         {
-            WinVState.On => Status(true, "已生效"),
-            WinVState.Pending => Status(false, "下次登录生效"),
-            WinVState.RestorePending => Status(false, "下次登录恢复"),
+            WinVState.On => Status(true, Strings.Settings_WinV_Active),
+            WinVState.Pending => Status(false, Strings.Settings_WinV_PendingEnable),
+            WinVState.RestorePending => Status(false, Strings.Settings_WinV_PendingRestore),
             _ => null,
         };
         var now = state is WinVState.Pending or WinVState.RestorePending
-            ? Button("重启资源管理器", "refresh", () => Run(t => state == WinVState.Pending ? w.EnableAsync(true, t) : w.DisableAsync(true, t)))
+            ? Button(Strings.Settings_WinV_RestartExplorer, "refresh", () => Run(t => state == WinVState.Pending ? w.EnableAsync(true, t) : w.DisableAsync(true, t)))
             : null;
-        yield return Row(label, "Win+V 交给 Pane；关掉时把系统设置原样恢复",
+        yield return Row(label, Strings.Settings_WinV_ReplaceDescription,
             new[] { status, now, toggle }.OfType<FrameworkElement>());
         var history = Switch(w.SystemHistoryDisabled, v => Run(t => w.SetSystemHistoryDisabledAsync(v, t)));
         Enable(history, replaced);
-        yield return Row("同时关闭 Windows 自带的剪贴板历史", replaced ? "避免同一份内容在两个地方各存一份；关闭替换时一起恢复" : "先打开上面的替换", history);
+        yield return Row(Strings.Settings_WinV_DisableSystemHistory, replaced ? Strings.Settings_WinV_DisableSystemHistoryDescription : Strings.Settings_WinV_EnableFirst, history);
     }
 
     void OnWinVChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "clipboard" && !winvBusy) Later(0); });
@@ -741,7 +755,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         try { config = app.GestureConfig; }
         catch (Exception)
         {
-            Group(null, Row("手势配置读不出来", "gestures.json 可能损坏了，可以从 WGestures 重新导入", Status(false, "配置无效")));
+            Group(null, Row(Strings.Settings_Gestures_LoadFailed, Strings.Settings_Gestures_LoadFailedDescription, Status(false, Strings.Settings_Gestures_InvalidConfiguration)));
             RenderImport();
             return;
         }
@@ -750,15 +764,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
         var state = app.GestureState switch
         {
-            G.GestureServiceState.WGesturesRunning => "WGestures 正在运行，Pane 的手势先不启用；关掉 WGestures 后重启 Pane",
-            G.GestureServiceState.HookFailed => "鼠标钩子没装上，重启 Pane 再试",
-            G.GestureServiceState.Paused => "已暂停（用暂停热键或手势命令恢复）",
+            G.GestureServiceState.WGesturesRunning => Strings.Settings_Gestures_Conflict,
+            G.GestureServiceState.HookFailed => Strings.Settings_Gestures_HookFailed,
+            G.GestureServiceState.Paused => Strings.Settings_Gestures_Paused,
             _ => null,
         };
 
         int buttons = System.Numerics.BitOperations.PopCount((uint)st.EnabledButtons);
         var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-        foreach (var (b, name) in new[] { (G.GestureButton.Right, "右键"), (G.GestureButton.Middle, "中键"), (G.GestureButton.X1, "后退键"), (G.GestureButton.X2, "前进键") })
+        foreach (var (b, name) in new[] { (G.GestureButton.Right, Strings.Settings_Gestures_RightButton), (G.GestureButton.Middle, Strings.Settings_Gestures_MiddleButton), (G.GestureButton.X1, Strings.Settings_Gestures_BackButton), (G.GestureButton.X2, Strings.Settings_Gestures_ForwardButton) })
         {
             bool has = st.EnabledButtons.HasFlag(b);
             chips.Children.Add(ToggleChip(name, null, has, buttons == 1, v => SaveGestureSettings(x => x with { EnabledButtons = v ? x.EnabledButtons | b : x.EnabledButtons & ~b }, render: true)));
@@ -773,30 +787,30 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Enable(fade, on && st.ShowTrail);
 
         var rows = new List<FrameworkElement>();
-        if (state != null) rows.Add(Row("状态", null, Status(false, state)));
-        rows.Add(Row("启用鼠标手势", null, Switch(on, v =>
+        if (state != null) rows.Add(Row(Strings.Settings_Gestures_Status, null, Status(false, state)));
+        rows.Add(Row(Strings.Settings_Gestures_Enable, null, Switch(on, v =>
         {
             if (!v) gestureButtonsBeforeOff = app.GestureConfig.Settings.EnabledButtons;
             SaveGestureSettings(x => x with { EnabledButtons = v ? (gestureButtonsBeforeOff == G.GestureButton.None ? G.GestureButton.Right : gestureButtonsBeforeOff) : G.GestureButton.None }, render: true, delay: true);
         })));
-        rows.Add(Row("用哪些键画", "按住拖动画方向；不移动就松开，照常是原来的点击", chips));
-        rows.Add(Row("显示轨迹", null, trail));
-        rows.Add(Row("轨迹淡出", "松开后轨迹慢慢消失；关掉则立即消失", fade));
-        rows.Add(Row("显示手势提示", "在屏幕中间显示方向和将要执行的动作", hint));
-        rows.Add(Row("全屏程序里暂停", "玩游戏、看视频时不触发", fullscreen));
+        rows.Add(Row(Strings.Settings_Gestures_Buttons, Strings.Settings_Gestures_ButtonsDescription, chips));
+        rows.Add(Row(Strings.Settings_Gestures_ShowTrail, null, trail));
+        rows.Add(Row(Strings.Settings_Gestures_TrailFade, Strings.Settings_Gestures_TrailFadeDescription, fade));
+        rows.Add(Row(Strings.Settings_Gestures_ShowHint, Strings.Settings_Gestures_ShowHintDescription, hint));
+        rows.Add(Row(Strings.Settings_Gestures_PauseFullscreen, Strings.Settings_Gestures_PauseFullscreenDescription, fullscreen));
         rows.Add(PauseHotkeyRow(st.PauseHotkey));
-        if (gestureError != null) rows.Add(Row("没有保存", null, Status(false, gestureError)));
-        Group("基本", rows.ToArray());
+        if (gestureError != null) rows.Add(Row(Strings.Common_NotSaved, null, Status(false, gestureError)));
+        Group(Strings.Settings_Gestures_Basic, rows.ToArray());
 
         // 编辑中的那一行换成编辑器；新加的编辑器放在最后
         var list = config.Global.Select((g, i) => draft is { App: < 0 } d && d.Index == i ? Reveal("gesture", [GestureEditor(d, config)])
             : ListRow(Arrows(g), Text(g.Name, LabelProto), GestureSub(g), false,
-                IconButton("chev-r", "编辑", () => EditGesture(i)),
-                IconButton("close", "删除这个手势", () => { draft = null; SaveGestures(x => x with { Global = x.Global.Where((_, j) => j != i).ToArray() }); }))).ToList();
+                IconButton("chev-r", Strings.Common_Edit, () => EditGesture(i)),
+                IconButton("close", Strings.Settings_Gestures_Delete, () => { draft = null; SaveGestures(x => x with { Global = x.Global.Where((_, j) => j != i).ToArray() }); }))).ToList();
         if (draft is { App: < 0, Index: < 0 } fresh) list.Add(Reveal("gesture", [GestureEditor(fresh, config)]));
-        else if (draft is not { App: < 0 }) list.Add(AddRow(Button("添加手势", "plus", () => EditGesture(-1))));
-        Group($"手势（{config.Global.Count}）", list.ToArray(),
-            "八个方向，建议不超过 4 段。同一个键、同样的方向和附加动作只能对应一个手势；按程序设置里的专用手势优先。");
+        else if (draft is not { App: < 0 }) list.Add(AddRow(Button(Strings.Settings_Gestures_Add, "plus", () => EditGesture(-1))));
+        Group(string.Format(Strings.Settings_Gestures_Count, (object?)(config.Global.Count)), list.ToArray(),
+            Strings.Settings_Gestures_PatternDescription);
 
         RenderGestureApps(config);
         RenderImport();
@@ -814,9 +828,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
             var a = config.Apps[i];
             int at = i;
             var name = Path.GetFileNameWithoutExtension(a.ExePath) + (a.WindowClass is { } wc ? $"（{wc}）" : "");
-            var sub = a.Mode == G.AppRuleMode.Disabled ? "这个程序里不触发手势"
-                : a.Bindings.Count > 0 ? $"{a.Bindings.Count} 个专用手势，其余沿用全局" : "沿用全局手势";
-            var mode = Seg([("on", "启用"), ("off", "禁用")], a.Mode == G.AppRuleMode.Disabled ? "off" : "on",
+            var sub = a.Mode == G.AppRuleMode.Disabled ? Strings.Settings_Gestures_ProgramDisabled
+                : a.Bindings.Count > 0 ? string.Format(Strings.Settings_Gestures_ProgramCount, (object?)(a.Bindings.Count)) : Strings.Settings_Gestures_ProgramInherit;
+            var mode = Seg([("on", Strings.Common_Enable), ("off", Strings.Common_Disable)], a.Mode == G.AppRuleMode.Disabled ? "off" : "on",
                 v => SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == at ? r with { Mode = v == "off" ? G.AppRuleMode.Disabled : G.AppRuleMode.InheritAndOverride } : r).ToArray() }, render: true, delay: true));
             mode.MinWidth = 140;
             bool open = openApp == i;
@@ -827,7 +841,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 var chevron = new PaneIcon { Glyph = "chev-d", Width = 15, Height = 15, Foreground = IconProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = open && !opening ? 180 : 0 } };
                 if (opening) chevron.Loaded += (_, _) => SpinChevron(chevron, 180);
                 var expand = new Button { Style = IconButtonProto.Style, Content = chevron };
-                ToolTipService.SetToolTip(expand, open ? "收起" : "专用手势");
+                ToolTipService.SetToolTip(expand, open ? Strings.Common_Collapse : Strings.Settings_Gestures_ProgramBindings);
                 void ToggleApp()
                 {
                     if (open) { SpinChevron(chevron, 0); Collapse("app", () => { openApp = -1; if (draft is { App: >= 0 }) draft = null; Render(); }); }
@@ -837,7 +851,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 if (!designToggles.ContainsKey("app") || open) designToggles["app"] = ToggleApp;   // 演示：第一个启用的程序，展开后换成它自己的收起
                 tail.Add(expand);
             }
-            tail.Add(IconButton("close", "移除", () =>
+            tail.Add(IconButton("close", Strings.Common_Remove, () =>
             {
                 openApp = -1;
                 if (draft is { App: >= 0 }) draft = null;
@@ -846,13 +860,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
             rows.Add(ListRow("app", name, sub, false, tail.ToArray()));
             if (open) rows.Add(Reveal("app", AppBindingRows(config, at)));
         }
-        rows.Add(AddRow(Button("添加程序", "plus", async () =>
+        rows.Add(AddRow(Button(Strings.Settings_Gestures_AddProgram, "plus", async () =>
         {
             if (await PickProgram() is not { } exe) return;
             SaveGestures(x => x.Apps.Any(r => string.Equals(r.ExePath, exe, StringComparison.OrdinalIgnoreCase) && r.WindowClass == null) ? x
                 : x with { Apps = [.. x.Apps, new G.AppRule(exe, null, G.AppRuleMode.Disabled, [])] });
         })));
-        Group("按程序设置", rows.ToArray(), "新加的程序默认禁用手势；改成「启用」就沿用全局手势，再点右边的箭头可以加这个程序专用的手势。");
+        Group(Strings.Settings_Gestures_Programs, rows.ToArray(), Strings.Settings_Gestures_ProgramsDescription);
     }
 
     // 展开的程序：它的专用手势（缩进一格，和程序行区分），编辑中的那一行换成编辑器，末尾「添加专用手势」
@@ -866,10 +880,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
             int at = k;
             if (draft is { } d && d.App == appIndex && d.Index == k) { rows.Add(Reveal("gesture", [GestureEditor(d, config)])); continue; }
             var covered = config.Global.FirstOrDefault(g => G.GestureMatcher.Same(g.Pattern, b.Pattern));
-            var sub = GestureSub(b) + (covered != null ? $" · 代替全局的「{covered.Name}」" : "");
+            var sub = covered != null ? string.Format(Strings.Settings_Gestures_OverrideDescription, GestureSub(b), covered.Name) : GestureSub(b);
             var row = ListRow(Arrows(b), Text(b.Name, LabelProto), sub, false,
-                IconButton("chev-r", "编辑", () => EditGesture(at, appIndex)),
-                IconButton("close", "删除这个专用手势", () =>
+                IconButton("chev-r", Strings.Common_Edit, () => EditGesture(at, appIndex)),
+                IconButton("close", Strings.Settings_Gestures_DeleteProgramBinding, () =>
                 {
                     draft = null;
                     SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == appIndex ? r with { Bindings = r.Bindings.Where((_, n) => n != at).ToArray() } : r).ToArray() });
@@ -880,7 +894,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (draft is { Index: < 0 } fresh && fresh.App == appIndex) rows.Add(Reveal("gesture", [GestureEditor(fresh, config)]));
         else if (draft is not { App: >= 0 })
         {
-            var add = AddRow(Button("添加专用手势", "plus", () => EditGesture(-1, appIndex)));
+            var add = AddRow(Button(Strings.Settings_Gestures_AddProgramBinding, "plus", () => EditGesture(-1, appIndex)));
             add.Margin = new Thickness(28, 0, 0, 0);
             rows.Add(add);
         }
@@ -890,12 +904,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
     // 暂停热键可以不设；设了之后能改、能清除
     FrameworkElement PauseHotkeyRow(G.KeyChord? chord)
     {
-        const string label = "暂停 / 恢复热键";
+        var label = Strings.Settings_Gestures_PauseHotkey;
         if (chord is not { } k)
-            return Row(label, "没有设置", Button("设置", "plus", () => SaveGestureSettings(x => x with { PauseHotkey = new G.KeyChord(G.KeyModifiers.Ctrl | G.KeyModifiers.Alt, 'G') }, render: true)));
+            return Row(label, Strings.Settings_Gestures_HotkeyUnset, Button(Strings.Common_Settings, "plus", () => SaveGestureSettings(x => x with { PauseHotkey = new G.KeyChord(G.KeyModifiers.Ctrl | G.KeyModifiers.Alt, 'G') }, render: true)));
         var box = Hotkey(new Settings.Hotkey((KeyModifiers)(int)k.Modifiers, k.VirtualKey), app.Store.Current.Launcher.Hotkey,
             h => SaveGestureSettings(x => x with { PauseHotkey = new G.KeyChord((G.KeyModifiers)(int)h.Modifiers, h.VirtualKey) }));
-        return Row(label, null, box, IconButton("close", "清除", () => SaveGestureSettings(x => x with { PauseHotkey = null }, render: true)));
+        return Row(label, null, box, IconButton("close", Strings.Common_ClearValue, () => SaveGestureSettings(x => x with { PauseHotkey = null }, render: true)));
     }
 
     // 方向箭头列：定宽，各行的名字对齐（最多 4 段，WGestures 导入的老手势可能更长，超出就挤）
@@ -904,7 +918,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var arrows = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Width = 92 };
         foreach (var d in g.Pattern.Directions)
             arrows.Children.Add(new PaneIcon { Glyph = ArrowGlyphs[(int)d], Width = 16, Height = 16, StrokeWidth = 2.2, Foreground = LabelProto.Foreground });
-        if (g.Pattern.Directions.Count == 0) arrows.Children.Add(Text("不画方向", DescProto));
+        if (g.Pattern.Directions.Count == 0) arrows.Children.Add(Text(Strings.Settings_Gestures_NoDirection, DescProto));
         return arrows;
     }
 
@@ -912,13 +926,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var parts = new List<string>();
         if (g.Pattern.Button != G.GestureButton.Right)
-            parts.Add(g.Pattern.Button switch { G.GestureButton.Middle => "中键", G.GestureButton.X1 => "后退键", G.GestureButton.X2 => "前进键", _ => g.Pattern.Button.ToString() });
+            parts.Add(g.Pattern.Button switch { G.GestureButton.Middle => Strings.Settings_Gestures_MiddleButton, G.GestureButton.X1 => Strings.Settings_Gestures_BackButton, G.GestureButton.X2 => Strings.Settings_Gestures_ForwardButton, _ => g.Pattern.Button.ToString() });
         if (g.Pattern.Modifier != G.GestureModifier.None)
             parts.Add(g.Pattern.Modifier switch
             {
-                G.GestureModifier.WheelUp => "按住时滚轮向上", G.GestureModifier.WheelDown => "按住时滚轮向下",
-                G.GestureModifier.LeftClick => "按住时点左键", G.GestureModifier.MiddleClick => "按住时点中键",
-                G.GestureModifier.X1Click => "按住时点后退键", G.GestureModifier.X2Click => "按住时点前进键", _ => "",
+                G.GestureModifier.WheelUp => Strings.Settings_Gestures_WheelUp, G.GestureModifier.WheelDown => Strings.Settings_Gestures_WheelDown,
+                G.GestureModifier.LeftClick => Strings.Settings_Gestures_LeftClick, G.GestureModifier.MiddleClick => Strings.Settings_Gestures_MiddleClick,
+                G.GestureModifier.X1Click => Strings.Settings_Gestures_BackClick, G.GestureModifier.X2Click => Strings.Settings_Gestures_ForwardClick, _ => "",
             });
         parts.Add(CommandText(g.Command));
         return string.Join(" · ", parts);
@@ -926,23 +940,23 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     static string CommandText(G.GestureCommand c) => c switch
     {
-        G.HotkeyCommand h => "快捷键 " + string.Join(" ", h.Chords.Select(k => HotkeyBox.Text(new Settings.Hotkey((KeyModifiers)(int)k.Modifiers, k.VirtualKey)))),
-        G.SendTextCommand => "输入文字",
-        G.WebSearchCommand => "网页搜索选中文字",
-        G.RunCommand => "运行命令",
-        G.WindowCommand w => "窗口 · " + w.Action switch
+        G.HotkeyCommand h => string.Format(Strings.Settings_Gestures_HotkeyDescription, string.Join(" ", h.Chords.Select(k => HotkeyBox.Text(new Settings.Hotkey((KeyModifiers)(int)k.Modifiers, k.VirtualKey))))),
+        G.SendTextCommand => Strings.Settings_Gestures_SendText,
+        G.WebSearchCommand => Strings.Settings_Gestures_WebSearch,
+        G.RunCommand => Strings.Settings_Gestures_Run,
+        G.WindowCommand w => string.Format(Strings.Settings_Gestures_WindowAction, w.Action switch
         {
-            G.WindowAction.MaximizeRestore => "最大化 / 还原", G.WindowAction.Minimize => "最小化", G.WindowAction.Close => "关闭",
-            G.WindowAction.ToggleTopmost => "置顶 / 取消置顶", G.WindowAction.SnapLeft => "贴到左半边", _ => "贴到右半边",
-        },
+            G.WindowAction.MaximizeRestore => Strings.Settings_Gestures_Maximize, G.WindowAction.Minimize => Strings.Settings_Gestures_Minimize, G.WindowAction.Close => Strings.Settings_Gestures_Close,
+            G.WindowAction.ToggleTopmost => Strings.Settings_Gestures_Topmost, G.WindowAction.SnapLeft => Strings.Settings_Gestures_SnapLeft, _ => Strings.Settings_Gestures_SnapRight,
+        }),
         G.VolumeCommand v => v.Action switch
         {
-            G.VolumeAction.Up => "音量加", G.VolumeAction.Down => "音量减", G.VolumeAction.ToggleMute => "静音 / 取消静音", _ => "滚轮调音量",
+            G.VolumeAction.Up => Strings.Settings_Gestures_VolumeUp, G.VolumeAction.Down => Strings.Settings_Gestures_VolumeDown, G.VolumeAction.ToggleMute => Strings.Settings_Gestures_Mute, _ => Strings.Settings_Gestures_WheelVolume,
         },
-        G.TaskSwitchCommand => "切换窗口",
-        G.OpenCommand o => "打开 " + (Path.GetFileName(o.Target) is { Length: > 0 } f ? f : o.Target),
-        G.PauseGesturesCommand => "暂停手势",
-        _ => "什么都不做",
+        G.TaskSwitchCommand => Strings.Settings_Gestures_SwitchWindow,
+        G.OpenCommand o => string.Format(Strings.Settings_Gestures_OpenTarget, Path.GetFileName(o.Target) is { Length: > 0 } f ? f : o.Target),
+        G.PauseGesturesCommand => Strings.Settings_Gestures_Pause,
+        _ => Strings.Settings_Gestures_NoOp,
     };
 
     IReadOnlyList<string> importSearched = [];
@@ -952,14 +966,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         FrameworkElement row;
         if (importPreview is { } p)
         {
-            var desc = $"找到 WGestures {p.SourceVersion} 的配置：{p.GlobalCount} 个手势、{p.AppRuleCount} 条程序规则、{p.DisabledAppCount} 个禁用程序"
-                + (p.Unsupported.Count > 0 ? $"；{p.Unsupported.Count} 项不支持，会跳过" : "") + "。导入会替换 Pane 现在的手势和程序设置";
-            row = Row("从 WGestures 导入", desc,
-                Button("取消", null, () => { importPreview = null; Render(); }),
-                Button("导入", "check", () =>
+            var desc = string.Format(p.Unsupported.Count > 0 ? Strings.Settings_Gestures_ImportSummaryUnsupported : Strings.Settings_Gestures_ImportSummary, p.SourceVersion, p.GlobalCount, p.AppRuleCount, p.DisabledAppCount, p.Unsupported.Count);
+            row = Row(Strings.Settings_Gestures_ImportTitle, desc,
+                Button(Strings.Common_Cancel, null, () => { importPreview = null; Render(); }),
+                Button(Strings.Common_Import, "check", () =>
                 {
-                    try { app.ImportWGestures(p); importStatus = $"已导入 {p.GlobalCount} 个手势"; importOk = true; }
-                    catch (Exception e) { importStatus = "导入失败：" + e.Message; importOk = false; }
+                    try { app.ImportWGestures(p); importStatus = string.Format(Strings.Settings_Gestures_Imported, (object?)(p.GlobalCount)); importOk = true; }
+                    catch (Exception e) { importStatus = string.Format(Strings.Settings_Gestures_ImportError, e.Message); importOk = false; }
                     importPreview = null;
                     Render();
                 }));
@@ -971,15 +984,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 try
                 {
                     importPreview = app.PreviewWGestures(path);
-                    if (importPreview == null) { importStatus = "没找到 WGestures 的配置"; importOk = false; importSearched = app.WGesturesSearched; }
+                    if (importPreview == null) { importStatus = Strings.Settings_Gestures_ImportNotFound; importOk = false; importSearched = app.WGesturesSearched; }
                     else { importStatus = null; importSearched = []; }
                 }
-                catch (Exception e) { importStatus = "读不出 WGestures 的配置：" + e.Message; importOk = false; importSearched = []; }
+                catch (Exception e) { importStatus = string.Format(Strings.Settings_Gestures_ImportReadError, e.Message); importOk = false; importSearched = []; }
                 Render();
             }
-            var find = Button("查找配置", "search", () => Load(null));
+            var find = Button(Strings.Settings_Gestures_FindConfig, "search", () => Load(null));
             // 找不到时手动选（043）：WGestures 数据目录里的 gestures.wg2 / gestures.wg，或在 WGestures 里「导出」的 .wgb
-            var pick = Button("选择文件…", "folder", async () =>
+            var pick = Button(Strings.Settings_Gestures_ChooseConfig, "folder", async () =>
             {
                 try
                 {
@@ -988,28 +1001,27 @@ public sealed partial class SettingsView : UserControl, IPanelView
                     WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
                     if (await picker.PickSingleFileAsync() is { } file) Load(file.Path);
                 }
-                catch (Exception e) { importStatus = "选不了文件：" + (App.FailureReason(e) ?? e.Message); importOk = false; Render(); }
+                catch (Exception e) { importStatus = string.Format(Strings.Settings_Gestures_PickConfigError, App.FailureReason(e) ?? e.Message); importOk = false; Render(); }
             });
             row = importStatus != null
-                ? Row("从 WGestures 导入", null, Status(importOk, importStatus), find, pick)
-                : Row("从 WGestures 导入", "读取 WGestures 的手势、程序规则和轨迹颜色；不会改动 WGestures 本身", find, pick);
+                ? Row(Strings.Settings_Gestures_ImportTitle, null, Status(importOk, importStatus), find, pick)
+                : Row(Strings.Settings_Gestures_ImportTitle, Strings.Settings_Gestures_ImportDescription, find, pick);
             if (importSearched.Count > 0)
-                row = new StackPanel { Children = { row, Row("找过这些位置", string.Join("\n", importSearched.Take(6)) + (importSearched.Count > 6 ? "\n…" : "")
-                    + "\n在 WGestures 里用「导出」存一个 .wgb 文件，再点「选择文件…」也可以") } };
+                row = new StackPanel { Children = { row, Row(Strings.Settings_Gestures_SearchedLocations, string.Format(Strings.Settings_Gestures_ExportHelp, string.Join("\n", importSearched.Take(6)) + (importSearched.Count > 6 ? "\n…" : ""))) } };
         }
         // 恢复默认：点一下先问一句，再点「恢复」才替换
         var reset = resetConfirm
-            ? Row("恢复默认手势", "会替换现在的全部手势和程序设置，换成 Pane 自带的那一套",
-                Button("取消", null, () => { resetConfirm = false; Render(); }),
-                Button("恢复", "check", () =>
+            ? Row(Strings.Settings_Gestures_RestoreTitle, Strings.Settings_Gestures_RestoreWarning,
+                Button(Strings.Common_Cancel, null, () => { resetConfirm = false; Render(); }),
+                Button(Strings.Common_Restore, "check", () =>
                 {
                     resetConfirm = false;
                     try { app.ResetGestures(); gestureError = null; }
                     catch (Exception e) { gestureError = e.Message; }
                     Render();
                 }))
-            : Row("恢复默认手势", "后退、前进、关闭标签页、按住右键滚轮切换标签页等", Button("恢复默认", "refresh", () => { resetConfirm = true; Render(); }));
-        Group("迁移", row, reset);
+            : Row(Strings.Settings_Gestures_RestoreTitle, Strings.Settings_Gestures_DefaultDescription, Button(Strings.Common_ResetDefaults, "refresh", () => { resetConfirm = true; Render(); }));
+        Group(Strings.Settings_Gestures_Migration, row, reset);
     }
     bool resetConfirm;
 
@@ -1035,15 +1047,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var catalog = app.AppIcons;
         var rows = new List<FrameworkElement>
         {
-            Row("默认使用图标遮罩", "不规则图标放到由图标颜色生成的底板上，满幅图标裁成圆角方形；关掉后全部用程序原来的图标",
+            Row(Strings.Settings_Icons_DefaultMask, Strings.Settings_Icons_DefaultMaskDescription,
                 Switch(s.MaskByDefault, v => { SaveIcons(x => x with { MaskByDefault = v }); Later(); })),
         };
-        if (catalog.Rebuilding) rows.Add(Row("正在重新生成图标", "在后台进行，十几秒后启动器里就是新图标", Status(true, "生成中")));
-        Group("遮罩", rows.ToArray());
+        if (catalog.Rebuilding) rows.Add(Row(Strings.Settings_Icons_Rebuilding, Strings.Settings_Icons_RebuildingDescription, Status(true, Strings.Settings_Icons_Generating)));
+        Group(Strings.Settings_Icons_Mask, rows.ToArray());
 
         // 文件图标（036，评论区建议）：默认仍是 Pane 的彩色类型图标；选「系统」和资源管理器一样。只影响文件窗口和启动器里的文件行
-        Group("文件图标", Row("文件和文件夹", s.SystemFileIcons ? "和资源管理器里一样的系统图标；第一次见到的类型要等一下才出来" : "Pane 的彩色类型图标，一眼看出是文档、表格还是图片",
-            Seg([("pane", "Pane 风格"), ("system", "系统")], s.SystemFileIcons ? "system" : "pane", v => { SaveIcons(x => x with { SystemFileIcons = v == "system" }); Later(); })));
+        Group(Strings.Settings_Icons_FileIcons, Row(Strings.Settings_Icons_Files, s.SystemFileIcons ? Strings.Settings_Icons_SystemDescription : Strings.Settings_Icons_PaneDescription,
+            Seg([("pane", Strings.Settings_Icons_Pane), ("system", Strings.Settings_Icons_System)], s.SystemFileIcons ? "system" : "pane", v => { SaveIcons(x => x with { SystemFileIcons = v == "system" }); Later(); })));
 
         var apps = catalog.Apps().ToDictionary(a => a.Id);
         var ids = s.Overrides.Keys.Union(s.CustomIcons.Keys)
@@ -1054,29 +1066,33 @@ public sealed partial class SettingsView : UserControl, IPanelView
             apps.TryGetValue(id, out var info);
             var mode = s.Overrides.GetValueOrDefault(id);
             bool custom = s.CustomIcons.ContainsKey(id);
-            var sub = info == null ? "这个应用已不在列表里" : KindText(s.MaskByDefault ? mode : IconMode.Raw, info.Kind) + (custom ? " · 用的是你换的图片" : "");
-            var seg = Seg([("Auto", "自动"), ("ForceMask", "强制遮罩"), ("Raw", "原样")], mode.ToString(),
+            var sub = info == null ? Strings.Settings_Icons_AppMissing : custom ? string.Format(Strings.Settings_Icons_CustomDescription, KindText(s.MaskByDefault ? mode : IconMode.Raw, info.Kind)) : KindText(s.MaskByDefault ? mode : IconMode.Raw, info.Kind);
+            var seg = Seg([("Auto", Strings.Common_Auto), ("ForceMask", Strings.Settings_Icons_ForceMask), ("Raw", Strings.Settings_Icons_Raw)], mode.ToString(),
                 v => { SaveIcons(x => x with { Overrides = new(x.Overrides) { [id] = Enum.Parse<IconMode>(v) } }); Later(); });
             seg.MinWidth = 220;
             Enable(seg, s.MaskByDefault);
             list.Add(ListRow(AppIcon(info?.Icon), Text(info?.Name ?? id, LabelProto), sub, false, seg,
-                IconButton("image", "换成自己的图片", async () => { if (await PickIcon(id)) Render(); }),
-                IconButton("close", "恢复默认", () => { ResetIcon(id); Render(); })));
+                IconButton("image", Strings.Settings_Icons_ChangeImage, async () => { if (await PickIcon(id)) Render(); }),
+                IconButton("close", Strings.Common_ResetDefaults, () => { ResetIcon(id); Render(); })));
         }
         list.Add(iconQuery == null
-            ? AddRow(Button("添加应用", "plus", () => { iconQuery = ""; Render(); }))
+            ? AddRow(Button(Strings.Settings_Icons_AddApp, "plus", () => { iconQuery = ""; Render(); }))
             : IconSearch(apps.Values, ids));
-        Group("按应用设置", list.ToArray(), "自动：按图标形状决定裁成圆角方形还是放到底板上。换的图片支持 PNG、ICO、JPG、BMP，方形、256×256 以上、透明背景的 PNG 效果最好；读不出来时用程序自己的图标。");
+        Group(Strings.Settings_Icons_PerApp, list.ToArray(), Strings.Settings_Icons_PerAppDescription);
     }
 
-    static string KindText(IconMode mode, AppIconKind kind) => mode == IconMode.Raw ? "原样显示" : kind switch
+    static string KindText(IconMode mode, AppIconKind kind)
     {
-        AppIconKind.Full => "满幅，裁成圆角方形",
-        AppIconKind.Plate => "放在彩色底板上",
-        AppIconKind.Neutral => "放在中性底板上",
-        AppIconKind.Raw => "原样显示",
-        _ => "图标还没生成",
-    } + (mode == IconMode.ForceMask ? "（强制遮罩）" : "");
+        var text = mode == IconMode.Raw ? Strings.Settings_Icons_Original : kind switch
+    {
+        AppIconKind.Full => Strings.Settings_Icons_FullBleed,
+        AppIconKind.Plate => Strings.Settings_Icons_ColoredPlate,
+        AppIconKind.Neutral => Strings.Settings_Icons_NeutralPlate,
+        AppIconKind.Raw => Strings.Settings_Icons_Original,
+        _ => Strings.Settings_Icons_NotGenerated,
+    };
+        return mode == IconMode.ForceMask ? string.Format(Strings.Settings_Icons_ForcedDescription, text) : text;
+    }
 
     // 行首：应用现在的图标（和启动器里一样大小比例）；没有图就用占位图块
     FrameworkElement AppIcon(string? path)
@@ -1093,7 +1109,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     // 「添加应用」：就地搜索框 + 最多 6 个结果；只刷新结果，不重建整页（否则输入框会丢焦点）
     FrameworkElement IconSearch(IEnumerable<AppIconInfo> all, List<string> taken)
     {
-        var box = Field("输入应用名称", 260);
+        var box = Field(Strings.Settings_Icons_SearchPlaceholder, 260);
         box.Text = iconQuery ?? "";
         iconResults = new StackPanel { Spacing = 2 };
         var candidates = all.Where(a => !taken.Contains(a.Id)).ToList();
@@ -1123,7 +1139,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 };
                 iconResults.Children.Add(pick);
             }
-            if (iconResults.Children.Count == 0) iconResults.Children.Add(Text("没有找到", DescProto));
+            if (iconResults.Children.Count == 0) iconResults.Children.Add(Text(Strings.Common_NotFound, DescProto));
         }
         box.TextChanged += (_, _) => { iconQuery = box.Text; Fill(); };
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Escape) { iconQuery = null; Render(); e.Handled = true; } };
@@ -1131,7 +1147,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Fill();
         var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         head.Children.Add(Wrap(box));
-        head.Children.Add(Button("取消", null, () => { iconQuery = null; Render(); }));
+        head.Children.Add(Button(Strings.Common_Cancel, null, () => { iconQuery = null; Render(); }));
         var panel = new StackPanel { Spacing = 6, Padding = new Thickness(14, 10, 14, 10) };
         panel.Children.Add(head);
         panel.Children.Add(iconResults);
@@ -1201,15 +1217,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var a = app.Store.Current.Ai;
         // AI 总开关（issue 8，照原型 settings.js）：关掉后只留这一行
-        Group("基本", Row("启用 AI", a.Enabled ? "不用 AI 时可以关掉"
-                : "已关闭：启动器和超级面板里不再出现翻译、问 AI 等 AI 动作；下面的配置都还在",
+        Group(Strings.Settings_Ai_Basic, Row(Strings.Settings_Ai_Enable, a.Enabled ? Strings.Settings_Ai_EnableDescription
+                : Strings.Settings_Ai_Disabled,
             Switch(a.Enabled, v => { SaveAi(x => x with { Disabled = !v }); Later(); })));
         if (!a.Enabled) return;
         var setup = app.AiSetup;
         bool api = a.Provider == AiProvider.Api;
         var rows = new List<FrameworkElement>
         {
-            Row("服务方式", null, Seg([("Api", "第三方 API"), ("ChatGpt", "ChatGPT 账号")], a.Provider.ToString(), v =>
+            Row(Strings.Settings_Ai_Provider, null, Seg([("Api", Strings.Settings_Ai_ApiProvider), ("ChatGpt", Strings.Settings_Ai_ChatGptProvider)], a.Provider.ToString(), v =>
             {
                 SaveAi(x => x with { Provider = Enum.Parse<AiProvider>(v) });
                 aiModels = null; aiResult = null;
@@ -1218,25 +1234,25 @@ public sealed partial class SettingsView : UserControl, IPanelView
         };
         if (api)
         {
-            rows.Add(Row("接口地址", "兼容 OpenAI 接口格式的服务", CommitField("https://…/v1", 300, a.ApiBaseUrl, v =>
+            rows.Add(Row(Strings.Settings_Ai_Endpoint, Strings.Settings_Ai_EndpointDescription, CommitField("https://…/v1", 300, a.ApiBaseUrl, v =>
                 Uri.TryCreate(v, UriKind.Absolute, out var u) && u.Scheme is "http" or "https"
-                    ? Try(() => SaveAi(x => x with { ApiBaseUrl = v })) : "接口地址要以 http:// 或 https:// 开头")));
+                    ? Try(() => SaveAi(x => x with { ApiBaseUrl = v })) : Strings.Settings_Ai_EndpointInvalid)));
             rows.Add(KeyRow(setup));
         }
         else rows.AddRange(AccountRows(setup));
         if (api || setup.Account != null)
         {
             rows.Add(ModelRow(a, api));
-            var test = Button(aiBusy == "test" ? "测试中…" : "测试", null, () => _ = RunAi("test", async t => { await setup.TestAsync(t); return "连接正常"; }));
+            var test = Button(aiBusy == "test" ? Strings.Settings_Ai_Testing : Strings.Common_Test, null, () => _ = RunAi("test", async t => { await setup.TestAsync(t); return Strings.Settings_Ai_Connected; }));
             Enable(test, aiBusy == null);
-            rows.Add(aiResult is { } r && aiLast != "proxy" ? Row("测试连接", null, Status(r.Ok, r.Text), test) : Row("测试连接", "用现在的设置发一个很小的请求", test));
+            rows.Add(aiResult is { } r && aiLast != "proxy" ? Row(Strings.Settings_Ai_TestConnection, null, Status(r.Ok, r.Text), test) : Row(Strings.Settings_Ai_TestConnection, Strings.Settings_Ai_TestConnectionDescription, test));
         }
-        if (aiFieldError != null) rows.Add(Row("没有保存", null, Status(false, aiFieldError)));
+        if (aiFieldError != null) rows.Add(Row(Strings.Common_NotSaved, null, Status(false, aiFieldError)));
         // 思考程度（042，用户提）：ChatGPT 的推理模型等支持；不支持的模型服务自动去掉这个参数
-        rows.Add(Row("思考程度", a.Reasoning == AiReasoningEffort.Default ? "用服务的默认；只对支持思考的模型有效，不支持的自动忽略" : "越深回答越慢、越费额度；只对支持思考的模型有效，不支持的自动忽略",
-            Seg([("Default", "默认"), ("Low", "低"), ("Medium", "中"), ("High", "高")], a.Reasoning.ToString(),
+        rows.Add(Row(Strings.Settings_Ai_Reasoning, a.Reasoning == AiReasoningEffort.Default ? Strings.Settings_Ai_DefaultReasoningDescription : Strings.Settings_Ai_ReasoningDescription,
+            Seg([("Default", Strings.Common_Default), ("Low", Strings.Settings_Ai_ReasoningLow), ("Medium", Strings.Settings_Ai_ReasoningMedium), ("High", Strings.Settings_Ai_ReasoningHigh)], a.Reasoning.ToString(),
                 v => { SaveAi(x => x with { Reasoning = Enum.Parse<AiReasoningEffort>(v) }); Later(); })));
-        Group("服务", rows.ToArray());
+        Group(Strings.Settings_Ai_Service, rows.ToArray());
 
         RenderAiActions(a);
 
@@ -1245,23 +1261,23 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var autoSwitch = Switch(a.AutoTranslateSelection, v => SaveAi(x => x with { AutoTranslateSelection = v }));
         autoSwitch.IsEnabled = configured;
         autoSwitch.Opacity = configured ? 1 : 0.4;
-        Group("翻译",
-            Row("目标语言", a.TranslateTarget == "auto" ? "原文以中文为主就译成英文，否则译成中文" : null,
-                Seg([("auto", "自动"), ("zh", "中文"), ("en", "英文"), ("ja", "日文")], a.TranslateTarget,
+        Group(Strings.Settings_Ai_Translation,
+            Row(Strings.Settings_Ai_TargetLanguage, a.TranslateTarget == "auto" ? Strings.Settings_Ai_AutoLanguageDescription : null,
+                Seg([("auto", Strings.Common_Auto), ("zh", Strings.Translate_LanguageChinese), ("en", Strings.Translate_LanguageEnglish), ("ja", Strings.Translate_LanguageJapanese)], a.TranslateTarget,
                     v => SaveAi(x => x with { TranslateTarget = v }))),
             TranslationModelRow(a),
-            Row("超级面板选中外文自动翻译", configured ? "选中外文、超级面板一弹出就翻译，单个单词也翻；超过约 2000 字不自动翻；中文照旧只显示动作" : "先在上面配置好 AI 服务", autoSwitch));
+            Row(Strings.Settings_Ai_AutoTranslate, configured ? Strings.Settings_Ai_AutoTranslateDescription : Strings.Settings_Ai_ConfigureFirst, autoSwitch));
         // 代理（042）：跟随系统 / 不走代理 / 自定义（http、socks5）；选「自定义」后填了地址才算数
         var mode = proxyCustomPending ? AiProxyMode.Custom : a.Proxy;
         var network = new List<FrameworkElement>
         {
-            Row("代理", mode switch
+            Row(Strings.Settings_Ai_Proxy, mode switch
                 {
-                    AiProxyMode.None => "直接连接，不管系统有没有设代理",
-                    AiProxyMode.Custom => "用下面这个代理；支持 http 和 socks5",
-                    _ => "和浏览器一样，用系统设置里的代理",
+                    AiProxyMode.None => Strings.Settings_Ai_DirectDescription,
+                    AiProxyMode.Custom => Strings.Settings_Ai_CustomProxyDescription,
+                    _ => Strings.Settings_Ai_SystemProxyDescription,
                 },
-                Seg([("System", "跟随系统"), ("None", "不走代理"), ("Custom", "自定义")], mode.ToString(), v =>
+                Seg([("System", Strings.Settings_FollowSystem), ("None", Strings.Settings_Ai_Direct), ("Custom", Strings.Settings_Ai_CustomProxy)], mode.ToString(), v =>
                 {
                     var m = Enum.Parse<AiProxyMode>(v);
                     proxyCustomPending = m == AiProxyMode.Custom && a.ProxyUrl == null;
@@ -1271,20 +1287,20 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 })),
         };
         if (mode == AiProxyMode.Custom)
-            network.Add(Row("代理地址", "比如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891",
+            network.Add(Row(Strings.Settings_Ai_ProxyAddress, Strings.Settings_Ai_ProxyPlaceholder,
                 CommitField("http://127.0.0.1:7890", 260, a.ProxyUrl ?? "", v =>
                 {
-                    if (v.Length == 0) return "填上代理地址，或者换回「跟随系统」";
-                    if (!AiSettings.ValidProxy(v)) return "代理地址要以 http://、https:// 或 socks5:// 开头";
+                    if (v.Length == 0) return Strings.Settings_Ai_ProxyRequired;
+                    if (!AiSettings.ValidProxy(v)) return Strings.Settings_Ai_ProxyInvalid;
                     var error = Try(() => SaveAi(x => x with { ProxyUrl = v, ProxyMode = AiProxyMode.Custom }));
                     if (error == null) proxyCustomPending = false;
                     return error;
                 })));
-        var proxyTest = Button(aiBusy == "proxy" ? "测试中…" : "测试", null, () => _ = RunAi("proxy", async t => { await app.AiSetup.TestProxyAsync(t); return "能连上"; }));
+        var proxyTest = Button(aiBusy == "proxy" ? Strings.Settings_Ai_Testing : Strings.Common_Test, null, () => _ = RunAi("proxy", async t => { await app.AiSetup.TestProxyAsync(t); return Strings.Settings_Ai_ProxyConnected; }));
         Enable(proxyTest, aiBusy == null && !proxyCustomPending);
-        network.Add(aiResult is { } pr && aiLast == "proxy" ? Row("测试代理", null, Status(pr.Ok, pr.Text), proxyTest) : Row("测试代理", "按上面的代理连一下 AI 服务，不发送任何内容", proxyTest));
-        Group("网络", network.ToArray(),
-            "只在你主动触发时，才把那一段文字发给上面配置的服务；不会自动发送剪贴板内容。Key 和登录信息用 Windows 数据保护加密保存在本机。");
+        network.Add(aiResult is { } pr && aiLast == "proxy" ? Row(Strings.Settings_Ai_TestProxy, null, Status(pr.Ok, pr.Text), proxyTest) : Row(Strings.Settings_Ai_TestProxy, Strings.Settings_Ai_TestProxyDescription, proxyTest));
+        Group(Strings.Settings_Ai_Network, network.ToArray(),
+            Strings.Settings_Ai_PrivacyDescription);
     }
 
     // API Key：只显示掩码；输入框只在要改的时候用，保存后清空
@@ -1292,7 +1308,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var box = new PasswordBox
         {
-            PlaceholderText = setup.ApiKeyMask == null ? "sk-…" : "输入新的 Key 替换", Width = 220, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 6, 10, 0),
+            PlaceholderText = setup.ApiKeyMask == null ? "sk-…" : Strings.Settings_Ai_ReplaceKey, Width = 220, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 6, 10, 0),
             FontFamily = SmallStrongProto.FontFamily, FontSize = SmallStrongProto.FontSize,
         };
         void Save()
@@ -1308,31 +1324,31 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Child = box, CornerRadius = new CornerRadius(((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft),
             Background = FillProto.Background, BorderBrush = FillProto.BorderBrush, BorderThickness = new Thickness(1),
         };
-        var controls = new List<FrameworkElement> { wrap, Button("保存", "check", Save) };
+        var controls = new List<FrameworkElement> { wrap, Button(Strings.Common_Save, "check", Save) };
         if (setup.ApiKeyMask != null)
-            controls.Add(IconButton("close", "删除已保存的 Key", () => { aiFieldError = Try(() => setup.SaveApiKey("")); Later(0); }));
-        return Row("API Key", setup.ApiKeyMask is { } mask ? $"已保存：{mask}（加密保存在本机）" : "保存后只显示开头和结尾，加密保存在本机", controls);
+            controls.Add(IconButton("close", Strings.Settings_Ai_DeleteKey, () => { aiFieldError = Try(() => setup.SaveApiKey("")); Later(0); }));
+        return Row("API Key", setup.ApiKeyMask is { } mask ? string.Format(Strings.Settings_Ai_KeySaved, (object?)(mask)) : Strings.Settings_Ai_KeyDescription, controls);
     }
 
     IEnumerable<FrameworkElement> AccountRows(IAiSetup setup)
     {
         if (aiBusy == "signin")
         {
-            yield return Row("正在登录", "已在浏览器打开授权页面，完成后会自动回到这里（5 分钟内有效）",
-                Button("取消", null, () => signIn?.Cancel()));
+            yield return Row(Strings.Settings_Ai_LoggingIn, Strings.Settings_Ai_LoginPendingDescription,
+                Button(Strings.Common_Cancel, null, () => signIn?.Cancel()));
             yield break;
         }
         if (setup.Account is not { } account)
         {
-            yield return Row("用 ChatGPT 账号登录", "在浏览器里授权，翻译和提问算在你的 Plus / Pro 套餐里，不用填 API Key。免费账号能登录，但用不了套餐额度",
-                Button("登录 ChatGPT", "login", () => _ = SignIn(setup)));
-            if (aiResult is { Ok: false } r) yield return Row("没有登录上", null, Status(false, r.Text));
+            yield return Row(Strings.Settings_Ai_LoginTitle, Strings.Settings_Ai_LoginDescription,
+                Button(Strings.Settings_Ai_Login, "login", () => _ = SignIn(setup)));
+            if (aiResult is { Ok: false } r) yield return Row(Strings.Settings_Ai_LoginFailed, null, Status(false, r.Text));
             yield break;
         }
         // 套餐名官方不保证给：不知道时只说能不能用，不猜 Plus / Pro
-        var plan = !account.CanUsePlan ? "免费账号：能登录，但用不了套餐额度"
-            : account.PlanName is { Length: > 0 } name ? $"ChatGPT {name} · 用套餐额度" : "已登录 · 用套餐额度（套餐名称未知）";
-        yield return Row(account.Email, plan, Button("退出登录", "logout", () => _ = RunAi("signout", async t => { await setup.SignOutAsync(t); return null; })));
+        var plan = !account.CanUsePlan ? Strings.Settings_Ai_FreeAccount
+            : account.PlanName is { Length: > 0 } name ? string.Format(Strings.Settings_Ai_Subscription, (object?)(name)) : Strings.Settings_Ai_SubscriptionUnknown;
+        yield return Row(account.Email, plan, Button(Strings.Settings_Ai_Logout, "logout", () => _ = RunAi("signout", async t => { await setup.SignOutAsync(t); return null; })));
     }
 
     async Task SignIn(IAiSetup setup)
@@ -1346,7 +1362,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     FrameworkElement ModelRow(AiSettings a, bool api)
     {
         string current = (api ? a.ApiModel : a.ChatGptModel) ?? "";
-        var box = Field(api ? "模型 Id" : "默认（账号的第一个模型）", 220);
+        var box = Field(api ? Strings.Settings_Ai_ModelId : Strings.Settings_Ai_FirstModelDefault, 220);
         box.Text = current;
         var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6, Margin = new Thickness(0, 4, 0, 0) };
         void Commit(string value)
@@ -1373,13 +1389,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         box.LostFocus += (_, _) => { if (box.Text.Trim() != current) { Commit(box.Text); Later(); } };
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(box.Text); Later(0); e.Handled = true; } };
         Fill();
-        var load = Button(aiBusy == "models" ? "拉取中…" : "拉取模型列表", "refresh", () => _ = RunAi("models", async t =>
+        var load = Button(aiBusy == "models" ? Strings.Settings_Ai_LoadingModels : Strings.Settings_Ai_FetchModels, "refresh", () => _ = RunAi("models", async t =>
         {
             aiModels = await app.Ai.ListModelsAsync(t);
-            return aiModels.Count == 0 ? "服务没有返回模型" : null;
+            return aiModels.Count == 0 ? Strings.Settings_Ai_NoModels : null;
         }));
         Enable(load, aiBusy == null);
-        var row = Row("模型", aiModels is { } list ? $"共 {list.Count} 个，点一个就用它；也可以直接输入" : api ? "填服务商给的模型 Id，或拉取列表来选" : "空着就用账号模型列表里的第一个", Wrap(box), load);
+        var row = Row(Strings.Settings_Ai_Model, aiModels is { } list ? string.Format(Strings.Settings_Ai_ModelsCount, (object?)(list.Count)) : api ? Strings.Settings_Ai_ModelDescription : Strings.Settings_Ai_FirstModelDescription, Wrap(box), load);
         if (aiModels == null) return row;
         var stack = new StackPanel();
         stack.Children.Add(row);
@@ -1393,9 +1409,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderActionRow(LauncherSettings l)
     {
         var ai = app.Store.Current.Ai;
-        var all = new List<(string Id, string Name, string Glyph)> { ("ai:translate", "翻译", "translate"), ("ai:ask", "问 AI", "ai"), ("files", "搜文件", "folder") };
+        var all = new List<(string Id, string Name, string Glyph)> { ("ai:translate", Strings.Common_Translate, "translate"), ("ai:ask", Strings.Launcher_AskAi, "ai"), ("files", Strings.Launcher_SearchFiles, "folder") };
         all.AddRange(ai.Actions.Where(a => a.Id != "translate").Select(a => ("ai:" + a.Id, a.Name, a.Glyph)));
-        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, $"用 {e.Name} 搜", "globe")));
+        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, string.Format(Strings.Launcher_SearchWith, (object?)(e.Name)), "globe")));
         var shown = l.ActionRow.Where(id => all.Any(a => a.Id == id)).ToList();
         var ordered = shown.Select(id => all.First(a => a.Id == id)).Concat(all.Where(a => !shown.Contains(a.Id))).ToList();
         var rows = new List<FrameworkElement>();
@@ -1406,22 +1422,22 @@ public sealed partial class SettingsView : UserControl, IPanelView
             int pos = shown.IndexOf(id);
             var tools = new List<FrameworkElement>();
             if (on && pos > 0)
-                tools.Add(IconButton("U", "上移", () => { SaveLauncher(x => { var list = x.ActionRow.Where(v => all.Any(a => a.Id == v)).ToList(); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { ActionRow = list.ToArray() }; }); Render(); }));
+                tools.Add(IconButton("U", Strings.Common_MoveUp, () => { SaveLauncher(x => { var list = x.ActionRow.Where(v => all.Any(a => a.Id == v)).ToList(); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { ActionRow = list.ToArray() }; }); Render(); }));
             tools.Add(Switch(on, v =>
             {
                 SaveLauncher(x => x with { ActionRow = v ? [.. x.ActionRow.Where(a => a != id), id] : x.ActionRow.Where(a => a != id).ToArray() });
                 Render();
             }));
-            rows.Add(ListRow(glyph, name, on ? $"第 {pos + 1} 个{(pos < 9 ? $"，Alt+{pos + 1}" : "")}" : "不显示", false, tools.ToArray()));
+            rows.Add(ListRow(glyph, name, on ? string.Format(pos < 9 ? Strings.Settings_Launcher_ActionPositionHotkey : Strings.Settings_Launcher_ActionPosition, pos + 1, pos + 1) : Strings.Settings_Launcher_ActionHidden, false, tools.ToArray()));
         }
-        Group("动作行", rows.ToArray(), "启动器里输入任何文字都会出现这一排，位置固定。按住 Alt 显示序号，Alt+数字直接触发。网页搜索站点在下面「网页搜索」里增删。");
+        Group(Strings.Settings_Launcher_ActionRow, rows.ToArray(), Strings.Settings_Launcher_ActionRowDescription);
     }
 
     // 翻译用模型：单独指定一个快模型，空着 = 和主模型相同。候选用上面「拉取模型列表」拉到的
     FrameworkElement TranslationModelRow(AiSettings a)
     {
         string current = a.TranslationModel ?? "";
-        var box = Field("和主模型相同", 220);
+        var box = Field(Strings.Settings_Ai_SameAsMain, 220);
         box.Text = current;
         void Commit(string value)
         {
@@ -1430,10 +1446,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
         }
         box.LostFocus += (_, _) => { if (box.Text.Trim() != current) { Commit(box.Text); Later(); } };
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(box.Text); Later(0); e.Handled = true; } };
-        var row = Row("翻译用模型", aiModels is null ? "翻译窗口和自动翻译用它，选个快一点的；空着就用主模型。在上面拉取模型列表后可以直接点选" : "翻译窗口和自动翻译用它，选个快一点的；空着就用主模型", Wrap(box));
+        var row = Row(Strings.Settings_Ai_TranslationModel, aiModels is null ? Strings.Settings_Ai_TranslationModelDescription : Strings.Settings_Ai_TranslationModelManualDescription, Wrap(box));
         if (aiModels is not { } models) return row;
         var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6, Margin = new Thickness(14, 0, 14, 10) };
-        var main = Chip("和主模型相同");
+        var main = Chip(Strings.Settings_Ai_SameAsMain);
         main.Height = PaneTokens.ControlSm; main.CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2);
         if (current.Length == 0) main.BorderBrush = Accent();
         main.Tapped += (_, _) => { Commit(""); Later(0); };
@@ -1460,10 +1476,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
         {
             var act = a.Actions[i];
             int index = i;
-            var name = Field("名称", 120);
+            var name = Field(Strings.Common_Name, 120);
             name.Text = act.Name;
             name.LostFocus += (_, _) => { var v = name.Text.Trim(); if (v.Length > 0 && v != act.Name) aiFieldError = Try(() => SaveAction(index, x => x with { Name = v })); };
-            var prompt = Field("提示词", 0);
+            var prompt = Field(Strings.Settings_Ai_ActionPrompt, 0);
             prompt.Width = double.NaN;
             prompt.Height = 92;
             prompt.AcceptsReturn = true;
@@ -1473,7 +1489,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             prompt.LostFocus += (_, _) =>
             {
                 var v = prompt.Text.Replace("\r\n", "\n").Replace('\r', '\n');
-                if (v.Trim().Length == 0) { aiFieldError = "提示词不能是空的"; Later(0); return; }
+                if (v.Trim().Length == 0) { aiFieldError = Strings.Settings_Ai_ActionPromptRequired; Later(0); return; }
                 if (v != act.PromptTemplate) aiFieldError = Try(() => SaveAction(index, x => x with { PromptTemplate = v }));
             };
             var head = new Grid { ColumnSpacing = 8 };
@@ -1486,9 +1502,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Grid.SetColumn(nameBox, 1);
             head.Children.Add(nameBox);
             var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
-            if (index > 0) tools.Children.Add(IconButton("U", "上移", () => { MoveAction(index); Render(); }));
+            if (index > 0) tools.Children.Add(IconButton("U", Strings.Common_MoveUp, () => { MoveAction(index); Render(); }));
             if (act.Id != "translate")
-                tools.Children.Add(IconButton("close", "删除这个动作", () => { SaveAi(x => x with { Actions = x.Actions.Where((_, j) => j != index).ToArray() }); Render(); }));
+                tools.Children.Add(IconButton("close", Strings.Settings_Ai_DeleteAction, () => { SaveAi(x => x with { Actions = x.Actions.Where((_, j) => j != index).ToArray() }); Render(); }));
             Grid.SetColumn(tools, 3);
             head.Children.Add(tools);
             var block = new StackPanel { Spacing = 8, Padding = new Thickness(14, 10, 14, 12) };
@@ -1496,12 +1512,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
             block.Children.Add(Wrap(prompt));
             list.Add(block);
         }
-        list.Add(AddRow(Button("添加动作", "plus", () =>
+        list.Add(AddRow(Button(Strings.Settings_Ai_AddAction, "plus", () =>
         {
-            SaveAi(x => x with { Actions = [.. x.Actions, new AiActionSettings("custom-" + DateTime.Now.ToString("yyyyMMddHHmmss"), "新动作", "ai", "对下面的内容……\n\n{text}")] });
+            SaveAi(x => x with { Actions = [.. x.Actions, new AiActionSettings("custom-" + DateTime.Now.ToString("yyyyMMddHHmmss"), "新动作", "ai", "对下面的内容……\n\n{text}")] }); // 不翻译：用户数据
             Render();
         })));
-        Group("预设动作", list.ToArray(), "可用变量：{text} 要处理的文字，{lang} 目标语言。离开输入框时自动保存。启动器和超级面板按这里的顺序显示。");
+        Group(Strings.Settings_Ai_Actions, list.ToArray(), Strings.Settings_Ai_ActionsDescription);
     }
 
     void SaveAction(int index, Func<AiActionSettings, AiActionSettings> change) =>
@@ -1542,7 +1558,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         }
         catch (OperationCanceledException) { }
         catch (AiException e) { aiResult = (false, e.Message); }
-        catch (Exception e) { aiResult = (false, App.FailureReason(e) ?? "出了点问题"); }
+        catch (Exception e) { aiResult = (false, App.FailureReason(e) ?? Strings.Common_UnexpectedProblem); }
         finally { aiBusy = null; }
         if (current.Id == "ai") Render();
     }
@@ -1550,7 +1566,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     static string? Try(Action save)
     {
         try { save(); return null; }
-        catch (Exception e) { return e is ArgumentException ? "填的内容不对，没有保存" : App.FailureReason(e) ?? "没有保存成功"; }
+        catch (Exception e) { return e is ArgumentException ? Strings.Settings_SaveInvalid : App.FailureReason(e) ?? Strings.Settings_SaveFailed; }
     }
 
     void SaveAi(Func<AiSettings, AiSettings> change) =>
@@ -1581,8 +1597,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     static readonly (string Key, string Label)[] CommandKinds =
     [
-        ("hotkey", "快捷键"), ("window", "窗口"), ("volume", "音量"), ("open", "打开"), ("run", "运行命令"),
-        ("text", "输入文字"), ("search", "网页搜索"), ("task", "切换窗口"), ("pause", "暂停手势"), ("none", "什么都不做"),
+        ("hotkey", Strings.Settings_Gestures_CommandHotkey), ("window", Strings.Settings_Gestures_CommandWindow), ("volume", Strings.Settings_Gestures_CommandVolume), ("open", Strings.Settings_Gestures_CommandOpen), ("run", Strings.Settings_Gestures_Run),
+        ("text", Strings.Settings_Gestures_SendText), ("search", Strings.Settings_Gestures_CommandWebSearch), ("task", Strings.Settings_Gestures_SwitchWindow), ("pause", Strings.Settings_Gestures_Pause), ("none", Strings.Settings_Gestures_NoOp),
     ];
 
     static string KindOf(G.GestureCommand c) => c switch
@@ -1638,7 +1654,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         void ShowArrows()
         {
             arrows.Children.Clear();
-            if (d.Directions.Count == 0) { arrows.Children.Add(Text(d.Modifier == G.GestureModifier.None ? "还没有方向" : "不画方向（只用下面的附加动作）", DescProto)); return; }
+            if (d.Directions.Count == 0) { arrows.Children.Add(Text(d.Modifier == G.GestureModifier.None ? Strings.Settings_Gestures_DirectionMissing : Strings.Settings_Gestures_ModifierOnly, DescProto)); return; }
             foreach (var dir in d.Directions)
                 arrows.Children.Add(new PaneIcon { Glyph = ArrowGlyphs[(int)dir], Width = 24, Height = 24, StrokeWidth = 2.2, Foreground = LabelProto.Foreground });
         }
@@ -1656,14 +1672,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
         ];
         foreach (var (r, c, dir) in layout)
         {
-            var b = IconButton(ArrowGlyphs[(int)dir], "加一段", () =>
+            var b = IconButton(ArrowGlyphs[(int)dir], Strings.Settings_Gestures_AddDirection, () =>
             {
                 if (d.Directions.Count > 0 && d.Directions[^1] == dir) return;   // 同方向连着算一段
                 d.Directions.Add(dir); d.Error = null; ShowArrows();
             });
             Grid.SetRow(b, r); Grid.SetColumn(b, c); keys.Children.Add(b);
         }
-        var back = IconButton("close", "去掉最后一段", () => { if (d.Directions.Count > 0) d.Directions.RemoveAt(d.Directions.Count - 1); ShowArrows(); });
+        var back = IconButton("close", Strings.Settings_Gestures_RemoveDirection, () => { if (d.Directions.Count > 0) d.Directions.RemoveAt(d.Directions.Count - 1); ShowArrows(); });
         Grid.SetRow(back, 1); Grid.SetColumn(back, 1); keys.Children.Add(back);
         var drawRow = new Grid { ColumnSpacing = 16 };
         drawRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -1671,35 +1687,35 @@ public sealed partial class SettingsView : UserControl, IPanelView
         drawRow.Children.Add(pad);
         Grid.SetColumn(keys, 1); drawRow.Children.Add(keys);
         panel.Children.Add(drawRow);
-        panel.Children.Add(FormLine("方向", arrows));
+        panel.Children.Add(FormLine(Strings.Settings_Gestures_Direction, arrows));
 
         // ---- 触发键、附加动作 ----
-        panel.Children.Add(FormLine("用哪个键", Choices([("Right", "右键"), ("Middle", "中键"), ("X1", "后退键"), ("X2", "前进键")], d.Button.ToString(),
+        panel.Children.Add(FormLine(Strings.Settings_Gestures_TriggerButton, Choices([("Right", Strings.Settings_Gestures_RightButton), ("Middle", Strings.Settings_Gestures_MiddleButton), ("X1", Strings.Settings_Gestures_BackButton), ("X2", Strings.Settings_Gestures_ForwardButton)], d.Button.ToString(),
             v => d.Button = Enum.Parse<G.GestureButton>(v))));
-        panel.Children.Add(FormLine("附加动作", Choices([("None", "无"), ("WheelUp", "滚轮向上"), ("WheelDown", "滚轮向下"), ("LeftClick", "点左键"), ("MiddleClick", "点中键"), ("X1Click", "点后退键"), ("X2Click", "点前进键")],
+        panel.Children.Add(FormLine(Strings.Settings_Gestures_Modifier, Choices([("None", Strings.Common_None), ("WheelUp", Strings.Settings_Gestures_ModifierWheelUp), ("WheelDown", Strings.Settings_Gestures_ModifierWheelDown), ("LeftClick", Strings.Settings_Gestures_ModifierLeft), ("MiddleClick", Strings.Settings_Gestures_ModifierMiddle), ("X1Click", Strings.Settings_Gestures_ModifierBack), ("X2Click", Strings.Settings_Gestures_ModifierForward)],
             d.Modifier.ToString(), v => d.Modifier = Enum.Parse<G.GestureModifier>(v))));
         if (d.Modifier != G.GestureModifier.None)
         {
             var repeat = Switch(d.ExecuteOnModifier, v => d.ExecuteOnModifier = v);
             var line = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
             line.Children.Add(repeat);
-            line.Children.Add(Text("按住触发键时，每滚一下 / 点一下都执行一次（适合调音量、切换窗口）", DescProto));
+            line.Children.Add(Text(Strings.Settings_Gestures_ModifierDescription, DescProto));
             panel.Children.Add(FormLine("", line));
         }
 
         // ---- 动作 ----
-        panel.Children.Add(FormLine("动作", Choices(CommandKinds, KindOf(d.Command), v => d.Command = NewCommand(v))));
+        panel.Children.Add(FormLine(Strings.Settings_Gestures_Action, Choices(CommandKinds, KindOf(d.Command), v => d.Command = NewCommand(v))));
         if (CommandEditor(d) is { } editor) panel.Children.Add(FormLine("", editor));
 
-        var name = Field("显示在手势提示里，例如「关闭标签页」", 300);
+        var name = Field(Strings.Settings_Gestures_NameDescription, 300);
         name.Text = d.Name;
         name.TextChanged += (_, _) => d.Name = name.Text;
-        panel.Children.Add(FormLine("名称", Wrap(name)));
+        panel.Children.Add(FormLine(Strings.Common_Name, Wrap(name)));
 
         // ---- 保存 ----
         var foot = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        foot.Children.Add(Button("保存", "check", () => SaveDraft(d)));
-        foot.Children.Add(Button("取消", null, () => Collapse("gesture", () => { draft = null; Render(); })));
+        foot.Children.Add(Button(Strings.Common_Save, "check", () => SaveDraft(d)));
+        foot.Children.Add(Button(Strings.Common_Cancel, null, () => Collapse("gesture", () => { draft = null; Render(); })));
         if (d.Error != null) foot.Children.Add(Status(false, d.Error));
         panel.Children.Add(FormLine("", foot));
         return panel;
@@ -1711,7 +1727,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var line = new Microsoft.UI.Xaml.Shapes.Polyline { Stroke = Accent(), StrokeThickness = 3, StrokeLineJoin = PenLineJoin.Round, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
         var canvas = new Canvas { Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
         canvas.Children.Add(line);
-        var hint = Text("在这里按住鼠标左键画方向", DescProto);
+        var hint = Text(Strings.Settings_Gestures_DrawHint, DescProto);
         hint.HorizontalAlignment = HorizontalAlignment.Center;
         hint.IsHitTestVisible = false;
         var host = new Grid { Height = 168 };
@@ -1775,68 +1791,68 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 }
                 if (chords.Count > 0)
                 {
-                    row.Children.Add(IconButton("plus", "再按一个键（连续按）", () => { d.Command = new G.HotkeyCommand([.. ((G.HotkeyCommand)d.Command).Chords, default]); Render(); }));
-                    if (chords.Count > 1) row.Children.Add(IconButton("close", "去掉最后一个", () => { d.Command = new G.HotkeyCommand(((G.HotkeyCommand)d.Command).Chords.SkipLast(1).ToArray()); Render(); }));
+                    row.Children.Add(IconButton("plus", Strings.Settings_Gestures_AddChord, () => { d.Command = new G.HotkeyCommand([.. ((G.HotkeyCommand)d.Command).Chords, default]); Render(); }));
+                    if (chords.Count > 1) row.Children.Add(IconButton("close", Strings.Settings_Gestures_RemoveChord, () => { d.Command = new G.HotkeyCommand(((G.HotkeyCommand)d.Command).Chords.SkipLast(1).ToArray()); Render(); }));
                 }
                 return row;
             }
             case G.WindowCommand w:
-                return Choices([("MaximizeRestore", "最大化 / 还原"), ("Minimize", "最小化"), ("Close", "关闭"), ("ToggleTopmost", "置顶 / 取消"), ("SnapLeft", "贴左半边"), ("SnapRight", "贴右半边")],
+                return Choices([("MaximizeRestore", Strings.Settings_Gestures_Maximize), ("Minimize", Strings.Settings_Gestures_Minimize), ("Close", Strings.Settings_Gestures_Close), ("ToggleTopmost", Strings.Settings_Gestures_ToggleTopmost), ("SnapLeft", Strings.Settings_Gestures_LeftHalf), ("SnapRight", Strings.Settings_Gestures_RightHalf)],
                     w.Action.ToString(), v => d.Command = new G.WindowCommand(Enum.Parse<G.WindowAction>(v)));
             case G.VolumeCommand v:
             {
                 var stack = new StackPanel { Spacing = 8 };
-                stack.Children.Add(Choices([("Up", "加"), ("Down", "减"), ("ToggleMute", "静音 / 取消"), ("WheelAdjust", "跟着滚轮调")], v.Action.ToString(),
+                stack.Children.Add(Choices([("Up", Strings.Settings_Gestures_IncreaseVolume), ("Down", Strings.Settings_Gestures_DecreaseVolume), ("ToggleMute", Strings.Settings_Gestures_ToggleMute), ("WheelAdjust", Strings.Settings_Gestures_FollowWheel)], v.Action.ToString(),
                     x => d.Command = (G.VolumeCommand)d.Command with { Action = Enum.Parse<G.VolumeAction>(x) }));
                 if (v.Action != G.VolumeAction.ToggleMute)
-                    stack.Children.Add(Choices([("2", "每次 2%"), ("5", "每次 5%"), ("10", "每次 10%")], v.Step.ToString(),
+                    stack.Children.Add(Choices([("2", Strings.Settings_Gestures_VolumeStepTwo), ("5", Strings.Settings_Gestures_VolumeStepFive), ("10", Strings.Settings_Gestures_VolumeStepTen)], v.Step.ToString(),
                         x => d.Command = (G.VolumeCommand)d.Command with { Step = int.Parse(x) }));
                 return stack;
             }
             case G.OpenCommand o:
             {
-                var box = Field("程序、文件、文件夹或网址", 300);
+                var box = Field(Strings.Settings_Gestures_OpenPlaceholder, 300);
                 box.Text = o.Target;
                 box.TextChanged += (_, _) => d.Command = new G.OpenCommand(box.Text.Trim());
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
                 row.Children.Add(Wrap(box));
-                row.Children.Add(Button("选择文件", "folder", async () =>
+                row.Children.Add(Button(Strings.Common_ChooseFile, "folder", async () =>
                 {
                     var picker = new Windows.Storage.Pickers.FileOpenPicker();
                     picker.FileTypeFilter.Add("*");
                     WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-                    if ((await picker.PickSingleFileAsync())?.Path is { } path) { d.Command = new G.OpenCommand(path); if (d.Name.Length == 0) d.Name = "打开 " + Path.GetFileNameWithoutExtension(path); Render(); }
+                    if ((await picker.PickSingleFileAsync())?.Path is { } path) { d.Command = new G.OpenCommand(path); if (d.Name.Length == 0) d.Name = "打开 " + Path.GetFileNameWithoutExtension(path); Render(); } // 不翻译：用户数据
                 }));
                 return row;
             }
             case G.RunCommand r:
             {
-                var box = Field("命令行，例如 notepad.exe", 300);
+                var box = Field(Strings.Settings_Gestures_RunPlaceholder, 300);
                 box.Text = r.CommandLine;
                 box.TextChanged += (_, _) => d.Command = (G.RunCommand)d.Command with { CommandLine = box.Text.Trim() };
                 var stack = new StackPanel { Spacing = 8 };
                 stack.Children.Add(Wrap(box));
                 var opts = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
                 opts.Children.Add(Switch(r.InExplorerFolder, x => d.Command = (G.RunCommand)d.Command with { InExplorerFolder = x }));
-                opts.Children.Add(Text("在资源管理器当前的文件夹里运行", DescProto));
+                opts.Children.Add(Text(Strings.Settings_Gestures_RunInExplorer, DescProto));
                 opts.Children.Add(Switch(r.ShowWindow, x => d.Command = (G.RunCommand)d.Command with { ShowWindow = x }));
-                opts.Children.Add(Text("显示命令窗口", DescProto));
+                opts.Children.Add(Text(Strings.Settings_Gestures_ShowCommandWindow, DescProto));
                 stack.Children.Add(opts);
                 return stack;
             }
             case G.SendTextCommand t:
             {
-                var box = Field("要输入的文字", 300);
+                var box = Field(Strings.Settings_Gestures_TextPlaceholder, 300);
                 box.Text = t.Sequence;
                 box.TextChanged += (_, _) => d.Command = new G.SendTextCommand(box.Text);
                 var stack = new StackPanel { Spacing = 4 };
                 stack.Children.Add(Wrap(box));
-                stack.Children.Add(Text("按 WGestures / SendKeys 写法：{ENTER} 回车，^ Ctrl，% Alt，+ Shift", DescProto));
+                stack.Children.Add(Text(Strings.Settings_Gestures_SendKeysDescription, DescProto));
                 return stack;
             }
             case G.WebSearchCommand s:
             {
-                var box = Field("地址，用 {query} 代表选中的文字", 360);
+                var box = Field(Strings.Settings_Gestures_UrlPlaceholder, 360);
                 box.Text = s.UrlTemplate;
                 box.TextChanged += (_, _) => d.Command = new G.WebSearchCommand(box.Text.Trim());
                 return Wrap(box);
@@ -1850,19 +1866,19 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var config = app.GestureConfig;
         var pattern = new G.GesturePattern(d.Button, d.Directions.ToArray(), d.Modifier);
         string? error =
-            d.Directions.Count == 0 && d.Modifier == G.GestureModifier.None ? "先画方向，或选一个附加动作"
+            d.Directions.Count == 0 && d.Modifier == G.GestureModifier.None ? Strings.Settings_Gestures_PatternRequired
             : d.Command switch
             {
-                G.HotkeyCommand h when h.Chords.Count == 0 || h.Chords.Any(k => k.VirtualKey == 0) => "还没有录按键",
-                G.OpenCommand o when o.Target.Length == 0 => "要打开什么还没填",
-                G.RunCommand r when r.CommandLine.Length == 0 => "命令还没填",
-                G.SendTextCommand t when t.Sequence.Length == 0 => "要输入的文字还没填",
-                G.WebSearchCommand w when !w.UrlTemplate.Contains("{query}") => "搜索地址里要有 {query}",
-                G.VolumeCommand { Action: G.VolumeAction.WheelAdjust } when d.Modifier is not (G.GestureModifier.WheelUp or G.GestureModifier.WheelDown) => "「跟着滚轮调」要配合附加动作「滚轮」",
+                G.HotkeyCommand h when h.Chords.Count == 0 || h.Chords.Any(k => k.VirtualKey == 0) => Strings.Settings_Gestures_ChordRequired,
+                G.OpenCommand o when o.Target.Length == 0 => Strings.Settings_Gestures_TargetRequired,
+                G.RunCommand r when r.CommandLine.Length == 0 => Strings.Settings_Gestures_CommandRequired,
+                G.SendTextCommand t when t.Sequence.Length == 0 => Strings.Settings_Gestures_TextRequired,
+                G.WebSearchCommand w when !w.UrlTemplate.Contains("{query}") => Strings.Settings_Gestures_QueryRequired,
+                G.VolumeCommand { Action: G.VolumeAction.WheelAdjust } when d.Modifier is not (G.GestureModifier.WheelUp or G.GestureModifier.WheelDown) => Strings.Settings_Gestures_WheelRequired,
                 _ => null,
             }
             // 只在同一个列表里查重：程序专用手势和全局一样是允许的（这个程序里用专用的）
-            ?? (BindingsOf(config, d.App).Select((g, i) => (g, i)).FirstOrDefault(x => x.i != d.Index && G.GestureMatcher.Same(x.g.Pattern, pattern)) is { g: { } same } ? $"和「{same.Name}」的手势一样" : null);
+            ?? (BindingsOf(config, d.App).Select((g, i) => (g, i)).FirstOrDefault(x => x.i != d.Index && G.GestureMatcher.Same(x.g.Pattern, pattern)) is { g: { } same } ? string.Format(Strings.Settings_Gestures_DuplicatePattern, (object?)(same.Name)) : null);
         if (error != null) { d.Error = error; Render(); return; }
         var name = d.Name.Trim().Length > 0 ? d.Name.Trim() : CommandText(d.Command);
         var binding = new G.GestureBinding(name, pattern, d.Command, d.Modifier != G.GestureModifier.None && d.ExecuteOnModifier);
@@ -1904,12 +1920,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderSuper()
     {
         var p = app.Store.Current.SuperPanel;
-        var trigger = Seg([("X1", "长按后退键"), ("X2", "长按前进键"), ("Middle", "长按中键")], p.TriggerButton.ToString(),
+        var trigger = Seg([("X1", Strings.Settings_Super_BackButton), ("X2", Strings.Settings_Super_ForwardButton), ("Middle", Strings.Settings_Super_MiddleButton)], p.TriggerButton.ToString(),
             v => SaveSuper(x => x with { TriggerButton = Enum.Parse<SuperPanelButton>(v) }));
         // 2026-10-29 用户要求：改滑杆，0.1～1 秒自己调（原来是 0.3 / 0.4 / 0.6 三档）。拖动时只改读数，松手才存
         var holdValue = new TextBlock { Width = 44, TextAlignment = TextAlignment.Right, VerticalAlignment = VerticalAlignment.Center, FontFamily = MonoProto.FontFamily, FontSize = 12, Foreground = SmallProto.Foreground };
         var hold = new PaneSlider(100, 1000, 50, Math.Clamp(p.HoldMilliseconds, 100, 1000), FillProto.Background, FillProto.BorderBrush, Accent());
-        void HoldReadout(double v) => holdValue.Text = (v / 1000).ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture) + " 秒";
+        void HoldReadout(double v) => holdValue.Text = string.Format(Strings.Settings_Super_Seconds, (v / 1000).ToString("0.0#", System.Globalization.CultureInfo.InvariantCulture));
         HoldReadout(hold.Value);
         hold.ValueChanged += (_, v) => HoldReadout(v);
         hold.Committed += (_, _) => { int ms = (int)Math.Round(hold.Value); if (ms != app.Store.Current.SuperPanel.HoldMilliseconds) SaveSuper(x => x with { HoldMilliseconds = ms }); };
@@ -1918,22 +1934,22 @@ public sealed partial class SettingsView : UserControl, IPanelView
         // 关掉超级面板时其余各项变灰（原型 .srow.disabled）
         foreach (var c in new Control[] { trigger, hold, fullscreen, borrow }) Enable(c, p.Enabled);
         holdValue.Opacity = p.Enabled ? 1 : 0.4;
-        Group("基本",
-            Row("启用超级面板", null, Switch(p.Enabled, v => { SaveSuper(x => x with { Enabled = v }); Later(); })),
-            Row("触发键", "长按才弹出；短按照常是原来的功能（后退 / 前进 / 中键点击）。同一个键打开了手势时：按住拖动是手势，按住不动才是超级面板", trigger),
-            Row("长按多久", "太短容易误触，太长不跟手；默认 0.4 秒", hold, holdValue),
-            Row("全屏程序里不触发", "玩游戏、看视频时侧键保持原样", fullscreen),
-            Row("读不到选中内容时借用剪贴板", "优先直接读取选区，不碰剪贴板；读不到时先暂存剪贴板、模拟复制、取完再恢复，这次复制不进剪贴板历史", borrow));
+        Group(Strings.Settings_Super_Basic,
+            Row(Strings.Settings_Super_Enable, null, Switch(p.Enabled, v => { SaveSuper(x => x with { Enabled = v }); Later(); })),
+            Row(Strings.Settings_Super_Trigger, Strings.Settings_Super_TriggerDescription, trigger),
+            Row(Strings.Settings_Super_HoldDuration, Strings.Settings_Super_HoldDurationDescription, hold, holdValue),
+            Row(Strings.Settings_Super_DisableFullscreen, Strings.Settings_Super_DisableFullscreenDescription, fullscreen),
+            Row(Strings.Settings_Super_BorrowClipboard, Strings.Settings_Super_BorrowClipboardDescription, borrow));
 
         var programs = p.DisabledPrograms.Select(path => ListRow("app", Path.GetFileNameWithoutExtension(path), path, false,
-            IconButton("close", "移除", () => { SaveSuper(x => x with { DisabledPrograms = x.DisabledPrograms.Where(v => !string.Equals(v, path, StringComparison.OrdinalIgnoreCase)).ToArray() }); Render(); }))).ToList();
-        programs.Add(AddRow(Button("添加程序", "plus", async () =>
+            IconButton("close", Strings.Common_Remove, () => { SaveSuper(x => x with { DisabledPrograms = x.DisabledPrograms.Where(v => !string.Equals(v, path, StringComparison.OrdinalIgnoreCase)).ToArray() }); Render(); }))).ToList();
+        programs.Add(AddRow(Button(Strings.Settings_Super_AddProgram, "plus", async () =>
         {
             if (await PickProgram() is not { } exe) return;
             SaveSuper(x => x with { DisabledPrograms = x.DisabledPrograms.Any(v => string.Equals(v, exe, StringComparison.OrdinalIgnoreCase)) ? x.DisabledPrograms : [.. x.DisabledPrograms, exe] });
             Render();
         })));
-        Group("在这些程序里不触发", programs.ToArray(), "在这些程序里长按侧键也照常传给程序。");
+        Group(Strings.Settings_Super_ExcludedPrograms, programs.ToArray(), Strings.Settings_Super_ExcludedProgramsDescription);
         RenderSuperActions(p);
     }
 
@@ -1942,7 +1958,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void RenderSuperActions(SuperPanelSettings p)
     {
         var all = app.Store.Current.Ai.Actions.Select(a => ("ai:" + a.Id, a.Name, a.Glyph))
-            .Append(("search", "搜索", "globe")).Append(("copy", "复制", "clipboard")).ToList();
+            .Append(("search", Strings.Common_Search, "globe")).Append(("copy", Strings.Common_Copy, "clipboard")).ToList();
         List<string> Shown(SuperPanelSettings s) =>
             (s.Actions ?? SuperPanelSettings.DefaultActions(app.Store.Current.Ai.Actions.Select(a => a.Id))).Where(id => all.Any(a => a.Item1 == id)).Distinct().ToList();
         var shown = Shown(p);
@@ -1955,7 +1971,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             int pos = shown.IndexOf(id);
             var tools = new List<FrameworkElement>();
             if (on && pos > 0)
-                tools.Add(IconButton("U", "上移", () => { SaveSuper(x => { var list = Shown(x); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { Actions = list.ToArray() }; }); Render(); }));
+                tools.Add(IconButton("U", Strings.Common_MoveUp, () => { SaveSuper(x => { var list = Shown(x); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { Actions = list.ToArray() }; }); Render(); }));
             var toggle = Switch(on, v =>
             {
                 SaveSuper(x => { var list = Shown(x).Where(a => a != id).ToList(); if (v) list.Add(id); return x with { Actions = list.ToArray() }; });
@@ -1963,9 +1979,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
             });
             Enable(toggle, p.Enabled && (on || !full));
             tools.Add(toggle);
-            rows.Add(ListRow(glyph, name, on ? $"第 {pos + 1} 个" : full ? "已经放满 6 个，先关掉一个" : "不显示", false, tools.ToArray()));
+            rows.Add(ListRow(glyph, name, on ? string.Format(Strings.Settings_Super_ActionPosition, (object?)(pos + 1)) : full ? Strings.Settings_Super_ActionsFull : Strings.Settings_Super_ActionHidden, false, tools.ToArray()));
         }
-        Group("面板里的动作", rows.ToArray(), "选中的不是中文、又开了自动翻译时，面板换成翻译专用的一排，不受这里影响。AI 动作的名字和提示词在「AI」里改。");
+        Group(Strings.Settings_Super_Actions, rows.ToArray(), Strings.Settings_Super_ActionsDescription);
     }
 
     void SaveSuper(Func<SuperPanelSettings, SuperPanelSettings> change) =>
@@ -1981,20 +1997,20 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var auto = Switch(f.AutoJump, v => SaveFolderJump(x => x with { AutoJump = v }));
         var recent = Switch(f.ShowRecent, v => SaveFolderJump(x => x with { ShowRecent = v }));
         // 047（用户：开了三个资源管理器，Ctrl+G 只跳其中一个）：默认跳最近用过的那个（同 Listary），想自己挑的改成弹菜单
-        var many = Seg([("recent", "跳到最近用过的"), ("menu", "弹出菜单让我选")], f.MenuWhenMany ? "menu" : "recent", v => SaveFolderJump(x => x with { MenuWhenMany = v == "menu" }));
+        var many = Seg([("recent", Strings.Settings_FolderJump_Recent), ("menu", Strings.Settings_FolderJump_Menu)], f.MenuWhenMany ? "menu" : "recent", v => SaveFolderJump(x => x with { MenuWhenMany = v == "menu" }));
         foreach (var c in new Control[] { jump, menu, many, auto, recent }) Enable(c, f.Enabled);
         var problem = f.Enabled ? app.FolderJump?.HotkeyProblem : null;
-        Group("基本",
-            Row("启用对话框跳转", f.Enabled ? "只在「打开 / 另存为」对话框在前台时接管下面两个快捷键，别的程序里不受影响" : "已关闭：两个快捷键都还给对话框",
+        Group(Strings.Settings_FolderJump_Basic,
+            Row(Strings.Settings_FolderJump_Enable, f.Enabled ? Strings.Settings_FolderJump_EnableDescription : Strings.Settings_FolderJump_Disabled,
                 Switch(f.Enabled, v => { SaveFolderJump(x => x with { Enabled = v }); Later(); })));
-        Group("快捷键",
-            problem != null ? Row("跳到当前文件夹", "换一个组合，或者在占用它的程序里改掉", Status(false, problem), jump)
-                            : Row("跳到当前文件夹", "跳到最近用过的资源管理器窗口所在的文件夹；没开资源管理器时弹出菜单", jump),
-            Row("选择文件夹", "在对话框旁边弹出菜单，从开着的和最近用过的文件夹里选", menu));
-        Group("行为",
-            Row("开着多个资源管理器时", f.MenuWhenMany ? "弹出菜单从开着的文件夹里选；只开着一个时照常直接跳" : "直接跳到最后点过的那个窗口；想挑别的用「选择文件夹」", many),
-            Row("对话框打开时自动跳过去", "新打开的对话框直接跳到最近用过的资源管理器文件夹；只跳这一次，之后照常操作", auto),
-            Row("菜单里列出最近用过的文件夹", "来自 Windows 的最近使用记录，最多 8 个；关掉后菜单里只有开着的资源管理器文件夹", recent));
+        Group(Strings.Settings_FolderJump_Hotkeys,
+            problem != null ? Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_Hotkey_ConflictDescription, Status(false, problem), jump)
+                            : Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_FolderJump_CurrentFolderDescription, jump),
+            Row(Strings.Common_ChooseFolder, Strings.Settings_FolderJump_ChooseFolderDescription, menu));
+        Group(Strings.Settings_FolderJump_Behavior,
+            Row(Strings.Settings_FolderJump_MultipleWindows, f.MenuWhenMany ? Strings.Settings_FolderJump_MultipleMenuDescription : Strings.Settings_FolderJump_MultipleRecentDescription, many),
+            Row(Strings.Settings_FolderJump_Automatic, Strings.Settings_FolderJump_AutomaticDescription, auto),
+            Row(Strings.Settings_FolderJump_ShowRecent, Strings.Settings_FolderJump_ShowRecentDescription, recent));
     }
 
     void SaveFolderJump(Func<FolderJumpSettings, FolderJumpSettings> change) =>
@@ -2013,26 +2029,26 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     void RenderAbout()
     {
-        var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? "开发版";
+        var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? Strings.Update_DevelopmentVersion;
         Group(null,
-            Row("Pane", "Windows 上的启动器、鼠标手势和剪贴板工具", Chip(version)));
+            Row("Pane", Strings.Settings_About_DescriptionTagline, Chip(version)));
         if (app.Updates is { } updates) RenderUpdate(updates);
-        Group("信息",
-            Row("开源许可", "GPL-3.0（附加许可：可与微软运行库一起分发）；源代码在 GitHub", Button("打开", "external", () => OpenUrl(SourceUrl))),
-            Row("数据位置", app.Store.DirectoryPath, Button("打开", "external", () =>
+        Group(Strings.Settings_About_Information,
+            Row(Strings.Settings_About_License, Strings.Settings_About_LicenseDescription, Button(Strings.Common_Open, "external", () => OpenUrl(SourceUrl))),
+            Row(Strings.Settings_About_DataLocation, app.Store.DirectoryPath, Button(Strings.Common_Open, "external", () =>
             {
                 var start = new System.Diagnostics.ProcessStartInfo("explorer.exe") { UseShellExecute = false };
                 start.ArgumentList.Add(app.Store.DirectoryPath);
                 System.Diagnostics.Process.Start(start)?.Dispose();
             })));
         var notices = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md");
-        var noticeButton = Button("查看全部", "external", () => OpenUrl(notices));
+        var noticeButton = Button(Strings.Settings_About_ViewAll, "external", () => OpenUrl(notices));
         Enable(noticeButton, File.Exists(notices));
-        Group("开源组件",
-            ListRow("app", "Lucide 图标", "lucide-static 1.60.0 · ISC 许可", false),
-            ListRow("app", "Windows App SDK", "WinUI 3 · MIT 许可", false),
-            ListRow("text", "MiSans", "使用本机已安装的字体，不随程序分发；没装时用微软雅黑", false),
-            Row("全部第三方组件", "安装目录里的 THIRD_PARTY_NOTICES.md", noticeButton));
+        Group(Strings.Settings_About_Components,
+            ListRow("app", Strings.Settings_About_Lucide, Strings.Settings_About_LucideLicense, false),
+            ListRow("app", "Windows App SDK", Strings.Settings_About_WinUiLicense, false),
+            ListRow("text", "MiSans", Strings.Settings_About_FontLicense, false),
+            Row(Strings.Settings_About_AllComponents, Strings.Settings_About_NoticesLocation, noticeButton));
     }
 
     const string SourceUrl = "https://github.com/LBEILC/Pane";
@@ -2054,33 +2070,33 @@ public sealed partial class SettingsView : UserControl, IPanelView
             _ = Guard(work(updateWork.Token));
             static async Task Guard(Task t) { try { await t; } catch (Exception) { } }   // 失败由服务放进 State / Error
         }
-        string Ago(DateTimeOffset? t) => t is not { } v ? "还没检查过"
-            : DateTimeOffset.Now - v < TimeSpan.FromMinutes(1) ? "刚刚检查过"
-            : DateTimeOffset.Now - v < TimeSpan.FromHours(1) ? $"{(int)(DateTimeOffset.Now - v).TotalMinutes} 分钟前检查过"
-            : DateTimeOffset.Now - v < TimeSpan.FromDays(1) ? $"{(int)(DateTimeOffset.Now - v).TotalHours} 小时前检查过" : $"{v.LocalDateTime:M 月 d 日}检查过";
+        string Ago(DateTimeOffset? t) => t is not { } v ? Strings.Update_NeverChecked
+            : DateTimeOffset.Now - v < TimeSpan.FromMinutes(1) ? Strings.Update_JustChecked
+            : DateTimeOffset.Now - v < TimeSpan.FromHours(1) ? string.Format(Strings.Update_CheckedMinutesAgo, (object?)((int)(DateTimeOffset.Now - v).TotalMinutes))
+            : DateTimeOffset.Now - v < TimeSpan.FromDays(1) ? string.Format(Strings.Update_CheckedHoursAgo, (object?)((int)(DateTimeOffset.Now - v).TotalHours)) : string.Format(Strings.Update_CheckedOn, (object?)(v.LocalDateTime));
         string Size(long b) => $"{b / 1024.0 / 1024:0.#} MB";
-        var check = Button(u.State == UpdateState.Checking ? "检查中…" : "检查更新", "refresh", () => Run(u.CheckAsync));
+        var check = Button(u.State == UpdateState.Checking ? Strings.Update_Checking : Strings.Update_CheckNow, "refresh", () => Run(u.CheckAsync));
         Enable(check, u.State is not (UpdateState.Checking or UpdateState.Downloading));
         var rows = new List<FrameworkElement>();
         var latest = u.Latest;
         switch (u.State)
         {
             case UpdateState.Available when latest is not null:
-                rows.Add(Row($"发现新版本 {latest.Version}", $"{Size(latest.SizeBytes)} · {latest.PublishedAt.LocalDateTime:M 月 d 日}发布",
-                    Button("查看详情", "external", () => OpenUrl(latest.PageUrl)), Button("下载更新", "plus", () => Run(u.DownloadAsync))));
+                rows.Add(Row(string.Format(Strings.Update_AvailableVersion, (object?)(latest.Version)), string.Format(Strings.Update_ReleaseDetails, (object?)(Size(latest.SizeBytes)), (object?)(latest.PublishedAt.LocalDateTime)),
+                    Button(Strings.Common_ViewDetails, "external", () => OpenUrl(latest.PageUrl)), Button(Strings.Update_Download, "plus", () => Run(u.DownloadAsync))));
                 break;
             case UpdateState.Downloading when latest is not null:
-                rows.Add(Row($"正在下载 {latest.Version}", $"{u.DownloadProgress:P0} · 共 {Size(latest.SizeBytes)}；下载好会提示你", Chip($"{u.DownloadProgress:P0}")));
+                rows.Add(Row(string.Format(Strings.Update_DownloadingVersion, (object?)(latest.Version)), string.Format(Strings.Update_DownloadProgress, (object?)(u.DownloadProgress), (object?)(Size(latest.SizeBytes))), Chip($"{u.DownloadProgress:P0}")));
                 break;
             case UpdateState.Ready when latest is not null:
-                rows.Add(Row($"{latest.Version} 已经下载好", "重启后更新：安装窗口会自己装完并打开新版，设置和数据都保留",
-                    Button("重启并更新", "refresh", () => u.InstallAndRestart())));
+                rows.Add(Row(string.Format(Strings.Update_ReadyVersion, (object?)(latest.Version)), Strings.Update_InstallDescription,
+                    Button(Strings.Update_RestartAndUpdate, "refresh", () => u.InstallAndRestart())));
                 break;
             case UpdateState.Failed:
-                rows.Add(Row("更新没成功", null, Status(false, u.Error ?? "出了点问题"), Button("重试", "refresh", () => Run(latest is not null && u.Error?.Contains("下载") == true ? u.DownloadAsync : u.CheckAsync))));
+                rows.Add(Row(Strings.Update_Failed, null, Status(false, u.Error ?? Strings.Common_UnexpectedProblem), Button(Strings.Common_Retry, "refresh", () => Run(u.FailedStep == UpdateStep.Download ? u.DownloadAsync : u.CheckAsync))));
                 break;
             default:
-                rows.Add(Row(u.State == UpdateState.UpToDate ? "已是最新版本" : "检查更新", $"当前 {u.CurrentVersion} · {Ago(u.LastChecked)}", check));
+                rows.Add(Row(u.State == UpdateState.UpToDate ? Strings.Update_UpToDate : Strings.Update_CheckNow, string.Format(Strings.Update_CurrentVersion, (object?)(u.CurrentVersion), (object?)(Ago(u.LastChecked))), check));
                 break;
         }
         if (u.State is UpdateState.Available or UpdateState.Downloading or UpdateState.Ready && latest is { Notes.Length: > 0 })
@@ -2094,9 +2110,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
             }
             rows.Add(notes);
         }
-        rows.Add(Row("自动更新", "每天检查一次，有新版就在后台下载好，再提示你重启更新；关掉后只在这里手动检查",
+        rows.Add(Row(Strings.Update_Automatic, Strings.Update_AutomaticDescription,
             Switch(app.Store.Current.Update.AutoUpdate, v => app.Store.Save(app.Store.Current with { Update = app.Store.Current.Update with { AutoUpdate = v } }))));
-        Group("更新", rows.ToArray());
+        Group(Strings.Update_Title, rows.ToArray());
     }
 
     // ================= 拼装（原型 group / row / lrow） =================
@@ -2305,8 +2321,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var box = new HotkeyBox(value, SmallProto, KbdProto, FillProto.Background, FillProto.BorderBrush, Accent())
         {
-            Validate = h => h == other ? "和另一个热键重复了"
-                : h.Modifiers == KeyModifiers.Win && h.VirtualKey == 'V' ? (app.WinV is null ? "Win+V 被系统占用，换一个组合" : "Win+V 被系统占用；想用它打开剪贴板，打开下面的「用 Pane 替换 Win+V」")
+            Validate = h => h == other ? Strings.Settings_Hotkey_Duplicate
+                : h.Modifiers == KeyModifiers.Win && h.VirtualKey == 'V' ? (app.WinV is null ? Strings.Settings_Hotkey_WinVOccupied : Strings.Settings_Hotkey_WinVReplacement)
                 : null,
         };
         box.Changed += (_, h) => { changed(h); Later(400); };   // 宿主在后台线程重新注册，稍后刷新占用提示
@@ -2315,7 +2331,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     }
 
     // 注册失败 = 被占用
-    static string ConflictText(HotkeyConflict c) => $"{HotkeyBox.Text(c.Hotkey).Replace("Space", "空格")} 被其他程序占用";
+    static string ConflictText(HotkeyConflict c) => string.Format(Strings.Settings_Hotkey_Occupied, (object?)(HotkeyBox.Text(c.Hotkey).Replace("Space", Strings.Common_SpaceKey)));
 
     // 开发和试用时 PANE_DEV_HOTKEYS 会改掉实际注册的键，照实说明
     static string? DevHotkey(string name)
@@ -2323,7 +2339,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var text = Environment.GetEnvironmentVariable("PANE_DEV_HOTKEYS");
         if (string.IsNullOrWhiteSpace(text)) return null;
         var pair = text.Split(';').Select(p => p.Split('=', 2)).FirstOrDefault(p => p.Length == 2 && p[0] == name);
-        return pair == null ? null : $"开发模式：实际注册的是 {pair[1]}（PANE_DEV_HOTKEYS）";
+        return pair == null ? null : string.Format(Strings.Settings_Hotkey_DevelopmentOverride, (object?)(pair[1]));
     }
 
     Border Swatch(string color, string name, bool selected)

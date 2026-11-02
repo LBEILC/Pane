@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+using Pane.Localization;
+using System.Runtime.InteropServices;
 using Pane.Contracts;
 namespace Pane.Services.Launcher;
 
@@ -25,7 +26,7 @@ internal sealed class EverythingIpc:IEverythingIpc
             };
             int result=PaneEverythingPage(query,offset,count,sort,row,out int total);GC.KeepAlive(row);
             // TODO(design): 确认 Everything 不可用时的两条提示文案。
-            if(result!=1)throw new FileSearchUnavailableException(result==0?"Everything 没有运行，打开它之后就能搜文件":"连不上 Everything（需要 1.4 或更新的版本），可以在 设置 → 启动器 里重新检测");
+            if(result!=1)throw new FileSearchUnavailableException(result==0?Strings.Launcher_EverythingNotRunning:Strings.Launcher_EverythingUnavailable);
             return new EverythingPage(items,total);
         },token);
         return await work.WaitAsync(token).ConfigureAwait(false);

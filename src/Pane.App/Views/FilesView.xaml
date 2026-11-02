@@ -7,6 +7,7 @@
 <UserControl
     x:Class="Pane.Views.FilesView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:loc="using:Pane.Localization"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:files="using:Pane.Views.Files"
     xmlns:c="using:Pane.Views.Controls"
@@ -70,16 +71,16 @@
                     Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:PaneIcon Glyph="folder" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
-                    <TextBlock Text="文件" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Common_Files}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
             </Border>
-            <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" PlaceholderText="搜索文件和文件夹"
+            <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" PlaceholderText="{x:Bind loc:Strings.Files_SearchPlaceholder}"
                      FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                      IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnTextChanged"/>
-            <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="总在最前">
+            <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="关闭（Ctrl+W）">
+            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>
@@ -158,9 +159,9 @@
                         </Grid.ColumnDefinitions>
                     </Grid>
                     <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="6">
-                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="打开" Click="OnOpenSelected"/>
-                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="所在文件夹" Click="OnRevealSelected"/>
-                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="复制路径" Click="OnCopyPath"/>
+                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Common_Open}" Click="OnOpenSelected"/>
+                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Files_ContainingFolder}" Click="OnRevealSelected"/>
+                        <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Common_CopyPath}" Click="OnCopyPath"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -176,14 +177,14 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <Button x:Name="SortButton" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="6,0,6,0" CornerRadius="6" Click="OnSort" VerticalAlignment="Center"
-                    ToolTipService.ToolTip="换排序">
+                    ToolTipService.ToolTip="{x:Bind loc:Strings.Files_ChangeSort}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="sliders" Width="13" Height="13" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="SortText" Text="按相关度" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"/>
+                    <TextBlock x:Name="SortText" Text="{x:Bind loc:Strings.Files_SortRelevance}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"/>
                 </StackPanel>
             </Button>
             <StackPanel x:Name="PreviewToggle" Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                <TextBlock Text="预览" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                <TextBlock Text="{x:Bind loc:Strings.Files_Preview}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
             </StackPanel>
             <c:WrapPanel x:Name="Hints" Grid.Column="3" VerticalAlignment="Center" HorizontalSpacing="12" VerticalSpacing="0"/>
             <TextBlock x:Name="TotalText" Grid.Column="4" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>

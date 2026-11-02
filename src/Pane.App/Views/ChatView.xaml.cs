@@ -1,3 +1,4 @@
+using Pane.Localization;
 // AI 对话窗口逻辑（设计负责人）。照原型 prototype/launcher.html「二级：AI 对话窗口」：
 // 用户消息右侧气泡，AI 回答左侧正文（段落、列表、行内代码、代码块），逐字流出；回答下方复制，最后一条可「重新回答」。
 // 生成中发送键变成停止键；Esc 先停止、再清空输入（不关窗口）；Ctrl+N 新对话；Ctrl+W 关。只保留当前这次对话，关窗口即清空。
@@ -42,8 +43,8 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         this.output = output;
         InitializeComponent();
         Controls.PaneCaret.Attach(Input);
-        KeyHints.Fill(Hints, [(["Enter"], "发送"), (["Shift", "+", "Enter"], "换行"), (["Esc"], "停止生成 / 清空")], HintLabelProto, KbdProto);
-        Hints.Children.Add(new TextBlock { Text = "只保留这一次对话", VerticalAlignment = VerticalAlignment.Center, FontFamily = HintLabelProto.FontFamily, FontSize = HintLabelProto.FontSize, Foreground = HintLabelProto.Foreground });
+        KeyHints.Fill(Hints, [(["Enter"], Strings.Ai_Chat_Send), (["Shift", "+", "Enter"], Strings.Ai_Chat_NewLine), (["Esc"], Strings.Ai_Chat_StopOrClear)], HintLabelProto, KbdProto);
+        Hints.Children.Add(new TextBlock { Text = Strings.Ai_Chat_SessionOnly, VerticalAlignment = VerticalAlignment.Center, FontFamily = HintLabelProto.FontFamily, FontSize = HintLabelProto.FontSize, Foreground = HintLabelProto.Foreground });
         PreviewKeyDown += OnKeyDown;
         PointerPressed += (_, e) => { if (ModelMenu.Visibility == Visibility.Visible && !IsInside(e.OriginalSource, ModelMenu) && !IsInside(e.OriginalSource, ModelButton)) ModelMenu.Visibility = Visibility.Collapsed; };
         Render();
@@ -93,7 +94,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
     {
         topmost = !topmost;
         PinIcon.IsFilled = topmost;
-        ToolTipService.SetToolTip(PinButton, topmost ? "总在最前：开" : "总在最前");
+        ToolTipService.SetToolTip(PinButton, topmost ? Strings.Common_AlwaysOnTopEnabled : Strings.Common_AlwaysOnTop);
         TopmostChanged?.Invoke(this, topmost);
     }
 
@@ -102,7 +103,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
     void UpdateModel()
     {
         modelName ??= ai.CurrentModelName;
-        ModelText.Text = ai.Status == AiStatus.NotConfigured ? "还没配置 AI" : modelName ?? "模型";
+        ModelText.Text = ai.Status == AiStatus.NotConfigured ? Strings.Ai_NotConfiguredShort : modelName ?? Strings.Ai_Chat_Model;
     }
 
     async void OnModel(object sender, RoutedEventArgs e)
@@ -110,11 +111,11 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         if (ModelMenu.Visibility == Visibility.Visible) { ModelMenu.Visibility = Visibility.Collapsed; return; }
         if (ai.Status == AiStatus.NotConfigured) return;
         ModelList.Children.Clear();
-        ModelList.Children.Add(MenuNote("正在读取模型…"));
+        ModelList.Children.Add(MenuNote(Strings.Ai_Chat_LoadingModels));
         ModelMenu.Visibility = Visibility.Visible;
         IReadOnlyList<AiModel> models;
         try { models = await ai.ListModelsAsync(CancellationToken.None); }
-        catch (Exception ex) { ModelList.Children.Clear(); ModelList.Children.Add(MenuNote("读取失败：" + (App.FailureReason(ex) ?? "出了点问题"))); return; }
+        catch (Exception ex) { ModelList.Children.Clear(); ModelList.Children.Add(MenuNote(string.Format(Strings.Ai_Chat_LoadModelsError, App.FailureReason(ex) ?? Strings.Common_UnexpectedProblem))); return; }
         ModelList.Children.Clear();
         var current = modelId ?? ai.CurrentModelId;
         foreach (var m in models.Take(30))
@@ -179,7 +180,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         SetBusy(true);
         try
         {
-            if (ai.Status == AiStatus.NotConfigured) throw new AiCredentialException("还没配置 AI 服务，去 设置 → AI 里配置");
+            if (ai.Status == AiStatus.NotConfigured) throw new AiCredentialException(Strings.Ai_ConfigureInSettings);
             await foreach (var piece in ai.ChatAsync(history, modelId, cts.Token))
             {
                 if (cts.IsCancellationRequested) break;
@@ -188,7 +189,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception e) { answer.Error = App.FailureReason(e) ?? "出了点问题，稍后再试"; }
+        catch (Exception e) { answer.Error = App.FailureReason(e) ?? Strings.Common_TryAgain; }
         finally
         {
             answer.Live = false;
@@ -221,7 +222,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         SendButton.Background = busy ? StopProto.Background : AccentBrush();
         StopIcon.Background = new SolidColorBrush(ActualTheme == ElementTheme.Dark ? Windows.UI.Color.FromArgb(255, 22, 22, 25) : Microsoft.UI.Colors.White);
         SendButton.IsEnabled = busy || Input.Text.Trim().Length > 0;
-        ToolTipService.SetToolTip(SendButton, busy ? "停止（Esc）" : "发送（Enter）");
+        ToolTipService.SetToolTip(SendButton, busy ? Strings.Ai_Chat_StopHint : Strings.Ai_Chat_SendHint);
     }
 
     Brush? accent;
@@ -271,13 +272,13 @@ public sealed partial class ChatView : UserControl, ISecondaryView
         var panel = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = Math.Max(300, (ActualWidth > 0 ? ActualWidth : 780) * 0.92 - 44) };
         if (m.Text.Length > 0) foreach (var block in Markdown(m.Text)) panel.Children.Add(block);
         if (m.Live) panel.Children.Add(Caret());
-        if (m.Stopped) panel.Children.Add(Note("已停止", Text3Proto.Foreground));
+        if (m.Stopped) panel.Children.Add(Note(Strings.Ai_Chat_Stopped, Text3Proto.Foreground));
         if (m.Error is { } error) panel.Children.Add(Note(error, ErrorProto.Foreground));
         if (!m.Live)
         {
             var acts = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Margin = new Thickness(-4, -4, 0, 0) };
-            if (m.Text.Length > 0) acts.Children.Add(MiniButton("paste", "复制", () => _ = output.CopyAsync(m.Text, CancellationToken.None)));
-            if (last) acts.Children.Add(MiniButton("refresh", "重新回答", Again));
+            if (m.Text.Length > 0) acts.Children.Add(MiniButton("paste", Strings.Common_Copy, () => _ = output.CopyAsync(m.Text, CancellationToken.None)));
+            if (last) acts.Children.Add(MiniButton("refresh", Strings.Ai_Chat_Regenerate, Again));
             if (acts.Children.Count > 0) panel.Children.Add(acts);
         }
         return panel;

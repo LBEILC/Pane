@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
@@ -16,7 +17,7 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
     public int Notifications {get;private set;}
     public int Failures {get;private set;}
     public event Action<ClipboardContent>? Captured;
-    public void Start(){if(listener!=0)return;lastSequence=SelectionNative.GetClipboardSequenceNumber();Removed=false;callback=OnChange;listener=NativeClip.PaneClipListen(callback);Registered=listener!=0;if(!Registered)throw new InvalidOperationException("剪贴板监听注册失败");}
+    public void Start(){if(listener!=0)return;lastSequence=SelectionNative.GetClipboardSequenceNumber();Removed=false;callback=OnChange;listener=NativeClip.PaneClipListen(callback);Registered=listener!=0;if(!Registered)throw new InvalidOperationException("剪贴板监听注册失败");} // 不翻译：异常
     void OnChange(uint sequence)
     {
         Notifications++;
@@ -87,7 +88,7 @@ internal sealed class WindowsClipboardImages:IClipboardImages
     public (int Width,int Height) Save(byte[] png,string full,string thumbnail)
     {
         string input=full+".input",temporary=full+".tmp",small=thumbnail+".tmp";
-        try{File.WriteAllBytes(input,png);if(NativeClip.PaneClipSaveImage(input,temporary,small,out int width,out int height)!=1)throw new InvalidDataException("图片解码失败");
+        try{File.WriteAllBytes(input,png);if(NativeClip.PaneClipSaveImage(input,temporary,small,out int width,out int height)!=1)throw new InvalidDataException("图片解码失败"); // 不翻译：异常
             foreach(var path in new[]{temporary,small})using(var stream=new FileStream(path,FileMode.Open,FileAccess.Write,FileShare.None))stream.Flush(true);
             File.Move(temporary,full,true);File.Move(small,thumbnail,true);return(width,height);
         }finally{File.Delete(input);File.Delete(temporary);File.Delete(small);}
@@ -104,10 +105,10 @@ internal sealed class WindowsClipboardWriter:IClipboardWriter
     {
         string? files=null,image=null,text=entry.Text;
         // TODO(design): 图片没有文本时，纯文本粘贴保守地报告不支持；由设计决定是否禁用该入口。
-        if(plainText){text=entry.Kind==ClipKind.Files?string.Join(Environment.NewLine,entry.Files??[]):entry.Text;if(text==null)throw new NotSupportedException("此条目没有纯文本");}
-        else if(entry.Kind==ClipKind.Image){image=entry.ContentPath??throw new InvalidDataException("缺少完整图片");text=null;}
+        if(plainText){text=entry.Kind==ClipKind.Files?string.Join(Environment.NewLine,entry.Files??[]):entry.Text;if(text==null)throw new NotSupportedException(Strings.Clipboard_NoPlainText);}
+        else if(entry.Kind==ClipKind.Image){image=entry.ContentPath??throw new InvalidDataException(Strings.Clipboard_ImageMissing);text=null;}
         else if(entry.Kind==ClipKind.Files){files=string.Join('\0',entry.Files??[])+"\0\0";text=null;}
-        if(NativeClip.PaneClipWrite(text,image,files,files?.Length??0)!=1)throw new TimeoutException("剪贴板写入失败或正在被占用");
+        if(NativeClip.PaneClipWrite(text,image,files,files?.Length??0)!=1)throw new TimeoutException(Strings.Clipboard_WriteFailed);
     }
 }
 internal sealed class ClipboardAttachmentActions(ILauncherAttachmentActions other):ILauncherAttachmentActions
@@ -118,7 +119,7 @@ internal sealed class ClipboardAttachmentActions(ILauncherAttachmentActions othe
         return Sta.Run(()=>{token.ThrowIfCancellationRequested();
             switch(actionId){
                 case "copy-image":WindowsClipboardWriter.Write(attachment);break;
-                case "save-image":if(attachment.ContentPath==null)throw new InvalidDataException("缺少完整图片");if(NativeClip.PaneClipSaveDialog(attachment.ContentPath,$"截图 {attachment.CopiedAt.LocalDateTime:yyyy-MM-dd HH-mm-ss}.png")==0)throw new IOException("图片保存失败");break;
+                case "save-image":if(attachment.ContentPath==null)throw new InvalidDataException(Strings.Clipboard_ImageMissing);if(NativeClip.PaneClipSaveDialog(attachment.ContentPath,string.Format(Strings.Clipboard_ImageFileName, (object?)(attachment.CopiedAt.LocalDateTime)))==0)throw new IOException(Strings.Clipboard_SaveImageFailed);break;
                 default:throw new NotSupportedException(actionId);
             }return true;
         });

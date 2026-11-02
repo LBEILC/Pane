@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Pane.Services.Setup;
@@ -31,10 +32,10 @@ internal static class SetupEntry
             // 只验证隔离安装的新进程入口，不启动热键、钩子、剪贴板及窗口。
             var probePaths = SetupPaths.Isolated(probeRoot).ResolveInstalled(probeRoot);
             if (!SetupFiles.Full(Environment.ProcessPath!).Equals(SetupFiles.Full(probePaths.Exe), StringComparison.OrdinalIgnoreCase))
-                throw new IOException("自测启动位置无效");
+                throw new IOException("自测启动位置无效"); // 不翻译：诊断异常
             File.WriteAllText(Path.Combine(probeRoot, "current-directory.txt"), Environment.CurrentDirectory);
             File.WriteAllText(Path.Combine(probeRoot, "launched.txt"), SetupFiles.VersionOf(Environment.ProcessPath!) ?? "unknown");
-            File.AppendAllText(Path.Combine(probeRoot, "update-timeline.log"), $"{DateTimeOffset.UtcNow:O} 新版进程启动并退出 {SetupFiles.VersionOf(Environment.ProcessPath!)}\n");
+            File.AppendAllText(Path.Combine(probeRoot, "update-timeline.log"), $"{DateTimeOffset.UtcNow:O} 新版进程启动并退出 {SetupFiles.VersionOf(Environment.ProcessPath!)}\n"); // 不翻译：诊断日志
             return true;
         }
         if (args is ["--setup-preview" or "--uninstall-preview", var state])
@@ -51,7 +52,7 @@ internal static class SetupEntry
             var options = new Dictionary<string, string>(StringComparer.Ordinal);
             for (int i = 1; i < args.Length; i += 2)
             {
-                if (i + 1 >= args.Length || args[i] is not ("--package" or "--temp-dir" or "--self-test-root")) throw new ArgumentException("安装参数无效");
+                if (i + 1 >= args.Length || args[i] is not ("--package" or "--temp-dir" or "--self-test-root")) throw new ArgumentException("安装参数无效"); // 不翻译：异常
                 options.Add(args[i], args[i + 1]);
             }
             IsolatedRoot = options.GetValueOrDefault("--self-test-root");
@@ -67,12 +68,12 @@ internal static class SetupEntry
                 var start = new ProcessStartInfo(helper) { UseShellExecute = false, CreateNoWindow = true };
                 foreach (string value in new[] { "--relocate", Paths.App, Environment.ProcessId.ToString() }) start.ArgumentList.Add(value);
                 if (IsolatedRoot != null) { start.ArgumentList.Add("--self-test-root"); start.ArgumentList.Add(IsolatedRoot); }
-                using var process = Process.Start(start) ?? throw new IOException("无法启动卸载程序");
+                using var process = Process.Start(start) ?? throw new IOException(Strings.Setup_UninstallerLaunchFailed);
                 if(IsolatedRoot != null) File.WriteAllLines(Path.Combine(IsolatedRoot,"helper.txt"), [helper, process.Id.ToString()]);
                 return true;
             }
             if (args[0] == "--uninstall-worker" && SetupFiles.Full(AppContext.BaseDirectory).Equals(SetupFiles.Full(Paths.App), StringComparison.OrdinalIgnoreCase))
-                throw new ArgumentException("卸载程序必须先移到临时目录");
+                throw new ArgumentException("卸载程序必须先移到临时目录"); // 不翻译：异常
             Active = true;
             if (IsolatedRoot != null)
             {
@@ -85,7 +86,7 @@ internal static class SetupEntry
         {
             Environment.ExitCode = 1;
             if (IsolatedRoot != null) { if (Paths != null) { Directory.CreateDirectory(Paths.Root); File.WriteAllText(Path.Combine(Paths.Root, "setup-error.txt"), error.ToString()); } }
-            else MessageBoxW(0, error is Pane.Contracts.SetupException ? error.Message : "安装或卸载未完成，请检查磁盘空间、目录权限和文件占用后重试。", "Pane", 0x10);
+            else MessageBoxW(0, error is Pane.Contracts.SetupException ? error.Message : Strings.Setup_UnexpectedFailure, "Pane", 0x10);
         }
         return true;
     }

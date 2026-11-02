@@ -46,7 +46,7 @@ public interface IAiService
     /// 不保存任何历史；失败抛和 RunAsync 一样的带类型异常。
     /// </summary>
     IAsyncEnumerable<string> ChatAsync(IReadOnlyList<AiChatMessage> messages, string? modelId, CancellationToken cancellationToken)
-        => throw new NotSupportedException("AI 对话还没接上");
+        => throw new NotSupportedException("AI 对话还没接上"); // 不翻译：异常
 }
 
 public enum AiChatRole { User, Assistant }

@@ -1,4 +1,5 @@
-﻿using Microsoft.Win32;
+using Pane.Localization;
+using Microsoft.Win32;
 using Pane.Contracts;
 using Pane.Settings;
 namespace Pane.Services;
@@ -22,7 +23,7 @@ internal sealed class WindowsStartupRegistry:IStartupRegistry
 internal sealed class AutostartService(bool production,string executable,SettingsStore store,IStartupRegistry registry):IAutostart
 {
     string Command=>$"\"{executable}\" --autostart";
-    public string? UnavailableReason=>production?null:"开发版不注册开机启动";
+    public string? UnavailableReason=>production?null:Strings.Settings_Autostart_Development;
     public AutostartState State {get {
         if(!production)return AutostartState.Unavailable;
         var value=registry.Read();
@@ -41,7 +42,7 @@ internal sealed class AutostartService(bool production,string executable,Setting
     public void Set(bool enabled){
         if(!production)throw new InvalidOperationException(UnavailableReason);
         string? old=registry.Read();
-        if(old!=null&&!IsPane(old))throw new InvalidOperationException("启动项 Pane 指向其他程序");
+        if(old!=null&&!IsPane(old))throw new InvalidOperationException(Strings.Settings_Autostart_TargetConflict);
         try {
             if(enabled)registry.Write(Command);else if(old!=null)registry.Delete();
             store.Save(store.Current with {General=store.Current.General with {StartWithWindows=enabled}});

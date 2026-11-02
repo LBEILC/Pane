@@ -12,4 +12,4 @@
     <Content Include="../../src/Pane.App/Services/Launcher/Data/*" Link="LauncherData/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../src/Pane.App/bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-</Project>
+<Import Project="../Localization.targets" /></Project>

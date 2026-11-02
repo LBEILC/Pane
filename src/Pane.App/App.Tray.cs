@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 托盘菜单（设计负责人，2026-10-30）：右键托盘图标弹出玻璃小菜单，替代 Windows 原生菜单。原型 prototype/tray.html。
 // 托盘线程在右键那一刻取鼠标位置，连同命令「tray-menu x,y」交过来；菜单第一次用到时才建，之后复用。
 using Pane.Contracts;
@@ -16,7 +17,7 @@ public sealed partial class App
         if(trayPanel==null)
         {
             trayView=new TrayMenuView();trayView.Invoked+=(_,id)=>TrayInvoked(id);
-            trayPanel=new GlassPanel("托盘菜单",trayView,trayView,Glass){Placement=PanelPlacement.Tray};
+            trayPanel=new GlassPanel(Strings.Tray_Title,trayView,trayView,Glass){Placement=PanelPlacement.Tray};
             WatchFrames(trayPanel);trayPanel.Prepare();panels.Add("tray",trayPanel);
         }
         var u=Updates;

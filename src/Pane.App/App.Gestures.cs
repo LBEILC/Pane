@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Pane.Contracts;
 using Pane.Gestures;
 using Pane.Views;
@@ -17,10 +18,10 @@ public sealed partial class App
         gestureService=new(GestureConfigStore.LoadOrDefaults(path),Environment.GetEnvironmentVariable("PANE_OBSERVE")=="1");
         gestureService.StateChanged+=(_,_)=>queue.TryEnqueue(()=>{
             if(closing)return;bool paused=gestureService.IsPaused;shell!.GesturesPaused=paused;
-            if(paused!=wasPaused){wasPaused=paused;gestures!.Hint(new(GestureHintKind.Notice,[],CommandName:paused?"手势已暂停":"手势已恢复"));}
-            if(gestureService.State==GestureServiceState.WGesturesRunning)shell.NotifyOnce("检测到 WGestures 正在运行，Pane 的鼠标手势先不启用");
+            if(paused!=wasPaused){wasPaused=paused;gestures!.Hint(new(GestureHintKind.Notice,[],CommandName:paused?Strings.Gestures_Paused:Strings.Gestures_Resumed));}
+            if(gestureService.State==GestureServiceState.WGesturesRunning)shell.NotifyOnce(Strings.Gestures_ConflictDetected);
         });
-        gestureService.PauseHotkeyUnavailable+=(_,key)=>queue.TryEnqueue(()=>shell?.NotifyOnce("暂停热键被占用："+key));
+        gestureService.PauseHotkeyUnavailable+=(_,key)=>queue.TryEnqueue(()=>shell?.NotifyOnce(string.Format(Strings.Gestures_PauseHotkeyOccupied, key)));
         gestureService.EmergencyExitRequested+=(_,_)=>queue.TryEnqueue(Shutdown);
         gestureService.Progress+=(_,p)=>queue.TryEnqueue(()=>{if(closing)return;DrainTrail();lastHint=new(GestureHintKind.Drawing,p.Directions.Select(d=>(GestureArrow)d).ToArray(),Modifier(p.Modifier),p.CommandName);gestures!.Hint(lastHint);});
         gestureService.Finished+=(_,p)=>queue.TryEnqueue(()=>{if(closing)return;DrainTrail();if(p.Kind==GestureOutcomeKind.ReplayedClick){gestures!.Dismiss();return;}/* 设计改：动了一点又快速松开，先弹出的「…」要收起 */var kind=p.Kind==GestureOutcomeKind.Executed?GestureHintKind.Executed:p.Kind==GestureOutcomeKind.NotRecognized?GestureHintKind.NotRecognized:GestureHintKind.Failed;gestures!.Hint(new(kind,lastHint?.Arrows??[],lastHint?.Modifier??GestureHintModifier.None,p.CommandName,p.FailureReason));});
@@ -69,7 +70,7 @@ public sealed partial class App
     public IReadOnlyList<string> WGesturesSearched {get;private set;}=[];
     public void ImportWGestures(ImportPreview preview)=>SaveGestures(new WGesturesImporter().Import(preview,true));
     void ImportGestures(string source){
-        try{var importer=new WGesturesImporter();var preview=importer.Preview(string.IsNullOrWhiteSpace(source)?null:source.Trim())??throw new InvalidDataException("未找到 WGestures 配置");
+        try{var importer=new WGesturesImporter();var preview=importer.Preview(string.IsNullOrWhiteSpace(source)?null:source.Trim())??throw new InvalidDataException("未找到 WGestures 配置"); // 不翻译：诊断异常
             var config=importer.Import(preview,true);GestureConfigStore.Save(Path.Combine(Store.DirectoryPath,"gestures.json"),config);gestureService?.Apply(config);ApplyGestureDisplay();
             File.WriteAllText(output+".import-result",$"global={preview.GlobalCount};rules={preview.AppRuleCount};disabled={preview.DisabledAppCount};unsupported={preview.Unsupported.Count}\n"+string.Join("\n",preview.Unsupported.Select(p=>$"{p.Where}: {p.GestureText}: {p.Reason}")));
         }catch(Exception e){File.WriteAllText(output+".import-result","error="+e.Message);}

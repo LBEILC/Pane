@@ -26,11 +26,15 @@ internal sealed class PinyinTable
         }
         return new(name,tokens.ToArray());
     }
+    public SearchName CreateLocalized(string display, string simplified) => Create(simplified).WithDisplayName(display);
 }
 internal sealed record NameToken(int Offset,int Length,string[] Full,string[] Initials);
 internal sealed record NameMatch(int Score,IReadOnlyList<TextSpan> Spans);
 internal sealed class SearchName(string name,NameToken[] tokens)
 {
+    bool phoneticHighlights = true;
+    // 简繁标题长度不同时不把简体位置套到显示文字上；直接文字匹配仍有正常高亮。
+    public SearchName WithDisplayName(string display) => new(display, Tokens) { phoneticHighlights = display.Length == Name.Length };
     public string Name {get;}=name;
     readonly string lower=name.ToLowerInvariant();
     public NameToken[] Tokens {get;}=tokens;
@@ -42,11 +46,11 @@ internal sealed class SearchName(string name,NameToken[] tokens)
         var q=query.ToLowerInvariant();if(q.Length==0)return null;
         int i=lower.IndexOf(q,StringComparison.Ordinal);
         if(i==0)return new(100,[new(0,q.Length)]);
-        var spans=Phonetic(q,true,true)??Phonetic(q,true,true,wordInitials);if(spans!=null)return new(90,spans);
+        var spans=Phonetic(q,true,true)??Phonetic(q,true,true,wordInitials);if(spans!=null)return new(90,phoneticHighlights?spans:[]);
         if(i>=0)return new(70,[new(i,q.Length)]);
-        spans=Phonetic(q,false,true);if(spans!=null)return new(60,spans);
-        spans=Phonetic(q,true,false)??Phonetic(q,true,false,wordInitials);if(spans!=null)return new(45,spans);
-        spans=Phonetic(q,false,false);if(spans!=null)return new(35,spans);
+        spans=Phonetic(q,false,true);if(spans!=null)return new(60,phoneticHighlights?spans:[]);
+        spans=Phonetic(q,true,false)??Phonetic(q,true,false,wordInitials);if(spans!=null)return new(45,phoneticHighlights?spans:[]);
+        spans=Phonetic(q,false,false);if(spans!=null)return new(35,phoneticHighlights?spans:[]);
         var hits=new List<TextSpan>();int j=0;
         for(int n=0;n<lower.Length&&j<q.Length;n++)if(lower[n]==q[j]){hits.Add(new(n,1));j++;}
         return j==q.Length&&q.Length>1?new(10,Merge(hits)):null;

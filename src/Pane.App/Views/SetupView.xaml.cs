@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 安装界面逻辑（设计负责人）。安装逻辑在 ISetupService（工程，018）；这里只管状态切换和文案。
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -25,8 +26,8 @@ public sealed partial class SetupView : UserControl, IPanelView
         var info = setup.Info;
         Logo.Source = WorkingLogo.Source = SetupArt.Logo();
         bool update = info.InstalledVersion is not null;
-        VersionText.Text = update ? $"{info.InstalledVersion} → {info.Version}" : $"版本 {info.Version}";
-        InstallButton.Content = update ? $"更新到 {info.Version}" : "立即安装";
+        VersionText.Text = update ? $"{info.InstalledVersion} → {info.Version}" : string.Format(Strings.Setup_Version, (object?)(info.Version));
+        InstallButton.Content = update ? string.Format(Strings.Setup_UpdateVersion, (object?)(info.Version)) : Strings.Setup_InstallNow;
         start = new PaneSwitch(info.StartWithWindows, FillProto.Background, FillProto.BorderBrush, AccentProto.Background);
         desktop = new PaneSwitch(false, FillProto.Background, FillProto.BorderBrush, AccentProto.Background);
         StartHost.Content = start;
@@ -34,14 +35,14 @@ public sealed partial class SetupView : UserControl, IPanelView
         // 升级、正在运行：提前说一句会发生什么
         var notes = new List<string>();
         // 升级时用户已经知道 Pane 是什么：去掉介绍，换成「会发生什么」
-        if (update) { Tagline.Visibility = Visibility.Collapsed; notes.Add("设置和数据都会保留"); }
-        if (info.PaneRunning) notes.Add("会先让正在运行的 Pane 退出");
+        if (update) { Tagline.Visibility = Visibility.Collapsed; notes.Add(Strings.Setup_KeepData); }
+        if (info.PaneRunning) notes.Add(Strings.Setup_StopRunningHint);
         if (notes.Count > 0) { NoteText.Text = string.Join("；", notes); NoteText.Visibility = Visibility.Visible; }
         installPath = info.InstallPath;
-        PathText.Text = update ? $"{info.InstallPath}（更新时装在原来的位置）" : info.InstallPath;
+        PathText.Text = update ? string.Format(Strings.Setup_UpdatePath, (object?)(info.InstallPath)) : info.InstallPath;
         ChangePath.IsEnabled = !update;
         ChangePath.Opacity = update ? 0.4 : 1;
-        WhereText.Text = $"约 {SetupArt.Size(info.SizeBytes)} · 只装给当前用户，不需要管理员权限";
+        WhereText.Text = string.Format(Strings.Setup_InstallSize, (object?)(SetupArt.Size(info.SizeBytes)));
         KeyDown += OnKeyDown;
         // 设计预览：一出来就点主按钮，截进行中 / 完成 / 失败（只在 --setup-preview 的假服务上有意义）
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_SETUP_RUN") == "1") Loaded += (_, _) => OnInstall(this, new RoutedEventArgs());
@@ -55,9 +56,9 @@ public sealed partial class SetupView : UserControl, IPanelView
         if (working) return;
         working = true;
         bool update = setup.Info.InstalledVersion is not null;
-        WorkingTitle.Text = update ? "正在更新…" : "正在安装…";
+        WorkingTitle.Text = update ? Strings.Setup_Updating : Strings.Setup_Installing;
         ProgressFill.Width = 0;
-        StepText.Text = "准备中";
+        StepText.Text = Strings.Setup_Preparing;
         SetupArt.Show(this, Working);
         CloseButton.IsEnabled = false;
         var progress = new Progress<SetupProgress>(p =>
@@ -68,20 +69,20 @@ public sealed partial class SetupView : UserControl, IPanelView
         try
         {
             await setup.InstallAsync(new(start.IsOn, desktop.IsOn, installPath), progress);
-            DoneTitle.Text = update ? "更新好了" : "装好了";
+            DoneTitle.Text = update ? Strings.Setup_UpdateComplete : Strings.Setup_InstalledHeading;
             SetupArt.Show(this, Done);
             if (setup.AutoUpdate && update)
             {
-                DoneTitle.Text = "更新好了，正在打开 Pane…";
+                DoneTitle.Text = Strings.Setup_OpeningUpdated;
                 await Task.Delay(1200);
                 OnLaunch(this, new RoutedEventArgs());
             }
         }
         catch (SetupException ex)
         {
-            FailedTitle.Text = update ? "没有更新成功" : "没有装上";
+            FailedTitle.Text = update ? Strings.Setup_UpdateFailed : Strings.Setup_InstallFailed;
             ErrorText.Text = ex.Message;
-            KeptText.Text = update ? "已经装着的版本没有动，还能照常用" : "没有留下装了一半的文件";
+            KeptText.Text = update ? Strings.Setup_ExistingIntact : Strings.Setup_NoPartialFiles;
             SetupArt.Show(this, Failed);
         }
         finally
@@ -148,7 +149,7 @@ internal static class SetupArt
         >= 1L << 30 => $"{bytes / (double)(1L << 30):0.#} GB",
         >= 1L << 20 => $"{bytes / (double)(1L << 20):0} MB",
         >= 1L << 10 => $"{bytes / (double)(1L << 10):0} KB",
-        _ => $"{bytes} 字节",
+        _ => string.Format(Strings.Setup_Bytes, (object?)(bytes)),
     };
 
     // 切换状态：别的收起，这一页从 0 淡入（OpacityTransition 用令牌的时长）

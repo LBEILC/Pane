@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -79,7 +80,7 @@ internal sealed class SelectionReader(ISelectionPlatform platform,Func<bool> fal
 }
 internal static class Sta
 {
-    public static Task<T> Run<T>(Func<T> action){var source=new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);var thread=new Thread(()=>{int hr=SelectionNative.OleInitialize(0);try{source.SetResult(action());}catch(Exception e){source.SetException(e);}finally{if(hr>=0)SelectionNative.OleUninitialize();}}){IsBackground=true,Name="Pane 选区"};thread.SetApartmentState(ApartmentState.STA);thread.Start();return source.Task;}
+    public static Task<T> Run<T>(Func<T> action){var source=new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);var thread=new Thread(()=>{int hr=SelectionNative.OleInitialize(0);try{source.SetResult(action());}catch(Exception e){source.SetException(e);}finally{if(hr>=0)SelectionNative.OleUninitialize();}}){IsBackground=true,Name="Pane 选区"};thread.SetApartmentState(ApartmentState.STA);thread.Start();return source.Task;} // 不翻译：线程名称
 }
 internal sealed class WindowsSelectionPlatform : ISelectionPlatform
 {
@@ -87,12 +88,12 @@ internal sealed class WindowsSelectionPlatform : ISelectionPlatform
     public string Target(nint window){var cls=new StringBuilder(256);SelectionNative.GetClassName(window,cls,cls.Capacity);SelectionNative.GetWindowThreadProcessId(window,out uint pid);string name="unknown";try{using var p=Process.GetProcessById((int)pid);name=p.ProcessName+".exe";}catch(ArgumentException){}catch(System.ComponentModel.Win32Exception){}return name+" class="+cls;}
     public nint Foreground=>SelectionNative.GetForegroundWindow();
     public SelectionResult Direct(nint window){int code=SelectionNative.PaneSelectionDirectAlloc(window,out nint text);try{return new(code==0?Marshal.PtrToStringUni(text):null,window,(SelectionFailure)code);}finally{Marshal.FreeCoTaskMem(text);}}
-    public object Snapshot(){nint data=SelectionNative.PaneClipboardSnapshot();if(data==0)throw new InvalidOperationException("无法完整保存剪贴板");return data;}
+    public object Snapshot(){nint data=SelectionNative.PaneClipboardSnapshot();if(data==0)throw new InvalidOperationException("无法完整保存剪贴板");return data;} // 不翻译：内部异常
     public uint Sequence=>SelectionNative.GetClipboardSequenceNumber();
-    public void Copy(nint window){if(Foreground!=window)throw new InvalidOperationException("前台窗口已变化");SelectionNative.Chord(0x43);}
+    public void Copy(nint window){if(Foreground!=window)throw new InvalidOperationException("前台窗口已变化");SelectionNative.Chord(0x43);} // 不翻译：内部异常
     public string? ReadText(){int code=SelectionNative.PaneClipboardTextAlloc(out nint text);try{return code!=0?Marshal.PtrToStringUni(text):null;}finally{Marshal.FreeCoTaskMem(text);}}
     public void Release(object snapshot)=>SelectionNative.PaneClipboardRelease((nint)snapshot);
-    public void Restore(object snapshot){if(SelectionNative.PaneClipboardRestore((nint)snapshot)==0)throw new InvalidOperationException("剪贴板恢复失败");}
+    public void Restore(object snapshot){if(SelectionNative.PaneClipboardRestore((nint)snapshot)==0)throw new InvalidOperationException("剪贴板恢复失败");} // 不翻译：内部异常
 }
 internal sealed class SelectionActions : ISelectionActions
 {
@@ -103,7 +104,7 @@ internal sealed class SelectionActions : ISelectionActions
         long started=Environment.TickCount64; var platform=new Pane.Services.Clipboard.WindowsPastePlatform();
         return Sta.Run(()=>{new Clipboard.PasteTransfer(platform,Clipboard.PasteTransfer.WriteLog).Run(window,()=>Write(text),token,started);return true;});
     }
-    static void Write(string text){if(SelectionNative.PaneClipboardWrite(text)==0)throw new InvalidOperationException("无法写入剪贴板");}
+    static void Write(string text){if(SelectionNative.PaneClipboardWrite(text)==0)throw new InvalidOperationException(Strings.Common_ClipboardWriteFailed);}
 }
 internal static class SelectionNative
 {
@@ -125,5 +126,5 @@ internal static class SelectionNative
     [DllImport("user32.dll",SetLastError=true)] internal static extern bool SetForegroundWindow(nint window);
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
     internal static bool ModifiersDown()=>new[]{16,17,18,91,92}.Any(k=>(GetAsyncKeyState(k)&0x8000)!=0);
-    internal static void Chord(ushort key){long end=Environment.TickCount64+100;while(ModifiersDown()){if(Environment.TickCount64>=end)throw new TimeoutException("修饰键尚未松开");Thread.Sleep(5);}try{if(PaneKey(17,1,0)==0||PaneKey(key,1,0)==0)throw new InvalidOperationException("输入被系统拒绝");}finally{PaneKey(key,0,0);PaneKey(17,0,0);}}
+    internal static void Chord(ushort key){long end=Environment.TickCount64+100;while(ModifiersDown()){if(Environment.TickCount64>=end)throw new TimeoutException(Strings.Common_ModifiersHeld);Thread.Sleep(5);}try{if(PaneKey(17,1,0)==0||PaneKey(key,1,0)==0)throw new InvalidOperationException(Strings.Common_InputRejected);}finally{PaneKey(key,0,0);PaneKey(17,0,0);}}
 }

@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -48,20 +49,20 @@ public sealed partial class AiService
         if(form!=null)request.Content=new FormUrlEncodedContent(form);
         using var response=await Send(request,settings,ct);var body=await Json(response,ct);
         if(!response.IsSuccessStatusCode)throw AiProtocol.Error((int)response.StatusCode,body,true);
-        if(body.ValueKind!=JsonValueKind.Object)throw new AiNetworkException("ChatGPT 返回格式无效");return body;
+        if(body.ValueKind!=JsonValueKind.Object)throw new AiNetworkException(Strings.Ai_InvalidChatResponse);return body;
     }
     async Task<JsonElement> Discovery(AiSettings settings,CancellationToken ct)
     {
         var data=await FetchJson(endpoints.Issuer+"/.well-known/openid-configuration",settings,ct);
-        if(AiProtocol.String(data,"issuer")!=endpoints.Issuer)throw new AiSignInRequiredException("授权服务身份不匹配");
+        if(AiProtocol.String(data,"issuer")!=endpoints.Issuer)throw new AiSignInRequiredException(Strings.Ai_IssuerMismatch);
         foreach(var name in new[]{"jwks_uri","revocation_endpoint"}){
-            if(!Uri.TryCreate(AiProtocol.String(data,name),UriKind.Absolute,out var u)||u.GetLeftPart(UriPartial.Authority)!=new Uri(endpoints.Issuer).GetLeftPart(UriPartial.Authority))throw new AiSignInRequiredException("授权服务地址无效");
+            if(!Uri.TryCreate(AiProtocol.String(data,name),UriKind.Absolute,out var u)||u.GetLeftPart(UriPartial.Authority)!=new Uri(endpoints.Issuer).GetLeftPart(UriPartial.Authority))throw new AiSignInRequiredException(Strings.Ai_AuthorizationAddressInvalid);
         }return data;
     }
     static LoginRecord Tokens(JsonElement body,LoginRecord old)
     {
         string? access=AiProtocol.String(body,"access_token"),refresh=AiProtocol.String(body,"refresh_token");
-        if(string.IsNullOrEmpty(access)||access.Any(char.IsControl)||string.IsNullOrEmpty(refresh)||!body.TryGetProperty("expires_in",out var expiry)||expiry.ValueKind!=JsonValueKind.Number||!expiry.TryGetDouble(out var seconds)||!double.IsFinite(seconds)||seconds<=0||seconds>31536000)throw new AiSignInRequiredException("ChatGPT 令牌响应不完整，请重新登录");
+        if(string.IsNullOrEmpty(access)||access.Any(char.IsControl)||string.IsNullOrEmpty(refresh)||!body.TryGetProperty("expires_in",out var expiry)||expiry.ValueKind!=JsonValueKind.Number||!expiry.TryGetDouble(out var seconds)||!double.IsFinite(seconds)||seconds<=0||seconds>31536000)throw new AiSignInRequiredException(Strings.Ai_TokenIncomplete);
         DateTimeOffset earliest=default;
         if(body.TryGetProperty("earliest_refresh_at",out var at)){
             if(at.ValueKind==JsonValueKind.Number&&at.TryGetInt64(out var unix)&&unix is >0 and <253402300799)earliest=DateTimeOffset.FromUnixTimeSeconds(unix);
@@ -72,20 +73,20 @@ public sealed partial class AiService
     async Task<LoginRecord> Access(AiSettings settings,CancellationToken ct,bool force=false)
     {
         var observed=login;
-        if(observed.AccessToken==null)throw new AiSignInRequiredException("请先在设置中登录 ChatGPT");
+        if(observed.AccessToken==null)throw new AiSignInRequiredException(Strings.Ai_LoginRequired);
         if(!force&&observed.Expires>DateTimeOffset.UtcNow.AddSeconds(30))return observed;
         await refreshGate.WaitAsync(ct);
         try {
             var old=login;int version=epoch;
-            if(old.AccessToken==null)throw new AiSignInRequiredException("请重新登录 ChatGPT");
+            if(old.AccessToken==null)throw new AiSignInRequiredException(Strings.Ai_LoginAgain);
             if(old!=observed||(!force&&old.Expires>DateTimeOffset.UtcNow.AddSeconds(30)))return old;
-            if(old.EarliestRefresh>DateTimeOffset.UtcNow){if(!force&&old.Expires>DateTimeOffset.UtcNow)return old;throw new AiNetworkException("尚未到服务允许的刷新时间，请稍后重试");}
+            if(old.EarliestRefresh>DateTimeOffset.UtcNow){if(!force&&old.Expires>DateTimeOffset.UtcNow)return old;throw new AiNetworkException(Strings.Ai_RefreshTooEarly);}
             try {
                 var body=await FetchJson(endpoints.Issuer+"/api/accounts/oauth/token",settings,ct,new(){["grant_type"]="refresh_token",["client_id"]=old.ClientId!,["refresh_token"]=old.RefreshToken!,["resource"]=Resource});
                 var next=Tokens(body,old);
                 lock(gate){ct.ThrowIfCancellationRequested();if(version!=epoch)throw new OperationCanceledException(ct);SaveLogin(next);}Notify();return next;
             }catch(AiSignInRequiredException){if(version==epoch)ClearSession();throw;}
-            catch(AiException) when(old.Expires<=DateTimeOffset.UtcNow){if(version==epoch)ClearSession();throw new AiSignInRequiredException("ChatGPT 登录已过期且刷新失败，请重新登录");}
+            catch(AiException) when(old.Expires<=DateTimeOffset.UtcNow){if(version==epoch)ClearSession();throw new AiSignInRequiredException(Strings.Ai_RefreshFailed);}
         }finally{refreshGate.Release();}
     }
     internal static JsonElement ValidateIdentity(string token,JsonElement jwks,string issuer,string audience,string nonce)
@@ -101,13 +102,13 @@ public sealed partial class AiService
             long now=DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if(AiProtocol.String(c,"iss")!=issuer||!audiences.Contains(audience)||(audiences.Length>1&&azp!=audience)||(azp!=null&&azp!=audience)||c.GetProperty("exp").GetDouble()<=now||(c.TryGetProperty("nbf",out var nbf)&&nbf.GetDouble()>now)||AiProtocol.String(c,"nonce")!=nonce||string.IsNullOrEmpty(AiProtocol.String(c,"sub")))throw new FormatException();
             return c.Clone();
-        }catch(Exception e) when(e is FormatException or JsonException or InvalidOperationException or KeyNotFoundException or CryptographicException or ArgumentException){throw new AiSignInRequiredException("ChatGPT 身份令牌校验失败");}
+        }catch(Exception e) when(e is FormatException or JsonException or InvalidOperationException or KeyNotFoundException or CryptographicException or ArgumentException){throw new AiSignInRequiredException(Strings.Ai_IdentityTokenInvalid);}
     }
     public async Task SignInAsync(CancellationToken cancellationToken)
     {
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token);timeout.CancelAfter(LoginTimeout);
         int version;LoginRecord old;
-        lock(gate){if(pendingLogin!=null)throw new AiSignInRequiredException("已有登录正在等待，请先完成或取消");pendingLogin=timeout;version=epoch;old=login;SaveLogin(old);}
+        lock(gate){if(pendingLogin!=null)throw new AiSignInRequiredException(Strings.Ai_LoginPending);pendingLogin=timeout;version=epoch;old=login;SaveLogin(old);}
         var settings=store.Current.Ai;var listener=new TcpListener(IPAddress.Loopback,0);
         try {
             var ct=timeout.Token;var metadata=await Discovery(settings,ct);
@@ -118,7 +119,7 @@ public sealed partial class AiService
             if(old.Email!=null)query["login_hint"]=old.Email;
             if(old.IdToken!=null)query["id_token_hint"]=old.IdToken;
             string url=endpoints.Issuer+"/api/accounts/authorize?"+string.Join("&",query.Select(p=>Uri.EscapeDataString(p.Key)+"="+Uri.EscapeDataString(p.Value)));
-            ct.ThrowIfCancellationRequested();try{endpoints.OpenBrowser(url);}catch{throw new AiNetworkException("无法打开系统浏览器");}
+            ct.ThrowIfCancellationRequested();try{endpoints.OpenBrowser(url);}catch{throw new AiNetworkException(Strings.Ai_BrowserFailed);}
             while(true){
                 using var client=await listener.AcceptTcpClientAsync(ct);using var stream=client.GetStream();using var reader=new StreamReader(stream,Encoding.UTF8,leaveOpen:true);
                 // 每个无效连接最多占用两秒，登录总计仍受五分钟限制。
@@ -126,30 +127,30 @@ public sealed partial class AiService
                 string? line;var headers=new List<string>();
                 try{while((line=await reader.ReadLineAsync(readDeadline.Token)) is not null&&line.Length>0){headers.Add(line);if(headers.Count>64||line.Length>16384)break;}}catch(OperationCanceledException) when(!ct.IsCancellationRequested){continue;}
                 var requestLine=headers.FirstOrDefault()?.Split(' ');
-                if(requestLine?.Length!=3||requestLine[0]!="GET"||!headers.Any(h=>h.Equals($"Host: 127.0.0.1:{port}",StringComparison.OrdinalIgnoreCase))||!Uri.TryCreate("http://127.0.0.1:"+port+requestLine[1],UriKind.Absolute,out var callback)||callback.AbsolutePath!="/auth/callback"){await Reply(stream,"登录回调地址无效",ct);continue;}
+                if(requestLine?.Length!=3||requestLine[0]!="GET"||!headers.Any(h=>h.Equals($"Host: 127.0.0.1:{port}",StringComparison.OrdinalIgnoreCase))||!Uri.TryCreate("http://127.0.0.1:"+port+requestLine[1],UriKind.Absolute,out var callback)||callback.AbsolutePath!="/auth/callback"){await Reply(stream,Strings.Ai_CallbackInvalid,ct);continue;}
                 var values=new Dictionary<string,string>();foreach(var pair in callback.Query.TrimStart('?').Split('&')){var p=pair.Split('=',2);if(p.Length==2)values[Uri.UnescapeDataString(p[0])]=Uri.UnescapeDataString(p[1].Replace('+',' '));}
-                if(!values.TryGetValue("state",out var returnedState)||returnedState!=state){await Reply(stream,"登录状态校验失败，请返回 Pane 重试",ct);continue;}
+                if(!values.TryGetValue("state",out var returnedState)||returnedState!=state){await Reply(stream,Strings.Ai_LoginStateInvalid,ct);continue;}
                 try {
-                    if(values.ContainsKey("error")||!values.TryGetValue("code",out var code))throw new AiSignInRequiredException("登录未完成，请重新登录");
+                    if(values.ContainsKey("error")||!values.TryGetValue("code",out var code))throw new AiSignInRequiredException(Strings.Ai_LoginIncomplete);
                     string? issued=values.GetValueOrDefault("client_id")??old.ClientId;
-                    if(string.IsNullOrEmpty(issued)||issued=="dynamic_agent_client"||(old.ClientId!=null&&issued!=old.ClientId))throw new AiSignInRequiredException("登录客户端不匹配");
+                    if(string.IsNullOrEmpty(issued)||issued=="dynamic_agent_client"||(old.ClientId!=null&&issued!=old.ClientId))throw new AiSignInRequiredException(Strings.Ai_ClientMismatch);
                     // 回调签发的注册标识不是登录凭据；即使换码失败也保留，避免重复注册。
                     lock(gate){ct.ThrowIfCancellationRequested();if(version!=epoch)throw new OperationCanceledException(ct);SaveLogin(old with{ClientId=issued});}
                     var body=await FetchJson(endpoints.Issuer+"/api/accounts/oauth/token",settings,ct,new(){["grant_type"]="authorization_code",["client_id"]=issued,["code"]=code,["code_verifier"]=verifier,["redirect_uri"]=redirect,["resource"]=Resource});
                     var keys=await FetchJson(AiProtocol.String(metadata,"jwks_uri")!,settings,ct);
                     var claims=ValidateIdentity(AiProtocol.String(body,"id_token")??"",keys,endpoints.Issuer,issued,nonce);
-                    string? sub=AiProtocol.String(claims,"sub");if(old.Subject!=null&&old.Subject!=sub)throw new AiSignInRequiredException("登录账号与原注册不匹配");
+                    string? sub=AiProtocol.String(claims,"sub");if(old.Subject!=null&&old.Subject!=sub)throw new AiSignInRequiredException(Strings.Ai_AccountMismatch);
                     string? plan=claims.TryGetProperty("https://api.openai.com/auth",out var auth)?AiProtocol.String(auth,"chatgpt_plan_type"):null;
                     // TODO(design): 官方不保证返回套餐名称；缺失时设置页按未知套餐展示，不臆造 Plus/Pro。
                     // 调用资格以显式授权 scope 为准；明确的 free 声明或服务端拒绝会禁用套餐调用。
                     var next=Tokens(body,old with{ClientId=issued,Subject=sub,Email=AiProtocol.String(claims,"email"),Plan=plan,PlanDenied=false});
                     lock(gate){ct.ThrowIfCancellationRequested();if(version!=epoch)throw new OperationCanceledException(ct);SaveLogin(next);epoch++;RenewSession();models=[];}
-                    Notify();await Reply(stream,"登录完成，可以回到 Pane 了",ct);return;
+                    Notify();await Reply(stream,Strings.Ai_LoginComplete,ct);return;
                 }catch(AiException e){await Reply(stream,e.Message,ct);throw;}
             }
-        }catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested){throw new AiNetworkException("登录等待超时，请重试");}
-        catch(SocketException){throw new AiNetworkException("无法监听本机登录回调，请重试");}
-        catch(IOException){throw new AiNetworkException("登录连接中断，请重试");}
+        }catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested){throw new AiNetworkException(Strings.Ai_LoginTimeout);}
+        catch(SocketException){throw new AiNetworkException(Strings.Ai_CallbackListenFailed);}
+        catch(IOException){throw new AiNetworkException(Strings.Ai_LoginInterrupted);}
         finally{listener.Stop();lock(gate){if(pendingLogin==timeout)pendingLogin=null;}}
     }
     static async Task Reply(NetworkStream stream,string message,CancellationToken ct)

@@ -18,7 +18,7 @@ internal static class SingleInstance
                 pipe.Connect(5000);
                 using var writer=new StreamWriter(pipe,leaveOpen:true){AutoFlush=true};writer.WriteLine(command==LaunchCommand.Exit?"exit":"show-launcher");
                 if(command==LaunchCommand.Exit){using var reader=new StreamReader(pipe,leaveOpen:true);var reply=reader.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(Math.Max(1,10000-watch.ElapsedMilliseconds))).GetAwaiter().GetResult();
-                    if(!int.TryParse(reply,out int pid))throw new IOException("实例响应无效");
+                    if(!int.TryParse(reply,out int pid))throw new IOException("实例响应无效"); // 不翻译：异常
                     // 持有内核句柄直到退出；附着式 Process 对象在进程消失时不保证保留退出信息。
                     using var process=OpenProcess(0x101000,false,pid);
                     if(process.IsInvalid){if(Marshal.GetLastWin32Error()!=87)Environment.ExitCode=1;}

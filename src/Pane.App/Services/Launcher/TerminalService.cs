@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -105,8 +106,8 @@ internal sealed class TerminalService:IDisposable
     public LauncherResult Search(string query)
     {
         string raw=query[1..],command=raw.TrimStart();
-        var rows=new List<LauncherItem>{string.IsNullOrWhiteSpace(command)?new("terminal:hint",LauncherItemKind.Action,"终端","输入要在终端里运行的命令",null,new("terminal")):new("terminal:run:"+raw,LauncherItemKind.Action,"终端","在终端里运行",command,new("terminal"),Hotkey:"Enter")};
-        rows.AddRange(History.Match(command).Concat(programs.Match(command)).Distinct(StringComparer.OrdinalIgnoreCase).Where(s=>s!=command).Take(6).Select(s=>new LauncherItem("complete:"+s,LauncherItemKind.Action,"补全",s,null,new("terminal"))));
+        var rows=new List<LauncherItem>{string.IsNullOrWhiteSpace(command)?new("terminal:hint",LauncherItemKind.Action,LauncherGroups.Terminal,Strings.Launcher_TerminalInputHint,null,new("terminal")):new("terminal:run:"+raw,LauncherItemKind.Action,LauncherGroups.Terminal,Strings.Launcher_TerminalRunDescription,command,new("terminal"),Hotkey:"Enter")};
+        rows.AddRange(History.Match(command).Concat(programs.Match(command)).Distinct(StringComparer.OrdinalIgnoreCase).Where(s=>s!=command).Take(6).Select(s=>new LauncherItem("complete:"+s,LauncherItemKind.Action,LauncherGroups.Completion,s,null,new("terminal"))));
         return new(rows,false);
     }
     public static bool Owns(LauncherItem item)=>item.Id.StartsWith("terminal:",StringComparison.Ordinal)||item.Id.StartsWith("complete:",StringComparison.Ordinal);

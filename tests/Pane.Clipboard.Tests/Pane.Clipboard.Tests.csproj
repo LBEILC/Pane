@@ -10,4 +10,4 @@
     <Compile Include="../../src/Pane.App/Contracts/Selection.cs" Link="Contracts/Selection.cs"/>
     <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)"/><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>
   <Compile Include="../../src/Pane.App/Hosting/ShellHotkeyBindings.cs" Link="ShellHotkeyBindings.cs"/></ItemGroup>
-<ItemGroup><Compile Include="../../src/Pane.App/Services/PasteTransfer.cs" Link="PasteTransfer.cs"/></ItemGroup><ItemGroup><Compile Include="../../src/Pane.App/Services/FileSelection.cs" Link="FileSelection.cs"/></ItemGroup></Project>
+<ItemGroup><Compile Include="../../src/Pane.App/Services/PasteTransfer.cs" Link="PasteTransfer.cs"/></ItemGroup><ItemGroup><Compile Include="../../src/Pane.App/Services/FileSelection.cs" Link="FileSelection.cs"/></ItemGroup><Import Project="../Localization.targets" /></Project>

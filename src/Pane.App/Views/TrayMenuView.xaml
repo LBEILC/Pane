@@ -9,7 +9,7 @@
     x:Class="Pane.Views.TrayMenuView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:c="using:Pane.Views.Controls"
+    xmlns:c="using:Pane.Views.Controls" xmlns:loc="using:Pane.Localization"
     IsTabStop="True" UseSystemFocusVisuals="False">
 
     <UserControl.Resources>
@@ -47,33 +47,33 @@
             <Grid x:Name="UpdateItem" Tag="update" Style="{StaticResource ItemRow}" Visibility="Collapsed">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="refresh" Style="{StaticResource ItemIcon}" Foreground="{StaticResource PaneAccentBrush}"/>
-                <TextBlock Grid.Column="1" Text="重启并更新" Style="{StaticResource ItemText}" Foreground="{StaticResource PaneAccentBrush}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_RestartUpdate}" Style="{StaticResource ItemText}" Foreground="{StaticResource PaneAccentBrush}"/>
             </Grid>
             <Border x:Name="UpdateSeparator" Style="{StaticResource Separator}" Visibility="Collapsed"/>
 
             <Grid Tag="launcher" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="search" Style="{StaticResource ItemIcon}"/>
-                <TextBlock Grid.Column="1" Text="打开启动器" Style="{StaticResource ItemText}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_OpenLauncher}" Style="{StaticResource ItemText}"/>
                 <StackPanel x:Name="LauncherKeys" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"/>
             </Grid>
             <Grid x:Name="ClipboardItem" Tag="clipboard" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="clipboard" Style="{StaticResource ItemIcon}"/>
-                <TextBlock Grid.Column="1" Text="打开剪贴板" Style="{StaticResource ItemText}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_OpenClipboard}" Style="{StaticResource ItemText}"/>
                 <StackPanel x:Name="ClipboardKeys" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"/>
             </Grid>
             <Grid Tag="settings" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="gear" Style="{StaticResource ItemIcon}"/>
-                <TextBlock Grid.Column="1" Text="设置" Style="{StaticResource ItemText}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_Settings}" Style="{StaticResource ItemText}"/>
             </Grid>
 
             <Border x:Name="PauseSeparator" Style="{StaticResource Separator}"/>
             <Grid x:Name="PauseItem" Tag="pause" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <c:PaneIcon x:Name="PauseIcon" Glyph="gesture" Style="{StaticResource ItemIcon}"/>
-                <TextBlock Grid.Column="1" Text="暂停手势" Style="{StaticResource ItemText}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_PauseGestures}" Style="{StaticResource ItemText}"/>
                 <StackPanel x:Name="PauseKeys" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"/>
             </Grid>
 
@@ -81,7 +81,7 @@
             <Grid Tag="exit" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="power" Style="{StaticResource ItemIcon}"/>
-                <TextBlock Grid.Column="1" Text="退出 Pane" Style="{StaticResource ItemText}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_Exit}" Style="{StaticResource ItemText}"/>
             </Grid>
         </StackPanel>
 

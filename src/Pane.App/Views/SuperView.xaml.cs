@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 超级面板逻辑（设计负责人）。交互照原型 app.js「超级面板」，另加键盘：
 // ←/→ 选动作、1~6 直接执行、Enter 执行（有结果时 = 粘贴替换选中文字）、Ctrl+C 复制结果、Ctrl+R 重新生成、Esc 关闭。
 // 选中外文自动翻译（2026-10-30，原型 launcher.html #sp，设置 → AI 里打开）：弹出就翻、不防抖，单个单词也翻；
@@ -57,7 +58,7 @@ public sealed partial class SuperView : UserControl, IPanelView
     public event Action<string>? OpenChat;
     /// <summary>批量重命名：打开重命名窗口，带上选中的文件。</summary>
     public event Action<IReadOnlyList<string>>? OpenRename;
-    readonly List<SuperAction> fileActions = [new("rename", "批量重命名", "pencil", false, 84), new("copy-path", "复制路径", "link", false, 84), new("copy-name", "复制名称", "copy", false, 84)];
+    readonly List<SuperAction> fileActions = [new("rename", Strings.Common_Rename, "pencil", false, 84), new("copy-path", Strings.Common_CopyPath, "link", false, 84), new("copy-name", Strings.SuperPanel_CopyName, "copy", false, 84)];
     IReadOnlyList<string>? files;
     int selected;
     bool activate;
@@ -72,9 +73,9 @@ public sealed partial class SuperView : UserControl, IPanelView
         InitializeComponent();
         normal = NormalActions();
         var summary = ai.Actions.FirstOrDefault(a => a.Id == "summary");
-        auto = [new("copy-translation", "复制译文", "paste", false), new("translate-window", "翻译窗口", "external", false), new("ask", "问 AI", "ai", false),
+        auto = [new("copy-translation", Strings.SuperPanel_CopyTranslation, "paste", false), new("translate-window", Strings.SuperPanel_TranslateWindow, "external", false), new("ask", Strings.Launcher_AskAi, "ai", false),
             .. summary is null ? Array.Empty<SuperAction>() : [new SuperAction(summary.Id, summary.Name, summary.Glyph, true)],
-            new("copy", "复制原文", "clipboard", false), new("search", "搜索", "globe", false)];
+            new("copy", Strings.SuperPanel_CopyOriginal, "clipboard", false), new("search", Strings.Common_Search, "globe", false)];
         items = normal;
         Actions.ItemsSource = items;
         highlight = new SlidingHighlight(ActionHighlightLayer);
@@ -95,8 +96,8 @@ public sealed partial class SuperView : UserControl, IPanelView
             if (!AiOptions.Enabled && id.StartsWith("ai:", StringComparison.Ordinal)) continue;   // AI 总开关关着（issue 8）
             SuperAction? a = id switch
             {
-                "search" => new("search", "搜索", "globe", false),
-                "copy" => new("copy", "复制", "clipboard", false),
+                "search" => new("search", Strings.Common_Search, "globe", false),
+                "copy" => new("copy", Strings.Common_Copy, "clipboard", false),
                 _ when id.StartsWith("ai:", StringComparison.Ordinal) && ai.Actions.FirstOrDefault(x => x.Id == id[3..]) is { } act => new(act.Id, act.Name, act.Glyph, true),
                 _ => null,
             };
@@ -147,10 +148,10 @@ public sealed partial class SuperView : UserControl, IPanelView
         var has = !string.IsNullOrWhiteSpace(sel.Text);
         QuoteText.Text = has ? sel.Text! : sel.Failure switch
         {
-            SelectionFailure.Elevated => "这个窗口是管理员权限，读不到选中文字",
-            SelectionFailure.Timeout => "读取超时，没读到选中文字",
-            SelectionFailure.ClipboardUnavailable => "剪贴板暂时借不了，没读到选中文字",
-            _ => "没读到选中文字",
+            SelectionFailure.Elevated => Strings.SuperPanel_SelectionPermission,
+            SelectionFailure.Timeout => Strings.SuperPanel_SelectionTimeout,
+            SelectionFailure.ClipboardUnavailable => Strings.SuperPanel_ClipboardUnavailable,
+            _ => Strings.SuperPanel_SelectionEmpty,
         };
         QuoteText.Opacity = has ? 1 : 0.7;
         StartAuto(has ? sel.Text! : null);
@@ -174,9 +175,9 @@ public sealed partial class SuperView : UserControl, IPanelView
         FileGlyph.Glyph = Files.FileKinds.Glyph(category);
         int folders = list.Take(200).Count(IsFolder);
         FileTitle.Text = list.Count == 1 ? System.IO.Path.GetFileName(first)
-            : $"{list.Count} 个" + (folders == 0 ? "文件" : folders == Math.Min(list.Count, 200) ? "文件夹" : "文件和文件夹");
+            : string.Format(folders == 0 ? Strings.SuperPanel_FileCount : folders == Math.Min(list.Count, 200) ? Strings.SuperPanel_FolderCount : Strings.SuperPanel_MixedCount, list.Count);
         FileNames.Text = list.Count == 1 ? System.IO.Path.GetDirectoryName(first) ?? ""
-            : string.Join("、", list.Take(3).Select(System.IO.Path.GetFileName)) + (list.Count > 3 ? " 等" : "");
+            : list.Count > 3 ? string.Format(Strings.SuperPanel_MoreNames, string.Join("、", list.Take(3).Select(System.IO.Path.GetFileName))) : string.Join("、", list.Take(3).Select(System.IO.Path.GetFileName));
     }
 
     async Task ExecuteFile(int index)
@@ -189,7 +190,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         if (id == "rename") { OpenRename?.Invoke(list); return; }
         var text = string.Join(Environment.NewLine, id == "copy-path" ? list : list.Select(p => System.IO.Path.GetFileName(p)));
         try { await actions.CopyAsync(text, CancellationToken.None); }
-        catch (Exception e) { ((App)Application.Current).ReportFailure(id == "copy-path" ? "复制路径" : "复制名称", e); }
+        catch (Exception e) { ((App)Application.Current).ReportFailure(id == "copy-path" ? Strings.Common_CopyPath : Strings.SuperPanel_CopyName, e); }
     }
 
     public void OnShown()
@@ -216,7 +217,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         if (autoMode && text!.Length > AutoLimit)
         {
             autoMode = false;
-            LongText.Text = $"内容较长（约 {text.Length:N0} 字），没有自动翻译";
+            LongText.Text = string.Format(Strings.SuperPanel_AutoTranslateTooLong, (object?)(text.Length));
             LongBox.Visibility = Visibility.Visible;
         }
         SetItems(autoMode ? auto : normal);
@@ -244,7 +245,7 @@ public sealed partial class SuperView : UserControl, IPanelView
             }
         }
         catch (OperationCanceledException) { }
-        catch (Exception e) { if (!cts.IsCancellationRequested) { AutoOut.Text = "翻译失败：" + (App.FailureReason(e) ?? "出了点问题"); AutoOut.Opacity = 0.7; RequestHeight(); } }
+        catch (Exception e) { if (!cts.IsCancellationRequested) { AutoOut.Text = string.Format(Strings.SuperPanel_TranslateError, App.FailureReason(e) ?? Strings.Common_UnexpectedProblem); AutoOut.Opacity = 0.7; RequestHeight(); } }
     }
 
     void SetItems(List<SuperAction> list)
@@ -309,15 +310,15 @@ public sealed partial class SuperView : UserControl, IPanelView
                 if (a.Id == "search") await actions.SearchWebAsync(text, CancellationToken.None);
                 else await actions.CopyAsync(text, CancellationToken.None);
             }
-            catch (Exception e) { ((App)Application.Current).ReportFailure(a.Id == "search" ? "网页搜索" : "复制", e); }
+            catch (Exception e) { ((App)Application.Current).ReportFailure(a.Id == "search" ? Strings.SuperPanel_WebSearch : Strings.Common_Copy, e); }
             return;
         }
         ResultArea.Visibility = Visibility.Visible;
         cardAction = a.Id;
         Card.Start(ai, new AiRequest(a.Id, text, null, null), a.Name, a.Glyph, source: null, compact: true,
             a.Id == "translate"
-                ? [(["Enter"], "粘贴替换"), (["Ctrl", "+", "C"], "复制"), (["Tab"], "翻译窗口"), (["Esc"], "关闭")]
-                : [(["Enter"], "粘贴替换选中文字"), (["Ctrl", "+", "C"], "复制"), (["Ctrl", "+", "R"], "重新生成"), (["Esc"], "关闭")]);
+                ? [(["Enter"], Strings.SuperPanel_PasteReplace), (["Ctrl", "+", "C"], Strings.Common_Copy), (["Tab"], Strings.SuperPanel_TranslateWindow), (["Esc"], Strings.Common_Close)]
+                : [(["Enter"], Strings.SuperPanel_PasteReplaceSelection), (["Ctrl", "+", "C"], Strings.Common_Copy), (["Ctrl", "+", "R"], Strings.Common_Regenerate), (["Esc"], Strings.Common_Close)]);
         RequestHeight();
     }
 
@@ -350,7 +351,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         var window = current.SourceWindow;
         CloseRequested?.Invoke(this, EventArgs.Empty);
         try { await actions.ReplaceSelectionAsync(text, window, CancellationToken.None); }
-        catch (Exception e) { ((App)Application.Current).ReportFailure("替换选中文字", e); }
+        catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.SuperPanel_ReplaceSelection, e); }
     }
 
     void OnActionsPointerMoved(object sender, PointerRoutedEventArgs e)

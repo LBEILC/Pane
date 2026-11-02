@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 文件窗口的界面数据：左侧分类、中间结果行。颜色和图标照原型 prototype/launcher.html 的 TYPES。
 using System.ComponentModel;
 using System.Globalization;
@@ -12,9 +13,9 @@ public static class FileKinds
 {
     public static string Name(FileCategory c) => c switch
     {
-        FileCategory.All => "全部", FileCategory.Folder => "文件夹", FileCategory.Document => "文档", FileCategory.Spreadsheet => "表格",
-        FileCategory.Presentation => "演示", FileCategory.Pdf => "PDF", FileCategory.Text => "文本", FileCategory.Image => "图片",
-        FileCategory.Video => "视频", FileCategory.Audio => "音频", FileCategory.Archive => "压缩包", FileCategory.Program => "程序", _ => "文件",
+        FileCategory.All => Strings.Common_All, FileCategory.Folder => Strings.Files_CategoryFolder, FileCategory.Document => Strings.Files_CategoryDocument, FileCategory.Spreadsheet => Strings.Files_CategorySpreadsheet,
+        FileCategory.Presentation => Strings.Files_CategoryPresentation, FileCategory.Pdf => "PDF", FileCategory.Text => Strings.Common_Text, FileCategory.Image => Strings.Common_Image,
+        FileCategory.Video => Strings.Files_CategoryVideo, FileCategory.Audio => Strings.Files_CategoryAudio, FileCategory.Archive => Strings.Files_CategoryArchive, FileCategory.Program => Strings.Files_CategoryProgram, _ => Strings.Common_File,
     };
 
     public static string Glyph(FileCategory c) => c switch
@@ -54,9 +55,9 @@ public static class FileKinds
         if (t is not { } v) return "";
         var local = v.ToLocalTime();
         var today = DateTime.Today;
-        if (local.Date == today) return "今天 " + local.ToString("HH:mm", CultureInfo.InvariantCulture);
-        if (local.Date == today.AddDays(-1)) return "昨天 " + local.ToString("HH:mm", CultureInfo.InvariantCulture);
-        return local.Year == today.Year ? $"{local.Month} 月 {local.Day} 日" : $"{local.Year} 年 {local.Month} 月 {local.Day} 日";
+        if (local.Date == today) return string.Format(Strings.Files_TodayTime, local.ToString("HH:mm", CultureInfo.InvariantCulture));
+        if (local.Date == today.AddDays(-1)) return string.Format(Strings.Files_YesterdayTime, local.ToString("HH:mm", CultureInfo.InvariantCulture));
+        return local.Year == today.Year ? string.Format(Strings.Files_MonthDay, (object?)(local.Month), (object?)(local.Day)) : string.Format(Strings.Files_YearMonthDay, (object?)(local.Year), (object?)(local.Month), (object?)(local.Day));
     }
 }
 
@@ -100,7 +101,7 @@ public sealed partial class FileRow : INotifyPropertyChanged
     public MatchedText Match { get; }
     public string Folder => System.IO.Path.GetDirectoryName(Hit.Path) ?? Hit.Path;
     public string Modified => FileKinds.When(Hit.Modified);
-    public string Size => Hit.Category == FileCategory.Folder ? "文件夹" : FileKinds.Size(Hit.Size);
+    public string Size => Hit.Category == FileCategory.Folder ? Strings.Files_CategoryFolder : FileKinds.Size(Hit.Size);
     public string Glyph => FileKinds.Glyph(Hit.Category);
     public Brush Tile => FileKinds.Brush(Hit.Category);
     /// <summary>系统图标（设置 → 外观 → 文件图标：系统，036）；还没取到时为 null，先显示彩色类型图块。</summary>

@@ -1,10 +1,11 @@
+using Pane.Localization;
 using System.Runtime.InteropServices;
 using System.Text;
 namespace Pane.Services.Clipboard;
 
-public sealed class ClipboardTargetClosedException():InvalidOperationException("目标窗口已关闭");
-public sealed class ClipboardPermissionException():UnauthorizedAccessException("系统拒绝向更高完整性级别的窗口输入");
-public sealed class ClipboardFocusException():InvalidOperationException("没能切回原来的窗口，内容已经复制好了，按 Ctrl+V 就能贴");
+public sealed class ClipboardTargetClosedException():InvalidOperationException("目标窗口已关闭"); // 不翻译：类型化异常
+public sealed class ClipboardPermissionException():UnauthorizedAccessException("系统拒绝向更高完整性级别的窗口输入"); // 不翻译：类型化异常
+public sealed class ClipboardFocusException():InvalidOperationException("没能切回原来的窗口，内容已经复制好了，按 Ctrl+V 就能贴"); // 不翻译：类型化异常
 
 // 仅由一次输入事务调用；没有常驻计时器或前台监听。
 internal interface IPastePlatform
@@ -51,13 +52,13 @@ internal sealed class PasteTransfer(IPastePlatform platform,Action<string>? log=
     {
         long end=platform.Now+timeout;
         while(Modifiers.Any(platform.Physical)){
-            token.ThrowIfCancellationRequested();if(platform.Now>=end)throw new TimeoutException("等待修饰键松开超时");platform.Wait();
+            token.ThrowIfCancellationRequested();if(platform.Now>=end)throw new TimeoutException("等待修饰键松开超时");platform.Wait(); // 不翻译：类型化异常
         }
         foreach(int key in Modifiers){
             token.ThrowIfCancellationRequested();
             // 再查一次物理状态，不能抬起用户仍按着的键。
             if(platform.Logical(key)&&!platform.Physical(key)&&!platform.Key((ushort)key,false))
-                throw new InvalidOperationException("输入被系统拒绝");
+                throw new InvalidOperationException(Strings.Common_InputRejected);
         }
     }
     internal void Run(nint target,Action write,CancellationToken token,long started)
@@ -73,7 +74,7 @@ internal sealed class PasteTransfer(IPastePlatform platform,Action<string>? log=
             if(!Equivalent(target,platform.Foreground))throw Failure(target);
             step="input";
             // 紧邻发送再检查，避免等待期间用户重新按住修饰键。
-            if(Modifiers.Any(platform.Physical))throw new TimeoutException("修饰键尚未松开");
+            if(Modifiers.Any(platform.Physical))throw new TimeoutException(Strings.Common_ModifiersHeld);
             if(platform.Higher(target)==true)throw new ClipboardPermissionException();
             SendChord();
         }catch(Exception e){
@@ -90,12 +91,12 @@ internal sealed class PasteTransfer(IPastePlatform platform,Action<string>? log=
     {
         bool control=false,v=false;
         try{
-            if(!platform.Key(17,true))throw new InvalidOperationException("输入被系统拒绝");control=true;
-            if(!platform.Key(0x56,true))throw new InvalidOperationException("输入被系统拒绝");v=true;
+            if(!platform.Key(17,true))throw new InvalidOperationException(Strings.Common_InputRejected);control=true;
+            if(!platform.Key(0x56,true))throw new InvalidOperationException(Strings.Common_InputRejected);v=true;
         }finally{
             int error=platform.Error;
             bool releasedV=!v||platform.Key(0x56,false),releasedControl=!control||platform.Key(17,false);
-            if(!releasedV||!releasedControl)throw new InvalidOperationException("输入被系统拒绝");
+            if(!releasedV||!releasedControl)throw new InvalidOperationException(Strings.Common_InputRejected);
             Marshal.SetLastPInvokeError(error);
         }
     }

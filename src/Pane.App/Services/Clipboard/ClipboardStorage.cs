@@ -14,7 +14,7 @@ internal sealed class ClipboardStorage:IClipboardStorage
         // File.Exists 会将部分访问失败当成不存在；不能因此把原图误当孤立文件清理。
         try{
             using var file=File.OpenRead(index);
-            return JsonSerializer.Deserialize(file,ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException("历史索引为空");
+            return JsonSerializer.Deserialize(file,ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException("历史索引为空"); // 不翻译：日志异常
         }catch(FileNotFoundException){return [];}
     }
     public void Save(string index,StoredClip[] entries,Action<string> step)

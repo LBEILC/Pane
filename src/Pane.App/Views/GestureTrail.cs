@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 手势轨迹（设计负责人）。照原型 drawTrail：主题色 6px 线 + 外发光（模糊 14），中间一条 1.6px 白色高光芯（75%），
 // 笔头是带发光的白点（半径 4.5）；松开后整条在 260ms 内淡出。
 // 每块显示器一张全屏透明窗（分层 + 鼠标穿透 + 不激活 + 无重定向位图），Composition 画线，不挡任何点击。
@@ -146,7 +147,7 @@ public sealed class GestureTrail : IDisposable
         foreach (var (b, dpi) in monitors)
         {
             int w = b.Right - b.Left, h = b.Bottom - b.Top;
-            var hwnd = Native.CreateWindowExW(0x82800A0, className, "Pane 手势轨迹", 0x80000000, b.Left, b.Top, w, h, 0, 0, Native.GetModuleHandleW(null), 0);
+            var hwnd = Native.CreateWindowExW(0x82800A0, className, Strings.Gestures_TrailTitle, 0x80000000, b.Left, b.Top, w, h, 0, 0, Native.GetModuleHandleW(null), 0);
             if (hwnd == 0) throw new System.ComponentModel.Win32Exception();
             Native.SetLayeredWindowAttributes(hwnd, 0, 255, 2);
             var target = Native.Target(compositor, hwnd);

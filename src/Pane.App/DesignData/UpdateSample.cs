@@ -29,6 +29,7 @@ public sealed class UpdateSample : IUpdateService
 
     public string CurrentVersion => "0.1.138";
     public UpdateState State { get; private set; }
+    public UpdateStep? FailedStep => State == UpdateState.Failed ? UpdateStep.Check : null;
     public UpdateRelease? Latest { get; private set; }
     public double DownloadProgress { get; private set; }
     public string? Error { get; private set; }

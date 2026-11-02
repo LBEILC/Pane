@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -22,7 +23,7 @@ internal static class IndexStorage
     public static PersistedIndex Read(string path){
         using var stream=File.OpenRead(path);
         var value=JsonSerializer.Deserialize(stream,IndexJson.Default.PersistedIndex);
-        if(value is not {Version:1,Snapshot:not null,Metrics:not null}||value.Snapshot.Apps==null||value.Snapshot.Favorites==null||value.Snapshot.Commands==null)throw new InvalidDataException("索引格式不兼容");
+        if(value is not {Version:1,Snapshot:not null,Metrics:not null}||value.Snapshot.Apps==null||value.Snapshot.Favorites==null||value.Snapshot.Commands==null)throw new InvalidDataException("索引格式不兼容"); // 不翻译：日志异常
         return value;
     }
     public static void Write(string path,PersistedIndex value){
@@ -35,8 +36,8 @@ internal static class IndexBuilder
     public static PersistedIndex Build(IAppCatalog catalog,FavoriteEntry[] favorites,CancellationToken token){
         var table=new PinyinTable();var index=catalog.Build(table,token);
         var entries=favorites.Select(f=>new SearchEntry("favorite:"+f.Path,f.IsFolder?LauncherItemKind.Folder:LauncherItemKind.File,table.Create(FileTitle(f.Path)),Path.GetDirectoryName(f.Path)??f.Path,f.IsFolder?"folder":"doc")).ToArray();
-        (string Id,string Name,string Glyph)[] commands=[("lock","锁屏","lock"),("sleep","睡眠","moon"),("restart","重启","restart"),("shutdown","关机","power"),("recycle","清空回收站","trash"),("clipboard","打开剪贴板历史","clipboard"),("settings","Pane 设置","gear")];
-        var commandEntries=commands.Select(c=>new SearchEntry("command:"+c.Id,LauncherItemKind.Command,table.Create(c.Name),c.Id is "clipboard" or "settings"?"Pane":"命令",c.Glyph)).ToArray();
+        (string Id,string Name,string Glyph)[] commands=[("lock",Strings.Simplified(nameof(Strings.Launcher_CommandLock)),"lock"),("sleep",Strings.Simplified(nameof(Strings.Launcher_CommandSleep)),"moon"),("restart",Strings.Simplified(nameof(Strings.Launcher_CommandRestart)),"restart"),("shutdown",Strings.Simplified(nameof(Strings.Launcher_CommandShutdown)),"power"),("recycle",Strings.Simplified(nameof(Strings.Launcher_CommandEmptyRecycleBin)),"trash"),("clipboard",Strings.Simplified(nameof(Strings.Launcher_CommandClipboard)),"clipboard"),("settings",Strings.Simplified(nameof(Strings.Launcher_CommandSettings)),"gear")];
+        var commandEntries=commands.Select(c=>new SearchEntry("command:"+c.Id,LauncherItemKind.Command,table.Create(c.Name),c.Id is "clipboard" or "settings"?"Pane":Strings.Simplified(nameof(Strings.Launcher_CommandSubtitle)),c.Glyph)).ToArray();
         token.ThrowIfCancellationRequested();return new(1,new(index.Apps,entries,commandEntries),index.Metrics,DateTimeOffset.UtcNow);
     }
     static string FileTitle(string path){var name=Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));return name.Length>0?name:path;}
@@ -92,7 +93,7 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
             using var child=new Process{StartInfo=start};var watch=Stopwatch.StartNew();PeakWorkingSet=0;LastProcessId=0;LastExitCode=null;Outcome="starting";
             using var deadline=CancellationTokenSource.CreateLinkedTokenSource(token);deadline.CancelAfter(timeout??TimeSpan.FromMinutes(5));
             try{
-                if(!child.Start())throw new IOException("索引进程启动失败");LastProcessId=child.Id;
+                if(!child.Start())throw new IOException(Strings.Launcher_IndexStartFailed);LastProcessId=child.Id;
                 try{child.PriorityClass=ProcessPriorityClass.BelowNormal;}catch(InvalidOperationException){}
                 Outcome="running";
                 var exited=child.WaitForExitAsync();bool originalsPublished=false;
@@ -103,7 +104,7 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
                     deadline.Token.ThrowIfCancellationRequested();
                 }
                 child.WaitForExit();SamplePeak(child);LastExitCode=child.ExitCode;
-                if(child.ExitCode!=0)throw new IOException("索引进程失败："+child.ExitCode);
+                if(child.ExitCode!=0)throw new IOException(string.Format(Strings.Launcher_IndexFailed, child.ExitCode));
                 var value=IndexStorage.Read(candidate);deadline.Token.ThrowIfCancellationRequested();
                 // 只有父进程在确认成功后提交；超时/崩溃绝不覆盖上次可用快照。
                 File.Move(candidate,ResultPath,true);IconCache.Cleanup(directory,value.Snapshot.Apps.Select(a=>a.Icon));Outcome="completed";return value;

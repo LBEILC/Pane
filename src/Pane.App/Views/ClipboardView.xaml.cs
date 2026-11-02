@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 剪贴板视图逻辑（设计负责人）。交互照原型 app.js「剪贴板」：
 // 搜索 + 类型筛选；已固定在前；Enter 粘贴、Shift+Enter 纯文本、Alt+1~9 快速粘贴、Ctrl+P 固定、Esc 分步；
 // 悬停 / 选中时右下角换成「交给启动器 / 固定 / 删除」按钮；删除带淡出右移。
@@ -22,7 +23,7 @@ namespace Pane.Views;
 
 public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowActions
 {
-    static readonly (string key, string label)[] Filters = [("all", "全部"), ("text", "文本"), ("image", "图片"), ("files", "文件"), ("pinned", "已固定")];
+    static readonly (string key, string label)[] Filters = [("all", Strings.Common_All), ("text", Strings.Common_Text), ("image", Strings.Common_Image), ("files", Strings.Common_File), ("pinned", Strings.Clipboard_Pinned)];
 
     readonly IClipboardHistory history;
     readonly SlidingHighlight highlight;
@@ -107,7 +108,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
 
     // 面板开着时顺序冻结：固定 / 取消固定、粘贴后挪到最前都只改条目本身（图钉变实心 / 空心），不挪位置、列表不跟着跑；
     // 下次呼出、换搜索词或换筛选时才按「已固定在前、其余按时间」归位。开着时新复制的条目插在已固定区后面。
-    Dictionary<string, (int Order, string Group)> frozen = [];
+    enum ClipGroup { Pinned, Today, Earlier }
+    Dictionary<string, (int Order, ClipGroup Group)> frozen = [];
 
     void Render(bool keepSelection)
     {
@@ -123,7 +125,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
             // 已显示过的按原顺序和原分组留着（「已固定」筛选下取消固定的也先留着），新来的放在已固定区之后
             var known = all.Where(e => frozen.ContainsKey(e.Id) && Matches(e, q, ignorePin: true)).OrderBy(e => frozen[e.Id].Order).ToList();
             var fresh = all.Where(e => !frozen.ContainsKey(e.Id) && Matches(e, q, ignorePin: false));
-            matched = [.. known.Where(e => frozen[e.Id].Group == "已固定"), .. fresh, .. known.Where(e => frozen[e.Id].Group != "已固定")];
+            matched = [.. known.Where(e => frozen[e.Id].Group == ClipGroup.Pinned), .. fresh, .. known.Where(e => frozen[e.Id].Group != ClipGroup.Pinned)];
         }
         frozen = matched.Select((e, i) => (e.Id, (i, GroupOf(e)))).ToDictionary(x => x.Id, x => x.Item2);
         if (keep is not null) count = Math.Max(count, matched.FindIndex(e => e.Id == keep) + 1);
@@ -158,8 +160,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     }
 
     // 冻结期间沿用条目第一次出现时的分组
-    string GroupOf(ClipEntry e) => frozen.TryGetValue(e.Id, out var f) ? f.Group
-        : e.Pinned ? "已固定" : (DateTimeOffset.Now - e.CopiedAt).TotalMinutes < 1440 ? "今天" : "更早";
+    ClipGroup GroupOf(ClipEntry e) => frozen.TryGetValue(e.Id, out var f) ? f.Group
+        : e.Pinned ? ClipGroup.Pinned : (DateTimeOffset.Now - e.CopiedAt).TotalMinutes < 1440 ? ClipGroup.Today : ClipGroup.Earlier;
 
     void Append(int until)
     {
@@ -168,7 +170,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
             var row = new ClipRow(matched[i], i, query, this);
             rows.Add(row);
             var group = GroupOf(row.Entry);
-            if (sections.Count == 0 || sections[^1].Label != group) sections.Add(new ClipSection(group));
+            if (sections.Count == 0 || i == 0 || GroupOf(rows[i - 1].Entry) != group) sections.Add(new ClipSection(group switch { ClipGroup.Pinned => Strings.Clipboard_Pinned, ClipGroup.Today => Strings.Clipboard_Today, _ => Strings.Clipboard_Earlier }));
             sections[^1].Rows.Add(row);
         }
     }
@@ -302,7 +304,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         var id = entry.Id;
         CloseRequested?.Invoke(this, EventArgs.Empty);
         try { await history.PasteAsync(id, plainText, previousWindow, CancellationToken.None); }
-        catch (Exception e) { ((App)Application.Current).ReportFailure("粘贴", e); } // 面板已收起：屏幕中间提示
+        catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.Common_Paste, e); } // 面板已收起：屏幕中间提示
     }
 
     /// <summary>「交给启动器」：宿主收到后把条目交给启动器（LauncherView.AttachNext）并切到启动器。</summary>
@@ -342,8 +344,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         if (Foot.Children.Count > 0) return;
         KeyHints.Fill(Foot,
         [
-            (["↑", "↓"], "选择"), (["Enter"], "粘贴"), (["Shift", "+", "Enter"], "纯文本"),
-            (["Alt", "+", "1~9"], "快速粘贴"), (["Tab"], "交给启动器"), (["Ctrl", "+", "P"], "固定"),
+            (["↑", "↓"], Strings.Clipboard_Select), (["Enter"], Strings.Common_Paste), (["Shift", "+", "Enter"], Strings.Clipboard_PlainText),
+            (["Alt", "+", "1~9"], Strings.Clipboard_QuickPaste), (["Tab"], Strings.Clipboard_SendToLauncher), (["Ctrl", "+", "P"], Strings.Clipboard_Pin),
         ], HintLabelProto, KbdProto);
     }
 

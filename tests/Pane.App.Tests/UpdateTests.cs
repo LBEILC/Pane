@@ -20,7 +20,8 @@ internal static class UpdateTests
         try
         {
             using var service = Service();
-            int changes = 0; service.Changed += (_, _) => changes++;
+            Check(service.FailedStep == null, "Idle 没有失败阶段");
+            int changes = 0; service.Changed += (_, _) => { changes++; Check(service.State == UpdateState.Failed || service.FailedStep == null, "非失败事件清空阶段"); };
             await service.CheckAsync(default);
             Check(service.State == UpdateState.Available && service.Latest?.Version == "0.1.100", "99 < 100，新版可下载");
             Check(service.Latest?.Notes == "标题\n更新内容" && service.LastChecked != null, "说明转纯文本，检查时间");
@@ -49,10 +50,10 @@ internal static class UpdateTests
             }
             using (var offline = Service("offline"))
             {
-                server.Disconnect = true; await offline.CheckAsync(default); Check(offline.State == UpdateState.Failed, "断网失败");
+                server.Disconnect = true; await offline.CheckAsync(default); Check(offline.State == UpdateState.Failed, "断网失败"); Check(offline.FailedStep == UpdateStep.Check, "检查失败阶段");
                 server.Disconnect = false; await offline.CheckAsync(default); server.BreakDownload = true; await offline.DownloadAsync(default);
-                Check(offline.State == UpdateState.Failed, "下载中断失败"); server.BreakDownload = false;
-                await offline.DownloadAsync(default); Check(offline.State == UpdateState.Ready, "断网恢复下载");
+                Check(offline.State == UpdateState.Failed, "下载中断失败"); Check(offline.FailedStep == UpdateStep.Download, "下载失败阶段"); server.BreakDownload = false;
+                await offline.DownloadAsync(default); Check(offline.State == UpdateState.Ready, "断网恢复下载"); Check(offline.FailedStep == null, "成功清空失败阶段");
             }
             using (var cancelled = Service("cancel"))
             {
@@ -62,7 +63,19 @@ internal static class UpdateTests
             }
             auto = true;
             using (var automatic = Service("auto")) { await automatic.CheckAsync(default); Check(automatic.State == UpdateState.Ready, "自动设置打开时连续下载"); }
+            using (var automaticFailure = Service("auto-failed"))
+            {
+                server.BadHash = true; await automaticFailure.CheckAsync(default);
+                Check(automaticFailure.FailedStep == UpdateStep.Download, "检查后自动下载失败属于下载阶段");
+                server.BadHash = false;
+            }
             auto = false;
+            using (var installFailure = Service("install-failed", _ => throw new IOException()))
+            {
+                await installFailure.CheckAsync(default); await installFailure.DownloadAsync(default); installFailure.InstallAndRestart();
+                Check(installFailure.FailedStep == UpdateStep.Install, "安装失败阶段");
+                await installFailure.CheckAsync(default); Check(installFailure.FailedStep == null, "再次成功清空安装失败");
+            }
             string? launched = null;
             using (var installer = Service("install", path => launched = path))
             {

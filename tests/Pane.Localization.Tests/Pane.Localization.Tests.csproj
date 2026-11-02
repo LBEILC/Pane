@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><RootNamespace>Pane</RootNamespace><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Pane.App/Localization/*.cs" Link="Localization/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="../../src/Pane.App/Localization/*.resx" Link="Localization/%(Filename)%(Extension)" />
+  </ItemGroup>
+  <Import Project="../../src/Pane.App/Localization/Localization.targets" />
+</Project>

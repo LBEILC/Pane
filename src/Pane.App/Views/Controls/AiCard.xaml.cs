@@ -1,3 +1,4 @@
+using Pane.Localization;
 // AI 结果卡片的逻辑：逐字追加结果、闪烁光标、未配置 / 出错状态、取消。
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -73,7 +74,7 @@ public sealed partial class AiCard : UserControl
         OutScroll.Visibility = Visibility.Visible;
         if (ai!.Status != AiStatus.Ready)
         {
-            ShowProblem(ai.Status == AiStatus.NeedsSignIn ? "ChatGPT 登录已过期，请重新登录。" : "还没配置 AI 服务。", ai.Status == AiStatus.NeedsSignIn ? "重新登录" : "去设置", settings: true);
+            ShowProblem(ai.Status == AiStatus.NeedsSignIn ? Strings.Ai_Card_LoginExpired : Strings.Ai_Card_NotConfigured, ai.Status == AiStatus.NeedsSignIn ? Strings.Ai_Card_LoginAgain : Strings.Common_GoToSettings, settings: true);
             return;
         }
         Caret.Visibility = Visibility.Visible;
@@ -91,11 +92,11 @@ public sealed partial class AiCard : UserControl
             IsDone = true;
         }
         catch (OperationCanceledException) { return; }
-        catch (AiCredentialException) { ShowProblem("API Key 无效，请到设置里检查。", "去设置", settings: true); }
-        catch (AiSignInRequiredException) { ShowProblem("ChatGPT 登录已过期，请重新登录。", "重新登录", settings: true); }
-        catch (AiQuotaException e) { ShowProblem(string.IsNullOrEmpty(e.Message) ? "这个账号的额度用完了。" : e.Message, "重试", settings: false); }
-        catch (AiException e) { ShowProblem(e.Message, "重试", settings: false); }
-        catch (Exception) { ShowProblem("出了点问题，没拿到结果。", "重试", settings: false); }
+        catch (AiCredentialException) { ShowProblem(Strings.Ai_Card_InvalidKey, Strings.Common_GoToSettings, settings: true); }
+        catch (AiSignInRequiredException) { ShowProblem(Strings.Ai_Card_LoginExpired, Strings.Ai_Card_LoginAgain, settings: true); }
+        catch (AiQuotaException e) { ShowProblem(string.IsNullOrEmpty(e.Message) ? Strings.Ai_Card_QuotaExceeded : e.Message, Strings.Common_Retry, settings: false); }
+        catch (AiException e) { ShowProblem(e.Message, Strings.Common_Retry, settings: false); }
+        catch (Exception) { ShowProblem(Strings.Ai_Card_Failed, Strings.Common_Retry, settings: false); }
         finally
         {
             if (running == cts)

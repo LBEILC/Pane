@@ -1,0 +1,8 @@
+<Project>
+  <Target Name="GenerateLocalization" BeforeTargets="BeforeCompile;MarkupCompilePass1" Inputs="$(MSBuildThisFileDirectory)Strings.resx;$(MSBuildThisFileDirectory)generate.ps1" Outputs="$(IntermediateOutputPath)Localization/Strings.g.cs">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File &quot;$(MSBuildThisFileDirectory)generate.ps1&quot; -Output &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)Localization/Strings.g.cs&quot;" />
+  </Target>
+  <ItemGroup>
+    <Compile Include="$(IntermediateOutputPath)Localization/Strings.g.cs" />
+  </ItemGroup>
+</Project>

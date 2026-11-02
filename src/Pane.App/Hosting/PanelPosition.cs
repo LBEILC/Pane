@@ -111,7 +111,7 @@ public sealed partial class GlassPanel
     }
     internal void SimulateDrag(int dx,int dy)
     {
-        if(!Shown)throw new InvalidOperationException("拖动需要显示中的面板");
+        if(!Shown)throw new InvalidOperationException("拖动需要显示中的面板"); // 不翻译：异常
         int x=positionX+(int)(48*dpi)+dx,y=positionY+(int)(48*dpi)+dy;
         MovePanel(x,y,At(x,y));SavePosition();
     }

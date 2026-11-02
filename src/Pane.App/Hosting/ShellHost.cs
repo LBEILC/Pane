@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Runtime.InteropServices;
 using Pane.Settings;
 namespace Pane.Hosting;
@@ -13,14 +14,14 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     {
         var done=new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         winVRequests.Enqueue((enabled,done));
-        if(stopping||!PostMessageW(window,0x8004,0,0))done.TrySetException(new IOException("热键宿主已退出"));
+        if(stopping||!PostMessageW(window,0x8004,0,0))done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
         return done.Task;
     }
     bool ApplyWinV()
     {
         if(registered.Contains(3))
         {
-            if(!Native.UnregisterHotKey(shellWindow,3))throw new IOException("无法释放 Win+V 热键");
+            if(!Native.UnregisterHotKey(shellWindow,3))throw new IOException(Strings.Common_ReleaseWinVFailed);
             registered.Remove(3);
         }
         lock(conflicts)conflicts.RemoveAll(c=>c.Target=="winv");
@@ -67,7 +68,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
             shellWindow=Native.CreateWindowExW(0,wc.name!,"Pane",0,0,0,0,0,0,0,wc.instance,0);
             data=new NotifyIcon{Size=(uint)Marshal.SizeOf<NotifyIcon>(),Window=shellWindow,Id=1,Flags=7,Callback=Callback,Icon=AppIcon.Small,Tip="Pane",Info="",Title=""};
             ApplyCore(settings);ready.Set();while(GetMessageW(out var msg,0,0,0)>0){TranslateMessage(ref msg);DispatchMessageW(ref msg);}
-        }catch(Exception ex){error=ex;Cleanup();ready.Set();}}){IsBackground=true,Name="Pane 热键与托盘"};
+        }catch(Exception ex){error=ex;Cleanup();ready.Set();}}){IsBackground=true,Name="Pane 热键与托盘"}; // 不翻译：线程名称
         thread.Start();ready.Wait();window=shellWindow;if(error!=null)throw error;
     }
     nint shellWindow;
@@ -77,7 +78,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         var text=Environment.GetEnvironmentVariable("PANE_DEV_HOTKEYS");if(string.IsNullOrWhiteSpace(text))return value;
         foreach(var pair in text.Split(';')){var parts=pair.Split('=',2);if(parts.Length!=2||parts[0]!=name)continue;
             var keys=parts[1].Split('+');KeyModifiers mods=0;foreach(var k in keys[..^1])mods|=Enum.Parse<KeyModifiers>(k,true);
-            string last=keys[^1];ushort vk=last.Equals("Space",StringComparison.OrdinalIgnoreCase)?(ushort)32:last.Length==1?(ushort)char.ToUpperInvariant(last[0]):throw new FormatException("开发热键格式无效");return new(mods,vk);
+            string last=keys[^1];ushort vk=last.Equals("Space",StringComparison.OrdinalIgnoreCase)?(ushort)32:last.Length==1?(ushort)char.ToUpperInvariant(last[0]):throw new FormatException("开发热键格式无效");return new(mods,vk); // 不翻译：异常
         }return value;
     }
     void ApplyCore(PaneSettings settings){
@@ -86,7 +87,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;
         ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Clipboard.Enabled,suspended);
         ApplyWinV();
-        if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");}
+        if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");} // 不翻译：日志异常
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
     }
     void Register(int id,string name,Hotkey key){
@@ -96,7 +97,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         lock(Diagnostics)Diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
         if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
             // 设计加（2026-10-30）：注册失败时提示一次，否则按了没反应也不知道为什么
-            var what=name=="launcher"?"启动器":"剪贴板";NotifyOnce($"{Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space","空格")} 被其他程序占用，{what}的热键没设上；到 设置 → {what} 里换一个");}
+            var what=name=="launcher"?Strings.Common_Launcher:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
         // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
@@ -117,7 +118,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     void Dispatch(string value)=>queue.TryEnqueue(()=>command(value));
     void Cleanup(){
         stopping=true;
-        while(winVRequests.TryDequeue(out var request))request.Done.TrySetException(new IOException("热键宿主已退出"));
+        while(winVRequests.TryDequeue(out var request))request.Done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
         foreach(var id in registered)CleanupSucceeded &= Native.UnregisterHotKey(shellWindow,id);registered.Clear();
         if(tray){CleanupSucceeded &= Shell_NotifyIconW(2,ref data);tray=false;}
         if(data.Icon!=0){DestroyIcon(data.Icon);data.Icon=0;}

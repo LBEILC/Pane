@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -15,7 +16,7 @@ internal sealed class WindowsWinVRegistry : IWinVRegistry
         string name = history ? "EnableClipboardHistory" : "DisabledHotkeys";
         if (key == null || !key.GetValueNames().Contains(name, StringComparer.OrdinalIgnoreCase)) return new();
         var kind = key.GetValueKind(name);
-        if (kind != (history ? RegistryValueKind.DWord : RegistryValueKind.String)) throw new IOException(name + " 的注册表类型不受支持");
+        if (kind != (history ? RegistryValueKind.DWord : RegistryValueKind.String)) throw new IOException(string.Format(Strings.Settings_WinV_RegistryType, name));
         object value = key.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames)!;
         return history ? new(true, Number: (int)value) : new(true, (string)value);
     }
@@ -48,7 +49,7 @@ internal sealed class ExplorerRestart(IExplorerPlatform platform, int attempts =
         Exception? failure = null;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         try { await platform.RequestRestartAsync(timeout.Token); }
-        catch (Exception e) { failure = e is OperationCanceledException ? new IOException("资源管理器重启超时，请重新登录后再试。", e) : e; }
+        catch (Exception e) { failure = e is OperationCanceledException ? new IOException(Strings.Settings_WinV_RestartTimeout, e) : e; }
         // 正常退出请求发出后，恢复桌面不可被取消打断。
         for (int i = 0; i < attempts; i++)
         {
@@ -62,7 +63,7 @@ internal sealed class ExplorerRestart(IExplorerPlatform platform, int attempts =
             for (int i = 0; i < attempts; i++)
             { if (platform.TaskbarPresent) { if (failure != null) throw failure; return; } await platform.Delay(CancellationToken.None); }
         }
-        throw new IOException("资源管理器未完成重启，请重新登录后再试。", failure);
+        throw new IOException(Strings.Settings_WinV_RestartIncomplete, failure);
     }
 }
 internal sealed class WindowsExplorerPlatform : IExplorerPlatform
@@ -80,7 +81,7 @@ internal sealed class WindowsExplorerPlatform : IExplorerPlatform
     public void Start()
     {
         using var process = Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "explorer.exe"))
-            { WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows), UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden }) ?? throw new IOException("无法启动资源管理器");
+            { WorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Windows), UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden }) ?? throw new IOException(Strings.Settings_WinV_LaunchExplorerFailed);
     }
     public Task RequestRestartAsync(CancellationToken timeout) => Task.Run(() =>
     {
@@ -102,7 +103,7 @@ internal sealed class WindowsExplorerPlatform : IExplorerPlatform
         }
         finally { RmEndSession(session); }
     });
-    static void Check(int code) { if (code != 0) throw new IOException("资源管理器操作失败（" + code + "）"); }
+    static void Check(int code) { if (code != 0) throw new IOException(string.Format(Strings.Settings_WinV_ExplorerError, code)); }
     [StructLayout(LayoutKind.Sequential)] struct UniqueProcess { public int Pid; public System.Runtime.InteropServices.ComTypes.FILETIME Start; }
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern nint FindWindowW(string name, string? title);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(nint window, out uint pid);

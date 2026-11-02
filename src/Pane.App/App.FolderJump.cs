@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 文件对话框跳转菜单的宿主（设计负责人，038）：服务说要菜单（Ctrl+Shift+G，或 Ctrl+G 没有可直接跳的资源管理器），
 // 就在对话框文件名框的左下角弹出 FolderJumpView；选了文件夹先收起菜单，再让服务把对话框跳过去。
 using Pane.Contracts;
@@ -30,12 +31,12 @@ public sealed partial class App
         {
             jumpView=new FolderJumpView();
             jumpView.Jump+=(_,path)=>_=JumpTo(path);
-            jumpPanel=new GlassPanel("跳到文件夹",jumpView,jumpView,Glass){Placement=PanelPlacement.Tray};
+            jumpPanel=new GlassPanel(Strings.FolderJump_Title,jumpView,jumpView,Glass){Placement=PanelPlacement.Tray};
             WatchFrames(jumpPanel);jumpPanel.Prepare();panels.Add("folder-jump",jumpPanel);
         }
         IReadOnlyList<FolderJumpEntry> entries;
         try{entries=service.Entries();}
-        catch(Exception e){ReportFailure("列出文件夹",e);return;}
+        catch(Exception e){ReportFailure(Strings.FolderJump_ListAction,e);return;}
         jumpDialog=request.Dialog;
         jumpView!.Apply(entries);
         foreach(var other in panels.Values)if(other!=jumpPanel)other.Hide();
@@ -47,6 +48,6 @@ public sealed partial class App
     {
         if(folderJump is not { } service)return;
         try{await service.JumpAsync(jumpDialog,path,CancellationToken.None);}
-        catch(Exception e){ReportFailure("跳到文件夹",e);}
+        catch(Exception e){ReportFailure(Strings.FolderJump_JumpAction,e);}
     }
 }

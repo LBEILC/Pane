@@ -17,6 +17,7 @@ internal static partial class Program
         }
         string directory=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
         var store=new SettingsStore(directory,Defaults());
+        foreach(var message in new[]{"不支援 reasoning", "不識別思考參數"}) { using var error=JsonDocument.Parse("\""+message+"\""); Check(AiProtocol.UnsupportedReasoning(error.RootElement), "繁体推理参数错误:"+message); }
         var settings=new AiSettings();
         await ProxyReasoningTests(directory);
         Check(AiProtocol.Prompt(settings,new("translate","你好",null,null)).Contains("英文"),"auto han");

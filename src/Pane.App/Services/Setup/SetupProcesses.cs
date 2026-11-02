@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Diagnostics;
 using Pane.Contracts;
 namespace Pane.Services.Setup;
@@ -21,16 +22,16 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupPr
         // 发送者返回时原进程可能还在清理服务；等实际退出再换目录。
         var watch = Stopwatch.StartNew();
         if (!process.WaitForExit(12000))
-            throw new SetupException("Pane 正在运行，没能让它退出，请先从托盘退出再试");
+            throw new SetupException(Strings.Setup_RunningExitFailed);
         while (Running && watch.ElapsedMilliseconds < 15000) Thread.Sleep(50);
         if (Running)
-            throw new SetupException("Pane 正在运行，没能让它退出，请先从托盘退出再试");
+            throw new SetupException(Strings.Setup_RunningExitFailed);
     }
     public void Launch(bool background = false)
     {
         // 安装自测只启动验证入口，避免实际注册全局服务。
         using var process = Start(paths.Exe, isolated ? ["--setup-launch-probe", IsolatedRoot()] : background ? ["--autostart"] : []);
-        if (isolated && (!process.WaitForExit(15000) || process.ExitCode != 0)) throw new IOException("隔离新版启动失败");
+        if (isolated && (!process.WaitForExit(15000) || process.ExitCode != 0)) throw new IOException("隔离新版启动失败"); // 不翻译：诊断异常
     }
     string IsolatedRoot()
     {
@@ -47,6 +48,6 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupPr
             info.Environment["PANE_DATA_DIR"] = paths.Data; info.Environment["PANE_INSTANCE"] = paths.Root;
             info.Environment["PANE_OBSERVE"] = "1"; info.Environment["PANE_DEV_HOTKEYS"] = "launcher=Ctrl+Alt+Shift+L;clipboard=Ctrl+Alt+Shift+C";
         }
-        return Process.Start(info) ?? throw new IOException("无法启动 Pane");
+        return Process.Start(info) ?? throw new IOException(Strings.Setup_LaunchFailed);
     }
 }

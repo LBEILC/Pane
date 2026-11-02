@@ -8,9 +8,9 @@ internal static class SetupFiles
     {
         for (var part = new DirectoryInfo(Full(path)); part != null; part = part.Parent)
             if (part.Exists && (part.Attributes & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("安装目录不能经过链接");
+                throw new IOException("安装目录不能经过链接"); // 不翻译：内部异常
         if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("安装文件不能是链接");
+            throw new IOException("安装文件不能是链接"); // 不翻译：内部异常
     }
     public static void Copy(string source, string destination)
     {
@@ -68,7 +68,7 @@ internal sealed record SetupPaths(string Root, string Data)
             location = json.RootElement.TryGetProperty("InstallLocation", out var value) ? value.GetString() : null;
             if (!string.IsNullOrEmpty(location) && !SetupFiles.Full(location).StartsWith(SetupFiles.Full(isolatedRoot) + "\\", StringComparison.OrdinalIgnoreCase)
                 && !SetupFiles.Full(location).Equals(SetupFiles.Full(isolatedRoot), StringComparison.OrdinalIgnoreCase))
-                throw new IOException("自测安装位置必须在隔离根目录内");
+                throw new IOException("自测安装位置必须在隔离根目录内"); // 不翻译：诊断异常
         }
         else
         {
@@ -85,7 +85,7 @@ internal sealed record SetupPaths(string Root, string Data)
         root = SetupFiles.Full(root);
         string temp = SetupFiles.Full(Path.GetTempPath()) + Path.DirectorySeparatorChar;
         if (!root.StartsWith(temp, StringComparison.OrdinalIgnoreCase) || !Path.GetFileName(root).StartsWith("Pane-018-", StringComparison.Ordinal))
-            throw new IOException("自测根目录必须是临时目录下的 Pane-018-* 独立目录");
+            throw new IOException("自测根目录必须是临时目录下的 Pane-018-* 独立目录"); // 不翻译：诊断异常
         SetupFiles.Check(root);
         return new(root, Path.Combine(root, "data"));
     }

@@ -21,7 +21,7 @@
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.3.9" />
     <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" Version="2.1.9" />
   </ItemGroup>
-  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/SetupProbe.cs" Link="Diagnostics/SetupProbe.cs" /><Compile Include="../../tests/Pane.App.Probes/ReleaseProbe.cs" Link="Diagnostics/ReleaseProbe.cs" /><Compile Include="../../tests/Pane.App.Probes/App.Diagnostics.cs" Link="Diagnostics/App.Diagnostics.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/LocalizationProbe.cs" Link="Diagnostics/LocalizationProbe.cs" /><Compile Include="../../tests/Pane.App.Probes/SetupProbe.cs" Link="Diagnostics/SetupProbe.cs" /><Compile Include="../../tests/Pane.App.Probes/ReleaseProbe.cs" Link="Diagnostics/ReleaseProbe.cs" /><Compile Include="../../tests/Pane.App.Probes/App.Diagnostics.cs" Link="Diagnostics/App.Diagnostics.cs" /></ItemGroup>
   <ItemGroup><Content Include="Services/Launcher/Data/*" Link="LauncherData/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><Content Update="Assets/pane.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/><Content Update="Assets/pane-app.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/><Content Include="bin/native/Pane.Effect.dll" Link="Pane.Effect.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest"/></ItemGroup>
   <ItemGroup><Content Include="bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
@@ -32,4 +32,5 @@
   <Target Name="PublishAppResources" AfterTargets="Publish">
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)resources.pri" />
   </Target>
+  <Import Project="Localization/Localization.targets" />
 </Project>

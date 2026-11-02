@@ -1,3 +1,4 @@
+using Pane.Localization;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Hosting;
 using Pane.Services.Setup;
@@ -45,7 +46,7 @@ internal sealed class SetupHost : IDisposable
             view = SetupEntry.Uninstall ? new UninstallView(service) : new SetupView(service);
             operation = () => service.Operation;
         }
-        panel = new(SetupEntry.Uninstall ? "卸载 Pane" : "安装 Pane", (UIElement)view, view, glass, true);
+        panel = new(SetupEntry.Uninstall ? Strings.Setup_UninstallTitle : Strings.Setup_InstallTitle, (UIElement)view, view, glass, true);
         panel.Hidden += async (_, _) =>
         {
             // 标题栏关闭或 Esc 也必须等事务完成，不能让后台复制随进程一起中断。
@@ -60,7 +61,7 @@ internal sealed class SetupHost : IDisposable
     void ShowPreviewBackground()
     {
         if (Environment.GetEnvironmentVariable("PANE_WALLPAPER") is not { Length: > 0 } wallpaper) return;
-        background = new Window { Title = "Pane 安装预览背景" };
+        background = new Window { Title = "Pane 安装预览背景" }; // 不翻译：演示夹具
         background.Content = new Microsoft.UI.Xaml.Controls.Image { Source = new Microsoft.UI.Xaml.Media.Imaging.SvgImageSource(new Uri(wallpaper)), Stretch = Microsoft.UI.Xaml.Media.Stretch.Fill };
         var presenter = Microsoft.UI.Windowing.OverlappedPresenter.Create();
         presenter.SetBorderAndTitleBar(false, false);

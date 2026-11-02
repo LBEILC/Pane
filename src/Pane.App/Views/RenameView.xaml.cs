@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 批量重命名窗口逻辑（设计负责人，040）。照原型 prototype/rename.html：
 // 左边规则按顺序叠加（拖左边的握把调整顺序，开关暂时不用某条），右边实时预览（停手 90 ms 重算）；
 // 有问题的行标红、右端写原因，有任何问题就不能执行；执行后行停在「原名 → 新名」并标「已改名」，再动规则才按新名字重新预览。
@@ -29,16 +30,16 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     // 七种规则：名字、图标、一句话说明（添加规则时显示）
     static readonly (RenameRuleKind Kind, string Name, string Glyph, string Desc)[] Kinds =
     [
-        (RenameRuleKind.Replace, "替换", "replace", "把一段文字换成别的，支持正则"),
-        (RenameRuleKind.Insert, "插入文字", "insert", "在开头、末尾或第几个字前面插入"),
-        (RenameRuleKind.Number, "序号", "hash", "按顺序编号，可以补零、调步长"),
-        (RenameRuleKind.Remove, "删除", "eraser", "从第几个字起删掉几个"),
-        (RenameRuleKind.Case, "大小写", "case", "全小写、全大写、首字母大写"),
-        (RenameRuleKind.Extension, "扩展名", "ext", "换掉或去掉扩展名"),
-        (RenameRuleKind.Date, "日期", "calendar", "插入文件的修改或创建日期"),
+        (RenameRuleKind.Replace, Strings.Rename_Replace, "replace", Strings.Rename_ReplaceDescription),
+        (RenameRuleKind.Insert, Strings.Rename_Insert, "insert", Strings.Rename_InsertDescription),
+        (RenameRuleKind.Number, Strings.Rename_Number, "hash", Strings.Rename_NumberDescription),
+        (RenameRuleKind.Remove, Strings.Rename_Delete, "eraser", Strings.Rename_DeleteDescription),
+        (RenameRuleKind.Case, Strings.Rename_Case, "case", Strings.Rename_CaseDescription),
+        (RenameRuleKind.Extension, Strings.Rename_Extension, "ext", Strings.Rename_ExtensionDescription),
+        (RenameRuleKind.Date, Strings.Rename_Date, "calendar", Strings.Rename_DateDescription),
     ];
     const int MaxRules = 20, MaxPresets = 30;
-    static readonly string[] Orders = ["原顺序", "按名称", "按时间"];
+    static readonly string[] Orders = [Strings.Rename_OrderOriginal, Strings.Rename_OrderName, Strings.Rename_OrderTime];
 
     sealed class RuleItem(RenameRule rule)
     {
@@ -111,7 +112,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     {
         topmost = !topmost;
         PinIcon.IsFilled = topmost;
-        ToolTipService.SetToolTip(PinButton, topmost ? "总在最前：开" : "总在最前");
+        ToolTipService.SetToolTip(PinButton, topmost ? Strings.Common_AlwaysOnTopEnabled : Strings.Common_AlwaysOnTop);
         TopmostChanged?.Invoke(this, topmost);
     }
 
@@ -128,11 +129,11 @@ public sealed partial class RenameView : UserControl, ISecondaryView
 
     void UpdateWhere()
     {
-        if (rows.Count == 0) { WhereText.Text = "还没有文件"; return; }
+        if (rows.Count == 0) { WhereText.Text = Strings.Rename_EmptyFiles; return; }
         var folders = rows.Select(r => System.IO.Path.GetDirectoryName(r.Path) ?? "").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         WhereText.Inlines.Clear();
-        WhereText.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = $"{rows.Count} 个", FontWeight = FontWeights.SemiBold, Foreground = SmallStrongProto.Foreground });
-        WhereText.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = folders.Count == 1 ? $" · {folders[0]}" : $" · 来自 {folders.Count} 个文件夹" });
+        WhereText.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = string.Format(Strings.Rename_FileCount, (object?)(rows.Count)), FontWeight = FontWeights.SemiBold, Foreground = SmallStrongProto.Foreground });
+        WhereText.Inlines.Add(new Microsoft.UI.Xaml.Documents.Run { Text = folders.Count == 1 ? $" · {folders[0]}" : string.Format(Strings.Rename_FolderCountSuffix, (object?)(folders.Count)) });
         ToolTipService.SetToolTip(WhereText, string.Join("\n", folders.Take(8)) + (folders.Count > 8 ? "\n…" : ""));
     }
 
@@ -146,14 +147,14 @@ public sealed partial class RenameView : UserControl, ISecondaryView
             var picked = await picker.PickMultipleFilesAsync();
             if (picked is { Count: > 0 }) AddFiles(picked.Select(f => f.Path));
         }
-        catch (Exception ex) { Host.ReportFailure("添加文件", ex); }
+        catch (Exception ex) { Host.ReportFailure(Strings.Rename_AddFiles, ex); }
     }
 
     void OnDragOver(object sender, DragEventArgs e)
     {
         if (!e.DataView.Contains(StandardDataFormats.StorageItems)) return;
         e.AcceptedOperation = DataPackageOperation.Copy;
-        e.DragUIOverride.Caption = "加进来";
+        e.DragUIOverride.Caption = Strings.Rename_AddSelected;
         DropHint.Opacity = 1;
     }
 
@@ -203,7 +204,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         IReadOnlyList<RenamePreview> result;
         try { result = await renamer.PreviewAsync([.. list.Select(r => r.Path)], Rules, cts.Token); }
         catch (OperationCanceledException) { return; }
-        catch (Exception e) { if (cts == previewRun) Host.ReportFailure("预览", e); return; }
+        catch (Exception e) { if (cts == previewRun) Host.ReportFailure(Strings.Rename_Preview, e); return; }
         if (cts != previewRun || applied) return;
         for (int i = 0; i < list.Count && i < result.Count; i++) list[i].Show(result[i]);
         preview = result;
@@ -235,23 +236,23 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         if (doneText is not null)
         {
             Summary.Children.Add(Dot(doneText, PaneTokens.Success));
-            if (failed > 0) Summary.Children.Add(Dot($"{failed} 个没改成（鼠标移到标签上看原因）", PaneTokens.Danger));
-            GoText.Text = "已完成";
+            if (failed > 0) Summary.Children.Add(Dot(string.Format(Strings.Rename_FailedCount, (object?)(failed)), PaneTokens.Danger));
+            GoText.Text = Strings.Rename_Finished;
             GoButton.IsEnabled = false;
             return;
         }
         int change = ChangeCount, same = preview.Count(p => p.Issue == RenameIssue.Unchanged), problems = ProblemCount;
         bool badPattern = preview.Any(p => p.Issue == RenameIssue.BadPattern);
-        if (rows.Count == 0) Summary.Children.Add(Dot("先选中要改名的文件", null));
-        else if (badPattern) Summary.Children.Add(Dot(rules.Any(r => r.Rule.Enabled && r.Rule.Regex && BadRegex(r.Rule)) ? "正则写错了" : "规则写错了（正则或日期格式）", PaneTokens.Danger));
+        if (rows.Count == 0) Summary.Children.Add(Dot(Strings.Rename_SelectFilesFirst, null));
+        else if (badPattern) Summary.Children.Add(Dot(rules.Any(r => r.Rule.Enabled && r.Rule.Regex && BadRegex(r.Rule)) ? Strings.Rename_InvalidRegex : Strings.Rename_InvalidRule, PaneTokens.Danger));
         else
         {
-            Summary.Children.Add(Dot($"改名 {change} 个", Text2Proto.Foreground));
-            if (same > 0) Summary.Children.Add(Dot($"不变 {same} 个", Text3Proto.Foreground));
-            if (problems > 0) Summary.Children.Add(Dot($"{problems} 个有问题，先解决才能执行", PaneTokens.Danger));
+            Summary.Children.Add(Dot(string.Format(Strings.Rename_ChangedCount, (object?)(change)), Text2Proto.Foreground));
+            if (same > 0) Summary.Children.Add(Dot(string.Format(Strings.Rename_UnchangedCount, (object?)(same)), Text3Proto.Foreground));
+            if (problems > 0) Summary.Children.Add(Dot(string.Format(Strings.Rename_IssuesCount, (object?)(problems)), PaneTokens.Danger));
         }
         GoButton.IsEnabled = change > 0 && problems == 0 && !busy;
-        GoText.Text = change > 0 ? $"重命名 {change} 个" : "重命名";
+        GoText.Text = change > 0 ? string.Format(Strings.Rename_RenameCount, (object?)(change)) : Strings.Common_RenameAction;
     }
 
     // 底栏的一项：小圆点 + 文字；圆点颜色表示类别，警示类文字也用警示色
@@ -322,7 +323,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         if (ChangeCount == 0 || ProblemCount > 0) return;
         busy = true;
         GoButton.IsEnabled = false;
-        GoText.Text = "正在改名…";
+        GoText.Text = Strings.Rename_Running;
         var plan = preview;
         var byPath = shown.ToDictionary(r => r.Path, StringComparer.OrdinalIgnoreCase);
         try
@@ -353,11 +354,11 @@ public sealed partial class RenameView : UserControl, ISecondaryView
             times.Clear();
             undoId = result.UndoId;
             UndoButton.Visibility = undoId is null ? Visibility.Collapsed : Visibility.Visible;
-            UpdateSummary($"已重命名 {result.Renamed} 个", failed.Count);
+            UpdateSummary(string.Format(Strings.Rename_CompleteCount, (object?)(result.Renamed)), failed.Count);
             UpdateWhere();
             SaveLastRules();
         }
-        catch (Exception ex) { Host.ReportFailure("批量重命名", ex); UpdateSummary(); }
+        catch (Exception ex) { Host.ReportFailure(Strings.Common_Rename, ex); UpdateSummary(); }
         finally { busy = false; }
     }
 
@@ -383,9 +384,9 @@ public sealed partial class RenameView : UserControl, ISecondaryView
             UpdateWhere();
             busy = false;
             await Refresh();
-            if (result.Failed.Count > 0) Host.ReportFailure("撤销", new IOException($"{result.Failed.Count} 个没能改回去：{result.Failed[0].Reason}"));
+            if (result.Failed.Count > 0) Host.ReportFailure(Strings.Common_Undo, new IOException(string.Format(Strings.Rename_UndoFailed, (object?)(result.Failed.Count), (object?)(result.Failed[0].Reason))));
         }
-        catch (Exception ex) { Host.ReportFailure("撤销", ex); }
+        catch (Exception ex) { Host.ReportFailure(Strings.Common_Undo, ex); }
         finally { busy = false; }
     }
 
@@ -434,7 +435,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
 
         var grip = new Border { Width = 18, Height = PaneTokens.ControlXs, CornerRadius = new CornerRadius(6), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
             Child = new PaneIcon { Glyph = "grip", Width = 14, Height = 14, Foreground = Text3Proto.Foreground } };
-        ToolTipService.SetToolTip(grip, "拖动调整顺序");
+        ToolTipService.SetToolTip(grip, Strings.Rename_DragOrder);
         grip.PointerEntered += (_, _) => grip.Background = HoverProto.Background;
         grip.PointerExited += (_, _) => { if (dragging != item) grip.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent); };
         grip.PointerPressed += (s, e) => StartDrag(item, grip, e);
@@ -446,10 +447,10 @@ public sealed partial class RenameView : UserControl, ISecondaryView
             Child = new PaneIcon { Glyph = kind.Glyph, Width = 13, Height = 13, Foreground = SmallStrongProto.Foreground } };
         var sw = new PaneSwitch(item.Rule.Enabled, FillProto.Background, FillProto.BorderBrush, AccentProto.Background)
         { RenderTransform = new ScaleTransform { ScaleX = 0.82, ScaleY = 0.82, CenterX = 18, CenterY = 11 }, VerticalAlignment = VerticalAlignment.Center };
-        ToolTipService.SetToolTip(sw, item.Rule.Enabled ? "暂时不用这条" : "启用这条");
+        ToolTipService.SetToolTip(sw, item.Rule.Enabled ? Strings.Rename_DisableRule : Strings.Rename_EnableRule);
         var del = new Button { Style = (Style)Application.Current.Resources["PaneIconButton"], Width = PaneTokens.ControlXs, Height = PaneTokens.ControlXs, CornerRadius = new CornerRadius(6),
             Content = new PaneIcon { Glyph = "close", Width = 13, Height = 13 } };
-        ToolTipService.SetToolTip(del, "删掉这条");
+        ToolTipService.SetToolTip(del, Strings.Rename_DeleteRule);
         del.Click += (_, _) => RemoveRule(item);
 
         var head = new Grid { Height = PaneTokens.ControlSm, ColumnSpacing = 6 };
@@ -467,7 +468,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         sw.Toggled += (_, on) =>
         {
             item.Rule = item.Rule with { Enabled = on };
-            ToolTipService.SetToolTip(sw, on ? "暂时不用这条" : "启用这条");
+            ToolTipService.SetToolTip(sw, on ? Strings.Rename_DisableRule : Strings.Rename_EnableRule);
             Dim();
             Schedule();
         };
@@ -506,35 +507,35 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         {
             case RenameRuleKind.Replace:
             {
-                var find = Text(r.Find, r.Regex ? @"正则，比如 IMG_(\d+)" : "要换掉的文字", r.Regex, v => Set(x => x with { Find = v }));
-                var with = Text(r.Text, r.Regex ? "可以用 $1 引用分组" : "留空 = 删掉", false, v => Set(x => x with { Text = v }));
-                var space = Hint("查找的是空格");
+                var find = Text(r.Find, r.Regex ? Strings.Rename_RegexPlaceholder : Strings.Rename_FindPlaceholder, r.Regex, v => Set(x => x with { Find = v }));
+                var with = Text(r.Text, r.Regex ? Strings.Rename_ReplacementGroupPlaceholder : Strings.Rename_ReplacementEmptyPlaceholder, false, v => Set(x => x with { Text = v }));
+                var space = Hint(Strings.Rename_FindSpace);
                 void Space() => space.Visibility = item.Rule.Find.Length > 0 && item.Rule.Find.Trim().Length == 0 ? Visibility.Visible : Visibility.Collapsed;
                 ((TextBox)find.Child).TextChanged += (_, _) => Space();
                 Space();
-                item.Error = Hint("正则写错了，先改好才能预览");
+                item.Error = Hint(Strings.Rename_RegexHint);
                 item.Error.Foreground = PaneTokens.Danger;
                 item.Error.Visibility = Visibility.Collapsed;
-                var regex = Toggle("正则", r.Regex, on =>
+                var regex = Toggle(Strings.Rename_Regex, r.Regex, on =>
                 {
                     Set(x => x with { Regex = on });
                     var box = (TextBox)find.Child;
                     box.FontFamily = on ? MonoProto.FontFamily : SmallStrongProto.FontFamily;
-                    box.PlaceholderText = on ? @"正则，比如 IMG_(\d+)" : "要换掉的文字";
-                    ((TextBox)with.Child).PlaceholderText = on ? "可以用 $1 引用分组" : "留空 = 删掉";
+                    box.PlaceholderText = on ? Strings.Rename_RegexPlaceholder : Strings.Rename_FindPlaceholder;
+                    ((TextBox)with.Child).PlaceholderText = on ? Strings.Rename_ReplacementGroupPlaceholder : Strings.Rename_ReplacementEmptyPlaceholder;
                 });
-                body.Children.Add(Line("查找", find));
-                body.Children.Add(Line("换成", with));
-                body.Children.Add(Line("", Row(regex, Toggle("区分大小写", r.MatchCase, on => Set(x => x with { MatchCase = on })))));
+                body.Children.Add(Line(Strings.Rename_Find, find));
+                body.Children.Add(Line(Strings.Rename_ReplaceWith, with));
+                body.Children.Add(Line("", Row(regex, Toggle(Strings.Rename_CaseSensitive, r.MatchCase, on => Set(x => x with { MatchCase = on })))));
                 body.Children.Add(space);
                 body.Children.Add(item.Error);
                 break;
             }
             case RenameRuleKind.Insert:
             {
-                var index = IndexLine(item, "个字前面", "个字后面", Set);
-                body.Children.Add(Line("文字", Text(r.Text, "要插入的文字", false, v => Set(x => x with { Text = v }))));
-                body.Children.Add(Line("位置", Segments([("Start", "开头"), ("End", "末尾"), ("Index", "第几个字")], r.Position.ToString(), v =>
+                var index = IndexLine(item, Strings.Rename_BeforeCharacter, Strings.Rename_AfterCharacter, Set);
+                body.Children.Add(Line(Strings.Rename_Text, Text(r.Text, Strings.Rename_InsertPlaceholder, false, v => Set(x => x with { Text = v }))));
+                body.Children.Add(Line(Strings.Rename_Position, Segments([("Start", Strings.Rename_Beginning), ("End", Strings.Rename_End), ("Index", Strings.Rename_CharacterIndex)], r.Position.ToString(), v =>
                 {
                     Set(x => x with { Position = Enum.Parse<RenamePosition>(v) });
                     index.Visibility = v == "Index" ? Visibility.Visible : Visibility.Collapsed;
@@ -544,39 +545,39 @@ public sealed partial class RenameView : UserControl, ISecondaryView
                 break;
             }
             case RenameRuleKind.Number:
-                body.Children.Add(Line("位置", Segments([("Start", "开头"), ("End", "末尾")], r.Position == RenamePosition.Start ? "Start" : "End", v => Set(x => x with { Position = Enum.Parse<RenamePosition>(v) }))));
-                body.Children.Add(Line("起始", Row(
+                body.Children.Add(Line(Strings.Rename_Position, Segments([("Start", Strings.Rename_Beginning), ("End", Strings.Rename_End)], r.Position == RenamePosition.Start ? "Start" : "End", v => Set(x => x with { Position = Enum.Parse<RenamePosition>(v) }))));
+                body.Children.Add(Line(Strings.Rename_NumberStart, Row(
                     Number(r.Start, 0, v => Set(x => x with { Start = v })),
-                    Mid("步长"), Number(r.Step, 1, v => Set(x => x with { Step = v })),
-                    Mid("位数", "不够的前面补 0"), Number(r.Digits, 1, v => Set(x => x with { Digits = Math.Min(v, 9) })))));
-                body.Children.Add(Line("分隔", Text(r.Separator, "序号和名字之间，比如 -", false, v => Set(x => x with { Separator = v }))));
+                    Mid(Strings.Rename_NumberStep), Number(r.Step, 1, v => Set(x => x with { Step = v })),
+                    Mid(Strings.Rename_NumberDigits, Strings.Rename_NumberPadding), Number(r.Digits, 1, v => Set(x => x with { Digits = Math.Min(v, 9) })))));
+                body.Children.Add(Line(Strings.Rename_NumberSeparator, Text(r.Separator, Strings.Rename_NumberSeparatorPlaceholder, false, v => Set(x => x with { Separator = v }))));
                 break;
             case RenameRuleKind.Remove:
             {
-                var fromText = Mid(r.FromEnd ? "从倒数第" : "从第");
-                var tail = Mid(r.FromEnd ? "个字起往前删" : "个字起删");
-                body.Children.Add(Line("删除", Row(fromText, Number(r.Index, 1, v => Set(x => x with { Index = v })), tail, Number(r.Count, 1, v => Set(x => x with { Count = v })), Mid("个"))));
-                body.Children.Add(Line("", Row(Toggle("从末尾数", r.FromEnd, on =>
+                var fromText = Mid(r.FromEnd ? Strings.Rename_DeleteFromEnd : Strings.Rename_DeleteFromStart);
+                var tail = Mid(r.FromEnd ? Strings.Rename_DeleteBackward : Strings.Rename_DeleteForward);
+                body.Children.Add(Line(Strings.Rename_Delete, Row(fromText, Number(r.Index, 1, v => Set(x => x with { Index = v })), tail, Number(r.Count, 1, v => Set(x => x with { Count = v })), Mid(Strings.Rename_CharacterCount))));
+                body.Children.Add(Line("", Row(Toggle(Strings.Rename_CountFromEnd, r.FromEnd, on =>
                 {
                     Set(x => x with { FromEnd = on });
-                    fromText.Text = on ? "从倒数第" : "从第";
-                    tail.Text = on ? "个字起往前删" : "个字起删";
+                    fromText.Text = on ? Strings.Rename_DeleteFromEnd : Strings.Rename_DeleteFromStart;
+                    tail.Text = on ? Strings.Rename_DeleteBackward : Strings.Rename_DeleteForward;
                 }))));
                 break;
             }
             case RenameRuleKind.Case:
-                body.Children.Add(Line("改成", Segments([("Lower", "小写"), ("Upper", "大写"), ("Title", "词首大写")], r.Case.ToString(), v => Set(x => x with { Case = Enum.Parse<RenameCase>(v) }))));
-                body.Children.Add(Line("", Row(Toggle("扩展名也改", r.IncludeExtension, on => Set(x => x with { IncludeExtension = on })))));
+                body.Children.Add(Line(Strings.Rename_ChangeTo, Segments([("Lower", Strings.Rename_LowerCase), ("Upper", Strings.Rename_UpperCase), ("Title", Strings.Rename_TitleCase)], r.Case.ToString(), v => Set(x => x with { Case = Enum.Parse<RenameCase>(v) }))));
+                body.Children.Add(Line("", Row(Toggle(Strings.Rename_IncludeExtension, r.IncludeExtension, on => Set(x => x with { IncludeExtension = on })))));
                 break;
             case RenameRuleKind.Extension:
-                body.Children.Add(Line("改成", Text(r.Text, "比如 jpg；留空 = 去掉扩展名", false, v => Set(x => x with { Text = v }))));
-                body.Children.Add(Hint("只改文件；文件夹没有扩展名，不受影响。"));
+                body.Children.Add(Line(Strings.Rename_ChangeTo, Text(r.Text, Strings.Rename_ExtensionPlaceholder, false, v => Set(x => x with { Text = v }))));
+                body.Children.Add(Hint(Strings.Rename_ExtensionDescriptionHint));
                 break;
             case RenameRuleKind.Date:
-                body.Children.Add(Line("日期", Segments([("Modified", "修改日期"), ("Created", "创建日期")], r.DateSource.ToString(), v => Set(x => x with { DateSource = Enum.Parse<RenameDateSource>(v) }))));
-                body.Children.Add(Line("格式", Text(r.DateFormat, "yyyy-MM-dd", true, v => Set(x => x with { DateFormat = v }))));
-                body.Children.Add(Line("位置", Segments([("Start", "开头"), ("End", "末尾")], r.Position == RenamePosition.Start ? "Start" : "End", v => Set(x => x with { Position = Enum.Parse<RenamePosition>(v) }))));
-                body.Children.Add(Line("分隔", Text(r.Separator, "日期和名字之间，比如空格", false, v => Set(x => x with { Separator = v }))));
+                body.Children.Add(Line(Strings.Rename_Date, Segments([("Modified", Strings.Rename_ModifiedDate), ("Created", Strings.Rename_CreatedDate)], r.DateSource.ToString(), v => Set(x => x with { DateSource = Enum.Parse<RenameDateSource>(v) }))));
+                body.Children.Add(Line(Strings.Rename_DateFormat, Text(r.DateFormat, "yyyy-MM-dd", true, v => Set(x => x with { DateFormat = v }))));
+                body.Children.Add(Line(Strings.Rename_Position, Segments([("Start", Strings.Rename_Beginning), ("End", Strings.Rename_End)], r.Position == RenamePosition.Start ? "Start" : "End", v => Set(x => x with { Position = Enum.Parse<RenamePosition>(v) }))));
+                body.Children.Add(Line(Strings.Rename_DateSeparator, Text(r.Separator, Strings.Rename_DateSeparatorPlaceholder, false, v => Set(x => x with { Separator = v }))));
                 break;
         }
     }
@@ -585,12 +586,12 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     FrameworkElement IndexLine(RuleItem item, string before, string after, Action<Func<RenameRule, RenameRule>> set)
     {
         var r = item.Rule;
-        var lead = Mid(r.FromEnd ? "倒数第" : "第");
+        var lead = Mid(r.FromEnd ? Strings.Rename_CharacterFromEnd : Strings.Rename_CharacterFromStart);
         var tail = Mid(r.FromEnd ? after : before);
-        var toggle = Toggle("从末尾数", r.FromEnd, on =>
+        var toggle = Toggle(Strings.Rename_CountFromEnd, r.FromEnd, on =>
         {
             set(x => x with { FromEnd = on });
-            lead.Text = on ? "倒数第" : "第";
+            lead.Text = on ? Strings.Rename_CharacterFromEnd : Strings.Rename_CharacterFromStart;
             tail.Text = on ? after : before;
         });
         var g = new Grid();
@@ -829,7 +830,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     {
         KindGrid.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
         AddRuleTurn.Angle = show ? 45 : 0;
-        AddRuleText.Text = show ? "收起" : "添加规则";
+        AddRuleText.Text = show ? Strings.Common_Collapse : Strings.Rename_AddRule;
         if (show) { Enter(KindGrid); DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => KindGrid.StartBringIntoView()); }
     }
 
@@ -854,7 +855,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     void UpdateAddButton()
     {
         AddRuleButton.IsEnabled = rules.Count < MaxRules;
-        ToolTipService.SetToolTip(AddRuleButton, rules.Count < MaxRules ? null : $"最多 {MaxRules} 条规则");
+        ToolTipService.SetToolTip(AddRuleButton, rules.Count < MaxRules ? null : string.Format(Strings.Rename_RuleLimit, (object?)(MaxRules)));
     }
 
     // ---------------- 预设 ----------------
@@ -877,7 +878,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         var presets = Host.Store.Current.Rename.Presets;
         if (presets.Length == 0)
         {
-            PresetList.Children.Add(new TextBlock { Text = "还没有预设：调好规则后点底部的「存为预设」", TextWrapping = TextWrapping.Wrap, FontFamily = SmallProto.FontFamily, FontSize = SmallProto.FontSize, Foreground = SmallProto.Foreground });
+            PresetList.Children.Add(new TextBlock { Text = Strings.Rename_EmptyPresets, TextWrapping = TextWrapping.Wrap, FontFamily = SmallProto.FontFamily, FontSize = SmallProto.FontSize, Foreground = SmallProto.Foreground });
             return;
         }
         foreach (var p in presets)
@@ -885,7 +886,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
             var name = new TextBlock { Text = p.Name, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 200, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = SmallStrongProto.FontFamily, FontSize = SmallStrongProto.FontSize, Foreground = SmallStrongProto.Foreground };
             var x = new Border { Width = 18, Height = 18, CornerRadius = new CornerRadius(9), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 Child = new PaneIcon { Glyph = "close", Width = 11, Height = 11, Foreground = Text3Proto.Foreground } };
-            ToolTipService.SetToolTip(x, "删掉这个预设");
+            ToolTipService.SetToolTip(x, Strings.Rename_DeletePreset);
             x.PointerEntered += (_, _) => x.Background = HoverProto.Background;
             x.PointerExited += (_, _) => x.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
             x.Tapped += (_, e) => { e.Handled = true; DeletePreset(p); };
@@ -939,7 +940,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         {
             CloseSave();
             if (PresetBox.Visibility == Visibility.Visible) FillPresets();
-            UpdateSummaryNote($"已存为预设「{name}」");
+            UpdateSummaryNote(string.Format(Strings.Rename_PresetSaved, (object?)(name)));
         }
     }
 
@@ -948,7 +949,7 @@ public sealed partial class RenameView : UserControl, ISecondaryView
     static bool TrySave(PaneSettings value)
     {
         try { Host.Store.Save(value); return true; }
-        catch (Exception e) { Host.ReportFailure("保存预设", e); return false; }
+        catch (Exception e) { Host.ReportFailure(Strings.Rename_SavePreset, e); return false; }
     }
 
     // 底栏左边临时说一句（存好预设），下次预览刷新时换回汇总

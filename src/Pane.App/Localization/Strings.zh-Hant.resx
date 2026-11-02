@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
+  </resheader>
+  <data name="Tray_Title" xml:space="preserve">
+    <value>托盤選單</value>
+  </data>
+  <data name="Tray_UpdateReady" xml:space="preserve">
+    <value>新版本 {0} 已下載好</value>
+  </data>
+  <data name="Tray_RestartUpdate" xml:space="preserve">
+    <value>重新啟動並更新</value>
+  </data>
+  <data name="Tray_OpenLauncher" xml:space="preserve">
+    <value>開啟啟動器</value>
+  </data>
+  <data name="Tray_OpenClipboard" xml:space="preserve">
+    <value>開啟剪貼簿</value>
+  </data>
+  <data name="Tray_Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Tray_PauseGestures" xml:space="preserve">
+    <value>暫停手勢</value>
+  </data>
+  <data name="Tray_Exit" xml:space="preserve">
+    <value>結束 Pane</value>
+  </data>
+  <data name="Launcher_Group_Applications" xml:space="preserve">
+    <value>應用程式</value>
+  </data>
+  <data name="Launcher_Group_Files" xml:space="preserve">
+    <value>檔案</value>
+  </data>
+  <data name="Launcher_Group_Commands" xml:space="preserve">
+    <value>命令</value>
+  </data>
+  <data name="Launcher_Group_Calculation" xml:space="preserve">
+    <value>計算</value>
+  </data>
+  <data name="Launcher_Group_Ai" xml:space="preserve">
+    <value>AI</value>
+  </data>
+  <data name="Launcher_Group_Web" xml:space="preserve">
+    <value>網頁</value>
+  </data>
+  <data name="Launcher_Group_Settings" xml:space="preserve">
+    <value>設定</value>
+  </data>
+  <data name="Launcher_Group_Terminal" xml:space="preserve">
+    <value>終端機</value>
+  </data>
+  <data name="Launcher_Group_Recent" xml:space="preserve">
+    <value>最近使用</value>
+  </data>
+  <data name="Launcher_Group_Pinned" xml:space="preserve">
+    <value>已釘選</value>
+  </data>
+  <data name="Launcher_Group_Completion" xml:space="preserve">
+    <value>補全</value>
+  </data>
+  <data name="Launcher_Group_Images" xml:space="preserve"><value>圖片</value></data>
+  <data name="Launcher_Group_Other" xml:space="preserve"><value>其他</value></data>
+  <data name="Launcher_Group_Actions" xml:space="preserve"><value>動作</value></data>
+</root>

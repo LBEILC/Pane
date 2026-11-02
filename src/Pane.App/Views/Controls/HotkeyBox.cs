@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 热键录入（原型 .hotkey）：显示成一串键帽；点一下进入录入（焦点光环），按下组合键即保存，Esc 取消；
 // 必须带修饰键；Win+V 在没打开「替换 Win+V」时不能选。
 using Microsoft.UI.Input;
@@ -49,7 +50,7 @@ public sealed partial class HotkeyBox : UserControl
     {
         recording = true;
         box.BorderBrush = ring; box.BorderThickness = new Thickness(2);
-        Message(AllowBareKeys ? "按下要发送的键…" : "按下新的组合键…");
+        Message(AllowBareKeys ? Strings.Common_RecordKey : Strings.Common_RecordHotkey);
         Focus(FocusState.Programmatic);
         RecordingChanged?.Invoke(this, true);
     }
@@ -74,7 +75,7 @@ public sealed partial class HotkeyBox : UserControl
         if (Down(VirtualKey.Menu)) mods |= KeyModifiers.Alt;
         if (Down(VirtualKey.Shift)) mods |= KeyModifiers.Shift;
         if (Down(VirtualKey.LeftWindows) || Down(VirtualKey.RightWindows)) mods |= KeyModifiers.Win;
-        if (mods == 0 && !AllowBareKeys) { Message("至少要带一个 Ctrl / Alt / Shift / Win"); return; }
+        if (mods == 0 && !AllowBareKeys) { Message(Strings.Common_ModifierRequired); return; }
         var next = new Hotkey(mods, (ushort)e.Key);
         if (Validate?.Invoke(next) is { } reason) { Message(reason); return; }
         value = next;
@@ -93,7 +94,7 @@ public sealed partial class HotkeyBox : UserControl
     void Show()
     {
         keys.Children.Clear();
-        if (value.VirtualKey == 0) { Message("点这里，然后按键"); return; }   // 还没录过
+        if (value.VirtualKey == 0) { Message(Strings.Common_ClickToRecord); return; }   // 还没录过
         bool first = true;
         foreach (var name in Names(value))
         {
@@ -124,6 +125,6 @@ public sealed partial class HotkeyBox : UserControl
         0x24 => "Home", 0x23 => "End", 0x21 => "PgUp", 0x22 => "PgDn",
         0x25 => "←", 0x26 => "↑", 0x27 => "→", 0x28 => "↓",
         0xC0 => "`", 0xBD => "-", 0xBB => "=", 0xDB => "[", 0xDD => "]", 0xDC => "\\", 0xBA => ";", 0xDE => "'", 0xBC => ",", 0xBE => ".", 0xBF => "/",
-        _ => $"键 {vk:X2}",
+        _ => string.Format(Strings.Common_KeyCode, (object?)(vk)),
     };
 }

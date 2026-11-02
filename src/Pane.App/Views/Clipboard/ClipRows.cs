@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 剪贴板条目在界面上的形态。
 using System.ComponentModel;
 using Microsoft.UI.Text;
@@ -77,7 +78,7 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public Visibility SourcePictureVisibility => V(SourcePicture is not null);
     public Visibility HotkeyVisibility => V(Index < 9);
     public bool Pinned => Entry.Pinned;
-    public string PinTip => Entry.Pinned ? "取消固定（Ctrl+P）" : "固定（Ctrl+P）";
+    public string PinTip => Entry.Pinned ? Strings.Clipboard_UnpinHint : Strings.Clipboard_PinHint;
 
     // 右下角：平时显示 Alt+数字，选中或悬停时换成操作按钮（原型 .clip-end）
     bool selected;
@@ -107,11 +108,11 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public static string Ago(DateTimeOffset at)
     {
         var min = (int)(DateTimeOffset.Now - at).TotalMinutes;
-        if (min < 1) return "刚刚";
-        if (min < 60) return $"{min} 分钟前";
-        if (min < 1440) return $"{min / 60} 小时前";
-        if (min < 2880) return "昨天";
-        return $"{min / 1440} 天前";
+        if (min < 1) return Strings.Clipboard_JustNow;
+        if (min < 60) return string.Format(Strings.Clipboard_MinutesAgo, (object?)(min));
+        if (min < 1440) return string.Format(Strings.Clipboard_HoursAgo, (object?)(min / 60));
+        if (min < 2880) return Strings.Clipboard_Yesterday;
+        return string.Format(Strings.Clipboard_DaysAgo, (object?)(min / 1440));
     }
 
     static Brush PictureBrush(ClipPicture p)
