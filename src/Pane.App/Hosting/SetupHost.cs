@@ -38,10 +38,10 @@ internal sealed class SetupHost : IDisposable
         }
         else
         {
-            var integration = new SetupIntegration(SetupEntry.Paths, defaults);
+            var integration = new SetupIntegration(SetupEntry.Paths, defaults, SetupEntry.IsolatedRoot);
             var service = new SetupService(SetupEntry.Paths, AppContext.BaseDirectory,
-                SetupFiles.VersionOf(Environment.ProcessPath!) ?? "0.1.0", integration, new SetupProcesses(SetupEntry.Paths, false), autoUpdate: SetupEntry.AutoUpdate,
-                restoreWinV: directory => new Pane.Services.WinV.WinVReplacement(directory, new Pane.Services.WinV.WindowsWinVRegistry(),
+                SetupFiles.VersionOf(Environment.ProcessPath!) ?? "0.1.0", integration, new SetupProcesses(SetupEntry.Paths, SetupEntry.IsolatedRoot != null), autoUpdate: SetupEntry.AutoUpdate,
+                restoreWinV: directory => SetupEntry.IsolatedRoot != null ? Task.CompletedTask : new Pane.Services.WinV.WinVReplacement(directory, new Pane.Services.WinV.WindowsWinVRegistry(),
                     new Pane.Services.WinV.ExplorerRestart(new Pane.Services.WinV.WindowsExplorerPlatform()), new Pane.Services.WinV.NoWinVHotkey()).RestoreForUninstallAsync());
             view = SetupEntry.Uninstall ? new UninstallView(service) : new SetupView(service);
             operation = () => service.Operation;
@@ -54,6 +54,14 @@ internal sealed class SetupHost : IDisposable
             Dispose(); app.Exit();
         };
         panel.Prepare(); panel.Show();
+        if (SetupEntry.Uninstall)
+        {
+            bool foreground = UninstallChain.SetForegroundWindow(panel.Input);
+            UninstallChain.Log("window-shown", foreground ? "foreground" : "foreground-denied");
+            UninstallChain.Signal(SetupEntry.ReadyEvent);
+            UninstallChain.WaitLauncher(SetupEntry.LauncherPid);
+            if (SetupEntry.IsolatedWindow) File.WriteAllText(Path.Combine(SetupEntry.IsolatedRoot!, "window.txt"), $"{Environment.ProcessId}\n{panel.Input}\n{foreground}");
+        }
         timer = queue.CreateTimer(); timer.Interval = TimeSpan.FromMilliseconds(8); timer.Tick += (_, _) => panel.Tick(); timer.Start();
     }
     // 设计预览截图用：PANE_WALLPAPER 指定的原型壁纸铺满主屏，放在安装窗口后面，截图里不会出现用户自己的屏幕内容

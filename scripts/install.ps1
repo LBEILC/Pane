@@ -19,14 +19,30 @@ $createdRoot=!(Test-Path -LiteralPath $Root);$movedCurrent=$false;$movedOld=$fal
 $journal=[Collections.Generic.List[string]]::new()
 $registration=Get-PaneRegistration
 $registrationChanged=$false
+$uninstaller=Join-Path $Root 'Uninstall Pane.exe'
+Assert-PanePath $uninstaller $Root
+$uninstallerBefore=if(Test-Path -LiteralPath $uninstaller){[IO.File]::ReadAllBytes($uninstaller)}else{$null}
+$uninstallerChanged=$false
 try {
     New-Item -ItemType Directory -Force -Path $Root|Out-Null
     if(!$Rollback){New-Item -ItemType Directory -Path $stage|Out-Null;foreach($item in Get-ChildItem -LiteralPath $source -Force){Copy-Item -LiteralPath $item.FullName -Destination $stage -Recurse};Write-Host '已复制 AOT 文件到 app.new'}
+    if(!$Rollback -and !(Test-Path -LiteralPath (Join-Path $stage 'Uninstall Pane.exe'))){
+        $v=[Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $stage 'Pane.App.exe'))
+        $version="$($v.FileMajorPart).$($v.FileMinorPart).$($v.FileBuildPart)"
+        $helperBuild=Join-Path $repo ('src/Pane.Setup/bin/script-'+[Guid]::NewGuid().ToString('N'))
+        & dotnet @('publish',(Join-Path $repo 'src/Pane.Setup/Pane.Setup.csproj'),'-c','Release','-r','win-x64',"-p:Version=$version",'-p:AssemblyName=Uninstall Pane','-o',$helperBuild)
+        if($LASTEXITCODE -ne 0){throw '卸载程序构建失败'}
+        Copy-Item -LiteralPath (Join-Path $helperBuild 'Uninstall Pane.exe') -Destination $stage
+        Copy-Item -LiteralPath (Join-Path $helperBuild 'Uninstall Pane.exe') -Destination (Join-Path $stage 'Pane.Maintenance.exe')
+    }
     if($CopyDevData){Copy-PaneData $DevDataDirectory $DataDirectory $journal}
     Invoke-PaneProcess $(if($Rollback){"$old/Pane.App.exe"}else{"$stage/Pane.App.exe"}) @('--exit') -Wait;$stopped=$true
     if(!$Rollback -and (Test-Path -LiteralPath $old)){Move-PaneTree $old $saved $Root;$movedOld=$true}
     if(Test-Path -LiteralPath $app){Move-PaneTree $app $(if($Rollback){$stage}else{$old}) $Root;$movedCurrent=$true}
     Move-PaneTree $(if($Rollback){$old}else{$stage}) $app $Root;$activated=$true
+    $uninstallerChanged=$true
+    if(Test-Path -LiteralPath (Join-Path $app 'Uninstall Pane.exe')){Copy-Item -LiteralPath (Join-Path $app 'Uninstall Pane.exe') -Destination $uninstaller -Force}
+    elseif(Test-Path -LiteralPath $uninstaller){Remove-Item -LiteralPath $uninstaller}
     if(!$NoStart){$started=Invoke-PaneProcess "$app/Pane.App.exe" @();Start-Sleep -Seconds 2;if($started.HasExited){throw "启动失败：$($started.ExitCode)"}}
     $registrationChanged=$true;Register-PaneInstallation
     if($Rollback -and $movedCurrent){Move-PaneTree $stage $old $Root;$movedCurrent=$false}
@@ -34,6 +50,7 @@ try {
     Write-Host $(if($Rollback){'已回退，替换前版本保留在 app.old'}else{'安装/更新完成，上一版本保留在 app.old'})
 }catch {
     $failure=$_
+    if($uninstallerChanged){if($null -eq $uninstallerBefore){Remove-Item -LiteralPath $uninstaller -ErrorAction SilentlyContinue}else{[IO.File]::WriteAllBytes($uninstaller,$uninstallerBefore)}}
     if($registrationChanged){Set-PaneRegistration $registration}
     if($started -and !$started.HasExited){Invoke-PaneProcess "$app/Pane.App.exe" @('--exit') -Wait}
     if($activated){Move-PaneTree $app $(if($Rollback){$old}else{$stage}) $Root}

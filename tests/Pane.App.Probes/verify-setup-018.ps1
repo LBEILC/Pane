@@ -43,6 +43,7 @@ try {
         $resolved=[IO.Path]::GetFullPath($helper)
         if([IO.Path]::GetDirectoryName($resolved) -ne [IO.Path]::GetTempPath().TrimEnd('\') -or [IO.Path]::GetFileName($resolved) -notmatch '^Pane-Cleanup-[0-9a-f]{32}\.exe$'){throw '助手清理路径无效'}
         Remove-Item -LiteralPath $resolved -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath ($resolved+'.lease') -Force -ErrorAction SilentlyContinue
     }
     Run-Installer $package.installer @('--self-test-root',('"{0}"' -f $Root))
     $helper=Join-Path ([IO.Path]::GetTempPath()) ('Pane-Cleanup-'+[Guid]::NewGuid().ToString('N')+'.exe')
@@ -61,6 +62,7 @@ try {
         $resolved=[IO.Path]::GetFullPath($helper)
         if([IO.Path]::GetDirectoryName($resolved) -ne [IO.Path]::GetTempPath().TrimEnd('\') -or [IO.Path]::GetFileName($resolved) -notmatch '^Pane-Cleanup-[0-9a-f]{32}\.exe$'){throw '助手清理路径无效'}
         Remove-Item -LiteralPath $resolved -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath ($resolved+'.lease') -Force -ErrorAction SilentlyContinue
     }
     $checkedRoot=Resolve-PaneRoot $Root
     if(!$checkedRoot.StartsWith([IO.Path]::GetTempPath(),[StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($checkedRoot) -notlike 'Pane-018-e2e-*'){throw '清理根目录无效'}

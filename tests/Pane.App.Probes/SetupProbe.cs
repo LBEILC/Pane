@@ -4,6 +4,15 @@ namespace Pane.Diagnostics;
 
 internal static class SetupProbe
 {
+    public static void RequireHiddenDesktop()
+    {
+        var name = new System.Text.StringBuilder(256);
+        if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), 2, name, 512, out _) || !name.ToString().StartsWith("Pane027-", StringComparison.Ordinal))
+            throw new InvalidOperationException("Window probe requires hidden desktop");
+    }
+    [System.Runtime.InteropServices.DllImport("user32.dll")] static extern nint GetThreadDesktop(uint thread);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)] static extern bool GetUserObjectInformationW(nint handle, int kind, System.Text.StringBuilder value, int length, out int needed);
     public static void Run(SetupPaths paths, bool uninstall)
     {
         // 自测假数据；不依赖 XAML，也不读取真实用户设置。

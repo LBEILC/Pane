@@ -2040,7 +2040,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 var start = new System.Diagnostics.ProcessStartInfo("explorer.exe") { UseShellExecute = false };
                 start.ArgumentList.Add(app.Store.DirectoryPath);
                 System.Diagnostics.Process.Start(start)?.Dispose();
-            })));
+            })),
+            UninstallRow());
         var notices = Path.Combine(AppContext.BaseDirectory, "THIRD_PARTY_NOTICES.md");
         var noticeButton = Button(Strings.Settings_About_ViewAll, "external", () => OpenUrl(notices));
         Enable(noticeButton, File.Exists(notices));
@@ -2049,6 +2050,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
             ListRow("app", "Windows App SDK", Strings.Settings_About_WinUiLicense, false),
             ListRow("text", "MiSans", Strings.Settings_About_FontLicense, false),
             Row(Strings.Settings_About_AllComponents, Strings.Settings_About_NoticesLocation, noticeButton));
+    }
+
+    // 卸载 Pane（2026-11-02，issue 11 / 051）：放在「数据位置」下面，按钮打开卸载程序的窗口（那里再确认、选是否删数据）；开发版灰掉并说明
+    FrameworkElement UninstallRow()
+    {
+        bool can = app.CanUninstall;
+        var button = Button(Strings.Settings_About_UninstallButton, "trash", app.StartUninstall);
+        Enable(button, can);
+        return Row(Strings.Settings_About_Uninstall, can ? Strings.Settings_About_UninstallDescription : Strings.Settings_About_UninstallUnavailable, button);
     }
 
     const string SourceUrl = "https://github.com/LBEILC/Pane";

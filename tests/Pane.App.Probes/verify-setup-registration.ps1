@@ -11,6 +11,10 @@ try {
     Register-PaneInstallation
     $fields=Get-PaneRegistration | ConvertFrom-Json
     if($fields.InstallLocation -ne $Root -or $fields.UninstallString -ne ('"{0}\app\Pane.App.exe" --uninstall' -f $Root)){throw '登记错误'}
+    [IO.File]::WriteAllText((Join-Path $Root 'Uninstall Pane.exe'),'fake')
+    Register-PaneInstallation
+    $fields=Get-PaneRegistration | ConvertFrom-Json
+    if($fields.UninstallString -ne ('"{0}\Uninstall Pane.exe"' -f $Root)){throw '独立卸载登记错误'}
     Set-PaneRegistration $before
     if(Test-Path -LiteralPath (Join-Path $Root 'uninstall.json')){throw '快照还原错误'}
     Register-PaneInstallation

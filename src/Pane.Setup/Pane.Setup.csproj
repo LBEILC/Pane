@@ -6,7 +6,10 @@
     <ApplicationIcon>../Pane.App/Assets/pane.ico</ApplicationIcon>
     <Product>Pane 安装程序</Product><AssemblyTitle>Pane 安装程序</AssemblyTitle><Description>Pane 安装程序</Description><Company>Pane</Company>
     <AssemblyName Condition="'$(AssemblyName)' == ''">Pane.Setup</AssemblyName>
+    <Description Condition="'$(AssemblyName)' == 'Uninstall Pane'">Pane 卸载程序</Description>
+    <AssemblyTitle Condition="'$(AssemblyName)' == 'Uninstall Pane'">Pane 卸载程序</AssemblyTitle>
   </PropertyGroup>
   <ItemGroup Condition="'$(PayloadPath)' != ''"><EmbeddedResource Include="$(PayloadPath)" LogicalName="payload.zip" /></ItemGroup>
   <ItemGroup><Compile Include="../Pane.App/Services/Setup/SetupFiles.cs" Link="SetupFiles.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../Pane.App/Services/Setup/UninstallChain.cs" Link="UninstallChain.cs" /></ItemGroup>
 </Project>

@@ -13,6 +13,7 @@ internal static class SetupTests
         var source = Path.Combine(root, "source");
         Directory.CreateDirectory(source);
         File.WriteAllText(Path.Combine(source, "Pane.App.exe"), "new");
+        File.WriteAllText(Path.Combine(source, "Uninstall Pane.exe"), "uninstaller");
         File.WriteAllText(Path.Combine(source, "library.dll"), "payload");
         var integration = new SetupIntegration(paths, defaults, root);
         var process = new FakeProcesses();
@@ -54,7 +55,8 @@ internal static class SetupTests
                 Check(fields.GetProperty("DisplayName").GetString() == "Pane" && fields.GetProperty("DisplayVersion").GetString() == "0.1.123", "名称版本");
                 Check(fields.GetProperty("Publisher").GetString() == "Pane" && fields.GetProperty("DisplayIcon").GetString() == paths.Exe, "发布者图标");
                 Check(fields.GetProperty("InstallLocation").GetString() == paths.Root && fields.GetProperty("EstimatedSize").GetInt32() == 1, "安装位置及 KiB 大小");
-                Check(fields.GetProperty("UninstallString").GetString() == $"\"{paths.Exe}\" --uninstall", "卸载命令引号");
+                Check(fields.GetProperty("UninstallString").GetString() == $"\"{paths.Uninstaller}\"", "卸载命令引号");
+                Check(File.ReadAllText(paths.Uninstaller) == "uninstaller", "根目录独立卸载程序");
                 Check(fields.GetProperty("NoModify").GetInt32() == 1 && fields.GetProperty("NoRepair").GetInt32() == 1, "禁用修改修复");
             }
             Check(Service().Info.InstalledVersion == "0.1.123" && Service().Info.StartWithWindows, "读取已装信息");
@@ -79,7 +81,10 @@ internal static class SetupTests
             Check(process.Running && AppText() == "new" && !Directory.Exists(Path.Combine(paths.Root, "app.new")), "旧版退不掉不切换文件");
             process.Refuse = false;
             var failing = new FailingIntegration(integration);
+            File.WriteAllText(Path.Combine(source, "Uninstall Pane.exe"), "replacement");
             await Failure(() => Service(alternate: failing).InstallAsync(new(true, true, paths.Root), progress));
+            Check(File.ReadAllText(paths.Uninstaller) == "uninstaller", "登记失败恢复旧卸载程序");
+            File.WriteAllText(Path.Combine(source, "Uninstall Pane.exe"), "uninstaller");
             Check(AppText() == "new" && File.ReadAllText(Path.Combine(paths.Root, "app.old/Pane.App.exe")) == "017", "登记失败逆序恢复两代目录");
             Check(process.Running && process.Launches == 1, "登记失败恢复旧进程运行");
             Check(oldSettings.SequenceEqual(File.ReadAllBytes(Path.Combine(paths.Data, "settings.json"))) && !File.Exists(Path.Combine(root, "run.txt")) && !File.Exists(Path.Combine(root, "desktop/Pane.lnk")), "登记失败恢复设置启动项快捷方式");
@@ -124,6 +129,11 @@ internal static class SetupTests
             Check(File.ReadAllText(notDirectory) == "x", "日志不可写不掩盖失败");
             // 由其他应用接管 Run\Pane 后，卸载不能误删。
             File.WriteAllText(Path.Combine(root, "run.txt"), "\"C:\\Other\\tool.exe\" --autostart");
+            using (var held = new FileStream(Path.Combine(paths.Root, ".setup.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose))
+            {
+                try { await Service().UninstallAsync(false, progress); throw new Exception("锁占用应阻止卸载"); }
+                catch (SetupException error) { Check(error.Message.Contains("Pane-uninstall.log") && error.Message.Contains("获取安装锁") && File.Exists(paths.Exe), "卸载锁失败提示含日志及步骤且保留安装"); }
+            }
             File.WriteAllText(foreign, "保留");
             await Service().UninstallAsync(false, progress);
             Check(File.ReadAllText(foreign) == "保留" && Directory.Exists(parent), "卸载保留用户文件和父目录");

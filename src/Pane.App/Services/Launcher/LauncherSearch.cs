@@ -14,7 +14,7 @@ internal sealed record LauncherSnapshot(IndexedApp[] Apps,SearchEntry[] Favorite
     public string? IconSettingsKey {get;init;}
     public Dictionary<string,string> Aliases {get;init;}=[];
 }
-internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
+internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
 {
     readonly TerminalService terminal;
     public ITerminalHistory TerminalHistory=>terminal.History;
@@ -35,12 +35,13 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
     // 保留宿主已有接线；Shell 枚举只在子进程中调用。
     public LauncherSearch(SettingsStore store,WindowsAppCatalog catalog,ILauncherFiles files,ILauncherExecutor executor)
         :this(store,new ProcessLauncherIndex(store.DirectoryPath),files,executor) { }
-    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null)
+    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null,LauncherActionPlatform? actionPlatform=null)
     {
         var started=System.Diagnostics.Stopwatch.StartNew();
         this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();
         environment??=new LauncherEnvironment();process??=new LaunchProcess();
         terminal=new(store,environment,process,programs);
+        actions=new(actionPlatform??new WindowsLauncherActionPlatform(),executor,process);
         sources=[new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
         var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
         try{if(File.Exists(path))uses=JsonSerializer.Deserialize(File.ReadAllText(path),LauncherJson.Default.DictionaryStringAppUse)??[];}
@@ -133,7 +134,7 @@ internal sealed class LauncherSearch:ILauncherSearch,ILauncherAttachmentActions,
         cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename")return Task.CompletedTask;if(TerminalService.Owns(item))return terminal.ExecuteAsync(item,false,cancellationToken);var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         return source.ExecuteAsync(item,Context(""),cancellationToken);
     }
-    public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):ExecuteAsync(item,token);
+    public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,token):ExecuteAsync(item,token);
     void RecordUse(string id){
         lock(sync){var use=uses.GetValueOrDefault(id);uses[id]=new(Math.Min((use?.Count??0),int.MaxValue-1)+1,DateTimeOffset.UtcNow);Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");File.WriteAllText(path+".tmp",JsonSerializer.Serialize(uses,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);}
     }

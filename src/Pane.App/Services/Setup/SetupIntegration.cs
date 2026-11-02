@@ -23,7 +23,7 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
         ["DisplayName"] = "Pane", ["DisplayVersion"] = version, ["Publisher"] = "Pane",
         ["DisplayIcon"] = paths.Exe, ["InstallLocation"] = paths.Root,
         ["EstimatedSize"] = (int)Math.Min(int.MaxValue, (bytes + 1023) / 1024),
-        ["UninstallString"] = $"\"{paths.Exe}\" --uninstall", ["NoModify"] = 1, ["NoRepair"] = 1
+        ["UninstallString"] = $"\"{paths.Uninstaller}\"", ["NoModify"] = 1, ["NoRepair"] = 1
     };
     sealed record Snapshot(string? Startup, Dictionary<string, object>? Registration, Dictionary<string, byte[]?> Files);
     public object Capture() => new Snapshot(startup.Read(), ReadRegistration(), new[] { Menu, Desktop, SettingsFile, SettingsFile + ".tmp" }.ToDictionary(p => p, ReadBytes));

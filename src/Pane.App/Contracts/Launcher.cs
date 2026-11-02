@@ -56,7 +56,7 @@ public interface ILauncherSearch
     Task ExecuteAsync(LauncherItem item, CancellationToken cancellationToken);
 
     /// <summary>
-    /// 以管理员身份执行（037，2026-11-01 设计加）：终端项（「在终端里运行」和补全项）按 Ctrl+Shift+Enter 时调用，走系统 UAC，
+    /// 以管理员身份执行（037，2026-11-01 设计加）：终端项和应用都支持，按 Ctrl+Shift+Enter 时调用，走系统 UAC，
     /// 用户在 UAC 里点「否」静默（错误码 1223）。其他项没有管理员方式，照常执行。
     /// </summary>
     Task ExecuteElevatedAsync(LauncherItem item, CancellationToken cancellationToken) => ExecuteAsync(item, cancellationToken);
@@ -124,3 +124,27 @@ public static class LauncherGroups
     public const string Other = "other";
     public const string Actions = "actions";
 }
+
+/// <summary>启动器结果的附加操作（050，issue 10）。顺序就是菜单里的顺序。</summary>
+public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall }
+
+/// <summary>
+/// 右键 / Ctrl+K 菜单的数据。LauncherSearch 和 DesignData/LauncherSampleSearch 都实现它。
+/// </summary>
+public interface ILauncherItemActions
+{
+    /// <summary>
+    /// 这一项能用哪些附加操作，按枚举顺序给出，「打开」不在里面（界面自己放在第一项）。
+    /// 可以稍慢（解析快捷方式、读卸载登记），在后台线程做，界面最多等 300 ms，超时就不弹菜单；取消即放弃。
+    /// 不支持的项不要给，例如商店应用没有「以管理员身份运行」「打开所在位置」。
+    /// </summary>
+    Task<IReadOnlyList<LauncherItemAction>> GetActionsAsync(LauncherItem item, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 执行一项。失败抛 LauncherActionException（Message 是给用户看的一句话，进资源）；UAC 里点「否」静默返回（1223）。
+    /// RunAsAdmin 和 ExecuteElevatedAsync 走同一个实现。
+    /// </summary>
+    Task RunAsync(LauncherItem item, LauncherItemAction action, CancellationToken cancellationToken);
+}
+
+public sealed class LauncherActionException(string message) : Exception(message);

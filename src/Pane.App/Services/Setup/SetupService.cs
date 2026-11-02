@@ -34,6 +34,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
     readonly Action<int>? delay;
     string step = "开始操作", operationSource = ""; // 不翻译：日志
     string? operationTarget;
+    bool uninstalling;
     public SetupService(SetupPaths paths, string source, string version, ISetupIntegration integration,
         ISetupProcesses processes, Action<string, string>? copy = null, bool autoUpdate = false, Func<string, Task>? restoreWinV = null, Action<string, string>? move = null, Action<int>? delay = null)
     {
@@ -54,6 +55,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
     public Task InstallAsync(SetupOptions options, IProgress<SetupProgress> progress) => Operation = Task.Run(() => Install(options, progress));
     void Install(SetupOptions options, IProgress<SetupProgress> progress)
     {
+        uninstalling = false;
         string target;
         try { Track("解析安装路径", options.InstallPath); target = SetupFiles.Full(options.InstallPath); } // 不翻译：日志
         catch (Exception error) { Log(error); throw Failure(error); }
@@ -69,8 +71,12 @@ internal sealed class SetupService : ISetupService, IUninstallService
         bool movedCurrent = false, movedOld = false, activated = false, stopped = false;
         bool running = processes.Running;
         object? snapshot = null;
+        byte[]? previousUninstaller = null;
+        bool uninstallerChanged = false;
         try
         {
+            Track("备份卸载程序", paths.Uninstaller); SetupFiles.Check(paths.Uninstaller); // 不翻译：日志
+            previousUninstaller = File.Exists(paths.Uninstaller) ? File.ReadAllBytes(paths.Uninstaller) : null;
             Track("检查暂存目录", stage, previous); // 不翻译：日志
             if (Directory.Exists(stage) || Directory.Exists(previous)) throw new IOException("存在未完成的安装，请先检查 app.new / app.previous"); // 不翻译：日志异常
             Track("检查安装源", source); // 不翻译：日志
@@ -88,6 +94,9 @@ internal sealed class SetupService : ISetupService, IUninstallService
             Move(stage, paths.App); activated = true;
             progress.Report(new(.8, Strings.Setup_CreatingRegistration));
             Track("登记安装", paths.Root, paths.Data); // 不翻译：日志
+            SetupFiles.Check(paths.Uninstaller);
+            uninstallerChanged = true;
+            File.Copy(Path.Combine(paths.App, "Uninstall Pane.exe"), paths.Uninstaller, true);
             integration.Apply(version, SetupFiles.Size(paths.App), options);
         }
         catch (Exception error)
@@ -95,6 +104,8 @@ internal sealed class SetupService : ISetupService, IUninstallService
             Log(error);
             try
             {
+                if (uninstallerChanged)
+                { if (previousUninstaller == null) File.Delete(paths.Uninstaller); else File.WriteAllBytes(paths.Uninstaller, previousUninstaller); }
                 if (activated) Move(paths.App, stage);
                 if (movedCurrent) Move(old, paths.App);
                 if (movedOld) Move(previous, old);
@@ -111,6 +122,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
     }
     public Task UninstallAsync(bool removeData, IProgress<SetupProgress> progress) => Operation = Task.Run(() =>
     {
+        uninstalling = true;
         using var operation = Lock();
         try
         {
@@ -123,6 +135,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
             progress.Report(new(.35, Strings.Setup_RemovingRegistration)); Track("移除登记", paths.Root); integration.Remove(); // 不翻译：日志
             progress.Report(new(.6, Strings.Setup_DeletingFiles));
             foreach (string name in new[] { "app", "app.old", "app.new", "app.previous" }) { Track("删除程序", Path.Combine(paths.Root, name)); SetupFiles.Delete(Path.Combine(paths.Root, name)); } // 不翻译：日志
+            Track("删除卸载程序", paths.Uninstaller); SetupFiles.Check(paths.Uninstaller); File.Delete(paths.Uninstaller); // 不翻译：日志
             if (removeData) { progress.Report(new(.85, Strings.Setup_DeletingData)); Track("删除数据", paths.Data); SetupFiles.Delete(paths.Data); } // 不翻译：日志
             operation.Dispose();
             if (Directory.Exists(paths.Root) && !Directory.EnumerateFileSystemEntries(paths.Root).Any())
@@ -138,17 +151,21 @@ internal sealed class SetupService : ISetupService, IUninstallService
             Track("获取安装锁", paths.Root); SetupFiles.Check(paths.Root); Directory.CreateDirectory(paths.Root); // 不翻译：日志
             return new FileStream(Path.Combine(paths.Root, ".setup.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
         }
-        catch (Exception error) { Log(error); throw new SetupException(Strings.Setup_CannotStart, error); }
+        catch (Exception error) { Log(error); throw Failure(new SetupException(Strings.Setup_CannotStart, error)); }
     }
     void Track(string name, string source, string? target = null)
-    { step = name; operationSource = source; operationTarget = target; }
+    { step = name; operationSource = source; operationTarget = target; UninstallChain.Log(name, "begin", path: source); }
     void Move(string source, string target)
     {
         Track("移动目录", source, target); // 不翻译：日志
         SetupFiles.Check(source); SetupFiles.Check(target);
         SetupDiagnostics.Move(source, target, move, delay);
     }
-    void Log(Exception error) => SetupDiagnostics.Write(paths.Data, error, step, operationSource, operationTarget);
-    static SetupException Failure(Exception error) => error as SetupException ?? new SetupException(
-        (error.HResult & 0xffff) is 112 or 39 ? Strings.Setup_DiskFull : SetupDiagnostics.Busy(error) ? Strings.Setup_DirectoryBusy : Strings.Setup_OperationFailed, error);
+    void Log(Exception error) { UninstallChain.Log(step, "failed", error, operationSource); SetupDiagnostics.Write(paths.Data, error, step, operationSource, operationTarget); }
+    SetupException Failure(Exception error)
+    {
+        var failure = error as SetupException ?? new SetupException(
+            (error.HResult & 0xffff) is 112 or 39 ? Strings.Setup_DiskFull : SetupDiagnostics.Busy(error) ? Strings.Setup_DirectoryBusy : Strings.Setup_OperationFailed, error);
+        return uninstalling ? new SetupException(string.Format(Strings.Setup_UninstallOperationFailed, failure.Message, step, UninstallChain.LogPath), error) : failure;
+    }
 }

@@ -5,8 +5,28 @@ using Pane.Contracts;
 
 namespace Pane.DesignData;
 
-public sealed class LauncherSampleSearch : ILauncherSearch
+public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
 {
+    // 微信演示完整操作，Code 演示无卸载，终端演示商店应用。
+    public Task<IReadOnlyList<LauncherItemAction>> GetActionsAsync(LauncherItem item, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        IReadOnlyList<LauncherItemAction> result = item.Kind switch
+        {
+            LauncherItemKind.App when item.Title == "终端" => [],
+            LauncherItemKind.App when item.Title == "微信" => Enum.GetValues<LauncherItemAction>(),
+            LauncherItemKind.App => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
+            LauncherItemKind.File or LauncherItemKind.Folder => [LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
+            _ => []
+        };
+        return Task.FromResult(result);
+    }
+    public Task RunAsync(LauncherItem item, LauncherItemAction action, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        System.Diagnostics.Debug.WriteLine($"Launcher sample: {item.Id} {action}");
+        return Task.CompletedTask;
+    }
     sealed record Entry(string Name, string Py, string Ab, string Sub, string Glyph, string? From = null, string? To = null, string? Hotkey = null, string? Id = null);
 
     static readonly Entry[] Apps =

@@ -122,11 +122,13 @@ function Set-PaneRegistration($Fields) {
 }
 function Register-PaneInstallation {
     $exe=Join-Path $Root 'app/Pane.App.exe'
+    $uninstaller=Join-Path $Root 'Uninstall Pane.exe'
+    $uninstallCommand=if(Test-Path -LiteralPath $uninstaller){'"{0}"' -f $uninstaller}else{'"{0}" --uninstall' -f $exe}
     $version=[Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
     $bytes=(Get-ChildItem -LiteralPath (Join-Path $Root 'app') -File -Recurse | Measure-Object Length -Sum).Sum
     Set-PaneRegistration @{
         DisplayName='Pane';DisplayVersion="$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)";Publisher='Pane'
         DisplayIcon=$exe;InstallLocation=$Root;EstimatedSize=[int][Math]::Min([int]::MaxValue,[Math]::Ceiling($bytes/1024))
-        UninstallString=('"{0}" --uninstall' -f $exe);NoModify=1;NoRepair=1
+        UninstallString=$uninstallCommand;NoModify=1;NoRepair=1
     }
 }

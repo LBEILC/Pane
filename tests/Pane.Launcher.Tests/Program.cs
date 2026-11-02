@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--050-probe")){ActionProbe();return;}
         if(args.Contains("--037")){await SystemTerminalTests(args.Contains("--live"));return;}
         if(args.Contains("--file-icons")){await FileIconTests();return;}
         if(args.Contains("--files-performance")){await FilePerformance();return;}
@@ -75,7 +76,7 @@ static partial class Program
         var timings=new List<double>();for(int i=0;i<100;i++){var timer=Stopwatch.StartNew();await perf.SearchAsync(queries[i%queries.Length],default);timings.Add(timer.Elapsed.TotalMilliseconds);}
         timings.Sort();Console.WriteLine($"search apps=1000 samples=100 medianMs={timings[50]:F4} maxMs={timings[^1]:F4}");Check(timings[^1]<=15,"1000 app latency");
         Console.WriteLine($"PASS original launcher assertions={checks}");
-        await SourceTests();await IndexTests();await IconTests();
+        await SourceTests();await IndexTests();await IconTests();await ActionTests();
         Console.WriteLine($"PASS launcher assertions={checks};realExecutions=0;clipboardWrites=0;browserLaunches=0");
     }
     static async Task Probe()

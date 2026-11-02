@@ -78,6 +78,7 @@ internal sealed record SetupPaths(string Root, string Data)
         return string.IsNullOrEmpty(location) ? this : this with { Root = SetupFiles.Full(location) };
     }
     public string App => Path.Combine(Root, "app");
+    public string Uninstaller => Path.Combine(Root, "Uninstall Pane.exe");
     public string Exe => Path.Combine(App, "Pane.App.exe");
     public static SetupPaths Production => new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Pane"), Pane.Settings.SettingsStore.ProductionDirectory);
     public static SetupPaths Isolated(string root)

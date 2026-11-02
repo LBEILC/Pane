@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
@@ -642,6 +642,10 @@
   <data name="Settings_About_AllComponents" xml:space="preserve"><value>全部第三方组件</value></data>
   <data name="Settings_About_Components" xml:space="preserve"><value>开源组件</value></data>
   <data name="Settings_About_DataLocation" xml:space="preserve"><value>数据位置</value></data>
+  <data name="Settings_About_Uninstall" xml:space="preserve"><value>卸载 Pane</value></data>
+  <data name="Settings_About_UninstallDescription" xml:space="preserve"><value>打开卸载程序；也可以运行安装目录里的「Uninstall Pane.exe」</value></data>
+  <data name="Settings_About_UninstallUnavailable" xml:space="preserve"><value>开发版不是安装出来的，不能从这里卸载</value></data>
+  <data name="Settings_About_UninstallButton" xml:space="preserve"><value>卸载…</value></data>
   <data name="Settings_About_Description" xml:space="preserve"><value>版本、数据位置和开源组件。</value></data>
   <data name="Settings_About_DescriptionTagline" xml:space="preserve"><value>Windows 上的启动器、鼠标手势和剪贴板工具</value></data>
   <data name="Settings_About_FontLicense" xml:space="preserve"><value>使用本机已安装的字体，不随程序分发；没装时用微软雅黑</value></data>
@@ -1312,4 +1316,13 @@
   <data name="Update_StorageFailed" xml:space="preserve"><value>更新包存不下来，看看磁盘空间够不够</value></data>
   <data name="Update_Title" xml:space="preserve"><value>更新</value></data>
   <data name="Update_UpToDate" xml:space="preserve"><value>已是最新版本</value></data>
+  <data name="Setup_UninstallChainFailed" xml:space="preserve"><value>卸载窗口没能打开。未完成的步骤：{0}。请检查目录权限和安全软件的拦截记录。日志：{1}</value></data>
+  <data name="Setup_UninstallOperationFailed" xml:space="preserve"><value>{0} 未完成的步骤：{1}。日志：{2}</value></data>
+  <data name="Launcher_ActionFailed" xml:space="preserve"><value>无法完成此操作，请确认目标仍然存在且可以访问。</value></data>
+  <data name="Launcher_MoreActions" xml:space="preserve"><value>更多操作</value></data>
+  <data name="Launcher_NoMoreActions" xml:space="preserve"><value>这一项没有更多操作</value></data>
+  <data name="Launcher_MenuTarget" xml:space="preserve"><value>{0}：{1}</value></data>
+  <data name="Launcher_Properties" xml:space="preserve"><value>属性</value></data>
+  <data name="Launcher_Uninstall" xml:space="preserve"><value>卸载</value></data>
+  <data name="Launcher_ActionUnavailable" xml:space="preserve"><value>此项目已不支持该操作，请重新搜索后再试。</value></data>
 </root>

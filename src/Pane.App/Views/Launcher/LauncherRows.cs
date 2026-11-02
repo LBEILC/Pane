@@ -11,7 +11,8 @@ using Windows.Foundation;
 namespace Pane.Views.Launcher;
 
 /// <summary>每一项在界面上是什么：决定排法、底部提示栏的说明和按键。</summary>
-public enum LauncherCell { Calc, App, Command, Action, File, More, Attachment }
+/// <remarks>Menu：Ctrl+K / 右键之后就地列出的附加操作（050）。</remarks>
+public enum LauncherCell { Calc, App, Command, Action, File, More, Attachment, Menu }
 
 public sealed partial class LauncherRow : INotifyPropertyChanged
 {

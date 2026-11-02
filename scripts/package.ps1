@@ -36,6 +36,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'src/Pane.App/ThirdParty') -Destination 
 & $dotnet @('publish',"$repo/src/Pane.Setup/Pane.Setup.csproj",'-c','Release','-r','win-x64',"-p:Version=$version",'-p:AssemblyName=Pane.Maintenance','-o',"$work/helper")
 if($LASTEXITCODE -ne 0){throw '卸载助手构建失败'}
 Copy-Item -LiteralPath "$work/helper/Pane.Maintenance.exe" -Destination $stage
+& $dotnet @('publish',"$repo/src/Pane.Setup/Pane.Setup.csproj",'-c','Release','-r','win-x64',"-p:Version=$version",'-p:AssemblyName=Uninstall Pane','-o',"$work/uninstaller")
+if($LASTEXITCODE -ne 0){throw '独立卸载程序构建失败'}
+Copy-Item -LiteralPath "$work/uninstaller/Uninstall Pane.exe" -Destination $stage
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $zip=Join-Path $work 'payload.zip'
 [IO.Compression.ZipFile]::CreateFromDirectory($stage,$zip,[IO.Compression.CompressionLevel]::Optimal,$false)

@@ -54,6 +54,9 @@ public sealed partial class LauncherView : UserControl, IPanelView
     string shownQuery = "";
     AiRequest? cardRequest;
     string cardTitle = "";
+    // 附加操作（050，issue 10）：正在列谁的操作；每行对应的操作（第一行「打开」为 null）
+    LauncherItem? menuItem;
+    List<LauncherItemAction?> menuActions = [];
 
     /// <summary>文件窗口：查询文字、要选中的文件路径（文件格按 Tab 时）。宿主负责创建或复用窗口。</summary>
     public event Action<string, string?>? OpenFiles;
@@ -85,6 +88,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         Input.GotFocus += (_, _) => HideClearButton();
         Sections.PointerMoved += OnResultsPointerMoved;
         Sections.Tapped += OnResultsTapped;
+        Sections.RightTapped += OnResultsRightTapped;
         Card.ContentGrew += (_, _) => RequestHeight();
         Card.SizeChanged += (_, _) => RequestHeight();
         Icons.Ready += OnIconReady;
@@ -105,6 +109,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         activate = context.Activate;
         previousWindow = context.PreviousForegroundWindow;
         ExitAi();
+        menuItem = null;   // 每次呼出都从结果列表开始
         // 附件：交过来的优先；否则复制后几秒内呼出（设置里定，0 = 关），带入刚复制的内容（不清空系统剪贴板）
         var attach = pendingAttachment;
         pendingAttachment = null;
@@ -140,6 +145,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
         // 设计预览：PANE_DESIGN_LAUNCHER_RUN 指定一呼出就执行的条目 Id（如 act:ai:translate）
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_LAUNCHER_RUN") is { Length: > 0 } id
             && rows.FindIndex(r => r.Item.Id == id) is var i and >= 0) _ = Execute(i, false, false);
+        // 设计预览：PANE_DESIGN_LAUNCHER_MENU=1 一呼出就列出默认选中项的附加操作（050）
+        if (Environment.GetEnvironmentVariable("PANE_DESIGN_LAUNCHER_MENU") == "1") _ = OpenMenu(selected);
     }
 
     public void OnHidden()
@@ -270,6 +277,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
     {
         HideClearButton();
         if (aiMode) ExitAi(); // 卡片打开时继续打字 = 回到列表重新搜
+        menuItem = null;      // 操作列表里打字 = 回到列表接着搜
         // 设计改（2026-10-30）：不再防抖，每次按键直接搜（026 补测：防抖 60 ms 加等慢来源，结果比 uTools 晚 110～170 ms）
         _ = Refresh(Input.Text);
     }
@@ -335,6 +343,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
 
     void Render(LauncherResult result, string query, bool attachmentMode, bool keepSelection = false)
     {
+        if (menuItem is not null) { lastResult = result; return; }   // 列着操作时晚到的结果先记下，Esc 回去再画
         var q = query.Trim();
         var keep = keepSelection && selected >= 0 && selected < rows.Count && selected != DefaultSelection() ? rows[selected].Item.Id : null;
         shownQuery = q;
@@ -465,14 +474,15 @@ public sealed partial class LauncherView : UserControl, IPanelView
         (string what, (string[], string)[] keys) = row.Cell switch
         {
             LauncherCell.Calc => (string.Format(Strings.Launcher_CopyTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Copy)]),
-            LauncherCell.App => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
+            LauncherCell.App => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
+            LauncherCell.Menu when menuItem is { } target => (string.Format(Strings.Launcher_MenuTarget, (object?)(item.Title), (object?)(target.Title)), [(["Enter"], Strings.Common_Execute), (["Esc"], Strings.Common_Back)]),
             LauncherCell.Command when item.Id == "terminal:hint" => (Strings.Launcher_TerminalHelp, []),
             LauncherCell.Command when item.Group == LauncherGroups.Terminal => (string.Format(Strings.Launcher_RunInTerminal, (object?)(item.Subtitle)), [(["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_RunAsAdmin)]),
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
             LauncherCell.Command when item.Group == LauncherGroups.Settings => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
             LauncherCell.Command => (item.Title, [(["Enter"], Strings.Common_Execute)]),
-            LauncherCell.File => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Tab"], Strings.Launcher_ViewInFiles)]),
+            LauncherCell.File => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Tab"], Strings.Launcher_ViewInFiles), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
             LauncherCell.More => (string.Format(Strings.Launcher_SearchInFiles, (object?)(q)), [(["Enter"], Strings.Launcher_OpenFiles)]),
             LauncherCell.Action => ActionFoot(ActionId(item), item.Title, q),
             _ => (item.Title, [(["Enter"], Strings.Common_Execute)]),
@@ -647,6 +657,25 @@ public sealed partial class LauncherView : UserControl, IPanelView
             return;
         }
 
+        // 操作列表：数字键直接执行，Esc 回到结果；上下、Enter、点一下照常
+        if (menuItem is not null)
+        {
+            switch (e.Key)
+            {
+                case >= VirtualKey.Number1 and <= VirtualKey.Number9 when e.Key - VirtualKey.Number1 < rows.Count:
+                    Select(e.Key - VirtualKey.Number1); _ = Execute(selected, false, false); break;
+                case VirtualKey.Escape: CloseMenu(); break;
+                case VirtualKey.K when ctrl: CloseMenu(); break;
+                case VirtualKey.Tab or VirtualKey.Left or VirtualKey.Right: break;
+                case VirtualKey.Down: MoveLine(1); break;
+                case VirtualKey.Up: MoveLine(-1); break;
+                case VirtualKey.Enter: _ = Execute(selected, false, false); break;
+                default: return;
+            }
+            e.Handled = true;
+            return;
+        }
+
         // 按住 Alt：动作格子出数字；Alt+数字直接触发
         if (e.Key == VirtualKey.Menu) { ShowNumbers(true); e.Handled = true; return; }
         if (Down(VirtualKey.Menu) && e.Key is >= VirtualKey.Number1 and <= VirtualKey.Number9)
@@ -659,6 +688,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
 
         switch (e.Key)
         {
+            case VirtualKey.K when ctrl: _ = OpenMenu(selected); break;
             case VirtualKey.Down: MoveLine(1); break;
             case VirtualKey.Up: MoveLine(-1); break;
             case VirtualKey.Right when SelectedIsTile: MoveInLine(1); break;
@@ -693,6 +723,14 @@ public sealed partial class LauncherView : UserControl, IPanelView
     void OnResultsTapped(object sender, TappedRoutedEventArgs e)
     {
         if (RowFrom(e.OriginalSource) is { } row) _ = Execute(row.Index, false, false);
+    }
+
+    void OnResultsRightTapped(object sender, RightTappedRoutedEventArgs e)
+    {
+        if (menuItem is not null || RowFrom(e.OriginalSource) is not { } row) return;
+        Select(row.Index, scroll: false);
+        _ = OpenMenu(row.Index);
+        e.Handled = true;
     }
 
     static LauncherRow? RowFrom(object source)
@@ -772,6 +810,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         var row = rows[index];
         var item = row.Item;
         var q = shownQuery;
+        if (row.Cell == LauncherCell.Menu) { if (!tab) await RunMenu(row); return; }
 
         // Tab：补全项填进输入框（037）；网页建议填成「关键字 建议」接着改
         if (tab && item.Id.StartsWith("complete:", StringComparison.Ordinal)) { Fill(">" + item.Id["complete:".Length..]); return; }
@@ -782,6 +821,15 @@ public sealed partial class LauncherView : UserControl, IPanelView
         {
             try { await search.ExecuteElevatedAsync(item, CancellationToken.None); CloseRequested?.Invoke(this, EventArgs.Empty); }
             catch (Exception e) { if (App.FailureReason(e) is { } reason) ShowFailure(row, string.Format(Strings.Launcher_RunFailed, (object?)(reason))); }
+            return;
+        }
+
+        // 应用：Ctrl+Shift+Enter 以管理员身份运行，Ctrl+Enter 打开所在文件夹（和终端、文件窗口一致，050）
+        if (ctrl && row.Cell == LauncherCell.App && search is ILauncherItemActions direct)
+        {
+            try { await direct.RunAsync(item, shift ? LauncherItemAction.RunAsAdmin : LauncherItemAction.OpenLocation, CancellationToken.None); }
+            catch (Exception e) { MenuFailed(row, e); return; }
+            CloseRequested?.Invoke(this, EventArgs.Empty);
             return;
         }
 
@@ -846,6 +894,88 @@ public sealed partial class LauncherView : UserControl, IPanelView
             return;
         }
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ---------------- 附加操作（050，issue 10） ----------------
+    // Ctrl+K / 右键：结果区就地换成这一项的操作列表（WinUI 版不弹独立菜单，同批量重命名的「就地展开」）。
+    // 第一行「打开」，后面是服务给的操作，右边数字键；卸载要按两次。Esc 回到结果并选回这一项
+
+    async Task OpenMenu(int index)
+    {
+        if (aiMode || menuItem is not null || index < 0 || index >= rows.Count || search is not ILauncherItemActions actions) return;
+        var row = rows[index];
+        if (row.Cell is not (LauncherCell.App or LauncherCell.File)) return;
+        IReadOnlyList<LauncherItemAction> list;
+        using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300)))
+        {
+            try { list = await actions.GetActionsAsync(row.Item, cts.Token).WaitAsync(cts.Token); }
+            catch (Exception) { list = []; }
+        }
+        if (aiMode || menuItem is not null || index >= rows.Count || !ReferenceEquals(rows[index], row)) return;   // 等的时候结果换了
+        if (list.Count == 0) { if (index == selected) FootWhat.Text = Strings.Launcher_NoMoreActions; return; }
+
+        Disarm();
+        menuItem = row.Item;
+        menuActions = [null, .. list.Select(a => (LauncherItemAction?)a)];
+        var s = new LauncherSection(row.Item.Title, LauncherSectionKind.List, []);
+        sections = [s];
+        rows = [];
+        foreach (var action in menuActions)
+        {
+            var n = (rows.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            var (title, glyph) = MenuLabel(action);
+            var r = new LauncherRow(new("menu:" + n, LauncherItemKind.Action, LauncherGroups.Actions, title, null, new(glyph), Hotkey: rows.Count < 9 ? n : null), rows.Count, LauncherCell.Menu);
+            rows.Add(r);
+            s.Rows.Add(r);
+        }
+        Sections.ItemsSource = sections;
+        Scroller.ChangeView(null, 0, null, true);
+        highlight.Hide();
+        selected = -1;
+        UpdateLayout();
+        Select(0, scroll: false);
+        RequestHeight();
+    }
+
+    static (string Title, string Glyph) MenuLabel(LauncherItemAction? action) => action switch
+    {
+        null => (Strings.Common_Open, "external"),
+        LauncherItemAction.RunAsAdmin => (Strings.Launcher_RunAsAdmin, "shield"),
+        LauncherItemAction.OpenLocation => (Strings.Common_OpenContainingFolder, "folder"),
+        LauncherItemAction.CopyPath => (Strings.Common_CopyPath, "copy"),
+        LauncherItemAction.Properties => (Strings.Launcher_Properties, "info"),
+        _ => (Strings.Launcher_Uninstall, "trash"),
+    };
+
+    void CloseMenu()
+    {
+        if (menuItem is not { } item) return;
+        menuItem = null;
+        Disarm();
+        if (lastResult is { } result) Render(result, shownQuery, attachmentMode: false);
+        int back = rows.FindIndex(r => r.Item.Id == item.Id);
+        if (back >= 0) Select(back);
+    }
+
+    async Task RunMenu(LauncherRow row)
+    {
+        if (menuItem is not { } item || row.Index >= menuActions.Count) return;
+        var action = menuActions[row.Index];
+        if (action == LauncherItemAction.Uninstall && !Confirmed(row)) return;
+        try
+        {
+            if (action is not { } a) await search.ExecuteAsync(item, CancellationToken.None);
+            else if (search is ILauncherItemActions actions) await actions.RunAsync(item, a, CancellationToken.None);
+        }
+        catch (Exception e) { MenuFailed(row, e); return; }
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    // 失败原因写在这一行；服务给的 LauncherActionException 本身就是给用户看的一句话；UAC 点「否」服务已经静默
+    void MenuFailed(LauncherRow row, Exception e)
+    {
+        var reason = e is LauncherActionException ? e.Message : App.FailureReason(e);
+        if (reason is not null && row.Index < rows.Count && ReferenceEquals(rows[row.Index], row)) ShowFailure(row, reason);
     }
 
     // 系统文件图标（036）：没缓存的后台去取，好了补到还显示着的那一行
