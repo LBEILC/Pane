@@ -25,7 +25,7 @@ foreach($library in $assets.libraries.PSObject.Properties){
         $candidates[$file.Name]+=,@{package=$library.Name;path=$file.FullName;length=$file.Length}
     }
 }
-$own=@('Pane.App.exe','Pane.Maintenance.exe','Pane.Native.dll','Pane.Effect.dll','resources.pri','Assets/pane.ico','Assets/pane-app.svg','LauncherData/pinyin.tsv','LauncherData/Unicode-LICENSE.txt')
+$own=@('Pane.App.exe','Pane.Maintenance.exe','Uninstall Pane.exe','zh-Hant/Pane.App.resources.dll','Pane.Native.dll','Pane.Effect.dll','resources.pri','Assets/pane.ico','Assets/pane-app.svg','LauncherData/pinyin.tsv','LauncherData/Unicode-LICENSE.txt')
 $notices=@{'LICENSE'='LICENSE';'LICENSE-EXCEPTION.md'='LICENSE-EXCEPTION.md';'THIRD_PARTY_NOTICES.md'='THIRD_PARTY_NOTICES.md'}
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $repo 'src/Pane.App/ThirdParty') -File){$notices['ThirdParty/'+$file.Name]='src/Pane.App/ThirdParty/'+$file.Name}
 $rows=@(foreach($file in Get-ChildItem -LiteralPath $metadata.stage -Recurse -File){
