@@ -12,64 +12,1317 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms</value>
   </resheader>
-  <data name="Tray_Title" xml:space="preserve">
-    <value>托盤選單</value>
-  </data>
-  <data name="Tray_UpdateReady" xml:space="preserve">
-    <value>新版本 {0} 已下載好</value>
-  </data>
-  <data name="Tray_RestartUpdate" xml:space="preserve">
-    <value>重新啟動並更新</value>
-  </data>
-  <data name="Tray_OpenLauncher" xml:space="preserve">
-    <value>開啟啟動器</value>
-  </data>
-  <data name="Tray_OpenClipboard" xml:space="preserve">
-    <value>開啟剪貼簿</value>
-  </data>
-  <data name="Tray_Settings" xml:space="preserve">
-    <value>設定</value>
-  </data>
-  <data name="Tray_PauseGestures" xml:space="preserve">
-    <value>暫停手勢</value>
-  </data>
-  <data name="Tray_Exit" xml:space="preserve">
-    <value>結束 Pane</value>
-  </data>
-  <data name="Launcher_Group_Applications" xml:space="preserve">
-    <value>應用程式</value>
-  </data>
-  <data name="Launcher_Group_Files" xml:space="preserve">
-    <value>檔案</value>
-  </data>
-  <data name="Launcher_Group_Commands" xml:space="preserve">
-    <value>命令</value>
-  </data>
-  <data name="Launcher_Group_Calculation" xml:space="preserve">
-    <value>計算</value>
-  </data>
-  <data name="Launcher_Group_Ai" xml:space="preserve">
-    <value>AI</value>
-  </data>
-  <data name="Launcher_Group_Web" xml:space="preserve">
-    <value>網頁</value>
-  </data>
-  <data name="Launcher_Group_Settings" xml:space="preserve">
-    <value>設定</value>
-  </data>
-  <data name="Launcher_Group_Terminal" xml:space="preserve">
-    <value>終端機</value>
-  </data>
-  <data name="Launcher_Group_Recent" xml:space="preserve">
-    <value>最近使用</value>
-  </data>
-  <data name="Launcher_Group_Pinned" xml:space="preserve">
-    <value>已釘選</value>
-  </data>
-  <data name="Launcher_Group_Completion" xml:space="preserve">
-    <value>補全</value>
-  </data>
+  <data name="Ai_AccountMismatch" xml:space="preserve"><value>登入帳號與原註冊不符</value></data>
+  <data name="Ai_ActionUnavailable" xml:space="preserve"><value>預設動作不可用，請檢查設定</value></data>
+  <data name="Ai_AuthorizationAddressInvalid" xml:space="preserve"><value>授權服務位址無效</value></data>
+  <data name="Ai_BrowserFailed" xml:space="preserve"><value>無法開啟系統瀏覽器</value></data>
+  <data name="Ai_CallbackInvalid" xml:space="preserve"><value>登入回呼位址無效</value></data>
+  <data name="Ai_CallbackListenFailed" xml:space="preserve"><value>無法監聽本機登入回呼，請重試</value></data>
+  <data name="Ai_Card_Failed" xml:space="preserve"><value>出了點問題，沒拿到結果。</value></data>
+  <data name="Ai_Card_InvalidKey" xml:space="preserve"><value>API Key 無效，請到設定裡檢查。</value></data>
+  <data name="Ai_Card_LoginAgain" xml:space="preserve"><value>重新登入</value></data>
+  <data name="Ai_Card_LoginExpired" xml:space="preserve"><value>ChatGPT 登入已過期，請重新登入。</value></data>
+  <data name="Ai_Card_NotConfigured" xml:space="preserve"><value>還沒設定 AI 服務。</value></data>
+  <data name="Ai_Card_QuotaExceeded" xml:space="preserve"><value>這個帳號的額度用完了。</value></data>
+  <data name="Ai_Chat_ChangeModel" xml:space="preserve"><value>換模型（只對這次對話）</value></data>
+  <data name="Ai_Chat_Empty" xml:space="preserve"><value>新的對話
+只保留到關掉視窗為止</value></data>
+  <data name="Ai_Chat_ExampleClarity" xml:space="preserve"><value>玻璃上的文字怎麼保持清晰</value></data>
+  <data name="Ai_Chat_ExampleDebounce" xml:space="preserve"><value>寫一個防抖函式</value></data>
+  <data name="Ai_Chat_LoadingModels" xml:space="preserve"><value>正在讀取模型…</value></data>
+  <data name="Ai_Chat_LoadModelsError" xml:space="preserve"><value>讀取失敗：{0}</value></data>
+  <data name="Ai_Chat_Model" xml:space="preserve"><value>模型</value></data>
+  <data name="Ai_Chat_NewChat" xml:space="preserve"><value>新對話</value></data>
+  <data name="Ai_Chat_NewChatHint" xml:space="preserve"><value>新對話（Ctrl+N）</value></data>
+  <data name="Ai_Chat_NewLine" xml:space="preserve"><value>換行</value></data>
+  <data name="Ai_Chat_QuestionPlaceholder" xml:space="preserve"><value>問點什麼…</value></data>
+  <data name="Ai_Chat_Regenerate" xml:space="preserve"><value>重新回答</value></data>
+  <data name="Ai_Chat_Send" xml:space="preserve"><value>傳送</value></data>
+  <data name="Ai_Chat_SendHint" xml:space="preserve"><value>傳送（Enter）</value></data>
+  <data name="Ai_Chat_SessionOnly" xml:space="preserve"><value>只保留這一次對話</value></data>
+  <data name="Ai_Chat_StopHint" xml:space="preserve"><value>停止（Esc）</value></data>
+  <data name="Ai_Chat_StopOrClear" xml:space="preserve"><value>停止生成 / 清空</value></data>
+  <data name="Ai_Chat_Stopped" xml:space="preserve"><value>已停止</value></data>
+  <data name="Ai_ClientMismatch" xml:space="preserve"><value>登入客戶端不符</value></data>
+  <data name="Ai_ConfigureInSettings" xml:space="preserve"><value>還沒設定 AI 服務，去 設定 → AI 裡設定</value></data>
+  <data name="Ai_ConnectionInterrupted" xml:space="preserve"><value>目標連不上，連線已中斷</value></data>
+  <data name="Ai_ConnectionTimeout" xml:space="preserve"><value>連線逾時，請檢查網路和代理</value></data>
+  <data name="Ai_CredentialsFailed" xml:space="preserve"><value>無法讀取或儲存加密憑證，請重新設定</value></data>
+  <data name="Ai_CredentialsReadFailed" xml:space="preserve"><value>無法讀取加密憑證，請檢查資料目錄</value></data>
+  <data name="Ai_CredentialsSaveFailed" xml:space="preserve"><value>無法儲存加密憑證，請檢查資料目錄</value></data>
+  <data name="Ai_EndpointNetworkFailed" xml:space="preserve"><value>目標連不上，請檢查服務位址和網路</value></data>
+  <data name="Ai_EndpointUnreachable" xml:space="preserve"><value>目標連不上，請檢查服務位址</value></data>
+  <data name="Ai_IdentityTokenInvalid" xml:space="preserve"><value>ChatGPT 身份令牌校驗失敗</value></data>
+  <data name="Ai_IncompleteResponse" xml:space="preserve"><value>AI 響應未完成，請重試</value></data>
+  <data name="Ai_InvalidChatResponse" xml:space="preserve"><value>ChatGPT 返回格式無效</value></data>
+  <data name="Ai_InvalidChatRole" xml:space="preserve"><value>對話角色無效</value></data>
+  <data name="Ai_InvalidKey" xml:space="preserve"><value>API Key 無效，請在設定裡重新填寫</value></data>
+  <data name="Ai_InvalidKeyFormat" xml:space="preserve"><value>API Key 格式無效</value></data>
+  <data name="Ai_InvalidRequest" xml:space="preserve"><value>介面位址、模型或請求設定無效，請檢查設定</value></data>
+  <data name="Ai_InvalidResponse" xml:space="preserve"><value>AI 返回格式無效，請稍後重試</value></data>
+  <data name="Ai_IssuerMismatch" xml:space="preserve"><value>授權服務身份不符</value></data>
+  <data name="Ai_LoginAgain" xml:space="preserve"><value>請重新登入 ChatGPT</value></data>
+  <data name="Ai_LoginComplete" xml:space="preserve"><value>登入完成，可以回到 Pane 了</value></data>
+  <data name="Ai_LoginExpired" xml:space="preserve"><value>ChatGPT 登入已過期，請重新登入</value></data>
+  <data name="Ai_LoginIncomplete" xml:space="preserve"><value>登入未完成，請重新登入</value></data>
+  <data name="Ai_LoginInterrupted" xml:space="preserve"><value>登入連線中斷，請重試</value></data>
+  <data name="Ai_LoginPending" xml:space="preserve"><value>已有登入正在等待，請先完成或取消</value></data>
+  <data name="Ai_LoginRequired" xml:space="preserve"><value>請先在設定中登入 ChatGPT</value></data>
+  <data name="Ai_LoginStateInvalid" xml:space="preserve"><value>登入狀態校驗失敗，請返回 Pane 重試</value></data>
+  <data name="Ai_LoginTimeout" xml:space="preserve"><value>登入等待逾時，請重試</value></data>
+  <data name="Ai_ModelRequired" xml:space="preserve"><value>請先在設定裡選擇模型</value></data>
+  <data name="Ai_ModelUnavailable" xml:space="preserve"><value>模型不可用，請在設定裡換一個</value></data>
+  <data name="Ai_NetworkFailed" xml:space="preserve"><value>無法連線 AI 服務，請檢查網路和代理</value></data>
+  <data name="Ai_NoModels" xml:space="preserve"><value>沒有可用模型，請檢查介面位址或帳號權限</value></data>
+  <data name="Ai_NoResponse" xml:space="preserve"><value>AI 服務沒有響應，稍後重試</value></data>
+  <data name="Ai_NotConfigured" xml:space="preserve"><value>還沒設定 AI 服務</value></data>
+  <data name="Ai_NotConfiguredShort" xml:space="preserve"><value>還沒設定 AI</value></data>
+  <data name="Ai_ProxyAuthenticationFailed" xml:space="preserve"><value>代理拒絕連線，請檢查代理認證</value></data>
+  <data name="Ai_ProxyRejected" xml:space="preserve"><value>代理拒絕連線，請檢查代理設定</value></data>
+  <data name="Ai_ProxyUnreachable" xml:space="preserve"><value>連不上代理，請檢查代理位址和埠</value></data>
+  <data name="Ai_QuotaExceeded" xml:space="preserve"><value>額度用完或目前方案不可用，請檢查帳號方案</value></data>
+  <data name="Ai_RateLimited" xml:space="preserve"><value>請求太頻繁，請稍後重試</value></data>
+  <data name="Ai_RefreshFailed" xml:space="preserve"><value>ChatGPT 登入已過期且重新整理失敗，請重新登入</value></data>
+  <data name="Ai_RefreshTooEarly" xml:space="preserve"><value>尚未到服務允許的重新整理時間，請稍後重試</value></data>
+  <data name="Ai_ResponseTooLarge" xml:space="preserve"><value>AI 響應過大，請縮短請求</value></data>
+  <data name="Ai_StreamIncomplete" xml:space="preserve"><value>AI 響應流在完成前斷開，請重試</value></data>
+  <data name="Ai_StreamInterrupted" xml:space="preserve"><value>AI 連線中斷，請重試</value></data>
+  <data name="Ai_SubscriptionUnavailable" xml:space="preserve"><value>目前帳號無法使用方案額度，請檢查帳號方案</value></data>
+  <data name="Ai_TargetLanguageInvalid" xml:space="preserve"><value>翻譯目標語言無效，請檢查設定</value></data>
+  <data name="Ai_TokenIncomplete" xml:space="preserve"><value>ChatGPT 令牌響應不完整，請重新登入</value></data>
+  <data name="Ai_Unavailable" xml:space="preserve"><value>AI 服務暫時不可用，稍後重試</value></data>
+  <data name="Clipboard_DaysAgo" xml:space="preserve"><value>{0} 天前</value></data>
+  <data name="Clipboard_Earlier" xml:space="preserve"><value>更早</value></data>
+  <data name="Clipboard_HoursAgo" xml:space="preserve"><value>{0} 小時前</value></data>
+  <data name="Clipboard_ImageFileName" xml:space="preserve"><value>截圖 {0:yyyy-MM-dd HH-mm-ss}.png</value></data>
+  <data name="Clipboard_ImageMissing" xml:space="preserve"><value>缺少完整圖片</value></data>
+  <data name="Clipboard_JustNow" xml:space="preserve"><value>剛剛</value></data>
+  <data name="Clipboard_MinutesAgo" xml:space="preserve"><value>{0} 分鐘前</value></data>
+  <data name="Clipboard_NoMatches" xml:space="preserve"><value>沒有匹配的記錄</value></data>
+  <data name="Clipboard_NoPlainText" xml:space="preserve"><value>此條目沒有純文字</value></data>
+  <data name="Clipboard_Pin" xml:space="preserve"><value>固定</value></data>
+  <data name="Clipboard_PinHint" xml:space="preserve"><value>固定（Ctrl+P）</value></data>
+  <data name="Clipboard_Pinned" xml:space="preserve"><value>已固定</value></data>
+  <data name="Clipboard_PlainText" xml:space="preserve"><value>純文字</value></data>
+  <data name="Clipboard_QuickPaste" xml:space="preserve"><value>快速貼上</value></data>
+  <data name="Clipboard_SaveImageFailed" xml:space="preserve"><value>圖片儲存失敗</value></data>
+  <data name="Clipboard_SearchPlaceholder" xml:space="preserve"><value>搜尋剪貼簿</value></data>
+  <data name="Clipboard_Select" xml:space="preserve"><value>選擇</value></data>
+  <data name="Clipboard_SendToLauncher" xml:space="preserve"><value>交給啟動器</value></data>
+  <data name="Clipboard_SendToLauncherHint" xml:space="preserve"><value>交給啟動器（Tab）</value></data>
+  <data name="Clipboard_StorageFailed" xml:space="preserve"><value>儲存失敗：{0}，已失敗 {1} 次</value></data>
+  <data name="Clipboard_StorageFileBusy" xml:space="preserve"><value>檔案被佔用</value></data>
+  <data name="Clipboard_StorageIoError" xml:space="preserve"><value>磁碟讀寫錯誤</value></data>
+  <data name="Clipboard_StoragePermission" xml:space="preserve"><value>沒有寫入權限</value></data>
+  <data name="Clipboard_StorageProgramError" xml:space="preserve"><value>程式出錯（{0}）</value></data>
+  <data name="Clipboard_Today" xml:space="preserve"><value>今天</value></data>
+  <data name="Clipboard_UnpinHint" xml:space="preserve"><value>取消固定（Ctrl+P）</value></data>
+  <data name="Clipboard_WriteFailed" xml:space="preserve"><value>剪貼簿寫入失敗或正在被佔用</value></data>
+  <data name="Clipboard_Yesterday" xml:space="preserve"><value>昨天</value></data>
+  <data name="Common_ActionFailed" xml:space="preserve"><value>{0}失敗：{1}</value></data>
+  <data name="Common_AiChat" xml:space="preserve"><value>AI 對話</value></data>
+  <data name="Common_All" xml:space="preserve"><value>全部</value></data>
+  <data name="Common_AlwaysOnTop" xml:space="preserve"><value>總在最前</value></data>
+  <data name="Common_AlwaysOnTopEnabled" xml:space="preserve"><value>總在最前：開</value></data>
+  <data name="Common_Auto" xml:space="preserve"><value>自動</value></data>
+  <data name="Common_Back" xml:space="preserve"><value>返回</value></data>
+  <data name="Common_Cancel" xml:space="preserve"><value>取消</value></data>
+  <data name="Common_Change" xml:space="preserve"><value>更改</value></data>
+  <data name="Common_ChooseFile" xml:space="preserve"><value>選擇檔案</value></data>
+  <data name="Common_ChooseFolder" xml:space="preserve"><value>選擇資料夾</value></data>
+  <data name="Common_Clear" xml:space="preserve"><value>清空</value></data>
+  <data name="Common_ClearValue" xml:space="preserve"><value>清除</value></data>
+  <data name="Common_ClickToRecord" xml:space="preserve"><value>點這裡，然後按鍵</value></data>
+  <data name="Common_Clipboard" xml:space="preserve"><value>剪貼簿</value></data>
+  <data name="Common_ClipboardWriteFailed" xml:space="preserve"><value>無法寫入剪貼簿</value></data>
+  <data name="Common_Close" xml:space="preserve"><value>關閉</value></data>
+  <data name="Common_CloseEscapeHint" xml:space="preserve"><value>關閉（Esc）</value></data>
+  <data name="Common_CloseWindowHint" xml:space="preserve"><value>關閉（Ctrl+W）</value></data>
+  <data name="Common_Collapse" xml:space="preserve"><value>收起</value></data>
+  <data name="Common_Copy" xml:space="preserve"><value>複製</value></data>
+  <data name="Common_CopyPath" xml:space="preserve"><value>複製路徑</value></data>
+  <data name="Common_CrashLog" xml:space="preserve"><value>Pane 上次意外結束，記錄在 {0}</value></data>
+  <data name="Common_Default" xml:space="preserve"><value>預設</value></data>
+  <data name="Common_Delete" xml:space="preserve"><value>刪除</value></data>
+  <data name="Common_Disable" xml:space="preserve"><value>停用</value></data>
+  <data name="Common_Done" xml:space="preserve"><value>完成</value></data>
+  <data name="Common_Edit" xml:space="preserve"><value>編輯</value></data>
+  <data name="Common_Enable" xml:space="preserve"><value>啟用</value></data>
+  <data name="Common_Execute" xml:space="preserve"><value>執行</value></data>
+  <data name="Common_File" xml:space="preserve"><value>檔案</value></data>
+  <data name="Common_FileNotFound" xml:space="preserve"><value>找不到這個檔案或程式</value></data>
+  <data name="Common_Files" xml:space="preserve"><value>檔案</value></data>
+  <data name="Common_FocusFailed" xml:space="preserve"><value>沒能切回原來的視窗，內容已經複製好了，按 Ctrl+V 就能貼</value></data>
+  <data name="Common_GoToSettings" xml:space="preserve"><value>去設定</value></data>
+  <data name="Common_HotkeyHostStopped" xml:space="preserve"><value>熱鍵宿主已結束</value></data>
+  <data name="Common_Image" xml:space="preserve"><value>圖片</value></data>
+  <data name="Common_Import" xml:space="preserve"><value>匯入</value></data>
+  <data name="Common_InputPermissionDenied" xml:space="preserve"><value>沒有權限往這個視窗輸入（它可能以管理員身份執行）</value></data>
+  <data name="Common_InputRejected" xml:space="preserve"><value>輸入被系統拒絕</value></data>
+  <data name="Common_KeyCode" xml:space="preserve"><value>鍵 {0:X2}</value></data>
+  <data name="Common_Launcher" xml:space="preserve"><value>啟動器</value></data>
+  <data name="Common_ModifierRequired" xml:space="preserve"><value>至少要帶一個 Ctrl / Alt / Shift / Win</value></data>
+  <data name="Common_ModifiersHeld" xml:space="preserve"><value>修飾鍵尚未鬆開</value></data>
+  <data name="Common_MoveUp" xml:space="preserve"><value>上移</value></data>
+  <data name="Common_Name" xml:space="preserve"><value>名稱</value></data>
+  <data name="Common_None" xml:space="preserve"><value>無</value></data>
+  <data name="Common_NotFound" xml:space="preserve"><value>沒有找到</value></data>
+  <data name="Common_NotSaved" xml:space="preserve"><value>沒有儲存</value></data>
+  <data name="Common_Off" xml:space="preserve"><value>關閉</value></data>
+  <data name="Common_Open" xml:space="preserve"><value>開啟</value></data>
+  <data name="Common_OpenContainingFolder" xml:space="preserve"><value>開啟所在資料夾</value></data>
+  <data name="Common_Paste" xml:space="preserve"><value>貼上</value></data>
+  <data name="Common_RecordHotkey" xml:space="preserve"><value>按下新的組合鍵…</value></data>
+  <data name="Common_RecordKey" xml:space="preserve"><value>按下要傳送的鍵…</value></data>
+  <data name="Common_Regenerate" xml:space="preserve"><value>重新生成</value></data>
+  <data name="Common_ReleaseWinVFailed" xml:space="preserve"><value>無法釋放 Win+V 熱鍵</value></data>
+  <data name="Common_Remove" xml:space="preserve"><value>移除</value></data>
+  <data name="Common_Rename" xml:space="preserve"><value>批次重新命名</value></data>
+  <data name="Common_RenameAction" xml:space="preserve"><value>重新命名</value></data>
+  <data name="Common_ResetDefaults" xml:space="preserve"><value>恢復預設</value></data>
+  <data name="Common_RestartFailed" xml:space="preserve"><value>無法重新啟動 Pane</value></data>
+  <data name="Common_RestartNow" xml:space="preserve"><value>立即重新啟動</value></data>
+  <data name="Common_Restore" xml:space="preserve"><value>恢復</value></data>
+  <data name="Common_Retry" xml:space="preserve"><value>重試</value></data>
+  <data name="Common_Run" xml:space="preserve"><value>執行</value></data>
+  <data name="Common_Save" xml:space="preserve"><value>儲存</value></data>
+  <data name="Common_SaveAs" xml:space="preserve"><value>另存為…</value></data>
+  <data name="Common_Search" xml:space="preserve"><value>搜尋</value></data>
+  <data name="Common_Settings" xml:space="preserve"><value>設定</value></data>
+  <data name="Common_SpaceKey" xml:space="preserve"><value>空格</value></data>
+  <data name="Common_SuperPanel" xml:space="preserve"><value>超級面板</value></data>
+  <data name="Common_SystemOperationFailed" xml:space="preserve"><value>系統未能完成操作</value></data>
+  <data name="Common_TargetClosed" xml:space="preserve"><value>原來的視窗已經關了</value></data>
+  <data name="Common_Test" xml:space="preserve"><value>測試</value></data>
+  <data name="Common_Text" xml:space="preserve"><value>文字</value></data>
+  <data name="Common_Timeout" xml:space="preserve"><value>等太久了，稍後再試</value></data>
+  <data name="Common_Translate" xml:space="preserve"><value>翻譯</value></data>
+  <data name="Common_TryAgain" xml:space="preserve"><value>出了點問題，稍後再試</value></data>
+  <data name="Common_TryOnceMore" xml:space="preserve"><value>再試一次</value></data>
+  <data name="Common_Undo" xml:space="preserve"><value>復原</value></data>
+  <data name="Common_UnexpectedProblem" xml:space="preserve"><value>出了點問題</value></data>
+  <data name="Common_ViewDetails" xml:space="preserve"><value>檢視詳情</value></data>
+  <data name="Files_CategoryArchive" xml:space="preserve"><value>壓縮包</value></data>
+  <data name="Files_CategoryAudio" xml:space="preserve"><value>音訊</value></data>
+  <data name="Files_CategoryDocument" xml:space="preserve"><value>文件</value></data>
+  <data name="Files_CategoryFolder" xml:space="preserve"><value>資料夾</value></data>
+  <data name="Files_CategoryPresentation" xml:space="preserve"><value>演示</value></data>
+  <data name="Files_CategoryProgram" xml:space="preserve"><value>程式</value></data>
+  <data name="Files_CategorySpreadsheet" xml:space="preserve"><value>表格</value></data>
+  <data name="Files_CategoryVideo" xml:space="preserve"><value>影片</value></data>
+  <data name="Files_ChangeSort" xml:space="preserve"><value>換排序</value></data>
+  <data name="Files_ContainingFolder" xml:space="preserve"><value>所在資料夾</value></data>
+  <data name="Files_Count" xml:space="preserve"><value>共 {0:N0} 個</value></data>
+  <data name="Files_ItemCount" xml:space="preserve"><value>{0:N0} 項</value></data>
+  <data name="Files_MetaContents" xml:space="preserve"><value>內容</value></data>
+  <data name="Files_MetaDimensions" xml:space="preserve"><value>尺寸</value></data>
+  <data name="Files_MetaLocation" xml:space="preserve"><value>位置</value></data>
+  <data name="Files_MetaModified" xml:space="preserve"><value>修改</value></data>
+  <data name="Files_MetaSize" xml:space="preserve"><value>大小</value></data>
+  <data name="Files_MetaType" xml:space="preserve"><value>類型</value></data>
+  <data name="Files_MonthDay" xml:space="preserve"><value>{0} 月 {1} 日</value></data>
+  <data name="Files_NotFound" xml:space="preserve"><value>沒有找到「{0}」
+換個關鍵詞，或者在左邊換個分類</value></data>
+  <data name="Files_Preview" xml:space="preserve"><value>預覽</value></data>
+  <data name="Files_ReadSelection" xml:space="preserve"><value>讀取選取的檔案</value></data>
+  <data name="Files_SearchError" xml:space="preserve"><value>搜尋失敗：{0}</value></data>
+  <data name="Files_SearchHint" xml:space="preserve"><value>輸入檔名的一部分開始搜尋
+由 Everything 提供，結果是即時的</value></data>
+  <data name="Files_SearchPlaceholder" xml:space="preserve"><value>搜尋檔案和資料夾</value></data>
+  <data name="Files_SearchUnavailable" xml:space="preserve"><value>檔案搜尋暫時用不了</value></data>
+  <data name="Files_SortModified" xml:space="preserve"><value>按修改時間</value></data>
+  <data name="Files_SortRelevance" xml:space="preserve"><value>按相關度</value></data>
+  <data name="Files_TodayTime" xml:space="preserve"><value>今天 {0}</value></data>
+  <data name="Files_YearMonthDay" xml:space="preserve"><value>{0} 年 {1} 月 {2} 日</value></data>
+  <data name="Files_YesterdayTime" xml:space="preserve"><value>昨天 {0}</value></data>
+  <data name="FolderJump_Empty" xml:space="preserve"><value>沒有開著的檔案總管，也沒有最近用過的資料夾</value></data>
+  <data name="FolderJump_Explorer" xml:space="preserve"><value>開著的檔案總管</value></data>
+  <data name="FolderJump_JumpAction" xml:space="preserve"><value>跳到資料夾</value></data>
+  <data name="FolderJump_KeyCode" xml:space="preserve"><value>鍵 {0:X2}</value></data>
+  <data name="FolderJump_ListAction" xml:space="preserve"><value>列出資料夾</value></data>
+  <data name="FolderJump_Recent" xml:space="preserve"><value>最近用過</value></data>
+  <data name="FolderJump_Title" xml:space="preserve"><value>跳到資料夾</value></data>
+  <data name="Gestures_ActionFailed" xml:space="preserve"><value>{0}失敗</value></data>
+  <data name="Gestures_Command" xml:space="preserve"><value>命令</value></data>
+  <data name="Gestures_ConflictDetected" xml:space="preserve"><value>偵測到 WGestures 正在執行，Pane 的滑鼠手勢先不啟用</value></data>
+  <data name="Gestures_Executed" xml:space="preserve"><value>已執行</value></data>
+  <data name="Gestures_HintTitle" xml:space="preserve"><value>手勢提示</value></data>
+  <data name="Gestures_LeftButton" xml:space="preserve"><value>左鍵</value></data>
+  <data name="Gestures_MiddleButton" xml:space="preserve"><value>中鍵</value></data>
+  <data name="Gestures_Paused" xml:space="preserve"><value>手勢已暫停</value></data>
+  <data name="Gestures_PauseHotkeyOccupied" xml:space="preserve"><value>暫停熱鍵被佔用：{0}</value></data>
+  <data name="Gestures_Resumed" xml:space="preserve"><value>手勢已恢復</value></data>
+  <data name="Gestures_SideButtonOne" xml:space="preserve"><value>側鍵 1</value></data>
+  <data name="Gestures_SideButtonTwo" xml:space="preserve"><value>側鍵 2</value></data>
+  <data name="Gestures_TimedOut" xml:space="preserve"><value>手勢逾時，已取消</value></data>
+  <data name="Gestures_TrailTitle" xml:space="preserve"><value>Pane 手勢軌跡</value></data>
+  <data name="Gestures_Unknown" xml:space="preserve"><value>未辨識的手勢</value></data>
+  <data name="Gestures_WheelDown" xml:space="preserve"><value>滾輪下</value></data>
+  <data name="Gestures_WheelUp" xml:space="preserve"><value>滾輪上</value></data>
+  <data name="Launcher_AdminToolCategory" xml:space="preserve"><value>管理工具</value></data>
+  <data name="Launcher_AllFileResults" xml:space="preserve"><value>在檔案視窗裡檢視全部 {0:N0} 個</value></data>
+  <data name="Launcher_ApplicationSubtitle" xml:space="preserve"><value>應用</value></data>
+  <data name="Launcher_AppMissing" xml:space="preserve"><value>應用已不在索引中</value></data>
+  <data name="Launcher_AsAdmin" xml:space="preserve"><value>以管理員身份</value></data>
+  <data name="Launcher_AskAi" xml:space="preserve"><value>問 AI</value></data>
+  <data name="Launcher_AskDescription" xml:space="preserve"><value>單輪迴答，可以複製或貼上</value></data>
+  <data name="Launcher_AskQuery" xml:space="preserve"><value>問 AI：“{0}”</value></data>
+  <data name="Launcher_AskTarget" xml:space="preserve"><value>問 AI：{0}</value></data>
+  <data name="Launcher_AttachmentActionDescription" xml:space="preserve"><value>處理附件裡的文字</value></data>
+  <data name="Launcher_AttachmentPlaceholder" xml:space="preserve"><value>對附件做什麼？</value></data>
+  <data name="Launcher_AttachmentTarget" xml:space="preserve"><value>對「{0}」</value></data>
+  <data name="Launcher_AttachmentText" xml:space="preserve"><value>附件：{0}</value></data>
+  <data name="Launcher_AttachmentTranslateDescription" xml:space="preserve"><value>自動判斷：中文譯成英文，其他譯成中文</value></data>
+  <data name="Launcher_CommandClipboard" xml:space="preserve"><value>開啟剪貼簿歷史</value></data>
+  <data name="Launcher_CommandEmptyRecycleBin" xml:space="preserve"><value>清空回收站</value></data>
+  <data name="Launcher_CommandHibernate" xml:space="preserve"><value>休眠</value></data>
+  <data name="Launcher_CommandLock" xml:space="preserve"><value>鎖屏</value></data>
+  <data name="Launcher_CommandLogoff" xml:space="preserve"><value>登出</value></data>
+  <data name="Launcher_CommandRename" xml:space="preserve"><value>批次重新命名</value></data>
+  <data name="Launcher_CommandRestart" xml:space="preserve"><value>重新啟動</value></data>
+  <data name="Launcher_CommandSettings" xml:space="preserve"><value>Pane 設定</value></data>
+  <data name="Launcher_CommandShutdown" xml:space="preserve"><value>關機</value></data>
+  <data name="Launcher_CommandSleep" xml:space="preserve"><value>睡眠</value></data>
+  <data name="Launcher_CommandSubtitle" xml:space="preserve"><value>命令</value></data>
+  <data name="Launcher_ConfirmAction" xml:space="preserve"><value>再按一次 Enter 確認{0}</value></data>
+  <data name="Launcher_ContinueChat" xml:space="preserve"><value>繼續對話</value></data>
+  <data name="Launcher_ControlPanelCategory" xml:space="preserve"><value>控制面板</value></data>
+  <data name="Launcher_CopyImage" xml:space="preserve"><value>複製圖片</value></data>
+  <data name="Launcher_CopyResultHint" xml:space="preserve"><value>Enter 複製結果</value></data>
+  <data name="Launcher_CopyTarget" xml:space="preserve"><value>複製 {0}</value></data>
+  <data name="Launcher_DefaultSearchEngine" xml:space="preserve"><value>預設搜尋引擎</value></data>
+  <data name="Launcher_EverythingNotRunning" xml:space="preserve"><value>Everything 沒有執行，開啟它之後就能搜檔案</value></data>
+  <data name="Launcher_EverythingUnavailable" xml:space="preserve"><value>連不上 Everything（需要 1.4 或更新的版本），可以在 設定 → 啟動器 裡重新檢測</value></data>
+  <data name="Launcher_Explorer" xml:space="preserve"><value>檔案檔案總管</value></data>
+  <data name="Launcher_FileCount" xml:space="preserve"><value>{0} 個檔案</value></data>
+  <data name="Launcher_FillInput" xml:space="preserve"><value>填進輸入框</value></data>
+  <data name="Launcher_Group_Actions" xml:space="preserve"><value>動作</value></data>
+  <data name="Launcher_Group_Ai" xml:space="preserve"><value>AI</value></data>
+  <data name="Launcher_Group_Applications" xml:space="preserve"><value>應用</value></data>
+  <data name="Launcher_Group_Calculation" xml:space="preserve"><value>計算</value></data>
+  <data name="Launcher_Group_Commands" xml:space="preserve"><value>命令</value></data>
+  <data name="Launcher_Group_Completion" xml:space="preserve"><value>補全</value></data>
+  <data name="Launcher_Group_Favorites" xml:space="preserve"><value>常用</value></data>
+  <data name="Launcher_Group_Files" xml:space="preserve"><value>檔案</value></data>
   <data name="Launcher_Group_Images" xml:space="preserve"><value>圖片</value></data>
   <data name="Launcher_Group_Other" xml:space="preserve"><value>其他</value></data>
-  <data name="Launcher_Group_Actions" xml:space="preserve"><value>動作</value></data>
+  <data name="Launcher_Group_Pinned" xml:space="preserve"><value>已固定</value></data>
+  <data name="Launcher_Group_Recent" xml:space="preserve"><value>最近使用</value></data>
+  <data name="Launcher_Group_Settings" xml:space="preserve"><value>設定</value></data>
+  <data name="Launcher_Group_Terminal" xml:space="preserve"><value>終端</value></data>
+  <data name="Launcher_Group_Web" xml:space="preserve"><value>網頁</value></data>
+  <data name="Launcher_IndexFailed" xml:space="preserve"><value>索引程式失敗：{0}</value></data>
+  <data name="Launcher_IndexStartFailed" xml:space="preserve"><value>索引程式啟動失敗</value></data>
+  <data name="Launcher_OpenChat" xml:space="preserve"><value>開啟 AI 對話視窗</value></data>
+  <data name="Launcher_OpenFiles" xml:space="preserve"><value>開啟檔案視窗</value></data>
+  <data name="Launcher_OpenTarget" xml:space="preserve"><value>開啟 {0}</value></data>
+  <data name="Launcher_OpenTranslate" xml:space="preserve"><value>開啟翻譯視窗</value></data>
+  <data name="Launcher_PathCount" xml:space="preserve"><value>{0} 個路徑</value></data>
+  <data name="Launcher_QuestionWithAttachment" xml:space="preserve"><value>{0}
+
+附件：
+{1}</value></data>
+  <data name="Launcher_RemoveAttachmentHint" xml:space="preserve"><value>去掉附件（Esc）</value></data>
+  <data name="Launcher_RestoreClipboard" xml:space="preserve"><value>重新放回剪貼簿</value></data>
+  <data name="Launcher_RunAsAdmin" xml:space="preserve"><value>以管理員身份執行</value></data>
+  <data name="Launcher_RunFailed" xml:space="preserve"><value>執行失敗：{0}</value></data>
+  <data name="Launcher_RunInTerminal" xml:space="preserve"><value>在終端裡執行 {0}</value></data>
+  <data name="Launcher_RunTarget" xml:space="preserve"><value>執行 {0}</value></data>
+  <data name="Launcher_SearchFiles" xml:space="preserve"><value>搜檔案</value></data>
+  <data name="Launcher_SearchFilesTarget" xml:space="preserve"><value>在檔案裡搜「{0}」</value></data>
+  <data name="Launcher_SearchInFiles" xml:space="preserve"><value>在檔案視窗裡搜「{0}」</value></data>
+  <data name="Launcher_SearchPlaceholder" xml:space="preserve"><value>搜尋應用、檔案，或輸入任何文字</value></data>
+  <data name="Launcher_SearchQuery" xml:space="preserve"><value>在{0}中搜尋“{1}”</value></data>
+  <data name="Launcher_SearchTarget" xml:space="preserve"><value>搜「{0}」</value></data>
+  <data name="Launcher_SearchWith" xml:space="preserve"><value>用 {0} 搜</value></data>
+  <data name="Launcher_SearchWithQuery" xml:space="preserve"><value>用 {0} 搜「{1}」</value></data>
+  <data name="Launcher_SendWithAttachment" xml:space="preserve"><value>連同附件文字一起傳送</value></data>
+  <data name="Launcher_System_About" xml:space="preserve"><value>系統資訊設定</value></data>
+  <data name="Launcher_System_Activation" xml:space="preserve"><value>啟用設定</value></data>
+  <data name="Launcher_System_Appsfeatures" xml:space="preserve"><value>安裝的應用</value></data>
+  <data name="Launcher_System_Appsforwebsites" xml:space="preserve"><value>網站應用</value></data>
+  <data name="Launcher_System_AppsVolume" xml:space="preserve"><value>音量混合器</value></data>
+  <data name="Launcher_System_AppwizCpl" xml:space="preserve"><value>程式和功能</value></data>
+  <data name="Launcher_System_Autoplay" xml:space="preserve"><value>自動播放</value></data>
+  <data name="Launcher_System_Bluetooth" xml:space="preserve"><value>藍牙設定</value></data>
+  <data name="Launcher_System_Camera" xml:space="preserve"><value>相機設定</value></data>
+  <data name="Launcher_System_CertlmMsc" xml:space="preserve"><value>計算機證書管理</value></data>
+  <data name="Launcher_System_CertmgrMsc" xml:space="preserve"><value>使用者證書管理</value></data>
+  <data name="Launcher_System_CharmapExe" xml:space="preserve"><value>字元對映表</value></data>
+  <data name="Launcher_System_CleanmgrExe" xml:space="preserve"><value>磁碟清理</value></data>
+  <data name="Launcher_System_Clipboard" xml:space="preserve"><value>系統剪貼簿</value></data>
+  <data name="Launcher_System_CompmgmtMsc" xml:space="preserve"><value>計算機管理</value></data>
+  <data name="Launcher_System_Connecteddevices" xml:space="preserve"><value>連線的裝置</value></data>
+  <data name="Launcher_System_CredwizExe" xml:space="preserve"><value>憑證備份和還原</value></data>
+  <data name="Launcher_System_Crossdevice" xml:space="preserve"><value>跨裝置共享</value></data>
+  <data name="Launcher_System_Dateandtime" xml:space="preserve"><value>日期和時間</value></data>
+  <data name="Launcher_System_Defaultapps" xml:space="preserve"><value>預設應用</value></data>
+  <data name="Launcher_System_DeliveryOptimization" xml:space="preserve"><value>傳遞最佳化</value></data>
+  <data name="Launcher_System_DeliveryOptimizationActivity" xml:space="preserve"><value>傳遞最佳化活動監視器</value></data>
+  <data name="Launcher_System_DeliveryOptimizationAdvanced" xml:space="preserve"><value>傳遞最佳化進階選項</value></data>
+  <data name="Launcher_System_DeskCpl" xml:space="preserve"><value>顯示控制面板</value></data>
+  <data name="Launcher_System_Developers" xml:space="preserve"><value>開發者選項</value></data>
+  <data name="Launcher_System_DevicestypingHwkbtextsuggestions" xml:space="preserve"><value>硬體鍵盤文字建議</value></data>
+  <data name="Launcher_System_DevmgmtMsc" xml:space="preserve"><value>裝置管理控制台</value></data>
+  <data name="Launcher_System_DfrguiExe" xml:space="preserve"><value>最佳化驅動器</value></data>
+  <data name="Launcher_System_DiskmgmtMsc" xml:space="preserve"><value>磁碟管理</value></data>
+  <data name="Launcher_System_Disksandvolumes" xml:space="preserve"><value>磁碟和磁碟區</value></data>
+  <data name="Launcher_System_Display" xml:space="preserve"><value>顯示設定</value></data>
+  <data name="Launcher_System_DxdiagExe" xml:space="preserve"><value>DirectX 診斷工具</value></data>
+  <data name="Launcher_System_EaseofaccessAudio" xml:space="preserve"><value>輔助音訊</value></data>
+  <data name="Launcher_System_EaseofaccessClosedcaptioning" xml:space="preserve"><value>字幕設定</value></data>
+  <data name="Launcher_System_EaseofaccessColorfilter" xml:space="preserve"><value>顏色濾鏡</value></data>
+  <data name="Launcher_System_EaseofaccessCursor" xml:space="preserve"><value>文字游標</value></data>
+  <data name="Launcher_System_EaseofaccessDisplay" xml:space="preserve"><value>輔助顯示</value></data>
+  <data name="Launcher_System_EaseofaccessHighcontrast" xml:space="preserve"><value>對比度主題</value></data>
+  <data name="Launcher_System_EaseofaccessKeyboard" xml:space="preserve"><value>輔助鍵盤</value></data>
+  <data name="Launcher_System_EaseofaccessMagnifier" xml:space="preserve"><value>放大鏡設定</value></data>
+  <data name="Launcher_System_EaseofaccessMouse" xml:space="preserve"><value>輔助滑鼠</value></data>
+  <data name="Launcher_System_EaseofaccessMousepointer" xml:space="preserve"><value>滑鼠指標和觸控</value></data>
+  <data name="Launcher_System_EaseofaccessNarrator" xml:space="preserve"><value>講述人設定</value></data>
+  <data name="Launcher_System_EaseofaccessNarratorIsautostartenabled" xml:space="preserve"><value>講述人自動啟動</value></data>
+  <data name="Launcher_System_EaseofaccessSpeechrecognition" xml:space="preserve"><value>輔助語音</value></data>
+  <data name="Launcher_System_EaseofaccessVisualeffects" xml:space="preserve"><value>視覺效果</value></data>
+  <data name="Launcher_System_Emailandaccounts" xml:space="preserve"><value>電子郵件和帳戶</value></data>
+  <data name="Launcher_System_EventvwrMsc" xml:space="preserve"><value>事件檢視器</value></data>
+  <data name="Launcher_System_Findmydevice" xml:space="preserve"><value>查詢我的裝置</value></data>
+  <data name="Launcher_System_FirewallCpl" xml:space="preserve"><value>Windows 防火牆</value></data>
+  <data name="Launcher_System_Fonts" xml:space="preserve"><value>字型設定</value></data>
+  <data name="Launcher_System_GamingGamebar" xml:space="preserve"><value>遊戲欄</value></data>
+  <data name="Launcher_System_GamingGamedvr" xml:space="preserve"><value>遊戲捕獲</value></data>
+  <data name="Launcher_System_GamingGamemode" xml:space="preserve"><value>遊戲模式</value></data>
+  <data name="Launcher_System_GpeditMsc" xml:space="preserve"><value>編輯組策略</value></data>
+  <data name="Launcher_System_HdwwizCpl" xml:space="preserve"><value>裝置管理器</value></data>
+  <data name="Launcher_System_InetcplCpl" xml:space="preserve"><value>Internet 選項</value></data>
+  <data name="Launcher_System_IntlCpl" xml:space="preserve"><value>區域控制面板</value></data>
+  <data name="Launcher_System_JoyCpl" xml:space="preserve"><value>遊戲控制器</value></data>
+  <data name="Launcher_System_Keyboard" xml:space="preserve"><value>鍵盤語言</value></data>
+  <data name="Launcher_System_KeyboardAdvanced" xml:space="preserve"><value>高階鍵盤設定</value></data>
+  <data name="Launcher_System_Lockscreen" xml:space="preserve"><value>鎖屏介面</value></data>
+  <data name="Launcher_System_LusrmgrMsc" xml:space="preserve"><value>本地使用者和組</value></data>
+  <data name="Launcher_System_MainCpl" xml:space="preserve"><value>滑鼠屬性</value></data>
+  <data name="Launcher_System_MdschedExe" xml:space="preserve"><value>Windows 記憶體診斷</value></data>
+  <data name="Launcher_System_MmsysCpl" xml:space="preserve"><value>聲音控制面板</value></data>
+  <data name="Launcher_System_Mousetouchpad" xml:space="preserve"><value>滑鼠設定</value></data>
+  <data name="Launcher_System_MsconfigExe" xml:space="preserve"><value>系統設定</value></data>
+  <data name="Launcher_System_Msinfo32Exe" xml:space="preserve"><value>系統資訊</value></data>
+  <data name="Launcher_System_Multitasking" xml:space="preserve"><value>多工處理</value></data>
+  <data name="Launcher_System_NcpaCpl" xml:space="preserve"><value>網路連線</value></data>
+  <data name="Launcher_System_NetplwizExe" xml:space="preserve"><value>使用者帳戶</value></data>
+  <data name="Launcher_System_NetworkAdvancedsettings" xml:space="preserve"><value>高階網路設定</value></data>
+  <data name="Launcher_System_NetworkDialup" xml:space="preserve"><value>撥號設定</value></data>
+  <data name="Launcher_System_NetworkEthernet" xml:space="preserve"><value>乙太網路</value></data>
+  <data name="Launcher_System_NetworkProxy" xml:space="preserve"><value>代理設定</value></data>
+  <data name="Launcher_System_NetworkStatus" xml:space="preserve"><value>網路和 Internet</value></data>
+  <data name="Launcher_System_NetworkVpn" xml:space="preserve"><value>VPN 設定</value></data>
+  <data name="Launcher_System_Nightlight" xml:space="preserve"><value>夜間模式</value></data>
+  <data name="Launcher_System_Notifications" xml:space="preserve"><value>通知設定</value></data>
+  <data name="Launcher_System_Odbcad32Exe" xml:space="preserve"><value>ODBC 資料來源</value></data>
+  <data name="Launcher_System_Optionalfeatures" xml:space="preserve"><value>可選功能</value></data>
+  <data name="Launcher_System_OptionalfeaturesExe" xml:space="preserve"><value>Windows 功能</value></data>
+  <data name="Launcher_System_Otherusers" xml:space="preserve"><value>其他使用者</value></data>
+  <data name="Launcher_System_PerfmonExe" xml:space="preserve"><value>效能監視器</value></data>
+  <data name="Launcher_System_Personalization" xml:space="preserve"><value>個性化設定</value></data>
+  <data name="Launcher_System_PersonalizationBackground" xml:space="preserve"><value>桌面背景</value></data>
+  <data name="Launcher_System_PersonalizationColors" xml:space="preserve"><value>顏色設定</value></data>
+  <data name="Launcher_System_PersonalizationStart" xml:space="preserve"><value>開始選單設定</value></data>
+  <data name="Launcher_System_PersonalizationStartPlaces" xml:space="preserve"><value>開始選單資料夾</value></data>
+  <data name="Launcher_System_PersonalizationTextinput" xml:space="preserve"><value>文字輸入個性化</value></data>
+  <data name="Launcher_System_PersonalizationTouchkeyboard" xml:space="preserve"><value>觸控鍵盤</value></data>
+  <data name="Launcher_System_PowercfgCpl" xml:space="preserve"><value>電源選項</value></data>
+  <data name="Launcher_System_Powersleep" xml:space="preserve"><value>電源和睡眠</value></data>
+  <data name="Launcher_System_Printers" xml:space="preserve"><value>印表機和掃描器</value></data>
+  <data name="Launcher_System_PrintmanagementMsc" xml:space="preserve"><value>列印管理</value></data>
+  <data name="Launcher_System_Privacy" xml:space="preserve"><value>隱私設定</value></data>
+  <data name="Launcher_System_PrivacyAccountinfo" xml:space="preserve"><value>帳戶資訊權限</value></data>
+  <data name="Launcher_System_PrivacyActivityhistory" xml:space="preserve"><value>活動歷史記錄</value></data>
+  <data name="Launcher_System_PrivacyAppdiagnostics" xml:space="preserve"><value>應用診斷權限</value></data>
+  <data name="Launcher_System_PrivacyAutomaticfiledownloads" xml:space="preserve"><value>自動檔案下載</value></data>
+  <data name="Launcher_System_PrivacyBroadfilesystemaccess" xml:space="preserve"><value>檔案系統權限</value></data>
+  <data name="Launcher_System_PrivacyCalendar" xml:space="preserve"><value>日曆權限</value></data>
+  <data name="Launcher_System_PrivacyCallhistory" xml:space="preserve"><value>通話記錄權限</value></data>
+  <data name="Launcher_System_PrivacyContacts" xml:space="preserve"><value>聯絡人權限</value></data>
+  <data name="Launcher_System_PrivacyCustomdevices" xml:space="preserve"><value>其他裝置權限</value></data>
+  <data name="Launcher_System_PrivacyDocuments" xml:space="preserve"><value>文件權限</value></data>
+  <data name="Launcher_System_PrivacyDownloadsfolder" xml:space="preserve"><value>下載資料夾權限</value></data>
+  <data name="Launcher_System_PrivacyEmail" xml:space="preserve"><value>電子郵件權限</value></data>
+  <data name="Launcher_System_PrivacyFeedback" xml:space="preserve"><value>診斷和意見回饋</value></data>
+  <data name="Launcher_System_PrivacyGeneral" xml:space="preserve"><value>常規隱私</value></data>
+  <data name="Launcher_System_PrivacyLocation" xml:space="preserve"><value>位置權限</value></data>
+  <data name="Launcher_System_PrivacyMessaging" xml:space="preserve"><value>訊息權限</value></data>
+  <data name="Launcher_System_PrivacyMicrophone" xml:space="preserve"><value>麥克風權限</value></data>
+  <data name="Launcher_System_PrivacyMusiclibrary" xml:space="preserve"><value>音樂庫權限</value></data>
+  <data name="Launcher_System_PrivacyNotifications" xml:space="preserve"><value>通知權限</value></data>
+  <data name="Launcher_System_PrivacyPhonecalls" xml:space="preserve"><value>電話權限</value></data>
+  <data name="Launcher_System_PrivacyPictures" xml:space="preserve"><value>圖片權限</value></data>
+  <data name="Launcher_System_PrivacyRadios" xml:space="preserve"><value>無線電權限</value></data>
+  <data name="Launcher_System_PrivacySpeech" xml:space="preserve"><value>線上語音辨識</value></data>
+  <data name="Launcher_System_PrivacySpeechtyping" xml:space="preserve"><value>墨跡書寫和鍵入個性化</value></data>
+  <data name="Launcher_System_PrivacyTasks" xml:space="preserve"><value>任務權限</value></data>
+  <data name="Launcher_System_PrivacyVideos" xml:space="preserve"><value>影片權限</value></data>
+  <data name="Launcher_System_PrivacyVoiceactivation" xml:space="preserve"><value>語音啟用</value></data>
+  <data name="Launcher_System_PrivacyWebcam" xml:space="preserve"><value>相機權限</value></data>
+  <data name="Launcher_System_Project" xml:space="preserve"><value>投影到此電腦</value></data>
+  <data name="Launcher_System_Quiethours" xml:space="preserve"><value>專注助手</value></data>
+  <data name="Launcher_System_Quietmomentsgame" xml:space="preserve"><value>遊戲時免打擾</value></data>
+  <data name="Launcher_System_Quietmomentspresentation" xml:space="preserve"><value>投影時免打擾</value></data>
+  <data name="Launcher_System_Quietmomentsscheduled" xml:space="preserve"><value>自動免打擾時段</value></data>
+  <data name="Launcher_System_Recovery" xml:space="preserve"><value>恢復設定</value></data>
+  <data name="Launcher_System_RegeditExe" xml:space="preserve"><value>登錄編輯程式</value></data>
+  <data name="Launcher_System_Regionformatting" xml:space="preserve"><value>區域格式</value></data>
+  <data name="Launcher_System_Regionlanguage" xml:space="preserve"><value>語言和區域</value></data>
+  <data name="Launcher_System_ResmonExe" xml:space="preserve"><value>資源監視器</value></data>
+  <data name="Launcher_System_Savelocations" xml:space="preserve"><value>新內容儲存位置</value></data>
+  <data name="Launcher_System_Search" xml:space="preserve"><value>Windows 搜尋設定</value></data>
+  <data name="Launcher_System_SearchMoredetails" xml:space="preserve"><value>搜尋 Windows</value></data>
+  <data name="Launcher_System_SearchPermissions" xml:space="preserve"><value>搜尋權限</value></data>
+  <data name="Launcher_System_SecpolMsc" xml:space="preserve"><value>本地安全策略</value></data>
+  <data name="Launcher_System_ServicesMsc" xml:space="preserve"><value>服務</value></data>
+  <data name="Launcher_System_Signinoptions" xml:space="preserve"><value>登入選項</value></data>
+  <data name="Launcher_System_SigninoptionsDynamiclock" xml:space="preserve"><value>動態鎖</value></data>
+  <data name="Launcher_System_Sound" xml:space="preserve"><value>聲音設定</value></data>
+  <data name="Launcher_System_SoundDefaultinputproperties" xml:space="preserve"><value>預設麥克風</value></data>
+  <data name="Launcher_System_SoundDefaultoutputproperties" xml:space="preserve"><value>預設音訊輸出</value></data>
+  <data name="Launcher_System_SoundDevices" xml:space="preserve"><value>管理聲音裝置</value></data>
+  <data name="Launcher_System_Speech" xml:space="preserve"><value>語音設定</value></data>
+  <data name="Launcher_System_Startupapps" xml:space="preserve"><value>啟動應用</value></data>
+  <data name="Launcher_System_Storagepolicies" xml:space="preserve"><value>儲存感知</value></data>
+  <data name="Launcher_System_Storagerecommendations" xml:space="preserve"><value>清理建議</value></data>
+  <data name="Launcher_System_Storagesense" xml:space="preserve"><value>儲存設定</value></data>
+  <data name="Launcher_System_Sync" xml:space="preserve"><value>同步設定</value></data>
+  <data name="Launcher_System_SysdmCpl" xml:space="preserve"><value>系統屬性</value></data>
+  <data name="Launcher_System_Taskbar" xml:space="preserve"><value>工作列設定</value></data>
+  <data name="Launcher_System_TaskmgrExe" xml:space="preserve"><value>工作管理員</value></data>
+  <data name="Launcher_System_TaskschdMsc" xml:space="preserve"><value>任務計劃程式</value></data>
+  <data name="Launcher_System_TelephonCpl" xml:space="preserve"><value>電話和數據機</value></data>
+  <data name="Launcher_System_Themes" xml:space="preserve"><value>主題設定</value></data>
+  <data name="Launcher_System_TimedateCpl" xml:space="preserve"><value>日期和時間控制面板</value></data>
+  <data name="Launcher_System_Troubleshoot" xml:space="preserve"><value>疑難解答</value></data>
+  <data name="Launcher_System_Typing" xml:space="preserve"><value>輸入設定</value></data>
+  <data name="Launcher_System_Usb" xml:space="preserve"><value>USB 設定</value></data>
+  <data name="Launcher_System_Videoplayback" xml:space="preserve"><value>影片播放</value></data>
+  <data name="Launcher_System_WfMsc" xml:space="preserve"><value>高階安全 Windows 防火牆</value></data>
+  <data name="Launcher_System_Windowsdefender" xml:space="preserve"><value>Windows 安全中心</value></data>
+  <data name="Launcher_System_Windowsupdate" xml:space="preserve"><value>Windows 更新</value></data>
+  <data name="Launcher_System_WindowsupdateActivehours" xml:space="preserve"><value>更新使用時段</value></data>
+  <data name="Launcher_System_WindowsupdateHistory" xml:space="preserve"><value>更新歷史記錄</value></data>
+  <data name="Launcher_System_WindowsupdateOptionalupdates" xml:space="preserve"><value>可選更新</value></data>
+  <data name="Launcher_System_WindowsupdateOptions" xml:space="preserve"><value>更新進階選項</value></data>
+  <data name="Launcher_System_WindowsupdateRestartoptions" xml:space="preserve"><value>更新重新啟動選項</value></data>
+  <data name="Launcher_System_Workplace" xml:space="preserve"><value>訪問工作或學校</value></data>
+  <data name="Launcher_System_Yourinfo" xml:space="preserve"><value>帳戶資訊</value></data>
+  <data name="Launcher_SystemCredentials" xml:space="preserve"><value>憑證管理器</value></data>
+  <data name="Launcher_SystemEnvironment" xml:space="preserve"><value>編輯系統環境變數</value></data>
+  <data name="Launcher_SystemPageCategory" xml:space="preserve"><value>設定頁面</value></data>
+  <data name="Launcher_TerminalHelp" xml:space="preserve"><value>輸入命令後按 Enter 在終端裡執行</value></data>
+  <data name="Launcher_TerminalInputHint" xml:space="preserve"><value>輸入要在終端裡執行的命令</value></data>
+  <data name="Launcher_TerminalRunDescription" xml:space="preserve"><value>在終端裡執行</value></data>
+  <data name="Launcher_TranslateDescription" xml:space="preserve"><value>用 AI 翻譯</value></data>
+  <data name="Launcher_TranslateQuery" xml:space="preserve"><value>翻譯“{0}”</value></data>
+  <data name="Launcher_TranslateTarget" xml:space="preserve"><value>翻譯「{0}」</value></data>
+  <data name="Launcher_TranslateWindow" xml:space="preserve"><value>翻譯視窗</value></data>
+  <data name="Launcher_ViewInFiles" xml:space="preserve"><value>在檔案視窗裡看</value></data>
+  <data name="Launcher_WebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
+  <data name="Rename_AddFiles" xml:space="preserve"><value>新增檔案</value></data>
+  <data name="Rename_AddFilesHint" xml:space="preserve"><value>新增檔案…</value></data>
+  <data name="Rename_AddRule" xml:space="preserve"><value>新增規則</value></data>
+  <data name="Rename_AddSelected" xml:space="preserve"><value>加進來</value></data>
+  <data name="Rename_AfterCharacter" xml:space="preserve"><value>個字後面</value></data>
+  <data name="Rename_ApplyPresetHint" xml:space="preserve"><value>點一下換成這組規則</value></data>
+  <data name="Rename_BeforeCharacter" xml:space="preserve"><value>個字前面</value></data>
+  <data name="Rename_Beginning" xml:space="preserve"><value>開頭</value></data>
+  <data name="Rename_Cancelled" xml:space="preserve"><value>操作已取消</value></data>
+  <data name="Rename_Case" xml:space="preserve"><value>大小寫</value></data>
+  <data name="Rename_CaseDescription" xml:space="preserve"><value>全小寫、全大寫、首字母大寫</value></data>
+  <data name="Rename_CaseSensitive" xml:space="preserve"><value>區分大小寫</value></data>
+  <data name="Rename_ChangedCount" xml:space="preserve"><value>改名 {0} 個</value></data>
+  <data name="Rename_ChangeOrderHint" xml:space="preserve"><value>序號按這個順序編（點一下換）</value></data>
+  <data name="Rename_ChangeTo" xml:space="preserve"><value>改成</value></data>
+  <data name="Rename_CharacterCount" xml:space="preserve"><value>個</value></data>
+  <data name="Rename_CharacterFromEnd" xml:space="preserve"><value>倒數第</value></data>
+  <data name="Rename_CharacterFromStart" xml:space="preserve"><value>第</value></data>
+  <data name="Rename_CharacterIndex" xml:space="preserve"><value>第幾個字</value></data>
+  <data name="Rename_CompleteCount" xml:space="preserve"><value>已重新命名 {0} 個</value></data>
+  <data name="Rename_CountFromEnd" xml:space="preserve"><value>從末尾數</value></data>
+  <data name="Rename_CreatedDate" xml:space="preserve"><value>建立日期</value></data>
+  <data name="Rename_Date" xml:space="preserve"><value>日期</value></data>
+  <data name="Rename_DateDescription" xml:space="preserve"><value>插入檔案的修改或建立日期</value></data>
+  <data name="Rename_DateFormat" xml:space="preserve"><value>格式</value></data>
+  <data name="Rename_DateSeparator" xml:space="preserve"><value>分隔</value></data>
+  <data name="Rename_DateSeparatorPlaceholder" xml:space="preserve"><value>日期和名字之間，比如空格</value></data>
+  <data name="Rename_Delete" xml:space="preserve"><value>刪除</value></data>
+  <data name="Rename_DeleteBackward" xml:space="preserve"><value>個字起往前刪</value></data>
+  <data name="Rename_DeleteDescription" xml:space="preserve"><value>從第幾個字起刪掉幾個</value></data>
+  <data name="Rename_DeleteForward" xml:space="preserve"><value>個字起刪</value></data>
+  <data name="Rename_DeleteFromEnd" xml:space="preserve"><value>從倒數第</value></data>
+  <data name="Rename_DeleteFromStart" xml:space="preserve"><value>從第</value></data>
+  <data name="Rename_DeletePreset" xml:space="preserve"><value>刪掉這個預設組合</value></data>
+  <data name="Rename_DeleteRule" xml:space="preserve"><value>刪掉這條</value></data>
+  <data name="Rename_DisableRule" xml:space="preserve"><value>暫時不用這條</value></data>
+  <data name="Rename_DragOrder" xml:space="preserve"><value>拖曳調整順序</value></data>
+  <data name="Rename_DropHint" xml:space="preserve"><value>在檔案總管裡選取檔案再開啟，或者把檔案拖到這裡</value></data>
+  <data name="Rename_DropReleaseHint" xml:space="preserve"><value>鬆開就加進來</value></data>
+  <data name="Rename_DuplicateName" xml:space="preserve"><value>和別的重名</value></data>
+  <data name="Rename_Empty" xml:space="preserve"><value>（空）</value></data>
+  <data name="Rename_EmptyFiles" xml:space="preserve"><value>還沒有檔案</value></data>
+  <data name="Rename_EmptyName" xml:space="preserve"><value>名字是空的</value></data>
+  <data name="Rename_EmptyPresets" xml:space="preserve"><value>還沒有預設組合：調好規則後點底部的「存為預設組合」</value></data>
+  <data name="Rename_EnableRule" xml:space="preserve"><value>啟用這條</value></data>
+  <data name="Rename_End" xml:space="preserve"><value>末尾</value></data>
+  <data name="Rename_Extension" xml:space="preserve"><value>副檔名</value></data>
+  <data name="Rename_ExtensionDescription" xml:space="preserve"><value>換掉或去掉副檔名</value></data>
+  <data name="Rename_ExtensionDescriptionHint" xml:space="preserve"><value>只改檔案；資料夾沒有副檔名，不受影響。</value></data>
+  <data name="Rename_ExtensionPlaceholder" xml:space="preserve"><value>比如 jpg；留空 = 去掉副檔名</value></data>
+  <data name="Rename_Failed" xml:space="preserve"><value>沒改成</value></data>
+  <data name="Rename_FailedCount" xml:space="preserve"><value>{0} 個沒改成（滑鼠移到標籤上看原因）</value></data>
+  <data name="Rename_FileCount" xml:space="preserve"><value>{0} 個</value></data>
+  <data name="Rename_Find" xml:space="preserve"><value>查詢</value></data>
+  <data name="Rename_FindPlaceholder" xml:space="preserve"><value>要換掉的文字</value></data>
+  <data name="Rename_FindSpace" xml:space="preserve"><value>查詢的是空格</value></data>
+  <data name="Rename_Finished" xml:space="preserve"><value>已完成</value></data>
+  <data name="Rename_FolderCountSuffix" xml:space="preserve"><value> · 來自 {0} 個資料夾</value></data>
+  <data name="Rename_IncludeExtension" xml:space="preserve"><value>副檔名也改</value></data>
+  <data name="Rename_Insert" xml:space="preserve"><value>插入文字</value></data>
+  <data name="Rename_InsertDescription" xml:space="preserve"><value>在開頭、末尾或第幾個字前面插入</value></data>
+  <data name="Rename_InsertPlaceholder" xml:space="preserve"><value>要插入的文字</value></data>
+  <data name="Rename_InvalidCharacters" xml:space="preserve"><value>含不能用的字元</value></data>
+  <data name="Rename_InvalidRegex" xml:space="preserve"><value>正則寫錯了</value></data>
+  <data name="Rename_InvalidRule" xml:space="preserve"><value>規則寫錯了（正則或日期格式）</value></data>
+  <data name="Rename_IssuesCount" xml:space="preserve"><value>{0} 個有問題，先解決才能執行</value></data>
+  <data name="Rename_LowerCase" xml:space="preserve"><value>小寫</value></data>
+  <data name="Rename_ModifiedDate" xml:space="preserve"><value>修改日期</value></data>
+  <data name="Rename_NewName" xml:space="preserve"><value>新名</value></data>
+  <data name="Rename_NoSelection" xml:space="preserve"><value>沒有選取檔案</value></data>
+  <data name="Rename_Number" xml:space="preserve"><value>序號</value></data>
+  <data name="Rename_NumberDescription" xml:space="preserve"><value>按順序編號，可以補零、調步長</value></data>
+  <data name="Rename_NumberDigits" xml:space="preserve"><value>位數</value></data>
+  <data name="Rename_NumberPadding" xml:space="preserve"><value>不夠的前面補 0</value></data>
+  <data name="Rename_NumberSeparator" xml:space="preserve"><value>分隔</value></data>
+  <data name="Rename_NumberSeparatorPlaceholder" xml:space="preserve"><value>序號和名字之間，比如 -</value></data>
+  <data name="Rename_NumberStart" xml:space="preserve"><value>起始</value></data>
+  <data name="Rename_NumberStep" xml:space="preserve"><value>步長</value></data>
+  <data name="Rename_OldName" xml:space="preserve"><value>原名</value></data>
+  <data name="Rename_OrderName" xml:space="preserve"><value>按名稱</value></data>
+  <data name="Rename_OrderOriginal" xml:space="preserve"><value>原順序</value></data>
+  <data name="Rename_OrderTime" xml:space="preserve"><value>按時間</value></data>
+  <data name="Rename_PathTooLong" xml:space="preserve"><value>路徑太長</value></data>
+  <data name="Rename_Position" xml:space="preserve"><value>位置</value></data>
+  <data name="Rename_PresetNamePlaceholder" xml:space="preserve"><value>給這組規則起個名字</value></data>
+  <data name="Rename_Presets" xml:space="preserve"><value>預設組合</value></data>
+  <data name="Rename_PresetSaved" xml:space="preserve"><value>已存為預設組合「{0}」</value></data>
+  <data name="Rename_PresetsHint" xml:space="preserve"><value>存過的規則組合</value></data>
+  <data name="Rename_Preview" xml:space="preserve"><value>預覽</value></data>
+  <data name="Rename_PreviewInvalid" xml:space="preserve"><value>預覽存在問題</value></data>
+  <data name="Rename_Regex" xml:space="preserve"><value>正則</value></data>
+  <data name="Rename_RegexHint" xml:space="preserve"><value>正則寫錯了，先改好才能預覽</value></data>
+  <data name="Rename_RegexPlaceholder" xml:space="preserve"><value>正則，比如 IMG_(\d+)</value></data>
+  <data name="Rename_RelatedRollback" xml:space="preserve"><value>關聯檔案重新命名失敗，已回退</value></data>
+  <data name="Rename_RemoveFileHint" xml:space="preserve"><value>不改這個（移出列表）</value></data>
+  <data name="Rename_RenameCount" xml:space="preserve"><value>重新命名 {0} 個</value></data>
+  <data name="Rename_Renamed" xml:space="preserve"><value>已改名</value></data>
+  <data name="Rename_Replace" xml:space="preserve"><value>替換</value></data>
+  <data name="Rename_ReplaceDescription" xml:space="preserve"><value>把一段文字換成別的，支援正則</value></data>
+  <data name="Rename_ReplacementEmptyPlaceholder" xml:space="preserve"><value>留空 = 刪掉</value></data>
+  <data name="Rename_ReplacementGroupPlaceholder" xml:space="preserve"><value>可以用 $1 引用分組</value></data>
+  <data name="Rename_ReplaceWith" xml:space="preserve"><value>換成</value></data>
+  <data name="Rename_RuleLimit" xml:space="preserve"><value>最多 {0} 條規則</value></data>
+  <data name="Rename_Running" xml:space="preserve"><value>正在改名…</value></data>
+  <data name="Rename_SaveAsPreset" xml:space="preserve"><value>存為預設組合</value></data>
+  <data name="Rename_SavePreset" xml:space="preserve"><value>儲存預設組合</value></data>
+  <data name="Rename_SelectFilesFirst" xml:space="preserve"><value>先選取要改名的檔案</value></data>
+  <data name="Rename_SourceMissing" xml:space="preserve"><value>檔案已經不在了</value></data>
+  <data name="Rename_TargetExists" xml:space="preserve"><value>已有同名檔案</value></data>
+  <data name="Rename_Text" xml:space="preserve"><value>文字</value></data>
+  <data name="Rename_TitleCase" xml:space="preserve"><value>詞首大寫</value></data>
+  <data name="Rename_Unchanged" xml:space="preserve"><value>不變</value></data>
+  <data name="Rename_UnchangedCount" xml:space="preserve"><value>不變 {0} 個</value></data>
+  <data name="Rename_UndoFailed" xml:space="preserve"><value>{0} 個沒能改回去：{1}</value></data>
+  <data name="Rename_UpperCase" xml:space="preserve"><value>大寫</value></data>
+  <data name="Settings_About" xml:space="preserve"><value>關於</value></data>
+  <data name="Settings_About_AllComponents" xml:space="preserve"><value>全部第三方元件</value></data>
+  <data name="Settings_About_Components" xml:space="preserve"><value>開源元件</value></data>
+  <data name="Settings_About_DataLocation" xml:space="preserve"><value>資料位置</value></data>
+  <data name="Settings_About_Uninstall" xml:space="preserve"><value>解除安裝 Pane</value></data>
+  <data name="Settings_About_UninstallDescription" xml:space="preserve"><value>開啟解除安裝程式；也可以執行安裝目錄裡的「Uninstall Pane.exe」</value></data>
+  <data name="Settings_About_UninstallUnavailable" xml:space="preserve"><value>開發版不是安裝出來的，不能從這裡解除安裝</value></data>
+  <data name="Settings_About_UninstallButton" xml:space="preserve"><value>解除安裝…</value></data>
+  <data name="Settings_About_Description" xml:space="preserve"><value>版本、資料位置和開源元件。</value></data>
+  <data name="Settings_About_DescriptionTagline" xml:space="preserve"><value>Windows 上的啟動器、滑鼠手勢和剪貼簿工具</value></data>
+  <data name="Settings_About_FontLicense" xml:space="preserve"><value>使用本機已安裝的字型，不隨程式分發；沒裝時用微軟雅黑</value></data>
+  <data name="Settings_About_Information" xml:space="preserve"><value>資訊</value></data>
+  <data name="Settings_About_License" xml:space="preserve"><value>開源許可</value></data>
+  <data name="Settings_About_LicenseDescription" xml:space="preserve"><value>GPL-3.0（附加許可：可與微軟執行庫一起分發）；原始碼在 GitHub</value></data>
+  <data name="Settings_About_Lucide" xml:space="preserve"><value>Lucide 圖示</value></data>
+  <data name="Settings_About_LucideLicense" xml:space="preserve"><value>lucide-static 1.60.0 · ISC 許可</value></data>
+  <data name="Settings_About_NoticesLocation" xml:space="preserve"><value>安裝目錄裡的 THIRD_PARTY_NOTICES.md</value></data>
+  <data name="Settings_About_ViewAll" xml:space="preserve"><value>檢視全部</value></data>
+  <data name="Settings_About_WinUiLicense" xml:space="preserve"><value>WinUI 3 · MIT 許可</value></data>
+  <data name="Settings_Accent_Graphite" xml:space="preserve"><value>石墨</value></data>
+  <data name="Settings_Accent_MistBlue" xml:space="preserve"><value>霧藍</value></data>
+  <data name="Settings_Accent_Moss" xml:space="preserve"><value>苔綠</value></data>
+  <data name="Settings_Accent_Teal" xml:space="preserve"><value>青碧</value></data>
+  <data name="Settings_AccentColor" xml:space="preserve"><value>主題色</value></data>
+  <data name="Settings_AccentColor_Description" xml:space="preserve"><value>只用在開關、滑塊、焦點等控制元件上，不給文字上色</value></data>
+  <data name="Settings_Ai_ActionPrompt" xml:space="preserve"><value>提示詞</value></data>
+  <data name="Settings_Ai_ActionPromptRequired" xml:space="preserve"><value>提示詞不能是空的</value></data>
+  <data name="Settings_Ai_Actions" xml:space="preserve"><value>預設動作</value></data>
+  <data name="Settings_Ai_ActionsDescription" xml:space="preserve"><value>可用變數：{text} 要處理的文字，{lang} 目標語言。離開輸入框時自動儲存。啟動器和超級面板按這裡的順序顯示。</value></data>
+  <data name="Settings_Ai_AddAction" xml:space="preserve"><value>新增動作</value></data>
+  <data name="Settings_Ai_ApiProvider" xml:space="preserve"><value>第三方 API</value></data>
+  <data name="Settings_Ai_AutoLanguageDescription" xml:space="preserve"><value>原文以中文為主就譯成英文，否則譯成中文</value></data>
+  <data name="Settings_Ai_AutoTranslate" xml:space="preserve"><value>超級面板選取外文自動翻譯</value></data>
+  <data name="Settings_Ai_AutoTranslateDescription" xml:space="preserve"><value>選取外文、超級面板一彈出就翻譯，單個單詞也翻；超過約 2000 字不自動翻；中文照舊只顯示動作</value></data>
+  <data name="Settings_Ai_Basic" xml:space="preserve"><value>基本</value></data>
+  <data name="Settings_Ai_ChatGptProvider" xml:space="preserve"><value>ChatGPT 帳號</value></data>
+  <data name="Settings_Ai_ConfigureFirst" xml:space="preserve"><value>先在上面設定好 AI 服務</value></data>
+  <data name="Settings_Ai_Connected" xml:space="preserve"><value>連線正常</value></data>
+  <data name="Settings_Ai_CustomProxy" xml:space="preserve"><value>自定義</value></data>
+  <data name="Settings_Ai_CustomProxyDescription" xml:space="preserve"><value>用下面這個代理；支援 http 和 socks5</value></data>
+  <data name="Settings_Ai_DefaultReasoningDescription" xml:space="preserve"><value>用服務的預設；只對支援思考的模型有效，不支援的自動忽略</value></data>
+  <data name="Settings_Ai_DeleteAction" xml:space="preserve"><value>刪除這個動作</value></data>
+  <data name="Settings_Ai_DeleteKey" xml:space="preserve"><value>刪除已儲存的 Key</value></data>
+  <data name="Settings_Ai_Description" xml:space="preserve"><value>翻譯、提問和快捷動作用的 AI 服務。</value></data>
+  <data name="Settings_Ai_Direct" xml:space="preserve"><value>不走代理</value></data>
+  <data name="Settings_Ai_DirectDescription" xml:space="preserve"><value>直接連線，不管系統有沒有設代理</value></data>
+  <data name="Settings_Ai_Disabled" xml:space="preserve"><value>已關閉：啟動器和超級面板裡不再出現翻譯、問 AI 等 AI 動作；下面的設定都還在</value></data>
+  <data name="Settings_Ai_Enable" xml:space="preserve"><value>啟用 AI</value></data>
+  <data name="Settings_Ai_EnableDescription" xml:space="preserve"><value>不用 AI 時可以關掉</value></data>
+  <data name="Settings_Ai_Endpoint" xml:space="preserve"><value>介面位址</value></data>
+  <data name="Settings_Ai_EndpointDescription" xml:space="preserve"><value>相容 OpenAI 介面格式的服務</value></data>
+  <data name="Settings_Ai_EndpointInvalid" xml:space="preserve"><value>介面位址要以 http:// 或 https:// 開頭</value></data>
+  <data name="Settings_Ai_FetchModels" xml:space="preserve"><value>拉取模型列表</value></data>
+  <data name="Settings_Ai_FirstModelDefault" xml:space="preserve"><value>預設（帳號的第一個模型）</value></data>
+  <data name="Settings_Ai_FirstModelDescription" xml:space="preserve"><value>空著就用帳號模型列表裡的第一個</value></data>
+  <data name="Settings_Ai_FreeAccount" xml:space="preserve"><value>免費帳號：能登入，但用不了方案額度</value></data>
+  <data name="Settings_Ai_Invalid" xml:space="preserve"><value>AI 設定無效</value></data>
+  <data name="Settings_Ai_KeyDescription" xml:space="preserve"><value>儲存後只顯示開頭和結尾，加密儲存在本機</value></data>
+  <data name="Settings_Ai_KeySaved" xml:space="preserve"><value>已儲存：{0}（加密儲存在本機）</value></data>
+  <data name="Settings_Ai_LoadingModels" xml:space="preserve"><value>拉取中…</value></data>
+  <data name="Settings_Ai_LoggingIn" xml:space="preserve"><value>正在登入</value></data>
+  <data name="Settings_Ai_Login" xml:space="preserve"><value>登入 ChatGPT</value></data>
+  <data name="Settings_Ai_LoginDescription" xml:space="preserve"><value>在瀏覽器裡授權，翻譯和提問算在你的 Plus / Pro 方案裡，不用填 API Key。免費帳號能登入，但用不了方案額度</value></data>
+  <data name="Settings_Ai_LoginFailed" xml:space="preserve"><value>沒有登入上</value></data>
+  <data name="Settings_Ai_LoginPendingDescription" xml:space="preserve"><value>已在瀏覽器開啟授權頁面，完成後會自動回到這裡（5 分鐘內有效）</value></data>
+  <data name="Settings_Ai_LoginTitle" xml:space="preserve"><value>用 ChatGPT 帳號登入</value></data>
+  <data name="Settings_Ai_Logout" xml:space="preserve"><value>登出</value></data>
+  <data name="Settings_Ai_Model" xml:space="preserve"><value>模型</value></data>
+  <data name="Settings_Ai_ModelDescription" xml:space="preserve"><value>填服務商給的模型 Id，或拉取列表來選</value></data>
+  <data name="Settings_Ai_ModelId" xml:space="preserve"><value>模型 Id</value></data>
+  <data name="Settings_Ai_ModelsCount" xml:space="preserve"><value>共 {0} 個，點一個就用它；也可以直接輸入</value></data>
+  <data name="Settings_Ai_Network" xml:space="preserve"><value>網路</value></data>
+  <data name="Settings_Ai_NoModels" xml:space="preserve"><value>服務沒有返回模型</value></data>
+  <data name="Settings_Ai_PrivacyDescription" xml:space="preserve"><value>只在你主動觸發時，才把那一段文字發給上面設定的服務；不會自動傳送剪貼簿內容。Key 和登入資訊用 Windows 資料保護加密儲存在本機。</value></data>
+  <data name="Settings_Ai_Provider" xml:space="preserve"><value>服務方式</value></data>
+  <data name="Settings_Ai_Proxy" xml:space="preserve"><value>代理</value></data>
+  <data name="Settings_Ai_ProxyAddress" xml:space="preserve"><value>代理位址</value></data>
+  <data name="Settings_Ai_ProxyConnected" xml:space="preserve"><value>能連上</value></data>
+  <data name="Settings_Ai_ProxyInvalid" xml:space="preserve"><value>代理位址要以 http://、https:// 或 socks5:// 開頭</value></data>
+  <data name="Settings_Ai_ProxyPlaceholder" xml:space="preserve"><value>比如 http://127.0.0.1:7890 或 socks5://127.0.0.1:7891</value></data>
+  <data name="Settings_Ai_ProxyRequired" xml:space="preserve"><value>填上代理位址，或者換回「跟隨系統」</value></data>
+  <data name="Settings_Ai_Reasoning" xml:space="preserve"><value>思考程度</value></data>
+  <data name="Settings_Ai_ReasoningDescription" xml:space="preserve"><value>越深回答越慢、越費額度；只對支援思考的模型有效，不支援的自動忽略</value></data>
+  <data name="Settings_Ai_ReasoningHigh" xml:space="preserve"><value>高</value></data>
+  <data name="Settings_Ai_ReasoningLow" xml:space="preserve"><value>低</value></data>
+  <data name="Settings_Ai_ReasoningMedium" xml:space="preserve"><value>中</value></data>
+  <data name="Settings_Ai_ReplaceKey" xml:space="preserve"><value>輸入新的 Key 替換</value></data>
+  <data name="Settings_Ai_SameAsMain" xml:space="preserve"><value>和主模型相同</value></data>
+  <data name="Settings_Ai_Service" xml:space="preserve"><value>服務</value></data>
+  <data name="Settings_Ai_Subscription" xml:space="preserve"><value>ChatGPT {0} · 用方案額度</value></data>
+  <data name="Settings_Ai_SubscriptionUnknown" xml:space="preserve"><value>已登入 · 用方案額度（方案名稱未知）</value></data>
+  <data name="Settings_Ai_SystemProxyDescription" xml:space="preserve"><value>和瀏覽器一樣，用系統設定裡的代理</value></data>
+  <data name="Settings_Ai_TargetLanguage" xml:space="preserve"><value>目標語言</value></data>
+  <data name="Settings_Ai_TestConnection" xml:space="preserve"><value>測試連線</value></data>
+  <data name="Settings_Ai_TestConnectionDescription" xml:space="preserve"><value>用現在的設定發一個很小的請求</value></data>
+  <data name="Settings_Ai_Testing" xml:space="preserve"><value>測試中…</value></data>
+  <data name="Settings_Ai_TestProxy" xml:space="preserve"><value>測試代理</value></data>
+  <data name="Settings_Ai_TestProxyDescription" xml:space="preserve"><value>按上面的代理連一下 AI 服務，不傳送任何內容</value></data>
+  <data name="Settings_Ai_Translation" xml:space="preserve"><value>翻譯</value></data>
+  <data name="Settings_Ai_TranslationModel" xml:space="preserve"><value>翻譯用模型</value></data>
+  <data name="Settings_Ai_TranslationModelDescription" xml:space="preserve"><value>翻譯視窗和自動翻譯用它，選個快一點的；空著就用主模型。在上面拉取模型列表後可以直接點選</value></data>
+  <data name="Settings_Ai_TranslationModelManualDescription" xml:space="preserve"><value>翻譯視窗和自動翻譯用它，選個快一點的；空著就用主模型</value></data>
+  <data name="Settings_Appearance" xml:space="preserve"><value>外觀</value></data>
+  <data name="Settings_Autostart" xml:space="preserve"><value>開機時啟動 Pane</value></data>
+  <data name="Settings_Autostart_ChangeFailed" xml:space="preserve"><value>沒有改成功</value></data>
+  <data name="Settings_Autostart_Description" xml:space="preserve"><value>登入 Windows 後在背景啟動，只有托盤圖示；按熱鍵直接叫出</value></data>
+  <data name="Settings_Autostart_Development" xml:space="preserve"><value>開發版不註冊開機啟動</value></data>
+  <data name="Settings_Autostart_DisabledInTaskManager" xml:space="preserve"><value>已在工作管理員裡停用</value></data>
+  <data name="Settings_Autostart_EnableInTaskManager" xml:space="preserve"><value>Pane 不會替你改回來；要開機啟動，請在工作管理員的「啟動應用」裡重新啟用</value></data>
+  <data name="Settings_Autostart_Error" xml:space="preserve"><value>沒有改成功：{0}</value></data>
+  <data name="Settings_Autostart_InstallHint" xml:space="preserve"><value>{0}；裝成正式版後可以開啟</value></data>
+  <data name="Settings_Autostart_TargetConflict" xml:space="preserve"><value>啟動項 Pane 指向其他程式</value></data>
+  <data name="Settings_Autostart_Unavailable" xml:space="preserve"><value>現在不能註冊</value></data>
+  <data name="Settings_Clipboard" xml:space="preserve"><value>剪貼簿</value></data>
+  <data name="Settings_Clipboard_Activation" xml:space="preserve"><value>叫出</value></data>
+  <data name="Settings_Clipboard_AddExcludedProgram" xml:space="preserve"><value>新增排除的程式</value></data>
+  <data name="Settings_Clipboard_Basic" xml:space="preserve"><value>基本</value></data>
+  <data name="Settings_Clipboard_Cleared" xml:space="preserve"><value>已清空，固定的條目保留了</value></data>
+  <data name="Settings_Clipboard_ClearHistory" xml:space="preserve"><value>清空剪貼簿歷史</value></data>
+  <data name="Settings_Clipboard_ClearWarning" xml:space="preserve"><value>未固定的記錄會全部刪除，不能復原</value></data>
+  <data name="Settings_Clipboard_ConfirmClear" xml:space="preserve"><value>再點一次清空</value></data>
+  <data name="Settings_Clipboard_Data" xml:space="preserve"><value>資料</value></data>
+  <data name="Settings_Clipboard_Deduplicate" xml:space="preserve"><value>連續重複只留一條</value></data>
+  <data name="Settings_Clipboard_DeduplicateDescription" xml:space="preserve"><value>再複製一遍同樣的內容，只把原來那條的時間更新</value></data>
+  <data name="Settings_Clipboard_Description" xml:space="preserve"><value>記錄什麼、保留多久，以及隱私保護。</value></data>
+  <data name="Settings_Clipboard_Disabled" xml:space="preserve"><value>已關閉：不監聽複製、不記錄，叫出熱鍵也不佔用；以前的記錄還在</value></data>
+  <data name="Settings_Clipboard_DisabledNotice" xml:space="preserve"><value>剪貼簿已關閉，可以在 設定 → 剪貼簿 裡開啟</value></data>
+  <data name="Settings_Clipboard_DisableWinVFirst" xml:space="preserve"><value>先關掉下面的「用 Pane 替換 Win+V」，才能關剪貼簿</value></data>
+  <data name="Settings_Clipboard_Enable" xml:space="preserve"><value>啟用剪貼簿</value></data>
+  <data name="Settings_Clipboard_EnableDescription" xml:space="preserve"><value>已經有別的剪貼簿工具時可以關掉</value></data>
+  <data name="Settings_Clipboard_ExcludedProgram" xml:space="preserve"><value>從這個程式複製的內容不記錄</value></data>
+  <data name="Settings_Clipboard_Formats" xml:space="preserve"><value>記錄哪些內容</value></data>
+  <data name="Settings_Clipboard_FormatsDescription" xml:space="preserve"><value>文字包括連結、顏色和程式碼</value></data>
+  <data name="Settings_Clipboard_Invalid" xml:space="preserve"><value>剪貼簿設定無效</value></data>
+  <data name="Settings_Clipboard_LimitFiveHundred" xml:space="preserve"><value>500 條</value></data>
+  <data name="Settings_Clipboard_LimitFiveThousand" xml:space="preserve"><value>5000 條</value></data>
+  <data name="Settings_Clipboard_LimitThousand" xml:space="preserve"><value>1000 條</value></data>
+  <data name="Settings_Clipboard_LimitTwoHundred" xml:space="preserve"><value>200 條</value></data>
+  <data name="Settings_Clipboard_MaxItems" xml:space="preserve"><value>最多保留</value></data>
+  <data name="Settings_Clipboard_MaxItemsDescription" xml:space="preserve"><value>已固定的條目不計入，也不會被自動清理</value></data>
+  <data name="Settings_Clipboard_MovePastedFirst" xml:space="preserve"><value>貼上後移到最前</value></data>
+  <data name="Settings_Clipboard_MovePastedFirstDescription" xml:space="preserve"><value>下次開啟剪貼簿時生效；面板開著時條目不挪位置</value></data>
+  <data name="Settings_Clipboard_OneFormatRequired" xml:space="preserve"><value>至少記錄一種</value></data>
+  <data name="Settings_Clipboard_PinnedRemain" xml:space="preserve"><value>已固定的條目會保留</value></data>
+  <data name="Settings_Clipboard_Privacy" xml:space="preserve"><value>隱私</value></data>
+  <data name="Settings_Clipboard_Recording" xml:space="preserve"><value>記錄</value></data>
+  <data name="Settings_Clipboard_RespectHistoryFlag" xml:space="preserve"><value>遵守「不進歷史」標記</value></data>
+  <data name="Settings_Clipboard_RespectHistoryFlagDescription" xml:space="preserve"><value>密碼管理器等程式複製的內容如果帶這個標記，就不記錄</value></data>
+  <data name="Settings_Clipboard_StorageFailed" xml:space="preserve"><value>歷史沒能儲存</value></data>
+  <data name="Settings_Clipboard_StorageFailedDescription" xml:space="preserve"><value>重新啟動 Pane 後這段時間複製的內容會丟；詳細記錄在資料目錄的 logs 裡</value></data>
+  <data name="Settings_Clipboard_WinVActive" xml:space="preserve"><value>Win+V 也會開啟 Pane 的剪貼簿</value></data>
+  <data name="Settings_Everything_Connected" xml:space="preserve"><value>已連線 Everything {0}</value></data>
+  <data name="Settings_Everything_ConnectedLegacy" xml:space="preserve"><value>已連線 Everything 1.4</value></data>
+  <data name="Settings_Everything_FilesUnavailable" xml:space="preserve"><value>Everything 沒有執行，檔案搜尋暫不可用</value></data>
+  <data name="Settings_Everything_NotRunning" xml:space="preserve"><value>Everything 沒有執行</value></data>
+  <data name="Settings_Everything_Refresh" xml:space="preserve"><value>重新檢測</value></data>
+  <data name="Settings_Everything_Unavailable" xml:space="preserve"><value>Everything 版本太老或連不上</value></data>
+  <data name="Settings_FolderJump" xml:space="preserve"><value>檔案對話方塊</value></data>
+  <data name="Settings_FolderJump_Automatic" xml:space="preserve"><value>對話方塊開啟時自動跳過去</value></data>
+  <data name="Settings_FolderJump_AutomaticDescription" xml:space="preserve"><value>新開啟的對話方塊直接跳到最近用過的檔案總管資料夾；只跳這一次，之後照常操作</value></data>
+  <data name="Settings_FolderJump_Basic" xml:space="preserve"><value>基本</value></data>
+  <data name="Settings_FolderJump_Behavior" xml:space="preserve"><value>行為</value></data>
+  <data name="Settings_FolderJump_ChooseFolderDescription" xml:space="preserve"><value>在對話方塊旁邊彈出選單，從開著的和最近用過的資料夾裡選</value></data>
+  <data name="Settings_FolderJump_CurrentFolder" xml:space="preserve"><value>跳到目前資料夾</value></data>
+  <data name="Settings_FolderJump_CurrentFolderDescription" xml:space="preserve"><value>跳到最近用過的檔案總管視窗所在的資料夾；沒開檔案總管時彈出選單</value></data>
+  <data name="Settings_FolderJump_Description" xml:space="preserve"><value>在「開啟 / 另存為」對話方塊裡一鍵跳到檔案總管開著的資料夾。</value></data>
+  <data name="Settings_FolderJump_Disabled" xml:space="preserve"><value>已關閉：兩個快捷鍵都還給對話方塊</value></data>
+  <data name="Settings_FolderJump_Enable" xml:space="preserve"><value>啟用對話方塊跳轉</value></data>
+  <data name="Settings_FolderJump_EnableDescription" xml:space="preserve"><value>只在「開啟 / 另存為」對話方塊在前臺時接管下面兩個快捷鍵，別的程式裡不受影響</value></data>
+  <data name="Settings_FolderJump_Hotkeys" xml:space="preserve"><value>快捷鍵</value></data>
+  <data name="Settings_FolderJump_Menu" xml:space="preserve"><value>彈出選單讓我選</value></data>
+  <data name="Settings_FolderJump_MultipleMenuDescription" xml:space="preserve"><value>彈出選單從開著的資料夾裡選；只開著一個時照常直接跳</value></data>
+  <data name="Settings_FolderJump_MultipleRecentDescription" xml:space="preserve"><value>直接跳到最後點過的那個視窗；想挑別的用「選擇資料夾」</value></data>
+  <data name="Settings_FolderJump_MultipleWindows" xml:space="preserve"><value>開著多個檔案總管時</value></data>
+  <data name="Settings_FolderJump_Recent" xml:space="preserve"><value>跳到最近用過的</value></data>
+  <data name="Settings_FolderJump_ShowRecent" xml:space="preserve"><value>選單裡列出最近用過的資料夾</value></data>
+  <data name="Settings_FolderJump_ShowRecentDescription" xml:space="preserve"><value>來自 Windows 的最近使用記錄，最多 8 個；關掉後選單裡只有開著的檔案總管資料夾</value></data>
+  <data name="Settings_FollowSystem" xml:space="preserve"><value>跟隨系統</value></data>
+  <data name="Settings_Font" xml:space="preserve"><value>字型</value></data>
+  <data name="Settings_Font_Choose" xml:space="preserve"><value>選擇字型</value></data>
+  <data name="Settings_Font_Default" xml:space="preserve"><value>預設（{0}）</value></data>
+  <data name="Settings_Font_DefaultFallback" xml:space="preserve"><value>預設（{0}，沒裝時用{1}）</value></data>
+  <data name="Settings_Font_FallbackDescription" xml:space="preserve"><value>所有面板和視窗的文字；沒裝或缺字時用{0}補上</value></data>
+  <data name="Settings_Font_Family" xml:space="preserve"><value>字族名</value></data>
+  <data name="Settings_Font_FamilyDescription" xml:space="preserve"><value>空著就用預設；按 Enter 儲存</value></data>
+  <data name="Settings_Font_FamilyPlaceholder" xml:space="preserve"><value>字族名，如 HarmonyOS Sans SC</value></data>
+  <data name="Settings_Font_InstallDescription" xml:space="preserve"><value>MiSans 不隨 Pane 分發；想用的話到小米官網下載安裝，再在這裡選。</value></data>
+  <data name="Settings_Font_JhengHei" xml:space="preserve"><value>微軟正黑</value></data>
+  <data name="Settings_Font_Loading" xml:space="preserve"><value>正在讀取本機字型…</value></data>
+  <data name="Settings_Font_Local" xml:space="preserve"><value>本機字型</value></data>
+  <data name="Settings_Font_LocalDescription" xml:space="preserve"><value>共 {0} 款，能寫中文的排在前面；最多列 40 個，可以搜尋</value></data>
+  <data name="Settings_Font_NotFound" xml:space="preserve"><value>沒有找到「{0}」</value></data>
+  <data name="Settings_Font_Sample" xml:space="preserve"><value>Pane 啟動器 · 剪貼簿 · 滑鼠手勢</value></data>
+  <data name="Settings_Font_SampleChinese" xml:space="preserve"><value>Pane 啟動器 · 剪貼簿 · 滑鼠手勢 Aa</value></data>
+  <data name="Settings_Font_SampleLatin" xml:space="preserve"><value>Pane Launcher Aa（不含漢字，中文會用別的字型補）</value></data>
+  <data name="Settings_Font_Search" xml:space="preserve"><value>搜尋字型</value></data>
+  <data name="Settings_Font_Ui" xml:space="preserve"><value>介面字型</value></data>
+  <data name="Settings_Font_YaHei" xml:space="preserve"><value>微軟雅黑</value></data>
+  <data name="Settings_General" xml:space="preserve"><value>通用</value></data>
+  <data name="Settings_General_Description" xml:space="preserve"><value>啟動方式、外觀和動效。</value></data>
+  <data name="Settings_Gestures" xml:space="preserve"><value>滑鼠手勢</value></data>
+  <data name="Settings_Gestures_Action" xml:space="preserve"><value>動作</value></data>
+  <data name="Settings_Gestures_Add" xml:space="preserve"><value>新增手勢</value></data>
+  <data name="Settings_Gestures_AddChord" xml:space="preserve"><value>再按一個鍵（連續按）</value></data>
+  <data name="Settings_Gestures_AddDirection" xml:space="preserve"><value>加一段</value></data>
+  <data name="Settings_Gestures_AddProgram" xml:space="preserve"><value>新增程式</value></data>
+  <data name="Settings_Gestures_AddProgramBinding" xml:space="preserve"><value>新增專用手勢</value></data>
+  <data name="Settings_Gestures_BackButton" xml:space="preserve"><value>後退鍵</value></data>
+  <data name="Settings_Gestures_BackClick" xml:space="preserve"><value>按住時點後退鍵</value></data>
+  <data name="Settings_Gestures_Basic" xml:space="preserve"><value>基本</value></data>
+  <data name="Settings_Gestures_Buttons" xml:space="preserve"><value>用哪些鍵畫</value></data>
+  <data name="Settings_Gestures_ButtonsDescription" xml:space="preserve"><value>按住拖曳來畫方向；不移動就鬆開，照常是原來的點選</value></data>
+  <data name="Settings_Gestures_ChooseConfig" xml:space="preserve"><value>選擇檔案…</value></data>
+  <data name="Settings_Gestures_ChordRequired" xml:space="preserve"><value>還沒有錄按鍵</value></data>
+  <data name="Settings_Gestures_Close" xml:space="preserve"><value>關閉</value></data>
+  <data name="Settings_Gestures_CommandHotkey" xml:space="preserve"><value>快捷鍵</value></data>
+  <data name="Settings_Gestures_CommandOpen" xml:space="preserve"><value>開啟</value></data>
+  <data name="Settings_Gestures_CommandRequired" xml:space="preserve"><value>命令還沒填</value></data>
+  <data name="Settings_Gestures_CommandVolume" xml:space="preserve"><value>音量</value></data>
+  <data name="Settings_Gestures_CommandWebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
+  <data name="Settings_Gestures_CommandWindow" xml:space="preserve"><value>視窗</value></data>
+  <data name="Settings_Gestures_Conflict" xml:space="preserve"><value>WGestures 正在執行，Pane 的手勢先不啟用；關掉 WGestures 後重新啟動 Pane</value></data>
+  <data name="Settings_Gestures_Count" xml:space="preserve"><value>手勢（{0}）</value></data>
+  <data name="Settings_Gestures_DecreaseVolume" xml:space="preserve"><value>減</value></data>
+  <data name="Settings_Gestures_DefaultDescription" xml:space="preserve"><value>後退、前進、關閉標籤頁、按住右鍵滾輪切換標籤頁等</value></data>
+  <data name="Settings_Gestures_Delete" xml:space="preserve"><value>刪除這個手勢</value></data>
+  <data name="Settings_Gestures_DeleteProgramBinding" xml:space="preserve"><value>刪除這個專用手勢</value></data>
+  <data name="Settings_Gestures_Description" xml:space="preserve"><value>按住右鍵畫方向，執行對應動作。</value></data>
+  <data name="Settings_Gestures_Direction" xml:space="preserve"><value>方向</value></data>
+  <data name="Settings_Gestures_DirectionMissing" xml:space="preserve"><value>還沒有方向</value></data>
+  <data name="Settings_Gestures_DrawHint" xml:space="preserve"><value>在這裡按住滑鼠左鍵畫方向</value></data>
+  <data name="Settings_Gestures_DuplicatePattern" xml:space="preserve"><value>和「{0}」的手勢一樣</value></data>
+  <data name="Settings_Gestures_Enable" xml:space="preserve"><value>啟用滑鼠手勢</value></data>
+  <data name="Settings_Gestures_ExportHelp" xml:space="preserve"><value>{0}
+在 WGestures 裡用「匯出」存一個 .wgb 檔案，再點「選擇檔案…」也可以</value></data>
+  <data name="Settings_Gestures_FindConfig" xml:space="preserve"><value>查詢設定</value></data>
+  <data name="Settings_Gestures_FollowWheel" xml:space="preserve"><value>跟著滾輪調</value></data>
+  <data name="Settings_Gestures_ForwardButton" xml:space="preserve"><value>前進鍵</value></data>
+  <data name="Settings_Gestures_ForwardClick" xml:space="preserve"><value>按住時點前進鍵</value></data>
+  <data name="Settings_Gestures_HookFailed" xml:space="preserve"><value>滑鼠鉤子沒裝上，重新啟動 Pane 再試</value></data>
+  <data name="Settings_Gestures_HotkeyDescription" xml:space="preserve"><value>快捷鍵 {0}</value></data>
+  <data name="Settings_Gestures_HotkeyUnset" xml:space="preserve"><value>沒有設定</value></data>
+  <data name="Settings_Gestures_ImportDescription" xml:space="preserve"><value>讀取 WGestures 的手勢、程式規則和軌跡顏色；不會改動 WGestures 本身</value></data>
+  <data name="Settings_Gestures_Imported" xml:space="preserve"><value>已匯入 {0} 個手勢</value></data>
+  <data name="Settings_Gestures_ImportError" xml:space="preserve"><value>匯入失敗：{0}</value></data>
+  <data name="Settings_Gestures_ImportNotFound" xml:space="preserve"><value>沒找到 WGestures 的設定</value></data>
+  <data name="Settings_Gestures_ImportReadError" xml:space="preserve"><value>讀不出 WGestures 的設定：{0}</value></data>
+  <data name="Settings_Gestures_ImportSummary" xml:space="preserve"><value>找到 WGestures {0} 的設定：{1} 個手勢、{2} 條程式規則、{3} 個停用程式。匯入會替換 Pane 現在的手勢和程式設定</value></data>
+  <data name="Settings_Gestures_ImportSummaryUnsupported" xml:space="preserve"><value>找到 WGestures {0} 的設定：{1} 個手勢、{2} 條程式規則、{3} 個停用程式；{4} 項不支援，會跳過。匯入會替換 Pane 現在的手勢和程式設定</value></data>
+  <data name="Settings_Gestures_ImportTitle" xml:space="preserve"><value>從 WGestures 匯入</value></data>
+  <data name="Settings_Gestures_IncreaseVolume" xml:space="preserve"><value>加</value></data>
+  <data name="Settings_Gestures_InvalidConfiguration" xml:space="preserve"><value>設定無效</value></data>
+  <data name="Settings_Gestures_LeftClick" xml:space="preserve"><value>按住時點左鍵</value></data>
+  <data name="Settings_Gestures_LeftHalf" xml:space="preserve"><value>貼左半邊</value></data>
+  <data name="Settings_Gestures_LoadFailed" xml:space="preserve"><value>手勢設定讀不出來</value></data>
+  <data name="Settings_Gestures_LoadFailedDescription" xml:space="preserve"><value>gestures.json 可能損壞了，可以從 WGestures 重新匯入</value></data>
+  <data name="Settings_Gestures_Maximize" xml:space="preserve"><value>最大化 / 還原</value></data>
+  <data name="Settings_Gestures_MiddleButton" xml:space="preserve"><value>中鍵</value></data>
+  <data name="Settings_Gestures_MiddleClick" xml:space="preserve"><value>按住時點中鍵</value></data>
+  <data name="Settings_Gestures_Migration" xml:space="preserve"><value>遷移</value></data>
+  <data name="Settings_Gestures_Minimize" xml:space="preserve"><value>最小化</value></data>
+  <data name="Settings_Gestures_Modifier" xml:space="preserve"><value>附加動作</value></data>
+  <data name="Settings_Gestures_ModifierBack" xml:space="preserve"><value>點後退鍵</value></data>
+  <data name="Settings_Gestures_ModifierDescription" xml:space="preserve"><value>按住觸發鍵時，每滾一下 / 點一下都執行一次（適合調音量、切換視窗）</value></data>
+  <data name="Settings_Gestures_ModifierForward" xml:space="preserve"><value>點前進鍵</value></data>
+  <data name="Settings_Gestures_ModifierLeft" xml:space="preserve"><value>點左鍵</value></data>
+  <data name="Settings_Gestures_ModifierMiddle" xml:space="preserve"><value>點中鍵</value></data>
+  <data name="Settings_Gestures_ModifierOnly" xml:space="preserve"><value>不畫方向（只用下面的附加動作）</value></data>
+  <data name="Settings_Gestures_ModifierWheelDown" xml:space="preserve"><value>滾輪向下</value></data>
+  <data name="Settings_Gestures_ModifierWheelUp" xml:space="preserve"><value>滾輪向上</value></data>
+  <data name="Settings_Gestures_Mute" xml:space="preserve"><value>靜音 / 取消靜音</value></data>
+  <data name="Settings_Gestures_NameDescription" xml:space="preserve"><value>顯示在手勢提示裡，例如「關閉標籤頁」</value></data>
+  <data name="Settings_Gestures_NoDirection" xml:space="preserve"><value>不畫方向</value></data>
+  <data name="Settings_Gestures_NoOp" xml:space="preserve"><value>什麼都不做</value></data>
+  <data name="Settings_Gestures_OpenPlaceholder" xml:space="preserve"><value>程式、檔案、資料夾或網址</value></data>
+  <data name="Settings_Gestures_OpenTarget" xml:space="preserve"><value>開啟 {0}</value></data>
+  <data name="Settings_Gestures_OverrideDescription" xml:space="preserve"><value>{0} · 代替全域的「{1}」</value></data>
+  <data name="Settings_Gestures_PatternDescription" xml:space="preserve"><value>八個方向，建議不超過 4 段。同一個鍵、同樣的方向和附加動作只能對應一個手勢；按程式設定裡的專用手勢優先。</value></data>
+  <data name="Settings_Gestures_PatternRequired" xml:space="preserve"><value>先畫方向，或選一個附加動作</value></data>
+  <data name="Settings_Gestures_Pause" xml:space="preserve"><value>暫停手勢</value></data>
+  <data name="Settings_Gestures_Paused" xml:space="preserve"><value>已暫停（用暫停熱鍵或手勢命令恢復）</value></data>
+  <data name="Settings_Gestures_PauseFullscreen" xml:space="preserve"><value>全螢幕程式裡暫停</value></data>
+  <data name="Settings_Gestures_PauseFullscreenDescription" xml:space="preserve"><value>玩遊戲、看影片時不觸發</value></data>
+  <data name="Settings_Gestures_PauseHotkey" xml:space="preserve"><value>暫停 / 恢復熱鍵</value></data>
+  <data name="Settings_Gestures_PickConfigError" xml:space="preserve"><value>選不了檔案：{0}</value></data>
+  <data name="Settings_Gestures_ProgramBindings" xml:space="preserve"><value>專用手勢</value></data>
+  <data name="Settings_Gestures_ProgramCount" xml:space="preserve"><value>{0} 個專用手勢，其餘沿用全域</value></data>
+  <data name="Settings_Gestures_ProgramDisabled" xml:space="preserve"><value>這個程式裡不觸發手勢</value></data>
+  <data name="Settings_Gestures_ProgramInherit" xml:space="preserve"><value>沿用全域手勢</value></data>
+  <data name="Settings_Gestures_Programs" xml:space="preserve"><value>按程式設定</value></data>
+  <data name="Settings_Gestures_ProgramsDescription" xml:space="preserve"><value>新加的程式預設停用手勢；改成「啟用」就沿用全域手勢，再點右邊的箭頭可以加這個程式專用的手勢。</value></data>
+  <data name="Settings_Gestures_QueryRequired" xml:space="preserve"><value>搜尋位址裡要有 {query}</value></data>
+  <data name="Settings_Gestures_RemoveChord" xml:space="preserve"><value>去掉最後一個</value></data>
+  <data name="Settings_Gestures_RemoveDirection" xml:space="preserve"><value>去掉最後一段</value></data>
+  <data name="Settings_Gestures_RestoreTitle" xml:space="preserve"><value>恢復預設手勢</value></data>
+  <data name="Settings_Gestures_RestoreWarning" xml:space="preserve"><value>會替換現在的全部手勢和程式設定，換成 Pane 自帶的那一套</value></data>
+  <data name="Settings_Gestures_RightButton" xml:space="preserve"><value>右鍵</value></data>
+  <data name="Settings_Gestures_RightHalf" xml:space="preserve"><value>貼右半邊</value></data>
+  <data name="Settings_Gestures_Run" xml:space="preserve"><value>執行命令</value></data>
+  <data name="Settings_Gestures_RunInExplorer" xml:space="preserve"><value>在檔案總管目前的資料夾裡執行</value></data>
+  <data name="Settings_Gestures_RunPlaceholder" xml:space="preserve"><value>命令列，例如 notepad.exe</value></data>
+  <data name="Settings_Gestures_SearchedLocations" xml:space="preserve"><value>找過這些位置</value></data>
+  <data name="Settings_Gestures_SendKeysDescription" xml:space="preserve"><value>按 WGestures / SendKeys 寫法：{ENTER} Enter，^ Ctrl，% Alt，+ Shift</value></data>
+  <data name="Settings_Gestures_SendText" xml:space="preserve"><value>輸入文字</value></data>
+  <data name="Settings_Gestures_ShowCommandWindow" xml:space="preserve"><value>顯示命令視窗</value></data>
+  <data name="Settings_Gestures_ShowHint" xml:space="preserve"><value>顯示手勢提示</value></data>
+  <data name="Settings_Gestures_ShowHintDescription" xml:space="preserve"><value>在螢幕中間顯示方向和將要執行的動作</value></data>
+  <data name="Settings_Gestures_ShowTrail" xml:space="preserve"><value>顯示軌跡</value></data>
+  <data name="Settings_Gestures_SnapLeft" xml:space="preserve"><value>貼到左半邊</value></data>
+  <data name="Settings_Gestures_SnapRight" xml:space="preserve"><value>貼到右半邊</value></data>
+  <data name="Settings_Gestures_Status" xml:space="preserve"><value>狀態</value></data>
+  <data name="Settings_Gestures_SwitchWindow" xml:space="preserve"><value>切換視窗</value></data>
+  <data name="Settings_Gestures_TargetRequired" xml:space="preserve"><value>要開啟什麼還沒填</value></data>
+  <data name="Settings_Gestures_TextPlaceholder" xml:space="preserve"><value>要輸入的文字</value></data>
+  <data name="Settings_Gestures_TextRequired" xml:space="preserve"><value>要輸入的文字還沒填</value></data>
+  <data name="Settings_Gestures_ToggleMute" xml:space="preserve"><value>靜音 / 取消</value></data>
+  <data name="Settings_Gestures_ToggleTopmost" xml:space="preserve"><value>置頂 / 取消</value></data>
+  <data name="Settings_Gestures_Topmost" xml:space="preserve"><value>置頂 / 取消置頂</value></data>
+  <data name="Settings_Gestures_TrailFade" xml:space="preserve"><value>軌跡淡出</value></data>
+  <data name="Settings_Gestures_TrailFadeDescription" xml:space="preserve"><value>鬆開後軌跡慢慢消失；關掉則立即消失</value></data>
+  <data name="Settings_Gestures_TriggerButton" xml:space="preserve"><value>用哪個鍵</value></data>
+  <data name="Settings_Gestures_UrlPlaceholder" xml:space="preserve"><value>位址，用 {query} 代表選取的文字</value></data>
+  <data name="Settings_Gestures_VolumeDown" xml:space="preserve"><value>音量減</value></data>
+  <data name="Settings_Gestures_VolumeStepFive" xml:space="preserve"><value>每次 5%</value></data>
+  <data name="Settings_Gestures_VolumeStepTen" xml:space="preserve"><value>每次 10%</value></data>
+  <data name="Settings_Gestures_VolumeStepTwo" xml:space="preserve"><value>每次 2%</value></data>
+  <data name="Settings_Gestures_VolumeUp" xml:space="preserve"><value>音量加</value></data>
+  <data name="Settings_Gestures_WebSearch" xml:space="preserve"><value>網頁搜尋選取文字</value></data>
+  <data name="Settings_Gestures_WheelDown" xml:space="preserve"><value>按住時滾輪向下</value></data>
+  <data name="Settings_Gestures_WheelRequired" xml:space="preserve"><value>「跟著滾輪調」要配合附加動作「滾輪」</value></data>
+  <data name="Settings_Gestures_WheelUp" xml:space="preserve"><value>按住時滾輪向上</value></data>
+  <data name="Settings_Gestures_WheelVolume" xml:space="preserve"><value>滾輪調音量</value></data>
+  <data name="Settings_Gestures_WindowAction" xml:space="preserve"><value>視窗 · {0}</value></data>
+  <data name="Settings_Glass_Advanced" xml:space="preserve"><value>玻璃引數（高階）</value></data>
+  <data name="Settings_Glass_Blur" xml:space="preserve"><value>加強模糊</value></data>
+  <data name="Settings_Glass_BlurDescription" xml:space="preserve"><value>在系統模糊上再加一層，0 = 只用系統模糊；越大越佔顯示卡</value></data>
+  <data name="Settings_Glass_CurrentTheme" xml:space="preserve"><value>現在調的是{0}這一套（跟隨目前主題）；調好後一般不用再動</value></data>
+  <data name="Settings_Glass_Dark" xml:space="preserve"><value>深色</value></data>
+  <data name="Settings_Glass_Description" xml:space="preserve"><value>著色、亮度、飽和度、高光邊、陰影、加強模糊</value></data>
+  <data name="Settings_Glass_Highlight" xml:space="preserve"><value>高光邊強度</value></data>
+  <data name="Settings_Glass_HighlightDescription" xml:space="preserve"><value>邊緣的細高光和外描邊</value></data>
+  <data name="Settings_Glass_Light" xml:space="preserve"><value>淺色</value></data>
+  <data name="Settings_Glass_Luminosity" xml:space="preserve"><value>亮度層</value></data>
+  <data name="Settings_Glass_LuminosityDescription" xml:space="preserve"><value>深色壓暗、淺色提亮的一層</value></data>
+  <data name="Settings_Glass_ResetAll" xml:space="preserve"><value>全部恢復預設</value></data>
+  <data name="Settings_Glass_Saturation" xml:space="preserve"><value>飽和度</value></data>
+  <data name="Settings_Glass_SaturationDescription" xml:space="preserve"><value>背後顏色透過來的鮮豔程度</value></data>
+  <data name="Settings_Glass_Shadow" xml:space="preserve"><value>陰影強度</value></data>
+  <data name="Settings_Glass_ShadowDescription" xml:space="preserve"><value>面板下面的柔和陰影</value></data>
+  <data name="Settings_Glass_Tint" xml:space="preserve"><value>著色濃度</value></data>
+  <data name="Settings_Glass_TintDescription" xml:space="preserve"><value>玻璃本身的顏色有多濃</value></data>
+  <data name="Settings_GlassOpacity" xml:space="preserve"><value>玻璃濃度</value></data>
+  <data name="Settings_GlassOpacity_Description" xml:space="preserve"><value>越高越不透，背後的桌布越淡（就是下面高階引數裡的「著色濃度」）</value></data>
+  <data name="Settings_Hotkey" xml:space="preserve"><value>叫出熱鍵</value></data>
+  <data name="Settings_Hotkey_ConflictDescription" xml:space="preserve"><value>換一個組合，或者在佔用它的程式裡改掉</value></data>
+  <data name="Settings_Hotkey_DevelopmentOverride" xml:space="preserve"><value>開發模式：實際註冊的是 {0}（PANE_DEV_HOTKEYS）</value></data>
+  <data name="Settings_Hotkey_Duplicate" xml:space="preserve"><value>和另一個熱鍵重複了</value></data>
+  <data name="Settings_Hotkey_Occupied" xml:space="preserve"><value>{0} 被其他程式佔用</value></data>
+  <data name="Settings_Hotkey_WinVOccupied" xml:space="preserve"><value>Win+V 被系統佔用，換一個組合</value></data>
+  <data name="Settings_Hotkey_WinVReplacement" xml:space="preserve"><value>Win+V 被系統佔用；想用它開啟剪貼簿，開啟下面的「用 Pane 替換 Win+V」</value></data>
+  <data name="Settings_Icons" xml:space="preserve"><value>圖示</value></data>
+  <data name="Settings_Icons_AddApp" xml:space="preserve"><value>新增應用</value></data>
+  <data name="Settings_Icons_AppMissing" xml:space="preserve"><value>這個應用已不在列表裡</value></data>
+  <data name="Settings_Icons_ChangeImage" xml:space="preserve"><value>換成自己的圖片</value></data>
+  <data name="Settings_Icons_ColoredPlate" xml:space="preserve"><value>放在彩色底板上</value></data>
+  <data name="Settings_Icons_CustomDescription" xml:space="preserve"><value>{0} · 用的是你換的圖片</value></data>
+  <data name="Settings_Icons_DefaultMask" xml:space="preserve"><value>預設使用圖示遮罩</value></data>
+  <data name="Settings_Icons_DefaultMaskDescription" xml:space="preserve"><value>不規則圖示放到由圖示顏色生成的底板上，滿幅圖示裁成圓角方形；關掉後全部用程式原來的圖示</value></data>
+  <data name="Settings_Icons_Description" xml:space="preserve"><value>應用圖示的遮罩規則和逐個應用的設定；檔案圖示用 Pane 風格還是系統的。</value></data>
+  <data name="Settings_Icons_FileIcons" xml:space="preserve"><value>檔案圖示</value></data>
+  <data name="Settings_Icons_Files" xml:space="preserve"><value>檔案和資料夾</value></data>
+  <data name="Settings_Icons_ForcedDescription" xml:space="preserve"><value>{0}（強制遮罩）</value></data>
+  <data name="Settings_Icons_ForceMask" xml:space="preserve"><value>強制遮罩</value></data>
+  <data name="Settings_Icons_FullBleed" xml:space="preserve"><value>滿幅，裁成圓角方形</value></data>
+  <data name="Settings_Icons_Generating" xml:space="preserve"><value>生成中</value></data>
+  <data name="Settings_Icons_Invalid" xml:space="preserve"><value>圖示設定無效</value></data>
+  <data name="Settings_Icons_Mask" xml:space="preserve"><value>遮罩</value></data>
+  <data name="Settings_Icons_NeutralPlate" xml:space="preserve"><value>放在中性底板上</value></data>
+  <data name="Settings_Icons_NotGenerated" xml:space="preserve"><value>圖示還沒生成</value></data>
+  <data name="Settings_Icons_Original" xml:space="preserve"><value>原樣顯示</value></data>
+  <data name="Settings_Icons_Pane" xml:space="preserve"><value>Pane 風格</value></data>
+  <data name="Settings_Icons_PaneDescription" xml:space="preserve"><value>Pane 的彩色類型圖示，一眼看出是文件、表格還是圖片</value></data>
+  <data name="Settings_Icons_PerApp" xml:space="preserve"><value>按應用設定</value></data>
+  <data name="Settings_Icons_PerAppDescription" xml:space="preserve"><value>自動：按圖示形狀決定裁成圓角方形還是放到底板上。換的圖片支援 PNG、ICO、JPG、BMP，方形、256×256 以上、透明背景的 PNG 效果最好；讀不出來時用程式自己的圖示。</value></data>
+  <data name="Settings_Icons_Raw" xml:space="preserve"><value>原樣</value></data>
+  <data name="Settings_Icons_Rebuilding" xml:space="preserve"><value>正在重新生成圖示</value></data>
+  <data name="Settings_Icons_RebuildingDescription" xml:space="preserve"><value>在背景進行，十幾秒後啟動器裡就是新圖示</value></data>
+  <data name="Settings_Icons_SearchPlaceholder" xml:space="preserve"><value>輸入應用名稱</value></data>
+  <data name="Settings_Icons_System" xml:space="preserve"><value>系統</value></data>
+  <data name="Settings_Icons_SystemDescription" xml:space="preserve"><value>和檔案總管裡一樣的系統圖示；第一次見到的類型要等一下才出來</value></data>
+  <data name="Settings_InvalidAccent" xml:space="preserve"><value>主題色無效</value></data>
+  <data name="Settings_InvalidGlass" xml:space="preserve"><value>玻璃引數無效</value></data>
+  <data name="Settings_InvalidNumber" xml:space="preserve"><value>設定數值無效</value></data>
+  <data name="Settings_InvalidVersion" xml:space="preserve"><value>設定版本或結構無效</value></data>
+  <data name="Settings_Language" xml:space="preserve"><value>語言</value></data>
+  <data name="Settings_Launcher" xml:space="preserve"><value>啟動器</value></data>
+  <data name="Settings_Launcher_ActionHidden" xml:space="preserve"><value>不顯示</value></data>
+  <data name="Settings_Launcher_ActionPosition" xml:space="preserve"><value>第 {0} 個</value></data>
+  <data name="Settings_Launcher_ActionPositionHotkey" xml:space="preserve"><value>第 {0} 個，Alt+{1}</value></data>
+  <data name="Settings_Launcher_ActionRow" xml:space="preserve"><value>動作行</value></data>
+  <data name="Settings_Launcher_ActionRowDescription" xml:space="preserve"><value>啟動器裡輸入任何文字都會出現這一排，位置固定。按住 Alt 顯示序號，Alt+數字直接觸發。網頁搜尋站點在下面「網頁搜尋」裡增刪。</value></data>
+  <data name="Settings_Launcher_Activation" xml:space="preserve"><value>叫出</value></data>
+  <data name="Settings_Launcher_AddEngine" xml:space="preserve"><value>新增搜尋站點</value></data>
+  <data name="Settings_Launcher_AddFile" xml:space="preserve"><value>新增檔案</value></data>
+  <data name="Settings_Launcher_AddFolder" xml:space="preserve"><value>新增資料夾</value></data>
+  <data name="Settings_Launcher_AttachFiveSeconds" xml:space="preserve"><value>5 秒</value></data>
+  <data name="Settings_Launcher_AttachOneSecond" xml:space="preserve"><value>1 秒</value></data>
+  <data name="Settings_Launcher_AttachThreeSeconds" xml:space="preserve"><value>3 秒</value></data>
+  <data name="Settings_Launcher_AutoAttach" xml:space="preserve"><value>複製後自動帶入</value></data>
+  <data name="Settings_Launcher_AutoAttachDescription" xml:space="preserve"><value>複製後這麼久內叫出，剛複製的內容作為附件帶入；不會清空剪貼簿</value></data>
+  <data name="Settings_Launcher_CommandsCleared" xml:space="preserve"><value>已清空</value></data>
+  <data name="Settings_Launcher_CommandsDescription" xml:space="preserve"><value>最近 20 條，用來補全；以空格開頭的命令不記</value></data>
+  <data name="Settings_Launcher_DefaultEngineCannotDelete" xml:space="preserve"><value>預設站點不能刪</value></data>
+  <data name="Settings_Launcher_Description" xml:space="preserve"><value>叫出、搜尋範圍、常用入口和網頁搜尋。</value></data>
+  <data name="Settings_Launcher_EngineAddress" xml:space="preserve"><value>位址，用 {query} 代表搜尋詞</value></data>
+  <data name="Settings_Launcher_EngineKeyword" xml:space="preserve"><value>關鍵字</value></data>
+  <data name="Settings_Launcher_EngineKeywordDuplicate" xml:space="preserve"><value>關鍵字「{0}」已經有了</value></data>
+  <data name="Settings_Launcher_EngineKeywordSpace" xml:space="preserve"><value>關鍵字不能有空格</value></data>
+  <data name="Settings_Launcher_EngineQueryRequired" xml:space="preserve"><value>位址裡要有 {query}</value></data>
+  <data name="Settings_Launcher_EngineRequired" xml:space="preserve"><value>三項都要填</value></data>
+  <data name="Settings_Launcher_EngineSchemeRequired" xml:space="preserve"><value>位址要以 http:// 或 https:// 開頭</value></data>
+  <data name="Settings_Launcher_Favorites" xml:space="preserve"><value>常用檔案和資料夾</value></data>
+  <data name="Settings_Launcher_FavoritesDescription" xml:space="preserve"><value>常用的檔案和資料夾在啟動器裡排在普通檔案前面，也能用拼音搜到。</value></data>
+  <data name="Settings_Launcher_FileSearch" xml:space="preserve"><value>檔案搜尋</value></data>
+  <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>檔名搜尋依賴 Everything；Pane 不自建全盤索引。啟動器列前 3 個，其餘在檔案視窗裡看</value></data>
+  <data name="Settings_Launcher_HideOnBlur" xml:space="preserve"><value>失去焦點時隱藏</value></data>
+  <data name="Settings_Launcher_HideOnBlurDescription" xml:space="preserve"><value>點到別的視窗時自動收起</value></data>
+  <data name="Settings_Launcher_Home" xml:space="preserve"><value>沒輸入時顯示</value></data>
+  <data name="Settings_Launcher_HomeHidden" xml:space="preserve"><value>都不顯示</value></data>
+  <data name="Settings_Launcher_HomeNone" xml:space="preserve"><value>叫出時只有一行搜尋欄</value></data>
+  <data name="Settings_Launcher_HomePinned" xml:space="preserve"><value>只顯示固定</value></data>
+  <data name="Settings_Launcher_HomeRecent" xml:space="preserve"><value>最近和固定</value></data>
+  <data name="Settings_Launcher_HomeRecentDescription" xml:space="preserve"><value>最近開啟過的應用和固定的應用</value></data>
+  <data name="Settings_Launcher_Invalid" xml:space="preserve"><value>啟動器設定無效</value></data>
+  <data name="Settings_Launcher_KeepAlways" xml:space="preserve"><value>一直保留</value></data>
+  <data name="Settings_Launcher_KeepInput" xml:space="preserve"><value>再次叫出時</value></data>
+  <data name="Settings_Launcher_KeepInputDescription" xml:space="preserve"><value>上次輸入的文字怎麼處理</value></data>
+  <data name="Settings_Launcher_KeepOneMinute" xml:space="preserve"><value>1 分鐘內保留</value></data>
+  <data name="Settings_Launcher_Position" xml:space="preserve"><value>位置</value></data>
+  <data name="Settings_Launcher_PositionDefault" xml:space="preserve"><value>在滑鼠所在螢幕的上部居中；拖曳搜尋行空白處可以挪開，會記住位置</value></data>
+  <data name="Settings_Launcher_PositionSaved" xml:space="preserve"><value>已記住拖曳後的位置。雙擊啟動器搜尋行的空白處也能恢復</value></data>
+  <data name="Settings_Launcher_RememberCommands" xml:space="preserve"><value>記住執行過的命令</value></data>
+  <data name="Settings_Launcher_ResetPosition" xml:space="preserve"><value>恢復預設位置</value></data>
+  <data name="Settings_Launcher_SetDefault" xml:space="preserve"><value>設為預設</value></data>
+  <data name="Settings_Launcher_Terminal" xml:space="preserve"><value>終端命令</value></data>
+  <data name="Settings_Launcher_TerminalDescription" xml:space="preserve"><value>在啟動器裡輸入 &gt; 加命令：Enter 在終端裡執行，Ctrl+Shift+Enter 以管理員身份執行。</value></data>
+  <data name="Settings_Launcher_WebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
+  <data name="Settings_Launcher_WebSearchDescription" xml:space="preserve"><value>位址裡用 {query} 代表搜尋詞；在啟動器輸入「關鍵字 空格 搜尋詞」直接用這個站點搜。</value></data>
+  <data name="Settings_Launcher_WebSuggestions" xml:space="preserve"><value>搜尋建議</value></data>
+  <data name="Settings_Launcher_WebSuggestionsDescription" xml:space="preserve"><value>用關鍵字搜網頁時（比如「bd 天氣」）向那個站點要搜尋建議；平時打字不聯網</value></data>
+  <data name="Settings_LauncherEntry_Invalid" xml:space="preserve"><value>啟動器入口無效</value></data>
+  <data name="Settings_LauncherPosition_Invalid" xml:space="preserve"><value>啟動器位置無效</value></data>
+  <data name="Settings_Motion" xml:space="preserve"><value>動效</value></data>
+  <data name="Settings_Motion_Description" xml:space="preserve"><value>「減弱」會縮短過渡</value></data>
+  <data name="Settings_Motion_Normal" xml:space="preserve"><value>標準</value></data>
+  <data name="Settings_Motion_Reduced" xml:space="preserve"><value>減弱</value></data>
+  <data name="Settings_PanelRadius" xml:space="preserve"><value>視窗圓角</value></data>
+  <data name="Settings_PanelRadius_Description" xml:space="preserve"><value>玻璃面板的圓角（自繪，帶抗鋸齒）</value></data>
+  <data name="Settings_PanelRadius_Large" xml:space="preserve"><value>大圓角 20px</value></data>
+  <data name="Settings_PanelRadius_Small" xml:space="preserve"><value>小 8px</value></data>
+  <data name="Settings_Rename_Invalid" xml:space="preserve"><value>重新命名設定無效</value></data>
+  <data name="Settings_RestartRequired" xml:space="preserve"><value>已儲存，重新啟動 Pane 後生效</value></data>
+  <data name="Settings_SaveDescription" xml:space="preserve"><value>按 Esc 關閉。改動立即生效，自動儲存。</value></data>
+  <data name="Settings_SaveFailed" xml:space="preserve"><value>沒有儲存成功</value></data>
+  <data name="Settings_SaveInvalid" xml:space="preserve"><value>填的內容不對，沒有儲存</value></data>
+  <data name="Settings_SearchEngine_Invalid" xml:space="preserve"><value>搜尋引擎設定無效</value></data>
+  <data name="Settings_ShowTrayIcon" xml:space="preserve"><value>在工作列通知區域顯示圖示</value></data>
+  <data name="Settings_ShowTrayIcon_Description" xml:space="preserve"><value>關掉後仍可用熱鍵開啟設定</value></data>
+  <data name="Settings_Startup" xml:space="preserve"><value>啟動</value></data>
+  <data name="Settings_Super_ActionHidden" xml:space="preserve"><value>不顯示</value></data>
+  <data name="Settings_Super_ActionPosition" xml:space="preserve"><value>第 {0} 個</value></data>
+  <data name="Settings_Super_Actions" xml:space="preserve"><value>面板裡的動作</value></data>
+  <data name="Settings_Super_ActionsDescription" xml:space="preserve"><value>選取的不是中文、又開了自動翻譯時，面板換成翻譯專用的一排，不受這裡影響。AI 動作的名字和提示詞在「AI」裡改。</value></data>
+  <data name="Settings_Super_ActionsFull" xml:space="preserve"><value>已經放滿 6 個，先關掉一個</value></data>
+  <data name="Settings_Super_AddProgram" xml:space="preserve"><value>新增程式</value></data>
+  <data name="Settings_Super_BackButton" xml:space="preserve"><value>長按後退鍵</value></data>
+  <data name="Settings_Super_Basic" xml:space="preserve"><value>基本</value></data>
+  <data name="Settings_Super_BorrowClipboard" xml:space="preserve"><value>讀不到選取內容時借用剪貼簿</value></data>
+  <data name="Settings_Super_BorrowClipboardDescription" xml:space="preserve"><value>優先直接讀取選區，不碰剪貼簿；讀不到時先暫存剪貼簿、模擬複製、取完再恢復，這次複製不進剪貼簿歷史</value></data>
+  <data name="Settings_Super_DisableFullscreen" xml:space="preserve"><value>全螢幕程式裡不觸發</value></data>
+  <data name="Settings_Super_DisableFullscreenDescription" xml:space="preserve"><value>玩遊戲、看影片時側鍵保持原樣</value></data>
+  <data name="Settings_Super_Enable" xml:space="preserve"><value>啟用超級面板</value></data>
+  <data name="Settings_Super_ExcludedPrograms" xml:space="preserve"><value>在這些程式裡不觸發</value></data>
+  <data name="Settings_Super_ExcludedProgramsDescription" xml:space="preserve"><value>在這些程式里長按側鍵也照常傳給程式。</value></data>
+  <data name="Settings_Super_ForwardButton" xml:space="preserve"><value>長按前進鍵</value></data>
+  <data name="Settings_Super_HoldDuration" xml:space="preserve"><value>長按多久</value></data>
+  <data name="Settings_Super_HoldDurationDescription" xml:space="preserve"><value>太短容易誤觸，太長不跟手；預設 0.4 秒</value></data>
+  <data name="Settings_Super_Invalid" xml:space="preserve"><value>超級面板設定無效</value></data>
+  <data name="Settings_Super_MiddleButton" xml:space="preserve"><value>長按中鍵</value></data>
+  <data name="Settings_Super_Seconds" xml:space="preserve"><value>{0} 秒</value></data>
+  <data name="Settings_Super_Trigger" xml:space="preserve"><value>觸發鍵</value></data>
+  <data name="Settings_Super_TriggerDescription" xml:space="preserve"><value>長按才彈出；短按照常是原來的功能（後退 / 前進 / 中鍵點選）。同一個鍵打開了手勢時：按住拖曳是手勢，按住不動才是超級面板</value></data>
+  <data name="Settings_SuperPanel" xml:space="preserve"><value>超級面板</value></data>
+  <data name="Settings_SuperPanel_Description" xml:space="preserve"><value>選取文字後長按滑鼠側鍵叫出，就地翻譯、總結；短按側鍵照常後退 / 前進。</value></data>
+  <data name="Settings_Theme" xml:space="preserve"><value>主題</value></data>
+  <data name="Settings_Theme_Dark" xml:space="preserve"><value>深色</value></data>
+  <data name="Settings_Theme_Light" xml:space="preserve"><value>淺色</value></data>
+  <data name="Settings_Title" xml:space="preserve"><value>Pane 設定</value></data>
+  <data name="Settings_UiLanguage" xml:space="preserve"><value>介面語言</value></data>
+  <data name="Settings_UiLanguage_Description" xml:space="preserve"><value>繁體翻譯還在進行，跟隨系統時暫時都顯示簡體</value></data>
+  <data name="Settings_WinV_Active" xml:space="preserve"><value>已生效</value></data>
+  <data name="Settings_WinV_DisableSystemHistory" xml:space="preserve"><value>同時關閉 Windows 自帶的剪貼簿歷史</value></data>
+  <data name="Settings_WinV_DisableSystemHistoryDescription" xml:space="preserve"><value>避免同一份內容在兩個地方各存一份；關閉替換時一起恢復</value></data>
+  <data name="Settings_WinV_EnableFirst" xml:space="preserve"><value>先開啟上面的替換</value></data>
+  <data name="Settings_WinV_EnableRequired" xml:space="preserve"><value>請先開啟 Win+V 替換</value></data>
+  <data name="Settings_WinV_ExplorerError" xml:space="preserve"><value>檔案總管操作失敗（{0}）</value></data>
+  <data name="Settings_WinV_InvalidHotkeys" xml:space="preserve"><value>DisabledHotkeys 不是字串</value></data>
+  <data name="Settings_WinV_InvalidRecord" xml:space="preserve"><value>替換記錄無效</value></data>
+  <data name="Settings_WinV_InvalidRecordVersion" xml:space="preserve"><value>替換記錄版本或內容無效</value></data>
+  <data name="Settings_WinV_LaunchExplorerFailed" xml:space="preserve"><value>無法啟動檔案總管</value></data>
+  <data name="Settings_WinV_NextLogin" xml:space="preserve"><value>下次登入</value></data>
+  <data name="Settings_WinV_Occupied" xml:space="preserve"><value>Win+V 被其他程式或系統佔用，替換尚未生效。</value></data>
+  <data name="Settings_WinV_PendingEnable" xml:space="preserve"><value>下次登入生效</value></data>
+  <data name="Settings_WinV_PendingRestore" xml:space="preserve"><value>下次登入恢復</value></data>
+  <data name="Settings_WinV_RegistryDescription" xml:space="preserve"><value>Pane 會在目前使用者的登錄檔裡改一項，讓檔案總管不再佔用 Win+V（Explorer\Advanced 的 DisabledHotkeys 加上 V）。不需要管理員權限；改之前記下原值，關掉時原樣恢復。</value></data>
+  <data name="Settings_WinV_RegistryType" xml:space="preserve"><value>{0} 的登錄檔類型不受支援</value></data>
+  <data name="Settings_WinV_Replace" xml:space="preserve"><value>用 Pane 替換 Win+V</value></data>
+  <data name="Settings_WinV_ReplaceDescription" xml:space="preserve"><value>Win+V 交給 Pane；關掉時把系統設定原樣恢復</value></data>
+  <data name="Settings_WinV_RestartDescription" xml:space="preserve"><value>重新啟動才生效，工作列和開啟的資料夾會閃一下；不重新啟動就等下次登入</value></data>
+  <data name="Settings_WinV_RestartExplorer" xml:space="preserve"><value>重新啟動檔案總管</value></data>
+  <data name="Settings_WinV_RestartIncomplete" xml:space="preserve"><value>檔案總管未完成重新啟動，請重新登入後再試。</value></data>
+  <data name="Settings_WinV_RestartNow" xml:space="preserve"><value>現在重新啟動</value></data>
+  <data name="Settings_WinV_RestartPrompt" xml:space="preserve"><value>現在重新啟動檔案總管嗎？</value></data>
+  <data name="Settings_WinV_RestartTimeout" xml:space="preserve"><value>檔案總管重新啟動逾時，請重新登入後再試。</value></data>
+  <data name="Settings_WinV_Restore" xml:space="preserve"><value>恢復系統的 Win+V</value></data>
+  <data name="Settings_WinV_RestoreDescription" xml:space="preserve"><value>把系統設定原樣恢復，Win+V 回到 Windows 自帶的剪貼簿歷史。</value></data>
+  <data name="Settings_WinV_RestoreFirst" xml:space="preserve"><value>請先完成系統快捷鍵恢復</value></data>
+  <data name="Settings_WinV_SetupError" xml:space="preserve"><value>Win+V 設定未完成：{0}</value></data>
+  <data name="Settings_WinV_StateSaveError" xml:space="preserve"><value>Win+V 狀態儲存失敗：{0}</value></data>
+  <data name="Settings_WinV_Working" xml:space="preserve"><value>正在處理…（重新啟動檔案總管時工作列會閃一下）</value></data>
+  <data name="Setup_Autostart" xml:space="preserve"><value>開機時啟動</value></data>
+  <data name="Setup_Bytes" xml:space="preserve"><value>{0} 位元組</value></data>
+  <data name="Setup_CannotStart" xml:space="preserve"><value>無法開始安裝或解除安裝，請檢查目錄權限以及是否已有安裝程式正在執行。</value></data>
+  <data name="Setup_CopyingFiles" xml:space="preserve"><value>正在複製檔案</value></data>
+  <data name="Setup_CreatingRegistration" xml:space="preserve"><value>正在建立捷徑和解除安裝入口</value></data>
+  <data name="Setup_DataDescription" xml:space="preserve"><value>設定、剪貼簿歷史、手勢和 AI 登入資訊，共 {0}。不刪的話，以後重新安裝會接著用</value></data>
+  <data name="Setup_DataKept" xml:space="preserve"><value>你的資料還留在 {0}，以後重新安裝會接著用；不需要的話可以直接刪掉這個資料夾。</value></data>
+  <data name="Setup_DataRemoved" xml:space="preserve"><value>資料也一起刪掉了。</value></data>
+  <data name="Setup_DeletingData" xml:space="preserve"><value>正在刪除使用者資料</value></data>
+  <data name="Setup_DeletingFiles" xml:space="preserve"><value>正在刪除程式檔案</value></data>
+  <data name="Setup_DesktopShortcut" xml:space="preserve"><value>建立桌面捷徑</value></data>
+  <data name="Setup_DirectoryBusy" xml:space="preserve"><value>有程式正在使用 Pane 的安裝目錄，關掉開啟著這個目錄的視窗或程式後再試。</value></data>
+  <data name="Setup_DirectoryOccupied" xml:space="preserve"><value>這個資料夾裡已經有別的檔案</value></data>
+  <data name="Setup_DiskFull" xml:space="preserve"><value>磁碟空間不夠</value></data>
+  <data name="Setup_ExistingIntact" xml:space="preserve"><value>已經裝著的版本沒有動，還能照常用</value></data>
+  <data name="Setup_FixedDiskRequired" xml:space="preserve"><value>請選本機的固定磁碟</value></data>
+  <data name="Setup_GestureHint" xml:space="preserve"><value>按住右鍵拖曳來畫手勢；設定在托盤圖示裡</value></data>
+  <data name="Setup_HotkeyConflict" xml:space="preserve"><value>{0} 被其他程式佔用，{1}的熱鍵沒設上；到 設定 → {2} 裡換一個</value></data>
+  <data name="Setup_InstallComplete" xml:space="preserve"><value>安裝完成</value></data>
+  <data name="Setup_InstalledHeading" xml:space="preserve"><value>裝好了</value></data>
+  <data name="Setup_InstallerLaunchFailed" xml:space="preserve"><value>無法啟動安裝程式</value></data>
+  <data name="Setup_InstallFailed" xml:space="preserve"><value>沒有裝上</value></data>
+  <data name="Setup_Installing" xml:space="preserve"><value>正在安裝…</value></data>
+  <data name="Setup_InstallLocation" xml:space="preserve"><value>安裝位置</value></data>
+  <data name="Setup_InstallNow" xml:space="preserve"><value>立即安裝</value></data>
+  <data name="Setup_InstallSize" xml:space="preserve"><value>約 {0} · 只裝給目前使用者，不需要管理員權限</value></data>
+  <data name="Setup_InstallTitle" xml:space="preserve"><value>安裝 Pane</value></data>
+  <data name="Setup_KeepData" xml:space="preserve"><value>設定和資料都會保留</value></data>
+  <data name="Setup_LaunchFailed" xml:space="preserve"><value>無法啟動 Pane</value></data>
+  <data name="Setup_NoPartialFiles" xml:space="preserve"><value>沒有留下裝了一半的檔案</value></data>
+  <data name="Setup_OpenClipboard" xml:space="preserve"><value>開啟剪貼簿</value></data>
+  <data name="Setup_OpeningUpdated" xml:space="preserve"><value>更新好了，正在開啟 Pane…</value></data>
+  <data name="Setup_OpenLauncher" xml:space="preserve"><value>開啟啟動器</value></data>
+  <data name="Setup_OpenPane" xml:space="preserve"><value>開啟 Pane</value></data>
+  <data name="Setup_OperationFailed" xml:space="preserve"><value>操作未完成，請檢查目錄權限和檔案是否被其他程式佔用後重試。</value></data>
+  <data name="Setup_PathTooLong" xml:space="preserve"><value>路徑太長，換一個短一點的位置</value></data>
+  <data name="Setup_PermissionRequired" xml:space="preserve"><value>這裡要管理員權限，換一個位置</value></data>
+  <data name="Setup_Preparing" xml:space="preserve"><value>準備中</value></data>
+  <data name="Setup_RemoveData" xml:space="preserve"><value>同時刪除我的資料</value></data>
+  <data name="Setup_RemovingRegistration" xml:space="preserve"><value>正在移除捷徑和解除安裝入口</value></data>
+  <data name="Setup_RollbackIncomplete" xml:space="preserve"><value>安裝失敗，回退未完成。請保留 app.old / app.previous 後重試。</value></data>
+  <data name="Setup_RunningExitFailed" xml:space="preserve"><value>Pane 正在執行，沒能讓它結束，請先從托盤結束再試</value></data>
+  <data name="Setup_StoppingPane" xml:space="preserve"><value>正在關閉正在執行的 Pane</value></data>
+  <data name="Setup_StopRunningHint" xml:space="preserve"><value>會先讓正在執行的 Pane 結束</value></data>
+  <data name="Setup_Tagline" xml:space="preserve"><value>啟動器、剪貼簿和滑鼠手勢，一個輕巧的常駐小工具。</value></data>
+  <data name="Setup_UnexpectedFailure" xml:space="preserve"><value>安裝或解除安裝未完成，請檢查磁碟空間、目錄權限和檔案佔用後重試。</value></data>
+  <data name="Setup_Uninstall" xml:space="preserve"><value>解除安裝</value></data>
+  <data name="Setup_UninstallComplete" xml:space="preserve"><value>解除安裝完成</value></data>
+  <data name="Setup_UninstallDescription" xml:space="preserve"><value>會刪掉程式、開始選單和桌面上的捷徑，以及開機啟動項。</value></data>
+  <data name="Setup_UninstalledHeading" xml:space="preserve"><value>Pane 已解除安裝</value></data>
+  <data name="Setup_UninstallerLaunchFailed" xml:space="preserve"><value>無法啟動解除安裝程式</value></data>
+  <data name="Setup_UninstallIncomplete" xml:space="preserve"><value>沒有解除安裝乾淨</value></data>
+  <data name="Setup_Uninstalling" xml:space="preserve"><value>正在解除安裝…</value></data>
+  <data name="Setup_UninstallPrompt" xml:space="preserve"><value>解除安裝 Pane {0}？</value></data>
+  <data name="Setup_UninstallRunningHint" xml:space="preserve"><value>Pane 正在執行，解除安裝時會先讓它結束</value></data>
+  <data name="Setup_UninstallTitle" xml:space="preserve"><value>解除安裝 Pane</value></data>
+  <data name="Setup_UpdateComplete" xml:space="preserve"><value>更新好了</value></data>
+  <data name="Setup_UpdateFailed" xml:space="preserve"><value>沒有更新成功</value></data>
+  <data name="Setup_UpdateLocation" xml:space="preserve"><value>更新時裝在原來的位置</value></data>
+  <data name="Setup_UpdatePath" xml:space="preserve"><value>{0}（更新時裝在原來的位置）</value></data>
+  <data name="Setup_UpdateVersion" xml:space="preserve"><value>更新到 {0}</value></data>
+  <data name="Setup_Updating" xml:space="preserve"><value>正在更新…</value></data>
+  <data name="Setup_UpdatingFiles" xml:space="preserve"><value>正在更新程式</value></data>
+  <data name="Setup_Version" xml:space="preserve"><value>版本 {0}</value></data>
+  <data name="SuperPanel_AutoTranslate" xml:space="preserve"><value>自動翻譯</value></data>
+  <data name="SuperPanel_AutoTranslateTooLong" xml:space="preserve"><value>內容較長（約 {0:N0} 字），沒有自動翻譯</value></data>
+  <data name="SuperPanel_ClipboardUnavailable" xml:space="preserve"><value>剪貼簿暫時借不了，沒讀到選取文字</value></data>
+  <data name="SuperPanel_ContinueTranslationHint" xml:space="preserve"><value>在翻譯視窗裡繼續（Tab）</value></data>
+  <data name="SuperPanel_CopyName" xml:space="preserve"><value>複製名稱</value></data>
+  <data name="SuperPanel_CopyOriginal" xml:space="preserve"><value>複製原文</value></data>
+  <data name="SuperPanel_CopyTranslation" xml:space="preserve"><value>複製譯文</value></data>
+  <data name="SuperPanel_FileCount" xml:space="preserve"><value>{0} 個檔案</value></data>
+  <data name="SuperPanel_FolderCount" xml:space="preserve"><value>{0} 個資料夾</value></data>
+  <data name="SuperPanel_MixedCount" xml:space="preserve"><value>{0} 個檔案和資料夾</value></data>
+  <data name="SuperPanel_MoreNames" xml:space="preserve"><value>{0} 等</value></data>
+  <data name="SuperPanel_PasteReplace" xml:space="preserve"><value>貼上替換</value></data>
+  <data name="SuperPanel_PasteReplaceSelection" xml:space="preserve"><value>貼上替換選取文字</value></data>
+  <data name="SuperPanel_ReplaceSelection" xml:space="preserve"><value>替換選取文字</value></data>
+  <data name="SuperPanel_SelectionEmpty" xml:space="preserve"><value>沒讀到選取文字</value></data>
+  <data name="SuperPanel_SelectionPermission" xml:space="preserve"><value>這個視窗是管理員權限，讀不到選取文字</value></data>
+  <data name="SuperPanel_SelectionTimeout" xml:space="preserve"><value>讀取逾時，沒讀到選取文字</value></data>
+  <data name="SuperPanel_TranslateError" xml:space="preserve"><value>翻譯失敗：{0}</value></data>
+  <data name="SuperPanel_TranslateWindow" xml:space="preserve"><value>翻譯視窗</value></data>
+  <data name="SuperPanel_WebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
+  <data name="Translate_AutoDetect" xml:space="preserve"><value>自動辨識</value></data>
+  <data name="Translate_CharacterCount" xml:space="preserve"><value>{0:N0} 字</value></data>
+  <data name="Translate_ConfigureHint" xml:space="preserve"><value>還沒設定 AI 服務，設定好就能翻譯</value></data>
+  <data name="Translate_Copied" xml:space="preserve"><value>已複製譯文</value></data>
+  <data name="Translate_DetectedLanguage" xml:space="preserve"><value>自動辨識：{0}</value></data>
+  <data name="Translate_EmptyCount" xml:space="preserve"><value>0 字</value></data>
+  <data name="Translate_Failed" xml:space="preserve"><value>翻譯失敗</value></data>
+  <data name="Translate_InputPlaceholder" xml:space="preserve"><value>輸入或貼上要翻譯的文字</value></data>
+  <data name="Translate_LanguageChinese" xml:space="preserve"><value>中文</value></data>
+  <data name="Translate_LanguageEnglish" xml:space="preserve"><value>英文</value></data>
+  <data name="Translate_LanguageForeign" xml:space="preserve"><value>外文</value></data>
+  <data name="Translate_LanguageFrench" xml:space="preserve"><value>法文</value></data>
+  <data name="Translate_LanguageGerman" xml:space="preserve"><value>德文</value></data>
+  <data name="Translate_LanguageJapanese" xml:space="preserve"><value>日文</value></data>
+  <data name="Translate_LanguageKorean" xml:space="preserve"><value>韓文</value></data>
+  <data name="Translate_LanguageRussian" xml:space="preserve"><value>俄文</value></data>
+  <data name="Translate_LanguageSpanish" xml:space="preserve"><value>西班牙文</value></data>
+  <data name="Translate_ModelHint" xml:space="preserve"><value>翻譯用模型：{0}（設定 → AI 裡換）</value></data>
+  <data name="Translate_NoResult" xml:space="preserve"><value>還沒有譯文</value></data>
+  <data name="Translate_NotConfigured" xml:space="preserve"><value>還沒設定 AI 服務（設定 → AI）</value></data>
+  <data name="Translate_ResultPlaceholder" xml:space="preserve"><value>譯文會出現在這裡</value></data>
+  <data name="Translate_SwapHint" xml:space="preserve"><value>對調：把譯文放到左邊接著翻</value></data>
+  <data name="Translate_TargetHint" xml:space="preserve"><value>翻譯成（點一下換）</value></data>
+  <data name="Translate_TranslateNow" xml:space="preserve"><value>立即翻譯</value></data>
+  <data name="Translate_Translating" xml:space="preserve"><value>正在翻譯…</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>結束 Pane</value></data>
+  <data name="Tray_OpenClipboard" xml:space="preserve"><value>開啟剪貼簿</value></data>
+  <data name="Tray_OpenLauncher" xml:space="preserve"><value>開啟啟動器</value></data>
+  <data name="Tray_PauseGestures" xml:space="preserve"><value>暫停手勢</value></data>
+  <data name="Tray_RestartUpdate" xml:space="preserve"><value>重新啟動並更新</value></data>
+  <data name="Tray_Settings" xml:space="preserve"><value>設定</value></data>
+  <data name="Tray_Title" xml:space="preserve"><value>托盤選單</value></data>
+  <data name="Tray_UpdateReady" xml:space="preserve"><value>新版本 {0} 已下載好</value></data>
+  <data name="Update_Automatic" xml:space="preserve"><value>自動更新</value></data>
+  <data name="Update_AutomaticDescription" xml:space="preserve"><value>每天檢查一次，有新版就在背景下載好，再提示你重新啟動更新；關掉後只在這裡手動檢查</value></data>
+  <data name="Update_AvailableVersion" xml:space="preserve"><value>發現新版本 {0}</value></data>
+  <data name="Update_CheckedHoursAgo" xml:space="preserve"><value>{0} 小時前檢查過</value></data>
+  <data name="Update_CheckedMinutesAgo" xml:space="preserve"><value>{0} 分鐘前檢查過</value></data>
+  <data name="Update_CheckedOn" xml:space="preserve"><value>{0:M 月 d 日}檢查過</value></data>
+  <data name="Update_Checking" xml:space="preserve"><value>檢查中…</value></data>
+  <data name="Update_CheckNow" xml:space="preserve"><value>檢查更新</value></data>
+  <data name="Update_CheckTimeout" xml:space="preserve"><value>連 GitHub 逾時了，稍後再試</value></data>
+  <data name="Update_CurrentVersion" xml:space="preserve"><value>目前 {0} · {1}</value></data>
+  <data name="Update_DevelopmentVersion" xml:space="preserve"><value>開發版</value></data>
+  <data name="Update_Download" xml:space="preserve"><value>下載更新</value></data>
+  <data name="Update_DownloadingVersion" xml:space="preserve"><value>正在下載 {0}</value></data>
+  <data name="Update_DownloadProgress" xml:space="preserve"><value>{0:P0} · 共 {1}；下載好會提示你</value></data>
+  <data name="Update_DownloadTimeout" xml:space="preserve"><value>下載逾時了，稍後再試</value></data>
+  <data name="Update_Failed" xml:space="preserve"><value>更新沒成功</value></data>
+  <data name="Update_InstallDescription" xml:space="preserve"><value>重新啟動後更新：安裝視窗會自己裝完並開啟新版，設定和資料都保留</value></data>
+  <data name="Update_InstallLaunchFailed" xml:space="preserve"><value>安裝程式沒能啟動，稍後再試</value></data>
+  <data name="Update_InvalidDownload" xml:space="preserve"><value>下載的檔案不完整，已刪除，稍後再試</value></data>
+  <data name="Update_InvalidResponse" xml:space="preserve"><value>看不懂 GitHub 返回的更新資訊，稍後再試</value></data>
+  <data name="Update_JustChecked" xml:space="preserve"><value>剛剛檢查過</value></data>
+  <data name="Update_NetworkFailed" xml:space="preserve"><value>連不上 GitHub，檢查網路後再試</value></data>
+  <data name="Update_NeverChecked" xml:space="preserve"><value>還沒檢查過</value></data>
+  <data name="Update_RateLimited" xml:space="preserve"><value>GitHub 暫時限制了檢查次數，過一會兒再試</value></data>
+  <data name="Update_ReadyNotification" xml:space="preserve"><value>Pane {0} 已下載好，到 設定 → 關於 裡重新啟動更新</value></data>
+  <data name="Update_ReadyVersion" xml:space="preserve"><value>{0} 已經下載好</value></data>
+  <data name="Update_ReleaseDetails" xml:space="preserve"><value>{0} · {1:M 月 d 日}釋出</value></data>
+  <data name="Update_RestartAndUpdate" xml:space="preserve"><value>重新啟動並更新</value></data>
+  <data name="Update_StorageFailed" xml:space="preserve"><value>更新包存不下來，看看磁碟空間夠不夠</value></data>
+  <data name="Update_Title" xml:space="preserve"><value>更新</value></data>
+  <data name="Update_UpToDate" xml:space="preserve"><value>已是最新版本</value></data>
+  <data name="Setup_UninstallChainFailed" xml:space="preserve"><value>解除安裝視窗沒能開啟。未完成的步驟：{0}。請檢查目錄權限和安全軟體的攔截記錄。記錄檔：{1}</value></data>
+  <data name="Setup_UninstallOperationFailed" xml:space="preserve"><value>{0} 未完成的步驟：{1}。記錄檔：{2}</value></data>
+  <data name="Launcher_ActionFailed" xml:space="preserve"><value>無法完成此操作，請確認目標仍然存在且可以訪問。</value></data>
+  <data name="Launcher_MoreActions" xml:space="preserve"><value>更多操作</value></data>
+  <data name="Launcher_NoMoreActions" xml:space="preserve"><value>這一項沒有更多操作</value></data>
+  <data name="Launcher_MenuTarget" xml:space="preserve"><value>{0}：{1}</value></data>
+  <data name="Launcher_Properties" xml:space="preserve"><value>屬性</value></data>
+  <data name="Launcher_Uninstall" xml:space="preserve"><value>解除安裝</value></data>
+  <data name="Launcher_ActionUnavailable" xml:space="preserve"><value>此項目已不支援該操作，請重新搜尋後再試。</value></data>
 </root>
