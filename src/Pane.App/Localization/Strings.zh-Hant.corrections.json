@@ -1,0 +1,338 @@
+{
+  "phrases": [
+    [
+      "賬",
+      "帳"
+    ],
+    [
+      "許可權",
+      "權限"
+    ],
+    [
+      "型別",
+      "類型"
+    ],
+    [
+      "退出登入",
+      "登出"
+    ],
+    [
+      "退出",
+      "結束"
+    ],
+    [
+      "窗口",
+      "視窗"
+    ],
+    [
+      "全屏",
+      "全螢幕"
+    ],
+    [
+      "撤銷",
+      "復原"
+    ],
+    [
+      "選中",
+      "選取"
+    ],
+    [
+      "粘貼",
+      "貼上"
+    ],
+    [
+      "圖標",
+      "圖示"
+    ],
+    [
+      "資源管理器",
+      "檔案總管"
+    ],
+    [
+      "檔案檔案總管",
+      "檔案總管"
+    ],
+    [
+      "快捷方式",
+      "捷徑"
+    ],
+    [
+      "快捷動作",
+      "快速動作"
+    ],
+    [
+      "快捷鍵",
+      "快速鍵"
+    ],
+    [
+      "拖動",
+      "拖曳"
+    ],
+    [
+      "撥出",
+      "叫出"
+    ],
+    [
+      "後臺",
+      "背景"
+    ],
+    [
+      "回撥",
+      "回呼"
+    ],
+    [
+      "全域性",
+      "全域"
+    ],
+    [
+      "文本",
+      "文字"
+    ],
+    [
+      "反饋",
+      "意見回饋"
+    ],
+    [
+      "識別",
+      "辨識"
+    ],
+    [
+      "地址",
+      "位址"
+    ],
+    [
+      "重啟",
+      "重新啟動"
+    ],
+    [
+      "配置",
+      "設定"
+    ],
+    [
+      "檢測",
+      "偵測"
+    ],
+    [
+      "套餐",
+      "方案"
+    ],
+    [
+      "憑據",
+      "憑證"
+    ],
+    [
+      "當前",
+      "目前"
+    ],
+    [
+      "超時",
+      "逾時"
+    ],
+    [
+      "不匹配",
+      "不符"
+    ],
+    [
+      "索引程序",
+      "索引程式"
+    ],
+    [
+      "日誌",
+      "記錄檔"
+    ],
+    [
+      "搜索",
+      "搜尋"
+    ],
+    [
+      "控制面板",
+      "控制台"
+    ],
+    [
+      "自帶",
+      "內建"
+    ],
+    [
+      "自定義",
+      "自訂"
+    ],
+    [
+      "標籤頁",
+      "分頁"
+    ],
+    [
+      "高階",
+      "進階"
+    ],
+    [
+      "引數",
+      "參數"
+    ],
+    [
+      "響應",
+      "回應"
+    ],
+    [
+      "客戶端",
+      "用戶端"
+    ],
+    [
+      "動效",
+      "動畫效果"
+    ],
+    [
+      "抗鋸齒",
+      "反鋸齒"
+    ],
+    [
+      "壓縮包",
+      "壓縮檔"
+    ],
+    [
+      "鎖屏介面",
+      "鎖定畫面"
+    ],
+    [
+      "鎖屏",
+      "鎖定"
+    ],
+    [
+      "組策略",
+      "群組原則"
+    ],
+    [
+      "站點",
+      "網站"
+    ],
+    [
+      "更新包",
+      "更新檔"
+    ],
+    [
+      "校驗",
+      "驗證"
+    ],
+    [
+      "令牌",
+      "權杖"
+    ],
+    [
+      "終端",
+      "終端機"
+    ],
+    [
+      "托盤",
+      "系統匣"
+    ],
+    [
+      "安全軟體",
+      "防毒軟體"
+    ]
+  ],
+  "keys": {
+    "Launcher_System_RegeditExe": "登錄編輯程式",
+    "Launcher_System_Disksandvolumes": "磁碟和磁碟區",
+    "Launcher_ActionUnavailable": "此項目已不支援該操作，請重新搜尋後再試。",
+    "Settings_Font_FamilyDescription": "空著就用預設；按 Enter 儲存",
+    "Settings_Gestures_SendKeysDescription": "按 WGestures / SendKeys 寫法：{ENTER} Enter，^ Ctrl，% Alt，+ Shift",
+    "Settings_Gestures_ButtonsDescription": "按住拖曳來畫方向；不移動就鬆開，照常是原來的點選",
+    "Setup_GestureHint": "按住右鍵拖曳來畫手勢；設定在系統匣圖示裡",
+    "Rename_DeletePreset": "刪掉這個預設集",
+    "Rename_EmptyPresets": "還沒有預設集：調好規則後點底部的「存為預設集」",
+    "Rename_Presets": "預設集",
+    "Rename_PresetSaved": "已存為預設集「{0}」",
+    "Rename_SaveAsPreset": "存為預設集",
+    "Rename_SavePreset": "儲存預設集",
+    "Launcher_System_Appsfeatures": "已安裝的應用程式",
+    "Launcher_System_Appsforwebsites": "適用於網站的應用程式",
+    "Launcher_System_CertlmMsc": "電腦憑證",
+    "Launcher_System_CertmgrMsc": "使用者憑證",
+    "Launcher_System_CharmapExe": "字元對應表",
+    "Launcher_System_CompmgmtMsc": "電腦管理",
+    "Launcher_System_Crossdevice": "跨裝置共用",
+    "Launcher_System_Defaultapps": "預設應用程式",
+    "Launcher_System_DevmgmtMsc": "裝置管理員",
+    "Launcher_System_DfrguiExe": "最佳化磁碟機",
+    "Launcher_System_EaseofaccessHighcontrast": "對比佈景主題",
+    "Launcher_System_EaseofaccessNarrator": "旁白設定",
+    "Launcher_System_EaseofaccessNarratorIsautostartenabled": "旁白自動啟動",
+    "Launcher_System_Findmydevice": "尋找我的裝置",
+    "Launcher_System_GamingGamebar": "遊戲列",
+    "Launcher_System_GamingGamedvr": "擷取",
+    "Launcher_System_HdwwizCpl": "裝置管理員",
+    "Launcher_System_LusrmgrMsc": "本機使用者和群組",
+    "Launcher_System_MainCpl": "滑鼠內容",
+    "Launcher_System_Nightlight": "夜間光線",
+    "Launcher_System_Optionalfeatures": "選用功能",
+    "Launcher_System_Personalization": "個人化設定",
+    "Launcher_System_PersonalizationTextinput": "文字輸入個人化",
+    "Launcher_System_PrivacyAppdiagnostics": "應用程式診斷權限",
+    "Launcher_System_PrivacyGeneral": "一般隱私權",
+    "Launcher_System_PrivacySpeechtyping": "筆跡與輸入個人化",
+    "Launcher_System_PrivacyTasks": "工作權限",
+    "Launcher_System_Quiethours": "專注輔助",
+    "Launcher_System_Recovery": "復原設定",
+    "Launcher_System_SecpolMsc": "本機安全性原則",
+    "Launcher_System_SigninoptionsDynamiclock": "動態鎖定",
+    "Launcher_System_Startupapps": "啟動應用程式",
+    "Launcher_System_Storagepolicies": "儲存空間感知器",
+    "Launcher_System_Storagesense": "儲存空間設定",
+    "Launcher_System_SysdmCpl": "系統內容",
+    "Launcher_System_TaskschdMsc": "工作排程器",
+    "Launcher_System_Themes": "佈景主題設定",
+    "Launcher_System_Troubleshoot": "疑難排解",
+    "Launcher_System_Windowsdefender": "Windows 安全性",
+    "Launcher_System_WindowsupdateOptionalupdates": "選用更新",
+    "Launcher_System_Workplace": "存取公司或學校資源",
+    "Launcher_Explorer": "檔案總管",
+    "Launcher_CommandEmptyRecycleBin": "清理資源回收筒",
+    "Launcher_Properties": "內容",
+    "Launcher_SystemCredentials": "認證管理員",
+    "Launcher_ActionFailed": "無法完成此操作，請確認目標仍然存在且可以存取。",
+    "Launcher_ApplicationSubtitle": "應用程式",
+    "Launcher_AppMissing": "應用程式已不在索引中",
+    "Launcher_Group_Applications": "應用程式",
+    "Launcher_SearchPlaceholder": "搜尋應用程式、檔案，或輸入任何文字",
+    "Common_SpaceKey": "空白鍵",
+    "Common_SaveAs": "另存新檔…",
+    "Common_ResetDefaults": "還原預設值",
+    "Common_Restore": "還原",
+    "Files_CategoryPresentation": "簡報",
+    "Files_NotFound": "沒有找到「{0}」\n換個關鍵字，或者在左邊換個分類",
+    "Clipboard_NoMatches": "沒有相符的記錄",
+    "Settings_Clipboard_ClearHistory": "清除剪貼簿歷史",
+    "Rename_Find": "尋找",
+    "Rename_FindSpace": "尋找的是空格",
+    "Rename_Replace": "取代",
+    "Rename_ReplaceDescription": "把一段文字換成別的，支援正則",
+    "Rename_RelatedRollback": "關聯檔案重新命名失敗，已還原",
+    "SuperPanel_PasteReplace": "貼上取代",
+    "SuperPanel_PasteReplaceSelection": "貼上取代選取文字",
+    "SuperPanel_ReplaceSelection": "取代選取文字",
+    "Setup_RollbackIncomplete": "安裝失敗，復原未完成。請保留 app.old / app.previous 後重試。",
+    "Settings_Super_ExcludedProgramsDescription": "在這些程式裡長按側鍵也照常傳給程式。",
+    "Settings_AccentColor_Description": "只用在開關、滑桿、焦點等控制項上，不給文字上色",
+    "Settings_Font_JhengHei": "微軟正黑體",
+    "Settings_Autostart_EnableInTaskManager": "Pane 不會替你改回來；要開機啟動，請在工作管理員的「啟動應用程式」裡重新啟用",
+    "Settings_Gestures_FindConfig": "尋找設定",
+    "Settings_Gestures_RestoreTitle": "還原預設手勢",
+    "Settings_WinV_Restore": "還原系統的 Win+V",
+    "Settings_WinV_PendingRestore": "下次登入還原",
+    "Settings_WinV_RestoreDescription": "把系統設定原樣還原，Win+V 回到 Windows 內建的剪貼簿歷史。",
+    "Settings_WinV_DisableSystemHistoryDescription": "避免同一份內容在兩個地方各存一份；關閉替換時一起還原",
+    "Settings_WinV_RestoreFirst": "請先完成系統快速鍵還原",
+    "Settings_Launcher_WebSuggestionsDescription": "用關鍵字搜網頁時（比如「bd 天氣」）向那個網站要搜尋建議；平時打字不連網",
+    "Ai_IdentityTokenInvalid": "ChatGPT 身分權杖驗證失敗",
+    "Ai_RefreshFailed": "ChatGPT 登入已過期且更新失敗，請重新登入",
+    "Ai_RefreshTooEarly": "尚未到服務允許的更新時間，請稍後重試",
+    "Ai_ProxyUnreachable": "連不上代理，請檢查代理位址和連接埠",
+    "Settings_Ai_AutoTranslateDescription": "選取外文、超級面板一彈出就翻譯，單個單字也翻；超過約 2000 字不自動翻；中文照舊只顯示動作",
+    "Settings_Icons_AddApp": "新增應用程式",
+    "Settings_Icons_AppMissing": "這個應用程式已不在清單裡",
+    "Settings_Icons_PerApp": "按應用程式設定",
+    "Settings_Icons_SearchPlaceholder": "輸入應用程式名稱",
+    "Settings_Launcher_HomeRecentDescription": "最近開啟過的應用程式和固定的應用程式",
+    "Settings_Gestures_HookFailed": "滑鼠監聽功能沒裝上，重新啟動 Pane 再試",
+    "Setup_UninstallChainFailed": "解除安裝視窗沒能開啟。未完成的步驟：{0}。請檢查目錄權限和防毒軟體的攔截記錄。記錄檔：{1}"
+  }
+}
