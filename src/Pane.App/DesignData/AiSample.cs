@@ -27,7 +27,8 @@ public sealed class AiSample : IAiService
 
     public async IAsyncEnumerable<string> RunAsync(AiRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        await Task.Delay(350, cancellationToken); // 模拟首字等待
+        // 模拟首字等待；设计预览 PANE_DESIGN_AI_WAIT=毫秒 拉长，好看清等待状态（issue 12）
+        await Task.Delay(int.TryParse(Environment.GetEnvironmentVariable("PANE_DESIGN_AI_WAIT"), out var wait) ? wait : 350, cancellationToken);
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_AI") == "error")
             throw new AiNetworkException("连不上 AI 服务，请检查网络后重试。");
         var answer = request.ActionId switch

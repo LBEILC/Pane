@@ -92,7 +92,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     }
     void Register(int id,string name,Hotkey key){
         var chord=Pane.Services.HotkeyConversions.ToGesture(key);
-        uint mods=0x4000;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Ctrl))mods|=2;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Alt))mods|=1;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Shift))mods|=4;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Win))mods|=8;
+        uint mods=ShellHotkeyBindings.NoRepeat;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Ctrl))mods|=2;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Alt))mods|=1;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Shift))mods|=4;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Win))mods|=8;
         bool ok=Native.RegisterHotKey(shellWindow,id,mods,key.VirtualKey);int code=ok?0:Marshal.GetLastWin32Error();if(ok)registered.Add(id);
         lock(Diagnostics)Diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
         if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
@@ -103,7 +103,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
         if(taskbarCreated!=0&&m==taskbarCreated){tray=false;if(currentSettings?.General.ShowTrayIcon==true)tray=Shell_NotifyIconW(0,ref data);return 0;}
         if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;request.Done.TrySetResult(ApplyWinV());}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
-        if(m==0x312){Dispatch(w==1?"show-launcher":"show-clipboard");return 0;}
+        if(m==0x312){if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8003){while(notifications.TryDequeue(out var text)){data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
         if(m==0x8002){if(pending is {} s)ApplyCore(s);return 0;}
         // 设计改（2026-10-30）：右键弹 Pane 自己的玻璃菜单（App.Tray.cs），不再用系统菜单。

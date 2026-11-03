@@ -20,6 +20,7 @@ internal static partial class Program
         foreach(var message in new[]{"不支援 reasoning", "不識別思考參數"}) { using var error=JsonDocument.Parse("\""+message+"\""); Check(AiProtocol.UnsupportedReasoning(error.RootElement), "繁体推理参数错误:"+message); }
         var settings=new AiSettings();
         await ProxyReasoningTests(directory);
+        await PresetTests(directory);
         Check(AiProtocol.Prompt(settings,new("translate","你好",null,null)).Contains("英文"),"auto han");
         Check(AiProtocol.Prompt(settings,new("translate","hi",null,null)).Contains("中文"),"auto latin");
         Check(AiProtocol.Prompt(settings,new("translate","中A",null,null)).Contains("英文"),"auto half");

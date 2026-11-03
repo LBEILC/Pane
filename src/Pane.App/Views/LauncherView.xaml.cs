@@ -320,6 +320,25 @@ public sealed partial class LauncherView : UserControl, IPanelView
         return Options.SearchEngines.FirstOrDefault(e => string.Equals(e.Keyword, q[..space], StringComparison.OrdinalIgnoreCase)) is { } engine ? (engine, text) : null;
     }
 
+    /// <summary>
+    /// 关键字直达（052，issue 11 / 12）：「关键字 空格 内容」，关键字是设置里的翻译 / 问 AI / 搜文件关键字。
+    /// 返回动作行的动作 Id（ai:translate、ai:ask、files）和内容；和搜索站点关键字重复时站点优先；AI 关着时 AI 两项不认。
+    /// </summary>
+    (string ActionId, string Text)? DirectQuery(string q)
+    {
+        int space = q.IndexOf(' ');
+        if (space <= 0) return null;
+        var text = q[(space + 1)..].Trim();
+        if (text.Length == 0) return null;
+        var key = q[..space];
+        if (Options.SearchEngines.Any(e => string.Equals(e.Keyword, key, StringComparison.OrdinalIgnoreCase))) return null;
+        bool Has(string[] keys) => keys.Any(k => string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+        if (AiOn && Has(Options.TranslateKeywords)) return ("ai:translate", text);
+        if (AiOn && Has(Options.AskKeywords)) return ("ai:ask", text);
+        if (Has(Options.FilesKeywords)) return ("files", text);
+        return null;
+    }
+
     static LauncherItem WebItem(Settings.SearchEngine engine, string text, string title, string? hotkey) =>
         new("web:" + engine.UrlTemplate.Replace("{query}", Uri.EscapeDataString(text), StringComparison.Ordinal), LauncherItemKind.Web, LauncherGroups.Web, title, null, new("search"), Hotkey: hotkey);
 
@@ -391,6 +410,17 @@ public sealed partial class LauncherView : UserControl, IPanelView
             Add(s, WebItem(web.Engine, web.Text, string.Format(Strings.Launcher_SearchWithQuery, (object?)(web.Engine.Name), (object?)(web.Text)), "Enter"), LauncherCell.Command);
             if (suggested.Query == web.Engine.Keyword + " " + web.Text)
                 foreach (var text in suggested.Items.Where(t => t != web.Text)) Add(s, WebItem(web.Engine, text, text, null), LauncherCell.Command);
+        }
+        else if (DirectQuery(q) is { } direct)
+        {
+            // 关键字直达（052，issue 12）：只出这一项、默认选中，Enter 直接翻译 / 问 AI / 进文件窗口，不用再去动作行里挑
+            var (label, title, glyph) = direct.ActionId switch
+            {
+                "ai:translate" => (Strings.Common_Translate, string.Format(Strings.Launcher_TranslateTarget, (object?)(direct.Text)), "translate"),
+                "ai:ask" => (Strings.Launcher_AskAi, string.Format(Strings.Launcher_AskTarget, (object?)(direct.Text)), "ai"),
+                _ => (Strings.Launcher_SearchFiles, string.Format(Strings.Launcher_SearchFilesTarget, (object?)(direct.Text)), "folder"),
+            };
+            Add(Section(label, LauncherSectionKind.List), new("direct:" + direct.ActionId, LauncherItemKind.Action, LauncherGroups.Actions, title, null, new(glyph), Hotkey: "Enter"), LauncherCell.Command);
         }
         else if (q.Length > 0)
         {
@@ -477,6 +507,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
             LauncherCell.App => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
             LauncherCell.Menu when menuItem is { } target => (string.Format(Strings.Launcher_MenuTarget, (object?)(item.Title), (object?)(target.Title)), [(["Enter"], Strings.Common_Execute), (["Esc"], Strings.Common_Back)]),
             LauncherCell.Command when item.Id == "terminal:hint" => (Strings.Launcher_TerminalHelp, []),
+            LauncherCell.Command when item.Id.StartsWith("direct:", StringComparison.Ordinal) && DirectQuery(q) is { } d => ActionFoot(d.ActionId, item.Title, d.Text),
             LauncherCell.Command when item.Group == LauncherGroups.Terminal => (string.Format(Strings.Launcher_RunInTerminal, (object?)(item.Subtitle)), [(["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_RunAsAdmin)]),
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
@@ -502,9 +533,9 @@ public sealed partial class LauncherView : UserControl, IPanelView
 
     // ---------------- AI ----------------
 
-    void RunAi(string actionId)
+    void RunAi(string actionId, string? query = null)
     {
-        var q = Input.Text.Trim();
+        var q = query ?? Input.Text.Trim();   // 关键字直达传进来的是去掉关键字的内容
         var text = attachment is { } a ? AttachmentText(a) : q;
         if (actionId == "ask" && q.Length == 0 && attachment is null) return;
         if (text.Length == 0 && actionId != "ask") return;
@@ -526,7 +557,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
         ResultsArea.Visibility = Visibility.Visible;
         Card.Start(ai, request, title, glyph, source, compact: false,
             [(["Enter"], Strings.Common_Paste), (["Ctrl", "+", "C"], Strings.Common_Copy), (["Ctrl", "+", "R"], Strings.Common_Regenerate),
-             (["Tab"], actionId == "translate" ? Strings.Launcher_TranslateWindow : Strings.Launcher_ContinueChat), (["Esc"], Strings.Common_Back)]);
+             (["Tab"], actionId == "translate" ? Strings.Launcher_TranslateWindow : Strings.Launcher_ContinueChat), (["Esc"], Strings.Common_Back)],
+            openSettings: () => { CloseRequested?.Invoke(this, EventArgs.Empty); ((App)Application.Current).OpenSettings("ai"); });
         RequestHeight();
     }
 
@@ -811,6 +843,20 @@ public sealed partial class LauncherView : UserControl, IPanelView
         var item = row.Item;
         var q = shownQuery;
         if (row.Cell == LauncherCell.Menu) { if (!tab) await RunMenu(row); return; }
+
+        // 关键字直达（052）：和动作行同样的动作，只是内容去掉了关键字；Tab 照动作行展开成翻译 / 对话窗口
+        if (item.Id.StartsWith("direct:", StringComparison.Ordinal))
+        {
+            if (DirectQuery(q) is not { } d) return;
+            switch (d.ActionId)
+            {
+                case "files": OpenFiles?.Invoke(d.Text, null); break;
+                case "ai:translate" when tab: OpenTranslate?.Invoke(d.Text); break;
+                case "ai:ask" when tab: OpenChat?.Invoke(d.Text, null); break;
+                default: if (!tab) RunAi(d.ActionId[3..], d.Text); break;
+            }
+            return;
+        }
 
         // Tab：补全项填进输入框（037）；网页建议填成「关键字 建议」接着改
         if (tab && item.Id.StartsWith("complete:", StringComparison.Ordinal)) { Fill(">" + item.Id["complete:".Length..]); return; }

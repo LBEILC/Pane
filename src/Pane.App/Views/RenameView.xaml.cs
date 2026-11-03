@@ -120,7 +120,8 @@ public sealed partial class RenameView : UserControl, ISecondaryView
 
     void AddFiles(IEnumerable<string> files, bool refresh = true)
     {
-        var have = new HashSet<string>(rows.Select(r => r.Path), StringComparer.OrdinalIgnoreCase);
+        HideFolderNote();
+        var have =new HashSet<string>(rows.Select(r => r.Path), StringComparer.OrdinalIgnoreCase);
         foreach (var f in files)
             if (!string.IsNullOrWhiteSpace(f) && have.Add(f)) rows.Add(new RenameRow(f));
         UpdateWhere();
@@ -149,6 +150,45 @@ public sealed partial class RenameView : UserControl, ISecondaryView
         }
         catch (Exception ex) { Host.ReportFailure(Strings.Rename_AddFiles, ex); }
     }
+
+    // 添加文件夹（052，issue 11）：先加这一层的文件；子文件夹里还有的，顶栏给「也加入子文件夹里的 N 个」，点了再加。
+    // 文件夹是空的、或超过一次能加的上限，也在顶栏说一声。拖进来的文件夹仍然按「改文件夹本身的名字」处理
+    IReadOnlyList<string> pendingNested = [];
+
+    async void OnAddFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker();
+            picker.FileTypeFilter.Add("*");
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
+            if (await picker.PickSingleFolderAsync() is not { } folder) return;
+            var list = await renamer.ListFolderAsync(folder.Path, CancellationToken.None);
+            AddFiles(list.Direct);
+            ShowFolderNote(folder.Name, list);
+        }
+        catch (Exception ex) { Host.ReportFailure(Strings.Rename_AddFolder, ex); }
+    }
+
+    void ShowFolderNote(string name, RenameFolderListing list)
+    {
+        pendingNested = list.Nested;
+        string? text = list.Direct.Count + list.Nested.Count == 0 ? string.Format(Strings.Rename_FolderEmpty, (object?)(name))
+            : list.Truncated ? string.Format(Strings.Rename_FolderTruncated, (object?)(IBatchRenamer.MaxFolderFiles)) : null;
+        FolderNoteText.Text = text ?? "";
+        FolderNoteText.Visibility = text is null ? Visibility.Collapsed : Visibility.Visible;
+        NestedButton.Content = string.Format(Strings.Rename_AddNested, (object?)(list.Nested.Count));
+        NestedButton.Visibility = list.Nested.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        FolderNote.Visibility = text is null && list.Nested.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    void HideFolderNote()
+    {
+        pendingNested = [];
+        FolderNote.Visibility = Visibility.Collapsed;
+    }
+
+    void OnAddNested(object sender, RoutedEventArgs e) => AddFiles(pendingNested);
 
     void OnDragOver(object sender, DragEventArgs e)
     {

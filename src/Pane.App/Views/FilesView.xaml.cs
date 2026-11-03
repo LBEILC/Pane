@@ -2,7 +2,7 @@ using Pane.Localization;
 // 文件窗口逻辑（设计负责人）。交互照原型 prototype/launcher.html「二级窗口：文件搜索」：
 // 输入防抖后搜；左侧分类带数量，Tab / Shift+Tab 切换；结果分批加载（每批 50，滚到接近底部再要）；
 // 上下键选中，Enter 打开，Ctrl+Enter 打开所在文件夹，可拖出；右侧预览可关；底部换排序。
-// Esc 只清空输入（不关窗口）；Ctrl+W 关。
+// Esc 有输入时清空，输入为空时关窗口（2026-11-03，issue 11）；Ctrl+W 关。
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -59,7 +59,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView
         Rail.Loaded += (_, _) => MoveRailHighlight(animate: false);
         thumbFade = new DispatcherQueueTimerHolder(DispatcherQueue, TimeSpan.FromMilliseconds(900), () => { if (!overThumb && !draggingThumb) FadeThumb(0); });
         ElementCompositionPreview.GetElementVisual(ScrollThumb).Opacity = 0;
-        KeyHints.Fill(Hints, [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Esc"], Strings.Common_Clear)], HintLabelProto, KbdProto);
+        FillHints();
         PreviewKeyDown += OnKeyDown;   // 先于输入框拿到方向键、Tab、Enter
         Loaded += (_, _) => HideDelete();
         Input.GotFocus += (_, _) => HideDelete();
@@ -110,6 +110,15 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     {
         HideDelete();
         debounce.Restart();
+        if ((Input.Text.Length == 0) != hintsForEmpty) FillHints();
+    }
+
+    // 提示栏的 Esc：有输入时是「清空」，空的时候是「关闭」
+    bool hintsForEmpty;
+    void FillHints()
+    {
+        hintsForEmpty = Input.Text.Length == 0;
+        KeyHints.Fill(Hints, [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Esc"], hintsForEmpty ? Strings.Common_Close : Strings.Common_Clear)], HintLabelProto, KbdProto);
     }
 
     async Task Search()
@@ -481,8 +490,9 @@ public sealed partial class FilesView : UserControl, ISecondaryView
                 SelectCategory(categories[(i + (shift ? categories.Count - 1 : 1)) % categories.Count].Category);
                 break;
             case VirtualKey.Escape:
-                // Esc 不关窗口：只清空输入
-                if (Input.Text.Length > 0) Input.Text = "";
+                // Esc：有输入先清空；输入已经是空的再按就关窗口（issue 11：原来只能点 X 或 Ctrl+W）
+                if (Input.Text.Length == 0) { CloseRequested?.Invoke(this, EventArgs.Empty); break; }
+                Input.Text = "";
                 Input.Focus(FocusState.Programmatic);
                 break;
             case VirtualKey.W when ctrl: CloseRequested?.Invoke(this, EventArgs.Empty); break;

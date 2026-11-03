@@ -23,6 +23,7 @@
   <data name="Ai_Card_LoginAgain" xml:space="preserve"><value>重新登录</value></data>
   <data name="Ai_Card_LoginExpired" xml:space="preserve"><value>ChatGPT 登录已过期，请重新登录。</value></data>
   <data name="Ai_Card_NotConfigured" xml:space="preserve"><value>还没配置 AI 服务。</value></data>
+  <data name="Ai_Card_Waiting" xml:space="preserve"><value>正在等回复</value></data>
   <data name="Ai_Card_QuotaExceeded" xml:space="preserve"><value>这个账号的额度用完了。</value></data>
   <data name="Ai_Chat_ChangeModel" xml:space="preserve"><value>换模型（只对这次对话）</value></data>
   <data name="Ai_Chat_Empty" xml:space="preserve"><value>新的对话
@@ -525,6 +526,13 @@
   <data name="Launcher_WebSearch" xml:space="preserve"><value>网页搜索</value></data>
   <data name="Rename_AddFiles" xml:space="preserve"><value>添加文件</value></data>
   <data name="Rename_AddFilesHint" xml:space="preserve"><value>添加文件…</value></data>
+  <data name="Rename_AddFolder" xml:space="preserve"><value>添加文件夹</value></data>
+  <data name="Rename_AddFolderHint" xml:space="preserve"><value>添加文件夹里的文件…</value></data>
+  <data name="Rename_AddNested" xml:space="preserve"><value>也加入子文件夹里的 {0} 个</value></data>
+  <data name="Rename_FolderEmpty" xml:space="preserve"><value>「{0}」里没有可以改名的文件</value></data>
+  <data name="Rename_NotFolder" xml:space="preserve"><value>选的不是文件夹</value></data>
+  <data name="Rename_LinkedFolder" xml:space="preserve"><value>这是一个链接文件夹，请选它指向的那个文件夹</value></data>
+  <data name="Rename_FolderTruncated" xml:space="preserve"><value>一次最多加 {0} 个，只加了前面的</value></data>
   <data name="Rename_AddRule" xml:space="preserve"><value>添加规则</value></data>
   <data name="Rename_AddSelected" xml:space="preserve"><value>加进来</value></data>
   <data name="Rename_AfterCharacter" xml:space="preserve"><value>个字后面</value></data>
@@ -689,6 +697,11 @@
   <data name="Settings_Ai_EnableDescription" xml:space="preserve"><value>不用 AI 时可以关掉</value></data>
   <data name="Settings_Ai_Endpoint" xml:space="preserve"><value>接口地址</value></data>
   <data name="Settings_Ai_EndpointDescription" xml:space="preserve"><value>兼容 OpenAI 接口格式的服务</value></data>
+  <data name="Settings_Ai_Vendor" xml:space="preserve"><value>服务商</value></data>
+  <data name="Settings_Ai_VendorDescription" xml:space="preserve"><value>地址和模型已经填好，只需要粘贴 key；换了服务商记得换 key</value></data>
+  <data name="Settings_Ai_CustomVendor" xml:space="preserve"><value>自定义</value></data>
+  <data name="Settings_Ai_CustomVendorDescription" xml:space="preserve"><value>点一家服务商，地址和模型自动填好；也可以在下面自己填地址</value></data>
+  <data name="Settings_Ai_GetKey" xml:space="preserve"><value>获取 key</value></data>
   <data name="Settings_Ai_EndpointInvalid" xml:space="preserve"><value>接口地址要以 http:// 或 https:// 开头</value></data>
   <data name="Settings_Ai_FetchModels" xml:space="preserve"><value>拉取模型列表</value></data>
   <data name="Settings_Ai_FirstModelDefault" xml:space="preserve"><value>默认（账号的第一个模型）</value></data>
@@ -1061,6 +1074,11 @@
   <data name="Settings_Launcher_EngineSchemeRequired" xml:space="preserve"><value>地址要以 http:// 或 https:// 开头</value></data>
   <data name="Settings_Launcher_Favorites" xml:space="preserve"><value>常用文件和文件夹</value></data>
   <data name="Settings_Launcher_FavoritesDescription" xml:space="preserve"><value>常用的文件和文件夹在启动器里排在普通文件前面，也能用拼音搜到。</value></data>
+  <data name="Settings_Launcher_DirectKeywords" xml:space="preserve"><value>关键字直达</value></data>
+  <data name="Settings_Launcher_DirectKeywordsDescription" xml:space="preserve"><value>在启动器里输入「关键字 空格 内容」，按 Enter 直接执行，比如「fy hello」直接翻译。多个关键字用空格隔开，留空就不用；和网页搜索的关键字重复时，网页搜索优先。</value></data>
+  <data name="Settings_Launcher_KeywordNone" xml:space="preserve"><value>不用</value></data>
+  <data name="Settings_Launcher_KeywordInvalid" xml:space="preserve"><value>关键字不能以 &gt; 开头（&gt; 开头是终端命令）</value></data>
+  <data name="Settings_Launcher_KeywordDuplicate" xml:space="preserve"><value>「{0}」已经用在别的地方了</value></data>
   <data name="Settings_Launcher_FileSearch" xml:space="preserve"><value>文件搜索</value></data>
   <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>文件名搜索依赖 Everything；Pane 不自建全盘索引。启动器列前 3 个，其余在文件窗口里看</value></data>
   <data name="Settings_Launcher_HideOnBlur" xml:space="preserve"><value>失去焦点时隐藏</value></data>
@@ -1137,7 +1155,7 @@
   <data name="Settings_Theme_Light" xml:space="preserve"><value>浅色</value></data>
   <data name="Settings_Title" xml:space="preserve"><value>Pane 设置</value></data>
   <data name="Settings_UiLanguage" xml:space="preserve"><value>界面语言</value></data>
-  <data name="Settings_UiLanguage_Description" xml:space="preserve"><value>繁体翻译还在进行，跟随系统时暂时都显示简体</value></data>
+  <data name="Settings_UiLanguage_Description" xml:space="preserve"><value>跟随系统时，繁体系统显示繁体，其余显示简体</value></data>
   <data name="Settings_WinV_Active" xml:space="preserve"><value>已生效</value></data>
   <data name="Settings_WinV_DisableSystemHistory" xml:space="preserve"><value>同时关闭 Windows 自带的剪贴板历史</value></data>
   <data name="Settings_WinV_DisableSystemHistoryDescription" xml:space="preserve"><value>避免同一份内容在两个地方各存一份；关闭替换时一起恢复</value></data>

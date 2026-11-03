@@ -73,6 +73,15 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     string[] actionRow=DefaultActionRow();
     public string[] ActionRow { get=>actionRow; init=>actionRow=value??DefaultActionRow(); }
     internal static string[] DefaultActionRow()=>["ai:translate","ai:ask","files","ai:summary","web:bing","web:bd"];
+    // 关键字直达（设计加，2026-11-03，052，issue 11 / 12）：启动器里「关键字 空格 内容」直接翻译、问 AI、进文件窗口。
+    // 关键字不含空格、不分大小写；空数组 = 不用；和搜索站点的关键字重复时站点优先
+    string[] translateKeywords=DefaultTranslateKeywords();
+    public string[] TranslateKeywords { get=>translateKeywords; init=>translateKeywords=value??DefaultTranslateKeywords(); }
+    internal static string[] DefaultTranslateKeywords()=>["fy","翻译"]; // 不翻译：默认关键字，用户数据
+    string[] askKeywords=["ai"];
+    public string[] AskKeywords { get=>askKeywords; init=>askKeywords=value??["ai"]; }
+    string[] filesKeywords=["f"];
+    public string[] FilesKeywords { get=>filesKeywords; init=>filesKeywords=value??["f"]; }
 }
 public sealed record LauncherPosition(string MonitorId, double X, double Y);
 public sealed record ClipboardSettings(Hotkey Hotkey,

@@ -108,7 +108,17 @@ public sealed partial class App : Application
     bool NeedsFrames=>!closing&&(!ready||controlsEnabled||pendingAck!=null||cycleIndex>=0||VisualFrames);
     void WatchFrames(GlassPanel panel)=>panel.TickRequested+=WakeFrames;
     void WakeFrames(){if(!queue.HasThreadAccess){queue.TryEnqueue(WakeFrames);return;}if(!closing&&timer is {IsRunning:false})timer.Start();}
-    void Command(string command){
+    void Command(string command)=>Command(command,null);
+    // 测试宿主可注入前台句柄；产品入口始终读取系统前台窗口。
+    void Command(string command,nint? foregroundOverride){
+        if(command.StartsWith("hotkey-",StringComparison.Ordinal)){
+            string name=command[7..];command="show-"+name;
+            nint foreground=foregroundOverride??Native.GetForegroundWindow();
+            if(panels.TryGetValue(name,out var target)&&ShellHotkeyBindings.ShouldHide(target.Shown,
+                foreground==target.Input||foreground==target.Visual)){
+                target.Hide();WakeFrames();return;
+            }
+        }
         if(!Pane.Services.Clipboard.ClipboardAccess.Allow(command,Store.Current.Clipboard.Enabled,text=>shell?.NotifyOnce(text)))return;
         WakeFrames();
         if(command.StartsWith("tray-menu ",StringComparison.Ordinal)){ShowTrayMenu(command[10..]);return;}/* 设计：托盘菜单 */

@@ -33,6 +33,7 @@ static class Program
   var dir=Path.Combine(AppContext.BaseDirectory,"results","settings");var store=new SettingsStore(dir,settings);store.Save(settings with{SuperPanel=new(true,SuperPanelButton.Middle,650,false,false){DisabledPrograms=["test.exe"]}});store.Load();Check(store.Current.SuperPanel.HoldMilliseconds==650&&store.Current.SuperPanel.TriggerButton==SuperPanelButton.Middle,"super settings roundtrip");
   checks+=FolderJumpSettingsTests.Run(settings);
   checks+=await RenameTests.Run(settings);
+  checks+=await FolderListingTests.Run();
   checks+=await WinVTests.Run();
   checks+=await SelectionTests.Run();
   checks+=ReleaseTests.Run(settings);

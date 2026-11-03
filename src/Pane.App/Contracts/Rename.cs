@@ -54,6 +54,13 @@ public sealed record RenameFailure(string Path, string Reason);
 /// <param name="UndoId">能撤销时给，传给 <see cref="IBatchRenamer.UndoAsync"/>；一个也没改成时为 null。</param>
 public sealed record RenameResult(int Renamed, IReadOnlyList<RenameFailure> Failed, string? UndoId);
 
+/// <summary>
+/// 一个文件夹里能拿来批量重命名的文件（052，issue 11）。Direct：直接在这个文件夹里的；Nested：各层子文件夹里的。
+/// 都只列文件、不列文件夹；按资源管理器的顺序排（同一文件夹内按名字自然排序，Direct 在前，Nested 按子文件夹路径再按名字）。
+/// 两项加起来最多 <see cref="IBatchRenamer.MaxFolderFiles"/> 个，超了截断并设 Truncated。
+/// </summary>
+public sealed record RenameFolderListing(IReadOnlyList<string> Direct, IReadOnlyList<string> Nested, bool Truncated);
+
 public interface IBatchRenamer
 {
     /// <summary>
@@ -70,4 +77,14 @@ public interface IBatchRenamer
 
     /// <summary>把那一次执行改过的名字全部改回去（只撤销还能撤销的；改回去失败的记进 Failed）。Pane 退出后不保证还能撤销。</summary>
     Task<RenameResult> UndoAsync(string undoId, CancellationToken cancellationToken);
+
+    /// <summary>「添加文件夹」一次最多列这么多个文件（052）。</summary>
+    const int MaxFolderFiles = 2000;
+
+    /// <summary>
+    /// 列出文件夹里的文件（052）：跳过隐藏和系统文件、不进隐藏 / 系统子文件夹、不跟随联接点和符号链接；没权限的子文件夹跳过不报错。
+    /// 文件夹本身打不开时抛异常（界面显示原因）。默认实现只为了在工程实现前能编译。
+    /// </summary>
+    Task<RenameFolderListing> ListFolderAsync(string folder, CancellationToken cancellationToken) =>
+        Task.FromResult(new RenameFolderListing([], [], false));
 }

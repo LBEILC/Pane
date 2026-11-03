@@ -50,6 +50,8 @@ public sealed partial class AiCard : UserControl
         Out.LineHeight = Math.Round(size * 1.7);
         Out.MinHeight = compact ? 0 : Math.Round(size * 1.7 * 2);
         Caret.Height = Math.Round(size * 1.05);
+        Waiting.Height = Out.LineHeight;
+        WaitingText.Text = Strings.Ai_Card_Waiting;
         KeyHints.Fill(Foot, hints, HintLabelProto, KbdProto);
         _ = Run();
     }
@@ -62,6 +64,32 @@ public sealed partial class AiCard : UserControl
         running = null;
         blink.Stop();
         Caret.Visibility = Visibility.Collapsed;
+        ShowWaiting(false);
+    }
+
+    // 等待状态（issue 12）：三个点依次亮起，动画在合成线程上跑，不唤醒界面线程；第一个字回来、出错、取消时停掉
+    bool waiting;
+    void ShowWaiting(bool on)
+    {
+        if (waiting == on) return;
+        waiting = on;
+        Waiting.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        Microsoft.UI.Xaml.Shapes.Ellipse[] dots = [Dot1, Dot2, Dot3];
+        for (int i = 0; i < dots.Length; i++)
+        {
+            var v = Microsoft.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(dots[i]);
+            if (!on) { v.StopAnimation("Opacity"); v.Opacity = 1; continue; }
+            var pulse = v.Compositor.CreateScalarKeyFrameAnimation();
+            pulse.InsertKeyFrame(0, 0.25f);
+            pulse.InsertKeyFrame(0.3f, 1f);
+            pulse.InsertKeyFrame(0.6f, 0.25f);
+            pulse.InsertKeyFrame(1, 0.25f);
+            pulse.Duration = TimeSpan.FromMilliseconds(1200);
+            pulse.DelayTime = TimeSpan.FromMilliseconds(i * 180);
+            pulse.DelayBehavior = Microsoft.UI.Composition.AnimationDelayBehavior.SetInitialValueBeforeDelay;
+            pulse.IterationBehavior = Microsoft.UI.Composition.AnimationIterationBehavior.Forever;
+            v.StartAnimation("Opacity", pulse);
+        }
     }
 
     async Task Run()
@@ -77,14 +105,21 @@ public sealed partial class AiCard : UserControl
             ShowProblem(ai.Status == AiStatus.NeedsSignIn ? Strings.Ai_Card_LoginExpired : Strings.Ai_Card_NotConfigured, ai.Status == AiStatus.NeedsSignIn ? Strings.Ai_Card_LoginAgain : Strings.Common_GoToSettings, settings: true);
             return;
         }
-        Caret.Visibility = Visibility.Visible;
-        Caret.Opacity = 1;
-        blink.Start();
+        Caret.Visibility = Visibility.Collapsed;
+        ShowWaiting(true);
         try
         {
             await foreach (var chunk in ai.RunAsync(request!, cts.Token))
             {
                 if (cts.IsCancellationRequested) return;
+                if (waiting && chunk.Length > 0)
+                {
+                    // 第一个字回来：等待状态换成逐字出现的光标
+                    ShowWaiting(false);
+                    Caret.Visibility = Visibility.Visible;
+                    Caret.Opacity = 1;
+                    blink.Start();
+                }
                 OutRun.Text += chunk;
                 ContentGrew?.Invoke(this, EventArgs.Empty);
                 OutScroll.ChangeView(null, OutScroll.ScrollableHeight, null, true);
@@ -101,6 +136,7 @@ public sealed partial class AiCard : UserControl
         {
             if (running == cts)
             {
+                ShowWaiting(false);
                 blink.Stop();
                 Caret.Visibility = Visibility.Collapsed;
                 Finished?.Invoke(this, EventArgs.Empty);
@@ -112,6 +148,7 @@ public sealed partial class AiCard : UserControl
 
     void ShowProblem(string text, string button, bool settings)
     {
+        ShowWaiting(false);
         blink.Stop();
         Caret.Visibility = Visibility.Collapsed;
         OutScroll.Visibility = OutRun.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -124,7 +161,8 @@ public sealed partial class AiCard : UserControl
 
     void OnProblemButton(object sender, RoutedEventArgs e)
     {
-        if (problemOpensSettings) openSettings?.Invoke();
+        // 调用方没给就直接打开「设置 → AI」（issue 11：启动器里没传，点了没反应）
+        if (problemOpensSettings) (openSettings ?? (() => ((App)Application.Current).OpenSettings("ai")))();
         else Retry();
     }
 }

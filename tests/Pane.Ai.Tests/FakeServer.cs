@@ -18,6 +18,7 @@ internal sealed class FakeServer:IAsyncDisposable
     public int Refreshes,Revocations;
     public bool RefreshFails;
     public bool ModelsAsChat;
+    public Func<string,string,(int Status,string Body,string ContentType)?>? Fixture;
     public readonly List<(string Path,string Body)> Requests=[];
     public string[] LastHeaders=[];
     public TaskCompletionSource Disconnected=new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -39,6 +40,7 @@ internal sealed class FakeServer:IAsyncDisposable
             foreach(var h in headers)if(h.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))length=int.Parse(h.Split(':')[1]);
             var body=new byte[length];await stream.ReadExactlyAsync(body,stop.Token);LastBody=Encoding.UTF8.GetString(body);LastPath=path;
             LastHeaders=headers;Requests.Add((path,LastBody));
+            if(Fixture?.Invoke(path,LastBody) is {} fixture){await Reply(stream,fixture.Status,fixture.Body,fixture.ContentType);return;}
             if(Mode=="probe-timeout"){await Task.Delay(Timeout.Infinite,stop.Token);return;}
             if(Mode.StartsWith("reasoning")&&path is "/responses" or "/chat/completions"){
                 bool has=LastBody.Contains("\"reasoning");
@@ -59,6 +61,10 @@ internal sealed class FakeServer:IAsyncDisposable
             if(Mode=="model-error"){await Reply(stream,404,"{\"error\":{\"code\":\"model_not_found\"}}");return;}
             if(path.EndsWith("/models")){await Reply(stream,200,ModelsAsChat?"{\"models\":[{\"slug\":\"fixture-model\",\"display_name\":\"Fixture Model\",\"visibility\":\"list\"},{\"slug\":\"hidden\",\"visibility\":\"hide\"}]}":"{\"data\":[{\"id\":\"fixture-model\",\"display_name\":\"Fixture Model\"}]}");return;}
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n"),stop.Token);
+            if(Mode=="thinking-first"){
+                await stream.WriteAsync(Encoding.UTF8.GetBytes("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"fixture\"}}]}\n\n"),stop.Token);
+                await Task.Delay(350,stop.Token);
+            }
             string first=path.EndsWith("/responses")?"data: {\"type\":\"response.output_text.delta\",\"delta\":\"你\"}\n\n":"data: {\"choices\":[{\"delta\":{\"content\":\"你\"}}]}\n\n";
             if(Mode!="stall")foreach(byte b in Encoding.UTF8.GetBytes("\n: ping\ninvalid-line\n"+first))await stream.WriteAsync(new byte[]{b},stop.Token);
             Connected.TrySetResult();
@@ -70,6 +76,6 @@ internal sealed class FakeServer:IAsyncDisposable
             await stream.WriteAsync(Encoding.UTF8.GetBytes(rest),stop.Token);
         }catch(Exception e) when(e is IOException or OperationCanceledException or SocketException){}
     }
-    async Task Reply(NetworkStream stream,int status,string body){var bytes=Encoding.UTF8.GetBytes(body);await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {status} Result\r\nContent-Type: application/json\r\nContent-Length: {bytes.Length}\r\nConnection: close\r\n\r\n"),stop.Token);await stream.WriteAsync(bytes,stop.Token);}
+    async Task Reply(NetworkStream stream,int status,string body,string contentType="application/json"){var bytes=Encoding.UTF8.GetBytes(body);await stream.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {status} Result\r\nContent-Type: {contentType}\r\nContent-Length: {bytes.Length}\r\nConnection: close\r\n\r\n"),stop.Token);await stream.WriteAsync(bytes,stop.Token);}
     public async ValueTask DisposeAsync(){stop.Cancel();listener.Stop();await loop;Task[] pending;lock(workers)pending=workers.ToArray();await Task.WhenAll(pending);rsa.Dispose();stop.Dispose();}
 }

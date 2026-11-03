@@ -35,7 +35,9 @@ public sealed partial class App
     }
 
     public void ShowFiles(string query,string? focus)=>Present(SecondaryId.Files, Strings.Common_Files,()=>new FilesView(Files,secondaryActions!),v=>((FilesView)v).Open(query,focus));
-    public void ShowTranslate(string? text)=>Present(SecondaryId.Translate, Strings.Common_Translate,()=>{var v=new TranslateView(Ai,secondaryActions!);v.OpenSettings+=(_,_)=>Command("show-settings");return v;},v=>((TranslateView)v).Open(text));
+    /// <summary>打开设置并跳到某个分区（各处「去设置」，issue 11）。</summary>
+    public void OpenSettings(string? section){Command("show-settings");if(section!=null&&settings?.View is SettingsView v)v.ShowSection(section);}
+    public void ShowTranslate(string? text)=>Present(SecondaryId.Translate, Strings.Common_Translate,()=>{var v=new TranslateView(Ai,secondaryActions!);v.OpenSettings+=(_,_)=>OpenSettings("ai");return v;},v=>((TranslateView)v).Open(text));
     public void ShowChat(string? question,IReadOnlyList<AiChatMessage>? history)=>Present(SecondaryId.Chat, Strings.Common_AiChat,()=>new ChatView(Ai,secondaryActions!),v=>((ChatView)v).Open(question,history));
     public void ShowChatDraft(string draft)=>Present(SecondaryId.Chat, Strings.Common_AiChat,()=>new ChatView(Ai,secondaryActions!),v=>((ChatView)v).SetDraft(draft));
 

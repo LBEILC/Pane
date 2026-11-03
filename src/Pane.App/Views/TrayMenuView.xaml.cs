@@ -49,6 +49,11 @@ public sealed partial class TrayMenuView : UserControl, IPanelView
         PauseIcon.Glyph = state.GesturesPaused ? "check" : "gesture";
         PauseIcon.Foreground = state.GesturesPaused ? AccentProto.Background : IconProto.Background;
         Keys(PauseKeys, state.PauseKeys);
+        // 宽度默认 264；热键很长（如 Ctrl + Alt + Shift + W）时按内容放宽，免得名字被挤成「暂…」（issue 11），最宽 400
+        Root.Width = double.NaN;
+        Root.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        width = Math.Clamp(Math.Ceiling(Root.DesiredSize.Width), 264, 400);
+        Root.Width = width;
         SizeRequested?.Invoke(this, PreferredSize);
     }
 
@@ -63,9 +68,11 @@ public sealed partial class TrayMenuView : UserControl, IPanelView
                 if (child.Visibility != Visibility.Visible) continue;
                 h += child switch { Grid => 34, Border => 11, _ => 26 };
             }
-            return new Size(264, h);
+            return new Size(width, h);
         }
     }
+
+    double width = 264;
 
     void Keys(StackPanel target, IReadOnlyList<string> keys)
     {

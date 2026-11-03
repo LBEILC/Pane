@@ -30,6 +30,8 @@ internal static class AiProtocol
     {
         var error=body.ValueKind==JsonValueKind.Object&&body.TryGetProperty("error",out var e)?e:body;
         string? code=error.ValueKind==JsonValueKind.String?error.GetString():String(error,"code")??String(error,"type");
+        if(code==null&&error.ValueKind==JsonValueKind.Object&&error.TryGetProperty("code",out var number)&&number.ValueKind==JsonValueKind.Number)code=number.GetRawText();
+        if(status==402||code is "1113" or "Arrearage" or "AllocationQuota.FreeTierOnly" or "insufficient_balance" or "exceeded_current_quota_error")return new AiQuotaException(Strings.Ai_QuotaExceeded);
         if(code is "insufficient_quota" or "usage_limit_reached" or "subscription_sharing_usage_limit_exceeded" or "subscription_sharing_user_not_eligible")return new AiQuotaException(Strings.Ai_QuotaExceeded);
         if(status==429||code=="rate_limit_exceeded")return new AiQuotaException(Strings.Ai_RateLimited);
         if(status>=500||code is "subscription_sharing_usage_unavailable" or "subscription_sharing_user_unavailable")return new AiNetworkException(Strings.Ai_Unavailable);
@@ -39,21 +41,25 @@ internal static class AiProtocol
         if(status is >=400 and <500)return new AiCredentialException(Strings.Ai_InvalidRequest);
         return new AiNetworkException(Strings.Ai_InvalidResponse);
     }
-    internal static (string? Text,bool Done) Frame(string data,bool chat)
+    internal static (string? Text,bool Done,bool Progress) Frame(string data,bool chat)
     {
-        if(data=="[DONE]"){if(chat)throw new AiNetworkException(Strings.Ai_IncompleteResponse);return(null,true);}
+        if(data=="[DONE]"){if(chat)throw new AiNetworkException(Strings.Ai_IncompleteResponse);return(null,true,false);}
         try {
             using var doc=JsonDocument.Parse(data);var root=doc.RootElement;
             if(root.TryGetProperty("error",out _))throw Error(0,root,chat);
             if(chat){
                 var type=String(root,"type");
-                if(type=="response.completed")return(null,true);
+                if(type=="response.completed")return(null,true,false);
                 if(type is "response.failed" or "error")throw Error(0,root.TryGetProperty("response",out var response)?response:root,true);
                 if(type=="response.incomplete")throw new AiNetworkException(Strings.Ai_IncompleteResponse);
-                return(type=="response.output_text.delta"?String(root,"delta"):null,false);
+                string? text=type=="response.output_text.delta"?String(root,"delta"):null;
+                return(text,false,!string.IsNullOrEmpty(text));
             }
-            if(root.TryGetProperty("choices",out var choices)&&choices.ValueKind==JsonValueKind.Array&&choices.GetArrayLength()>0&&choices[0].TryGetProperty("delta",out var delta))return(String(delta,"content"),false);
-            return(null,false);
+            if(root.TryGetProperty("choices",out var choices)&&choices.ValueKind==JsonValueKind.Array&&choices.GetArrayLength()>0&&choices[0].TryGetProperty("delta",out var delta)){
+                string? text=String(delta,"content");
+                return(text,false,!string.IsNullOrEmpty(text)||!string.IsNullOrEmpty(String(delta,"reasoning_content")));
+            }
+            return(null,false,false);
         }catch(Exception e) when(e is JsonException or InvalidOperationException){throw new AiNetworkException(Strings.Ai_InvalidResponse);}
     }
     internal static byte[] Body(string model,string prompt,bool chat)=>Body(model,[new(AiChatRole.User,prompt)],chat);
@@ -64,7 +70,7 @@ internal static class AiProtocol
         if(param is "reasoning" or "reasoning_effort"||param?.StartsWith("reasoning.",StringComparison.Ordinal)==true)return true;
         var message=(String(error,"message")??(error.ValueKind==JsonValueKind.String?error.GetString():null)??"").ToLowerInvariant();
         return (message.Contains("reasoning")||message.Contains("思考"))&& // 不翻译：外部数据匹配
-            (message.Contains("unsupported")||message.Contains("not support")||message.Contains("unknown")||message.Contains("unrecognized")||message.Contains("not allowed")||message.Contains("不支持")||message.Contains("不支援")||message.Contains("不识别")||message.Contains("不識別")); // 不翻译：外部数据匹配
+            (message.Contains("unsupported")||message.Contains("not support")||message.Contains("unknown")||message.Contains("unrecognized")||message.Contains("not allowed")||message.Contains("invalid")||message.Contains("不支持")||message.Contains("不支援")||message.Contains("不识别")||message.Contains("不識別")||message.Contains("非法")); // 不翻译：外部数据匹配
     }
     internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,bool chat,AiReasoningEffort reasoning=AiReasoningEffort.Default)
     {

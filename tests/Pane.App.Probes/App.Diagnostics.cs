@@ -65,6 +65,7 @@ public sealed partial class App
         finally{WakeFrames();}
     }
     bool DiagnosticCommand(){
+        if(Take("hotkey-probe",out _)){_ = HotkeyProbe();return true;}
         if(Take("localization-probe",out _)){File.WriteAllLines(output+".localization-result",new[]{UiLanguage}.Concat(new TrayMenuView().LocalizationProbe()));return true;}
         if(Take("frames-probe",out _)){_ = FramesProbe();return true;}
         if(Take("restart",out _)){Restart();return true;}
@@ -86,6 +87,40 @@ public sealed partial class App
         if(Take("service-status",out _)){File.WriteAllText(output+".service-status-result",$"hotkeys={shell?.RegisteredCount??0};pause={gestureService?.RegisteredHotkeyCount??0};state={gestureService?.State};hookError={gestureService?.Statistics().Error}");return true;}
         if(Take("settings-gc",out _)){GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();File.WriteAllText(output+".settings-gc-result",$"views={retiredSettings.Count(w=>w.IsAlive)};total={retiredSettings.Count};managed={GC.GetTotalMemory(false)};hosts={retiredHosts.Count(w=>w.IsAlive)};unloaded={settingsUnloaded};hotkeySubscribers={HotkeyOccupied?.GetInvocationList().Count(d=>d.Target is SettingsView)??0}");File.WriteAllLines(output+".settings-children-result",retiredChildren.GroupBy(v=>v.Type).Select(g=>$"{g.Key};alive={g.Count(v=>v.Reference.IsAlive)};observations={g.Count()}"));return true;}
         return false;
+    }
+    async Task HotkeyProbe(){
+        try{
+            if(!demo||shell!=null||clipboardSource!=null)throw new InvalidOperationException("热键探针只能在无全局服务的演示宿主运行");
+            int checks=0;
+            void Check(bool ok,string message){if(!ok)throw new InvalidOperationException(message);checks++;}
+            async Task Settled(Pane.Hosting.GlassPanel panel,bool shown){
+                long end=Environment.TickCount64+5000;
+                while(!panel.Settled){if(Environment.TickCount64>end)throw new TimeoutException("动画未完成");await Task.Delay(10);}
+                Check(panel.Shown==shown,"动画最终目标错误");
+                Check(panel.WindowDiagnostics().Contains(shown?"opacity=1;":"opacity=0;"),"动画停在半透明");
+            }
+            foreach(nuint id in new nuint[]{1,2}){
+                string command=Pane.Hosting.ShellHotkeyBindings.Command(id)!;
+                var panel=panels[id==1?"launcher":"clipboard"];
+                Command(command,0);await Settled(panel,true);
+                Command(command,panel.Input);await Settled(panel,false);
+                Command(command,0);await Settled(panel,true);
+                Command(command,0);Check(panel.Shown,"后台面板应被拉回前台");await Settled(panel,true);
+                Command(id==1?"show-launcher":"show-clipboard",panel.Input);Check(panel.Shown,"普通显示不能收起");
+                // 模拟 RegisterHotKey 的 MOD_NOREPEAT：一次按下只投递第一条消息。
+                Check((Pane.Hosting.ShellHotkeyBindings.NoRepeat&0x4000)!=0,"必须注册 MOD_NOREPEAT");
+                bool held=false;int delivered=0;
+                for(int repeat=0;repeat<10;repeat++){if(held)continue;held=true;delivered++;Command(command,panel.Input);}
+                Check(delivered==1&&!panel.Shown,"按住只收起一次");await Settled(panel,false);
+                held=false;
+                Command(command,0);await Task.Delay(20);Command(command,panel.Input);await Task.Delay(20);
+                Command(command,panel.Input);await Settled(panel,true);
+                Command(command,panel.Input);await Task.Delay(20);Command(command,panel.Input);await Task.Delay(20);
+                Command(command,panel.Input);await Settled(panel,false);
+            }
+            Check(Pane.Hosting.ShellHotkeyBindings.Command(3)=="hotkey-clipboard"&&Pane.Hosting.ShellHotkeyBindings.Command(99)==null,"热键编号映射");
+            File.WriteAllText(output+".hotkey-result",$"PASS hotkey assertions={checks}; realHotkeys=0; input=0; clipboard=0; finalOpacity=0");
+        }catch(Exception e){File.WriteAllText(output+".error",e.ToString());}
     }
     async Task FontsProbe(){
         var watch=System.Diagnostics.Stopwatch.StartNew();var fonts=await Fonts!.GetFamiliesAsync(default);double first=watch.Elapsed.TotalMilliseconds;watch.Restart();await Fonts.GetFamiliesAsync(default);double cached=watch.Elapsed.TotalMilliseconds;

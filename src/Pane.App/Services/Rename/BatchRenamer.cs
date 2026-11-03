@@ -6,6 +6,38 @@ namespace Pane.Services.Rename;
 
 internal sealed class BatchRenamer : IBatchRenamer
 {
+    [System.Runtime.InteropServices.DllImport("shlwapi.dll",CharSet=System.Runtime.InteropServices.CharSet.Unicode)]
+    static extern int StrCmpLogicalW(string left,string right);
+    public Task<RenameFolderListing> ListFolderAsync(string folder,CancellationToken cancellationToken)=>Task.Run(()=>{
+        cancellationToken.ThrowIfCancellationRequested();
+        string root=Path.GetFullPath(folder);
+        // 显式检查根目录，不能像无权限子目录一样吞掉错误。
+        var attributes=File.GetAttributes(root);
+        if(!attributes.HasFlag(FileAttributes.Directory))throw new IOException(Pane.Localization.Strings.Rename_NotFolder);
+        if(attributes.HasFlag(FileAttributes.ReparsePoint))throw new IOException(Pane.Localization.Strings.Rename_LinkedFolder);
+        var direct=new List<string>();var nested=new List<string>();
+        var pending=new Stack<string>();pending.Push(root);bool truncated=false;
+        var options=new EnumerationOptions{RecurseSubdirectories=false,IgnoreInaccessible=false,AttributesToSkip=FileAttributes.Hidden|FileAttributes.System|FileAttributes.ReparsePoint};
+        while(pending.TryPop(out string? current)){
+            cancellationToken.ThrowIfCancellationRequested();
+            var children=new List<string>();
+            try{
+                foreach(var entry in new DirectoryInfo(current).EnumerateFileSystemInfos("*",options)){
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if(entry.Attributes.HasFlag(FileAttributes.Directory)){children.Add(entry.FullName);continue;}
+                    if(direct.Count+nested.Count==IBatchRenamer.MaxFolderFiles){truncated=true;break;}
+                    (current==root?direct:nested).Add(entry.FullName);
+                }
+            }catch(UnauthorizedAccessException) when(current!=root){}
+            if(truncated)break;
+            children.Sort(StrCmpLogicalW);
+            for(int i=children.Count-1;i>=0;i--)pending.Push(children[i]);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        direct.Sort((a,b)=>StrCmpLogicalW(Path.GetFileName(a),Path.GetFileName(b)));
+        nested.Sort((a,b)=>{int parent=StrCmpLogicalW(Path.GetDirectoryName(a)!,Path.GetDirectoryName(b)!);return parent!=0?parent:StrCmpLogicalW(Path.GetFileName(a),Path.GetFileName(b));});
+        return new RenameFolderListing(direct,nested,truncated);
+    },cancellationToken);
     sealed record Metadata(bool Exists,bool Directory,DateTime Created,DateTime Modified);
     sealed record Move(string Before,string After,bool RestoresOriginal=false);
     readonly SemaphoreSlim gate=new(1);

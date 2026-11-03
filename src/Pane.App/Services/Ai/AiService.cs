@@ -112,7 +112,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             if(response.IsSuccessStatusCode)return response;
             using(response){if(chat&&response.StatusCode==HttpStatusCode.Unauthorized&&!refreshed){refreshed=true;await Access(settings,ct,true);continue;}
                 var bodyError=await Json(response,ct);
-                if(response.StatusCode==HttpStatusCode.BadRequest&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
+                if((int)response.StatusCode is 400 or 422&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
                 if(chat&&bodyError.ValueKind==JsonValueKind.Object&&bodyError.TryGetProperty("error",out var detail)&&AiProtocol.String(detail,"code")=="subscription_sharing_user_not_eligible"){
                     lock(gate)SaveLogin(login with{PlanDenied=true});Notify();
                 }
@@ -128,6 +128,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         return Stream(settings,[new(AiChatRole.User,AiProtocol.Prompt(settings,request))],request.ActionId=="translate"?settings.TranslationModel:null,cancellationToken);
     }
     public IAsyncEnumerable<string> ChatAsync(IReadOnlyList<AiChatMessage> messages,string? modelId,CancellationToken cancellationToken)
+        // TODO(design): Kimi K3 系列要求回传完整 assistant（含 reasoning_content）；当前契约只有 Text，需设计扩展消息与流式结果，不能声称多轮完全兼容。
         =>Stream(store.Current.Ai,messages.ToArray(),modelId,cancellationToken);
     async IAsyncEnumerable<string> Stream(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,[EnumeratorCancellation] CancellationToken cancellationToken)
     {
@@ -165,7 +166,9 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             if(line==null)throw new AiNetworkException(Strings.Ai_StreamIncomplete);
             if(line.Length==0){if(frame.Length==0)continue;var result=AiProtocol.Frame(frame.ToString().TrimEnd('\n'),chat);frame.Clear();
                 if(result.Done)yield break;
-                if(!string.IsNullOrEmpty(result.Text)){if(firstText){first.CancelAfter(Timeout.InfiniteTimeSpan);firstText=false;}yield return result.Text;}
+                // 思考增量也表示已收到首个 token；仍受总超时限制，不把思考内容输出给界面。
+                if(firstText&&result.Progress){first.CancelAfter(Timeout.InfiniteTimeSpan);firstText=false;}
+                if(!string.IsNullOrEmpty(result.Text))yield return result.Text;
             }else if(line.StartsWith("data:",StringComparison.Ordinal)){frame.Append(line.AsSpan(5).TrimStart());frame.Append('\n');if(frame.Length>4*1024*1024)throw new AiNetworkException(Strings.Ai_ResponseTooLarge);}
         }
     }

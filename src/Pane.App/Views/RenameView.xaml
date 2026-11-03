@@ -56,11 +56,13 @@
             <RowDefinition Height="54"/>
         </Grid.RowDefinitions>
 
-        <!-- 顶栏：类型标签、文件在哪、预设、添加文件、总在最前、关闭。空白处可拖动窗口（宿主处理） -->
+        <!-- 顶栏：类型标签、文件在哪、添加文件夹后的提示（子文件夹 / 空 / 截断）、预设、添加文件、添加文件夹、总在最前、关闭。空白处可拖动窗口（宿主处理） -->
         <Grid x:Name="Head" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -75,7 +77,11 @@
             </Border>
             <TextBlock x:Name="WhereText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
-            <Button x:Name="PresetButton" Grid.Column="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Padding="10,0,8,0" Click="OnPresets"
+            <StackPanel x:Name="FolderNote" Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock x:Name="FolderNoteText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                <Button x:Name="NestedButton" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Padding="10,0,10,0" Click="OnAddNested"/>
+            </StackPanel>
+            <Button x:Name="PresetButton" Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Padding="10,0,8,0" Click="OnPresets"
                     ToolTipService.ToolTip="{x:Bind loc:Strings.Rename_PresetsHint}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="bookmark" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
@@ -85,13 +91,16 @@
                     </c:PaneIcon>
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnAddFiles" ToolTipService.ToolTip="{x:Bind loc:Strings.Rename_AddFilesHint}">
+            <Button Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnAddFiles" ToolTipService.ToolTip="{x:Bind loc:Strings.Rename_AddFilesHint}">
                 <c:PaneIcon Glyph="plus" Width="16" Height="16"/>
             </Button>
-            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
+            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnAddFolder" ToolTipService.ToolTip="{x:Bind loc:Strings.Rename_AddFolderHint}">
+                <c:PaneIcon Glyph="folder-plus" Width="16" Height="16"/>
+            </Button>
+            <Button x:Name="PinButton" Grid.Column="6" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
+            <Button Grid.Column="7" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>

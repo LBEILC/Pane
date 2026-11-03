@@ -2,7 +2,7 @@
 <!--
   文件窗口（二级窗口，设计负责人）。照原型 prototype/launcher.html #fw（docs/design.md「文件窗口」）。
   默认 880 × 580，可改大小（最小 640 × 420）。顶栏 56；左侧分类 116；中间结果（行高 50）；右侧预览 268（可关）；底栏 38。
-  失去焦点不关；Esc 只清空输入；关闭按钮 / Ctrl+W / Alt+F4 关。
+  失去焦点不关；Esc 有输入时清空、输入为空时关；关闭按钮 / Ctrl+W / Alt+F4 关。
 -->
 <UserControl
     x:Class="Pane.Views.FilesView"

@@ -23,6 +23,7 @@
   <data name="Ai_Card_LoginAgain" xml:space="preserve"><value>重新登入</value></data>
   <data name="Ai_Card_LoginExpired" xml:space="preserve"><value>ChatGPT 登入已過期，請重新登入。</value></data>
   <data name="Ai_Card_NotConfigured" xml:space="preserve"><value>還沒設定 AI 服務。</value></data>
+  <data name="Ai_Card_Waiting" xml:space="preserve"><value>正在等回覆</value></data>
   <data name="Ai_Card_QuotaExceeded" xml:space="preserve"><value>這個帳號的額度用完了。</value></data>
   <data name="Ai_Chat_ChangeModel" xml:space="preserve"><value>換模型（只對這次對話）</value></data>
   <data name="Ai_Chat_Empty" xml:space="preserve"><value>新的對話
@@ -363,7 +364,7 @@
   <data name="Launcher_System_DeskCpl" xml:space="preserve"><value>顯示控制台</value></data>
   <data name="Launcher_System_Developers" xml:space="preserve"><value>開發者選項</value></data>
   <data name="Launcher_System_DevicestypingHwkbtextsuggestions" xml:space="preserve"><value>硬體鍵盤文字建議</value></data>
-  <data name="Launcher_System_DevmgmtMsc" xml:space="preserve"><value>裝置管理員</value></data>
+  <data name="Launcher_System_DevmgmtMsc" xml:space="preserve"><value>裝置管理主控台</value></data>
   <data name="Launcher_System_DfrguiExe" xml:space="preserve"><value>最佳化磁碟機</value></data>
   <data name="Launcher_System_DiskmgmtMsc" xml:space="preserve"><value>磁碟管理</value></data>
   <data name="Launcher_System_Disksandvolumes" xml:space="preserve"><value>磁碟和磁碟區</value></data>
@@ -525,6 +526,13 @@
   <data name="Launcher_WebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
   <data name="Rename_AddFiles" xml:space="preserve"><value>新增檔案</value></data>
   <data name="Rename_AddFilesHint" xml:space="preserve"><value>新增檔案…</value></data>
+  <data name="Rename_AddFolder" xml:space="preserve"><value>新增資料夾</value></data>
+  <data name="Rename_AddFolderHint" xml:space="preserve"><value>新增資料夾裡的檔案…</value></data>
+  <data name="Rename_AddNested" xml:space="preserve"><value>也加入子資料夾裡的 {0} 個</value></data>
+  <data name="Rename_FolderEmpty" xml:space="preserve"><value>「{0}」裡沒有可以改名的檔案</value></data>
+  <data name="Rename_NotFolder" xml:space="preserve"><value>選的不是資料夾</value></data>
+  <data name="Rename_LinkedFolder" xml:space="preserve"><value>這是一個連結資料夾，請選它指向的那個資料夾</value></data>
+  <data name="Rename_FolderTruncated" xml:space="preserve"><value>一次最多加 {0} 個，只加了前面的</value></data>
   <data name="Rename_AddRule" xml:space="preserve"><value>新增規則</value></data>
   <data name="Rename_AddSelected" xml:space="preserve"><value>加進來</value></data>
   <data name="Rename_AfterCharacter" xml:space="preserve"><value>個字後面</value></data>
@@ -689,6 +697,11 @@
   <data name="Settings_Ai_EnableDescription" xml:space="preserve"><value>不用 AI 時可以關掉</value></data>
   <data name="Settings_Ai_Endpoint" xml:space="preserve"><value>介面位址</value></data>
   <data name="Settings_Ai_EndpointDescription" xml:space="preserve"><value>相容 OpenAI 介面格式的服務</value></data>
+  <data name="Settings_Ai_Vendor" xml:space="preserve"><value>服務商</value></data>
+  <data name="Settings_Ai_VendorDescription" xml:space="preserve"><value>位址和模型已經填好，只需要貼上 key；換了服務商記得換 key</value></data>
+  <data name="Settings_Ai_CustomVendor" xml:space="preserve"><value>自訂</value></data>
+  <data name="Settings_Ai_CustomVendorDescription" xml:space="preserve"><value>點一家服務商，位址和模型自動填好；也可以在下面自己填位址</value></data>
+  <data name="Settings_Ai_GetKey" xml:space="preserve"><value>取得 key</value></data>
   <data name="Settings_Ai_EndpointInvalid" xml:space="preserve"><value>介面位址要以 http:// 或 https:// 開頭</value></data>
   <data name="Settings_Ai_FetchModels" xml:space="preserve"><value>拉取模型列表</value></data>
   <data name="Settings_Ai_FirstModelDefault" xml:space="preserve"><value>預設（帳號的第一個模型）</value></data>
@@ -1061,6 +1074,11 @@
   <data name="Settings_Launcher_EngineSchemeRequired" xml:space="preserve"><value>位址要以 http:// 或 https:// 開頭</value></data>
   <data name="Settings_Launcher_Favorites" xml:space="preserve"><value>常用檔案和資料夾</value></data>
   <data name="Settings_Launcher_FavoritesDescription" xml:space="preserve"><value>常用的檔案和資料夾在啟動器裡排在普通檔案前面，也能用拼音搜到。</value></data>
+  <data name="Settings_Launcher_DirectKeywords" xml:space="preserve"><value>關鍵字直達</value></data>
+  <data name="Settings_Launcher_DirectKeywordsDescription" xml:space="preserve"><value>在啟動器裡輸入「關鍵字 空格 內容」，按 Enter 直接執行，比如「fy hello」直接翻譯。多個關鍵字用空格隔開，留空就不用；和網頁搜尋的關鍵字重複時，網頁搜尋優先。</value></data>
+  <data name="Settings_Launcher_KeywordNone" xml:space="preserve"><value>不用</value></data>
+  <data name="Settings_Launcher_KeywordInvalid" xml:space="preserve"><value>關鍵字不能以 &gt; 開頭（&gt; 開頭是終端機命令）</value></data>
+  <data name="Settings_Launcher_KeywordDuplicate" xml:space="preserve"><value>「{0}」已經用在別的地方了</value></data>
   <data name="Settings_Launcher_FileSearch" xml:space="preserve"><value>檔案搜尋</value></data>
   <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>檔名搜尋依賴 Everything；Pane 不自建全盤索引。啟動器列前 3 個，其餘在檔案視窗裡看</value></data>
   <data name="Settings_Launcher_HideOnBlur" xml:space="preserve"><value>失去焦點時隱藏</value></data>
@@ -1137,7 +1155,7 @@
   <data name="Settings_Theme_Light" xml:space="preserve"><value>淺色</value></data>
   <data name="Settings_Title" xml:space="preserve"><value>Pane 設定</value></data>
   <data name="Settings_UiLanguage" xml:space="preserve"><value>介面語言</value></data>
-  <data name="Settings_UiLanguage_Description" xml:space="preserve"><value>繁體翻譯還在進行，跟隨系統時暫時都顯示簡體</value></data>
+  <data name="Settings_UiLanguage_Description" xml:space="preserve"><value>跟隨系統時，繁體系統顯示繁體，其餘顯示簡體</value></data>
   <data name="Settings_WinV_Active" xml:space="preserve"><value>已生效</value></data>
   <data name="Settings_WinV_DisableSystemHistory" xml:space="preserve"><value>同時關閉 Windows 內建的剪貼簿歷史</value></data>
   <data name="Settings_WinV_DisableSystemHistoryDescription" xml:space="preserve"><value>避免同一份內容在兩個地方各存一份；關閉替換時一起還原</value></data>

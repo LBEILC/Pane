@@ -157,6 +157,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
         Render(resetScroll: changed);
     }
 
+    /// <summary>打开到某个分区（各处「去设置」用，issue 11）；认不出的 Id 不动。</summary>
+    public void ShowSection(string id)
+    {
+        if (sections.Find(s => s.Id == id) is { } s) Show(s);
+    }
+
     void Render() => Render(false);
 
     void Render(bool resetScroll)
@@ -456,7 +462,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Row("Everything", Strings.Settings_Launcher_FileSearchDescription, Status(ready, status), check));
         RenderActionRow(l);
 
-        var favorites = l.Favorites.Select(f => ListRow(f.IsFolder ? "folder" : "doc", FavoriteTitle(f.Path), f.Path, false,
+        // 关键字直达（052，issue 11 / 12）：「关键字 空格 内容」直接翻译、问 AI、进文件窗口；AI 关着时只列搜文件
+        var direct = new List<FrameworkElement>();
+        if (s.Ai.Enabled)
+        {
+            direct.Add(KeywordRow(Strings.Common_Translate, "translate", l.TranslateKeywords));
+            direct.Add(KeywordRow(Strings.Launcher_AskAi, "ask", l.AskKeywords));
+        }
+        direct.Add(KeywordRow(Strings.Launcher_SearchFiles, "files", l.FilesKeywords));
+        if (keywordError != null) direct.Add(Row(Strings.Common_NotSaved, null, Status(false, keywordError)));
+        Group(Strings.Settings_Launcher_DirectKeywords, direct.ToArray(), Strings.Settings_Launcher_DirectKeywordsDescription);
+
+        var favorites =l.Favorites.Select(f => ListRow(f.IsFolder ? "folder" : "doc", FavoriteTitle(f.Path), f.Path, false,
             IconButton("close", Strings.Common_Remove, () => { SaveLauncher(x => x with { Favorites = x.Favorites.Where(e => e != f).ToArray() }); Render(); }))).ToList();
         favorites.Add(AddRow(
             Button(Strings.Settings_Launcher_AddFile, "plus", async () => { if (await PickFavorite(false) is { } e) AddFavorite(e); }),
@@ -495,6 +512,31 @@ public sealed partial class SettingsView : UserControl, IPanelView
             Strings.Settings_Launcher_TerminalDescription);
     }
     bool terminalCleared;
+
+    // 关键字直达的一行：多个关键字用空格隔开，留空 = 不用。CommitField 的错误本来写给 AI 分区，这里自己记
+    string? keywordError;
+    FrameworkElement KeywordRow(string label, string which, string[] keys) =>
+        Row(label, null, CommitField(Strings.Settings_Launcher_KeywordNone, 180, string.Join(" ", keys), v => { keywordError = SaveKeywords(which, v); Later(0); return null; }));
+
+    string? SaveKeywords(string which, string text)
+    {
+        var keys = text.Split([' ', '　'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (keys.Any(k => k.StartsWith('>'))) return Strings.Settings_Launcher_KeywordInvalid;   // > 开头是终端命令
+        var l = app.Store.Current.Launcher;
+        var others = which switch
+        {
+            "translate" => l.AskKeywords.Concat(l.FilesKeywords),
+            "ask" => l.TranslateKeywords.Concat(l.FilesKeywords),
+            _ => l.TranslateKeywords.Concat(l.AskKeywords),
+        };
+        if (keys.FirstOrDefault(k => others.Contains(k, StringComparer.OrdinalIgnoreCase)) is { } dup) return string.Format(Strings.Settings_Launcher_KeywordDuplicate, (object?)(dup));
+        return Try(() => SaveLauncher(x => which switch
+        {
+            "translate" => x with { TranslateKeywords = keys },
+            "ask" => x with { AskKeywords = keys },
+            _ => x with { FilesKeywords = keys },
+        }));
+    }
 
     void SaveLauncher(Func<LauncherSettings, LauncherSettings> change) =>
         app.Store.Save(app.Store.Current with { Launcher = change(app.Store.Current.Launcher) });
@@ -1234,6 +1276,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         };
         if (api)
         {
+            rows.Add(VendorRow(a));
             rows.Add(Row(Strings.Settings_Ai_Endpoint, Strings.Settings_Ai_EndpointDescription, CommitField("https://…/v1", 300, a.ApiBaseUrl, v =>
                 Uri.TryCreate(v, UriKind.Absolute, out var u) && u.Scheme is "http" or "https"
                     ? Try(() => SaveAi(x => x with { ApiBaseUrl = v })) : Strings.Settings_Ai_EndpointInvalid)));
@@ -1356,6 +1399,43 @@ public sealed partial class SettingsView : UserControl, IPanelView
         signIn?.Dispose();
         signIn = new CancellationTokenSource();
         await RunAi("signin", async _ => { await setup.SignInAsync(signIn.Token); return null; });
+    }
+
+    // 服务商（052，issue 11）：一排可点的标签，点了就把地址、模型、翻译模型换成那一家的，只剩粘贴 key。
+    // 地址对不上任何一家时「自定义」亮着（自定义不可点：改下面的地址就是自定义）。认出来的给「获取 key」
+    FrameworkElement VendorRow(AiSettings a)
+    {
+        var matched = AiPresets.Match(a.ApiBaseUrl);
+        var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6 };
+        Border VendorChip(string text, bool on)
+        {
+            var chip = Chip(text);
+            chip.Height = PaneTokens.ControlSm;
+            chip.CornerRadius = new CornerRadius(13);
+            if (on) chip.BorderBrush = Accent();
+            chips.Children.Add(chip);
+            return chip;
+        }
+        foreach (var p in AiPresets.All)
+        {
+            var chip = VendorChip(p.Name, p == matched);
+            if (p == matched) continue;
+            chip.Tapped += (_, _) =>
+            {
+                aiFieldError = Try(() => SaveAi(x => x with { ApiBaseUrl = p.BaseUrl, ApiModel = p.Model, TranslationModel = p.TranslationModel }));
+                aiModels = null; aiResult = null;
+                Later(0);
+            };
+        }
+        VendorChip(Strings.Settings_Ai_CustomVendor, matched == null);
+        var row = matched is { } m
+            ? Row(Strings.Settings_Ai_Vendor, Strings.Settings_Ai_VendorDescription, Button(Strings.Settings_Ai_GetKey, "external", () => OpenUrl(m.KeyUrl)))
+            : Row(Strings.Settings_Ai_Vendor, Strings.Settings_Ai_CustomVendorDescription);
+        var stack = new StackPanel();
+        stack.Children.Add(row);
+        chips.Margin = new Thickness(14, 0, 14, 10);
+        stack.Children.Add(chips);
+        return stack;
     }
 
     // 模型：可以手填；拉取列表后，下面按输入过滤出最多 12 个可点的候选
