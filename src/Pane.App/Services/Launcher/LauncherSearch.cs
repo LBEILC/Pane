@@ -81,6 +81,12 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     }
     void Publish(PersistedIndex value){
         lock(sync){
+            var settings=AppSettingsMigration.Apply(store.Current,value.Metrics.Aliases);
+            if(!ReferenceEquals(settings,store.Current)){
+                // 子进程已用相同别名处理图标；保存迁移结果不再触发一次等价重建。
+                var previousIcons=lastIcons;lastIcons=Pane.Services.Icons.IconProcessing.SettingsKey(settings.Icons);
+                try{store.Save(settings);}catch{lastIcons=previousIcons;throw;}
+            }
             var migrated=new Dictionary<string,AppUse>(uses);
             if(AppDeduplication.MergeUsage(migrated,value.Metrics.Aliases)){
                 Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");

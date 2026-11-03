@@ -30,6 +30,7 @@ internal static class IconProcessing
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes($"mask:{version}:{mode}:{dark}:{fingerprint}")));
     }
     public static PersistedIndex Apply(PersistedIndex index,string directory,IconSettings settings,CancellationToken token,Action<IconMeasurement>? measured=null){
+        settings=AppSettingsMigration.Icons(settings,index.Metrics.Aliases);
         var cache=Path.Combine(directory,"masked-icons");Directory.CreateDirectory(cache);var rows=new List<IndexedApp>();var measurements=new List<IconMeasurement>();
         foreach(var app in index.Snapshot.Apps){
             token.ThrowIfCancellationRequested();var watch=Stopwatch.StartNew();string? source=app.Icon,dark=null,light=null,error=null;string kind="Unavailable";bool hit=false;

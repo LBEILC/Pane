@@ -68,7 +68,7 @@ static partial class Program
         var migratedIndex=processed with{Metrics=processed.Metrics with{Aliases=new(){["old-app"]="app:1"}}};
         using(var search=new LauncherSearch(migrationStore,new CachedIconIndex(migratedIndex),new FakeFiles(),new FakeExecutor())){
             await search.Indexing;var home=await search.SearchAsync("",default);
-            Check(home.Items.Count(i=>i.Group==Pane.Contracts.LauncherGroups.Pinned&&i.Id=="app:1")==1&&migrationStore.Current.Launcher.PinnedApps[0]=="old-app","旧固定 Id 解析到保留应用且不改写设置");
+            Check(home.Items.Count(i=>i.Group==Pane.Contracts.LauncherGroups.Pinned&&i.Id=="app:1")==1&&migrationStore.Current.Launcher.PinnedApps.SequenceEqual(["app:1"]),"旧固定 Id 迁到保留应用并去重持久化");
             var stored=JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(migrationDir,"launcher-usage.json")),LauncherJson.Default.DictionaryStringAppUse)!;
             Check(stored.Count==1&&stored["app:1"].Count==10,"加载与重建发布后迁移次数只持久化一次");
         }
@@ -76,7 +76,7 @@ static partial class Program
     }
     static void DeduplicationTests(){
         var a=new CatalogEntry("任务计划程序","",@"C:\Windows\system32\taskschd.msc","/s","shell:a",0,"old-a","",0);
-        var b=a with{Name="Task Scheduler",Target=@"c:\WINDOWS\system32\taskschd.msc",Args="/S",Source=1,LegacyId="old-b"};
+        var b=a with{Name="Task Scheduler",Target=@"c:\WINDOWS\system32\taskschd.msc",Source=1,LegacyId="old-b"};
         var groups=AppDeduplication.Groups([b,a]);Check(groups.Length==1&&groups[0][0].Name=="任务计划程序","同目标不同名合并并优先 Shell 本地化名");
         Check(AppDeduplication.Groups([a,b with{Name=a.Name,Args="/other"}]).Length==2,"同名不同参数保留");
         var shared=a with{LegacyId="shared"};var variants=AppDeduplication.Resolve([shared,shared with{Args="/other"},b, b with{Args="/other",LegacyId="other-link"}]);

@@ -76,6 +76,16 @@ API int PaneLauncherResolve(const wchar_t* parsing,wchar_t* target,wchar_t* args
    buffer[0]=0;link->GetArguments(buffer,32768);a=buffer;buffer[0]=0;link->GetIconLocation(buffer,32768,&index);location=buffer;
   }
  }else if(_wcsicmp(ext.c_str(),L".url")==0){wchar_t buffer[32768]{};GetPrivateProfileStringW(L"InternetShortcut",L"IconFile",L"",buffer,32768,shortcut.c_str());location=buffer;index=GetPrivateProfileIntW(L"InternetShortcut",L"IconIndex",0,shortcut.c_str());}
+ // 部分桌面注册没有 BestShortcut，但直接提供完整可执行文件位置。
+ // 相对路径可能依赖包或工作目录，不能据此认定两个应用相同。
+ if(t.empty()){
+  PROPERTYKEY executableKey{};
+  if(SUCCEEDED(PSGetPropertyKeyFromName(L"System.AppUserModel.Exe",&executableKey))){
+   auto executable=property(item.Get(),executableKey);wchar_t full[32768]{};
+   DWORD length=ExpandEnvironmentStringsW(executable.c_str(),full,32768);
+   if(length>0&&length<=32768&&std::filesystem::path(full).is_absolute()&&_wcsicmp(std::filesystem::path(full).extension().c_str(),L".exe")==0)t=full;
+  }
+ }
  if(location.empty()){
   PIDLIST_ABSOLUTE pidl=nullptr;if(SUCCEEDED(SHParseDisplayName(parsing,nullptr,&pidl,0,nullptr))){ComPtr<IShellFolder> parent;PCUITEMID_CHILD child=nullptr;
    if(SUCCEEDED(SHBindToParent(pidl,IID_PPV_ARGS(&parent),&child))){ComPtr<IExtractIconW> extract;if(SUCCEEDED(parent->GetUIObjectOf(nullptr,1,&child,IID_IExtractIconW,nullptr,&extract))){wchar_t buffer[32768]{};UINT flags=0;int resourceIndex=0;if(SUCCEEDED(extract->GetIconLocation(0,buffer,32768,&resourceIndex,&flags))&&!(flags&GIL_NOTFILENAME)){location=buffer;index=resourceIndex;}}}

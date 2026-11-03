@@ -92,7 +92,7 @@ public sealed partial class App : Application
             if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new(Strings.Common_Clipboard,clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
             if(startupLevel>=3){var super=new SuperView(Ai,actions);superView=super;secondaryActions??=actions;WireSuper(super);panels.Add("super",new(Strings.Common_SuperPanel,super,super,Glass){Placement=PanelPlacement.Pointer});}
             foreach(var panel in panels.Values){WatchFrames(panel);panel.Prepare();}
-            if(startupLevel>=4){gestures=new GestureOverlay(Glass);gestures.TickRequested+=WakeFrames;}/* 设计：手势轨迹与提示框，手势服务的接线由工程做 */
+            if(startupLevel>=4){gestures=new GestureOverlay(Glass);gestures.TickRequested+=WakeFrames;ApplyGestureDisplay();}/* 设计：手势轨迹与提示框，手势服务的接线由工程做。手势服务在上面先启动，那时提示框还没建、显示设置没应用上（issue 16），建好后再应用一次 */
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
                 var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
