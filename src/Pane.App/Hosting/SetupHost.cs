@@ -54,6 +54,8 @@ internal sealed class SetupHost : IDisposable
             Dispose(); app.Exit();
         };
         panel.Prepare(); panel.Show();
+        UninstallChain.Signal(SetupEntry.ShownEvent);
+        UninstallChain.Log("window-shown");
         if (SetupEntry.Uninstall)
         {
             bool foreground = UninstallChain.SetForegroundWindow(panel.Input);

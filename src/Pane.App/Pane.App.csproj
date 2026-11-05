@@ -34,4 +34,5 @@
   </Target>
   <ItemGroup><Compile Include="../../tests/Pane.App.Probes/PanelKeysProbe.cs" Link="Diagnostics/PanelKeysProbe.cs" /></ItemGroup>
   <Import Project="Localization/Localization.targets" />
+  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/SetupFailureProbe.cs" Link="Diagnostics/SetupFailureProbe.cs" /></ItemGroup>
 </Project>

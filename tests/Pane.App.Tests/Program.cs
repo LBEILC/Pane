@@ -13,6 +13,11 @@ static class Program
   if(args is ["--fonts"]){try{await FontTests.Run();}catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}return;}
   if(args is ["--update-e2e-before",var beforeOld,var beforeNew,var beforeEvidence]){await UpdateEndToEnd.Run(beforeOld,beforeNew,beforeEvidence,true);return;}
   if(args is ["--update-e2e",var oldPackage,var newPackage,var evidence]){await UpdateEndToEnd.Run(oldPackage,newPackage,evidence);return;}
+  if(args is ["--setup-only"]){
+   var fixture=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Alt,32)),new(new(KeyModifiers.Ctrl,86)));
+   try {int total=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await SetupFailureTests.Run(fixture);
+   Console.WriteLine($"PASS setup suites assertions={total}");}catch(Exception error){Console.WriteLine(error);Environment.ExitCode=1;}return;
+  }
   foreach(var failure in new[]{SelectionFailure.None,SelectionFailure.Empty,SelectionFailure.Unsupported,SelectionFailure.Elevated,SelectionFailure.Timeout}){
    var fake=new Fake{Failure=failure};var reader=new SelectionReader(fake,()=>false);var result=await reader.ReadAsync(default);Check(result.Failure==failure,"direct failure "+failure);Check(fake.Calls.SequenceEqual(["direct"]),"no clipboard");
   }

@@ -83,6 +83,10 @@ public sealed partial class SetupView : UserControl, IPanelView
             FailedTitle.Text = update ? Strings.Setup_UpdateFailed : Strings.Setup_InstallFailed;
             ErrorText.Text = ex.Message;
             KeptText.Text = update ? Strings.Setup_ExistingIntact : Strings.Setup_NoPartialFiles;
+            // 出错的步骤和原因（061）：服务给了才显示
+            var detail = ex.Step is { Length: > 0 } step ? string.Format(Strings.Setup_FailureDetail, step, ex.Reason ?? "", Services.Setup.UninstallChain.LogPath) : "";
+            DetailText.Text = detail;
+            DetailText.Visibility = detail.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
             SetupArt.Show(this, Failed);
         }
         finally

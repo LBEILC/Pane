@@ -12,6 +12,7 @@ internal static class SetupEntry
     public static SetupPaths Paths { get; private set; } = null!;
     public static string? IsolatedRoot { get; private set; }
     public static string? ReadyEvent { get; private set; }
+    public static string? ShownEvent { get; private set; }
     public static int LauncherPid { get; private set; }
     public static bool IsolatedWindow => IsolatedRoot != null && File.Exists(Path.Combine(IsolatedRoot, "show-window.test"));
     /// <summary>设计预览（--setup-preview / --uninstall-preview &lt;状态&gt;）：界面接假服务，什么都不装。</summary>
@@ -58,11 +59,12 @@ internal static class SetupEntry
             var options = new Dictionary<string, string>(StringComparer.Ordinal);
             for (int i = 1; i < args.Length; i += 2)
             {
-                if (i + 1 >= args.Length || args[i] is not ("--package" or "--temp-dir" or "--self-test-root" or "--ready-event" or "--launcher-pid")) throw new ArgumentException("安装参数无效"); // 不翻译：异常
+                if (i + 1 >= args.Length || args[i] is not ("--package" or "--temp-dir" or "--self-test-root" or "--ready-event" or "--shown-event" or "--launcher-pid")) throw new ArgumentException("安装参数无效"); // 不翻译：异常
                 options.Add(args[i], args[i + 1]);
             }
             IsolatedRoot = options.GetValueOrDefault("--self-test-root");
             ReadyEvent = options.TryGetValue("--ready-event", out var signal) ? UninstallChain.ValidateEvent(signal) : null;
+            ShownEvent = options.TryGetValue("--shown-event", out var shown) ? UninstallChain.ValidateEvent(shown) : null;
             if (options.TryGetValue("--launcher-pid", out var parent)) LauncherPid = int.Parse(parent);
             Paths = IsolatedRoot == null ? SetupPaths.Production : SetupPaths.Isolated(IsolatedRoot);
             IsolatedRoot = IsolatedRoot == null ? null : Paths.Root;
@@ -77,6 +79,8 @@ internal static class SetupEntry
             if (args[0] == "--uninstall-worker" && SetupFiles.Full(AppContext.BaseDirectory).Equals(SetupFiles.Full(Paths.App), StringComparison.OrdinalIgnoreCase))
                 throw new ArgumentException("卸载程序必须先移到临时目录"); // 不翻译：异常
             Active = true;
+            Pane.Diagnostics.SetupFailureProbe.Worker(IsolatedRoot);
+            UninstallChain.Log("worker-initializing");
             if (IsolatedRoot != null)
             {
                 if (IsolatedWindow)
@@ -85,6 +89,7 @@ internal static class SetupEntry
                     runApplication(); return true;
                 }
                 UninstallChain.Signal(ReadyEvent);
+                UninstallChain.Signal(ShownEvent);
                 UninstallChain.WaitLauncher(LauncherPid);
                 // 只在验证过的临时根目录中使用假注册表、假快捷方式并跳过窗口。
                 Pane.Diagnostics.SetupProbe.Run(Paths, Uninstall);

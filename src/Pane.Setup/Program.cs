@@ -52,6 +52,7 @@ internal static class Program
                 return 0;
             }
             if (relay) helperLease = UninstallChain.Lease(Environment.ProcessPath!, isolated);
+            step = "cleanup-stale";
             UninstallChain.Cleanup(isolated);
             if (relay)
             {
@@ -72,26 +73,51 @@ internal static class Program
                 zip.ExtractToDirectory(temporary);
             }
             UninstallChain.Log(step, path: temporary);
+            Pane.Diagnostics.SetupFailureProbe.Extracted(isolated, temporary);
+            UninstallChain.WaitReadable(temporary);
             var start = new ProcessStartInfo(Path.Combine(temporary, "Pane.App.exe")) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = temporary };
             foreach (string value in new[] { relay ? "--uninstall-worker" : "--setup", "--package", Environment.ProcessPath!, "--temp-dir", temporary }) start.ArgumentList.Add(value);
             if (autoUpdate) start.ArgumentList.Add("--auto-update");
             if (readyEvent != null) { start.ArgumentList.Add("--ready-event"); start.ArgumentList.Add(readyEvent); }
             if (launcherPid != null) { start.ArgumentList.Add("--launcher-pid"); start.ArgumentList.Add(launcherPid); }
             if (isolated != null) { start.ArgumentList.Add("--self-test-root"); start.ArgumentList.Add(isolated); }
-            step = "start-worker";
-            using var process = UninstallChain.Start(start);
-            process.WaitForExit();
-            step = "worker-exit";
-            UninstallChain.Log(step, process.ExitCode == 0 ? "ok" : "failed", process.ExitCode == 0 ? null : new ExternalException("Worker exited", process.ExitCode));
-            // 1 是应用入口已经报告的异常；其余异常退出码由外壳兜底报告。
-            if (process.ExitCode is not (0 or 1)) throw new ExternalException("Worker exited", process.ExitCode);
-            return process.ExitCode;
+            string shownName = @"Local\Pane-Uninstall-" + Guid.NewGuid().ToString("N");
+            using var shown = new EventWaitHandle(false, EventResetMode.ManualReset, shownName);
+            start.ArgumentList.Add("--shown-event"); start.ArgumentList.Add(shownName);
+            for (int attempt = 1; ; attempt++)
+            {
+                shown.Reset(); step = "start-worker";
+                var started = DateTimeOffset.UtcNow;
+                var watch = Stopwatch.StartNew();
+                using var process = UninstallChain.Start(start);
+                process.WaitForExit();
+                step = "worker-exit";
+                bool visible = shown.WaitOne(0);
+                bool? progressed = null;
+                try
+                {
+                    foreach (string line in File.ReadLines(UninstallChain.LogPath))
+                    {
+                        if (!line.Contains($"\tpid={process.Id}\t") || !DateTimeOffset.TryParse(line.Split('\t')[0], out var time) || time < started) continue;
+                        if (line.Contains("\tstep=application-entry\t")) progressed ??= false;
+                        else if (progressed.HasValue) progressed = true;
+                    }
+                }
+                catch (Exception error) { UninstallChain.Log("worker-progress", "unavailable", error); }
+                var failure = process.ExitCode == 0 ? null : new ExternalException("安装界面意外退出", process.ExitCode); // 不翻译：外壳没有资源
+                UninstallChain.Log(step, failure == null ? "ok" : "failed", failure, details: $"attempt={attempt}; workerPid={process.Id}; elapsedMs={watch.ElapsedMilliseconds}; windowShown={visible}; afterEntry={progressed?.ToString() ?? "unknown"}");
+                if (process.ExitCode is 0 or 1) return process.ExitCode;
+                if (visible || attempt == 2) throw failure!;
+                UninstallChain.Log("worker-retry", "waiting", details: "delayMs=1000");
+                Thread.Sleep(1000); UninstallChain.WaitReadable(temporary);
+            }
         }
         catch (Exception error)
         {
             UninstallChain.Log(step, "failed", error);
             UninstallChain.Signal(readyEvent);
-            string message = $"安装或卸载未能完成步骤：{step}。卸载窗口没能打开时，请检查磁盘空间、目录权限和安全软件的拦截记录。日志：{UninstallChain.LogPath}"; // 不翻译：安装外壳没有资源
+            string description = step switch { "extract-package" => "解压安装文件", "cleanup-stale" => "清理旧的临时文件", "start-worker" => "启动安装界面", "worker-exit" => "安装界面意外退出", _ => step }; // 不翻译：安装外壳没有资源
+            string message = $"没有装上：{description}出错。\n{UninstallChain.Reason(error)}\n日志：{UninstallChain.LogPath}"; // 不翻译：安装外壳没有资源
             if (isolated != null) { Directory.CreateDirectory(isolated); File.WriteAllText(Path.Combine(isolated, "wrapper-error.txt"), message + "\n" + error); }
             else MessageBoxW(0, message, "Pane 安装程序", 0x10); // 不翻译：安装外壳没有资源
             return 1;
@@ -100,16 +126,11 @@ internal static class Program
         {
             if (temporary != null)
             {
-                try { SetupFiles.Delete(temporary); }
-                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-                {
-                    UninstallChain.Log("cleanup-app", "failed", e, temporary);
-                    if (isolated == null) MessageBoxW(0, "临时文件未能清理，请在关闭占用它的程序后删除：" + temporary + "。日志：" + UninstallChain.LogPath, "Pane 安装程序", 0x30); // 不翻译：安装外壳没有资源
-                    else File.WriteAllText(Path.Combine(isolated, "cleanup-error.txt"), temporary);
-                }
+                UninstallChain.DeleteTemporary(temporary, "cleanup-app");
             }
             temporaryLease?.Dispose();
-            if (temporary != null && !Directory.Exists(temporary)) File.Delete(temporary + ".lease");
+            try { if (temporary != null && !Directory.Exists(temporary)) File.Delete(temporary + ".lease"); }
+            catch (Exception error) { UninstallChain.Log("cleanup-lease", "retained", error, temporary); }
             if (relay) { try { File.Delete(Environment.ProcessPath!); } catch (Exception e) when (e is IOException or UnauthorizedAccessException) { UninstallChain.Log("cleanup-self", "retained", e, Environment.ProcessPath); } }
             helperLease?.Dispose();
         }

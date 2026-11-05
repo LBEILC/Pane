@@ -30,7 +30,7 @@ internal static class UninstallTests
             Check(step == "start-helper" && failure is System.ComponentModel.Win32Exception, "助手被拦被提示边界截获");
             var watch = Stopwatch.StartNew();
             UninstallChain.Launch(paths, paths.Uninstaller, root, Capture, copy: (_, _) => { },
-                start: _ => Process.GetCurrentProcess());
+                start: _ => Process.GetCurrentProcess(), timeout: 10000);
             Check(step == "wait-window" && failure is TimeoutException, "无窗口回执触发提示");
             Check(watch.ElapsedMilliseconds is >= 9900 and < 12000, "兜底约十秒");
             step = null; failure = null;

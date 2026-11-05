@@ -26,7 +26,21 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
         ["UninstallString"] = $"\"{paths.Uninstaller}\"", ["NoModify"] = 1, ["NoRepair"] = 1
     };
     sealed record Snapshot(string? Startup, Dictionary<string, object>? Registration, Dictionary<string, byte[]?> Files);
-    public object Capture() => new Snapshot(startup.Read(), ReadRegistration(), new[] { Menu, Desktop, SettingsFile, SettingsFile + ".tmp" }.ToDictionary(p => p, ReadBytes));
+    public object Capture()
+    {
+        // 只记录操作和路径，不记录注册表值、快捷方式内容或设置内容。
+        T Read<T>(string operation, string path, Func<T> read)
+        {
+            try { return read(); }
+            catch (Exception error) { UninstallChain.Log(operation, "failed", error, path); throw; }
+        }
+        var run = Read("capture-startup", isolatedRoot == null ? @"HKCU\Software\Microsoft\Windows\CurrentVersion\Run" : Path.Combine(isolatedRoot, "run.txt"), startup.Read);
+        var registration = Read("capture-registration", isolatedRoot == null ? "HKCU\\" + UninstallKey : FakeRegistration, ReadRegistration);
+        var files = new Dictionary<string, byte[]?>();
+        foreach (string path in new[] { Menu, Desktop, SettingsFile, SettingsFile + ".tmp" })
+            files[path] = Read("capture-file", path, () => ReadBytes(path));
+        return new Snapshot(run, registration, files);
+    }
     static byte[]? ReadBytes(string path) { SetupFiles.Check(path); return File.Exists(path) ? File.ReadAllBytes(path) : null; }
     public void Restore(object snapshot)
     {

@@ -1235,6 +1235,9 @@
   <data name="Setup_InstallTitle" xml:space="preserve"><value>安装 Pane</value></data>
   <data name="Setup_KeepData" xml:space="preserve"><value>设置和数据都会保留</value></data>
   <data name="Setup_LaunchFailed" xml:space="preserve"><value>无法启动 Pane</value></data>
+  <data name="Setup_FailureDetail" xml:space="preserve"><value>出错的步骤：{0}
+{1}
+日志：{2}</value><comment>{0} 内部步骤名；{1} 原因和错误码；{2} 日志路径</comment></data>
   <data name="Setup_NoPartialFiles" xml:space="preserve"><value>没有留下装了一半的文件</value></data>
   <data name="Setup_OpenClipboard" xml:space="preserve"><value>打开剪贴板</value></data>
   <data name="Setup_OpeningUpdated" xml:space="preserve"><value>更新好了，正在打开 Pane…</value></data>

@@ -61,4 +61,10 @@ public interface IUninstallService
     Task UninstallAsync(bool removeData, IProgress<SetupProgress> progress);
 }
 
-public sealed class SetupException(string message, Exception? inner = null) : Exception(message, inner);
+public sealed class SetupException(string message, Exception? inner = null) : Exception(message, inner)
+{
+    /// <summary>出错的步骤（服务的内部步骤名，如「备份登记」），安装界面的失败页显示（issue 23、061）。服务通过 Data["Step"] 给出。</summary>
+    public string? Step => Data["Step"] as string;
+    /// <summary>原因：底层异常消息 + 错误码，如「…(0x80070020)」。服务通过 Data["Reason"] 给出。</summary>
+    public string? Reason => Data["Reason"] as string;
+}

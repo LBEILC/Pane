@@ -38,7 +38,7 @@ public sealed class SetupSample(string state) : ISetupService, IUninstallService
         {
             progress.Report(new((i + 0.5) / steps.Length, steps[i]));
             if (hold && i == steps.Length / 2) await Task.Delay(Timeout.Infinite);
-            if (error != null && i == 2) throw new SetupException(error);
+            if (error != null && i == 2) throw new SetupException(error) { Data = { ["Step"] = "备份登记", ["Reason"] = "The process cannot access the file because it is being used by another process. (0x80070020)" } }; // 不翻译：演示数据
             await Task.Delay(fast);
         }
         progress.Report(new(1, "完成"));

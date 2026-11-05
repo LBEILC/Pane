@@ -27,8 +27,9 @@ internal static class SetupProbe
         var progress = new Progress<Pane.Contracts.SetupProgress>();
         if (uninstall) service.UninstallAsync(false, progress).GetAwaiter().GetResult();
         else service.InstallAsync(new(false, true, service.Info.InstalledVersion == null
-            ? service.CheckInstallPath(Path.Combine(isolated, "custom tools")).Path : service.Info.InstallPath), progress).GetAwaiter().GetResult();
+            ? service.CheckInstallPath(Path.Combine(isolated, File.Exists(Path.Combine(isolated, "ai-tools.test")) ? "Ai tools" : "custom tools")).Path : service.Info.InstallPath), progress).GetAwaiter().GetResult();
         File.WriteAllText(Path.Combine(isolated, uninstall ? "uninstalled.txt" : "installed.txt"), AppContext.BaseDirectory);
+        SetupFailureProbe.Completed(isolated);
         if (!uninstall && service.AutoUpdate) service.LaunchInstalled();
     }
 }

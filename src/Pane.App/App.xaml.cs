@@ -40,7 +40,7 @@ public sealed partial class App : Application
     string? pendingAck;
     int cycleIndex=-1;
     bool cycleHiding,cycleRecorded;
-    public App(){InitializeComponent();}
+    public App(){SetupCrashDiagnostics.Attach(this);InitializeComponent();}
     /// <summary>设置页录热键期间暂停业务热键，应急退出仍可使用。</summary>
     // 设计（012 补丁跟进）：设置窗口销毁后托管堆很小、GC 迟迟不跑，XAML 元素背后的大块原生内存就一直不释放，
     // 每开关一次涨几 MiB。关闭后主动回收两次（第二次收掉终结器释放后才变成垃圾的对象）。

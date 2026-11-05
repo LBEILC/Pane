@@ -101,6 +101,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
         }
         catch (Exception error)
         {
+            string failedStep = step;
             Log(error);
             try
             {
@@ -113,7 +114,15 @@ internal sealed class SetupService : ISetupService, IUninstallService
                 if (snapshot != null) { Track("回滚暂存目录", stage); SetupFiles.Delete(stage); Track("回滚登记", paths.Root, paths.Data); integration.Restore(snapshot); } // 不翻译：日志
                 if (stopped && running && File.Exists(paths.Exe)) { Track("回滚启动旧程序", paths.Exe); processes.Launch(true); } // 不翻译：日志
             }
-            catch (Exception rollback) { Log(rollback); throw new SetupException(Strings.Setup_RollbackIncomplete, new AggregateException(error, rollback)); }
+            catch (Exception rollback)
+            {
+                Log(rollback);
+                var failure = new SetupException(Strings.Setup_RollbackIncomplete, new AggregateException(error, rollback));
+                failure.Data["Step"] = failedStep; failure.Data["Reason"] = $"{error.Message} (0x{error.HResult:X8})";
+                failure.Data["RollbackStep"] = step; failure.Data["RollbackReason"] = $"{rollback.Message} (0x{rollback.HResult:X8})";
+                throw failure;
+            }
+            step = failedStep;
             throw Failure(error);
         }
         // 提交点之后的历史副本清理不再触发回滚，以免已部分删除的 previous 覆盖完好的旧版。
@@ -166,6 +175,11 @@ internal sealed class SetupService : ISetupService, IUninstallService
     {
         var failure = error as SetupException ?? new SetupException(
             (error.HResult & 0xffff) is 112 or 39 ? Strings.Setup_DiskFull : SetupDiagnostics.Busy(error) ? Strings.Setup_DirectoryBusy : Strings.Setup_OperationFailed, error);
-        return uninstalling ? new SetupException(string.Format(Strings.Setup_UninstallOperationFailed, failure.Message, step, UninstallChain.LogPath), error) : failure;
+        // Step / Reason 经 Data 给出，SetupException.Step / Reason 读取，安装界面失败页显示（设计接，061）
+        var result = uninstalling ? new SetupException(string.Format(Strings.Setup_UninstallOperationFailed, failure.Message, step, UninstallChain.LogPath), error) : failure;
+        result.Data["Step"] = step;
+        var cause = error is SetupException && error.InnerException != null ? error.InnerException : error;
+        result.Data["Reason"] = $"{cause.Message} (0x{cause.HResult:X8})";
+        return result;
     }
 }

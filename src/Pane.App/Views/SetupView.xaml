@@ -127,6 +127,9 @@
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText2Brush}"/>
             <TextBlock x:Name="KeptText" Margin="0,6,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <!-- 出错的步骤、原因、日志位置（issue 23：只说「没有装上」没法排查）；可选中复制，方便贴到 issue 里 -->
+            <TextBlock x:Name="DetailText" Margin="0,14,0,0" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}" Visibility="Collapsed"/>
             <StackPanel Margin="0,24,0,0" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                 <Button Style="{StaticResource PanePrimaryButton}" MinWidth="140" Content="{x:Bind loc:Strings.Common_TryOnceMore}" Click="OnInstall"/>
                 <Button Style="{StaticResource PaneTextButton}" MinHeight="{StaticResource PaneControlLg}" Padding="20,0,20,0" CornerRadius="20" FontSize="{StaticResource PaneTextMd}" Content="{x:Bind loc:Strings.Common_Close}" Click="OnClose"/>

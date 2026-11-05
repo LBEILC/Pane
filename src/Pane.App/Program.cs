@@ -6,6 +6,7 @@ internal static class Program
     [STAThread] static void Main()
     {
         var args=Environment.GetCommandLineArgs().Skip(1).ToArray();
+        Pane.Hosting.SetupCrashDiagnostics.Install(args);
         Pane.Hosting.StartupDirectory.Initialize(args);
         if(Pane.Hosting.SetupEntry.TryRun(args,RunApplication))return;
         if(args.FirstOrDefault()=="--launcher-index") { Environment.ExitCode=Pane.Services.Launcher.IndexWorker.Run(args);return; }

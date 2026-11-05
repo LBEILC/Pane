@@ -9,6 +9,7 @@ internal static class Program
     {
         var desktop = new StringBuilder(256);
         if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), 2, desktop, 512, out _) || !desktop.ToString().StartsWith("Pane027-")) return 2;
+        if (args[0] == "--061") return FailureFixture.Run(args[1], args[2], args[3]).GetAwaiter().GetResult();
         if (args[0] == "--launch")
         {
             GetWindowThreadProcessId(GetForegroundWindow(), out uint foreground);
@@ -151,7 +152,7 @@ internal static class Program
                     File.WriteAllText(worker, "blocked executable fixture");
                     await Run(uninstaller, "--self-test-root", root); await WaitHelper(root, 1);
                     string message = File.ReadAllText(failurePath);
-                    Check(message.Contains("start-worker") && message.Contains("安全软件") && message.Contains("Pane-uninstall.log"), "启动失败真实提示含安全软件及日志");
+                    Check(message.Contains("启动安装界面") && (message.Contains("0x800700C1") || message.Contains("0x800700D8")) && message.Contains("Pane-uninstall.log"), "启动失败提示含步骤、原生错误码及日志");
                     File.Delete(failurePath);
                 }
                 finally { File.Delete(worker); File.Move(backup, worker); }

@@ -12,4 +12,5 @@
   <ItemGroup Condition="'$(PayloadPath)' != ''"><EmbeddedResource Include="$(PayloadPath)" LogicalName="payload.zip" /></ItemGroup>
   <ItemGroup><Compile Include="../Pane.App/Services/Setup/SetupFiles.cs" Link="SetupFiles.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../Pane.App/Services/Setup/UninstallChain.cs" Link="UninstallChain.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/SetupFailureProbe.cs" Link="SetupFailureProbe.cs" /></ItemGroup>
 </Project>
