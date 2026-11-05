@@ -1090,7 +1090,7 @@
   <data name="Settings_Launcher_KeywordInvalid" xml:space="preserve"><value>关键字不能以 &gt; 开头（&gt; 开头是终端命令）</value></data>
   <data name="Settings_Launcher_KeywordDuplicate" xml:space="preserve"><value>「{0}」已经用在别的地方了</value></data>
   <data name="Settings_Launcher_FileSearch" xml:space="preserve"><value>文件搜索</value></data>
-  <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>文件名搜索依赖 Everything；Pane 不自建全盘索引。启动器列前 3 个，其余在文件窗口里看</value></data>
+  <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>文件名搜索依赖 Everything；Pane 不自建全盘索引。启动器里列几个在上面「外观」里调，其余在文件窗口里看</value></data>
   <data name="Settings_Launcher_HideOnBlur" xml:space="preserve"><value>失去焦点时隐藏</value></data>
   <data name="Settings_Launcher_HideOnBlurDescription" xml:space="preserve"><value>点到别的窗口时自动收起</value></data>
   <data name="Settings_Launcher_Home" xml:space="preserve"><value>没输入时显示</value></data>
@@ -1440,4 +1440,34 @@
   <data name="Tray_TimerOpen" xml:space="preserve"><value>定时关机…</value></data>
   <data name="Tray_TimerStatus" xml:space="preserve"><value>{0} · 还剩 {1}</value></data>
   <data name="Tray_TimerCancel" xml:space="preserve"><value>取消定时</value></data>
+  <data name="Settings_Launcher_Appearance" xml:space="preserve"><value>外观</value></data>
+  <data name="Settings_Launcher_Width" xml:space="preserve"><value>宽度</value></data>
+  <data name="Settings_Launcher_WidthDescription" xml:space="preserve"><value>一行 {0} 个应用</value></data>
+  <data name="Settings_Launcher_WidthCompact" xml:space="preserve"><value>紧凑</value></data>
+  <data name="Settings_Launcher_WidthStandard" xml:space="preserve"><value>标准</value></data>
+  <data name="Settings_Launcher_WidthWide" xml:space="preserve"><value>宽</value></data>
+  <data name="Settings_Launcher_AppRows" xml:space="preserve"><value>应用最多显示</value></data>
+  <data name="Settings_Launcher_AppRowsDescription" xml:space="preserve"><value>最多 {0} 个应用</value></data>
+  <data name="Settings_Launcher_RowsCount" xml:space="preserve"><value>{0} 行</value></data>
+  <data name="Settings_Launcher_FileRows" xml:space="preserve"><value>文件最多显示</value></data>
+  <data name="Settings_Launcher_FileRowsDescription" xml:space="preserve"><value>更多的在「查看全部」里看</value></data>
+  <data name="Settings_Launcher_ItemsCount" xml:space="preserve"><value>{0} 个</value></data>
+  <data name="Update_ViewOnGitHub" xml:space="preserve"><value>在 GitHub 上查看</value></data>
+  <data name="Update_InstallOnStartup" xml:space="preserve"><value>下次启动时自动安装</value></data>
+  <data name="Update_InstallOnStartupDescription" xml:space="preserve"><value>下载好的更新在下次启动 Pane 时（比如开机）直接装好，不再询问</value></data>
+  <data name="Update_Changelog" xml:space="preserve"><value>更新日志</value></data>
+  <data name="Update_ChangelogDescription" xml:space="preserve"><value>{0} 以来每个版本的更新内容</value></data>
+  <data name="Update_ChangelogOpen" xml:space="preserve"><value>查看</value></data>
+  <data name="Update_CurrentTag" xml:space="preserve"><value>{0}（当前）</value></data>
+  <data name="Update_KindNew" xml:space="preserve"><value>新增</value></data>
+  <data name="Update_KindImproved" xml:space="preserve"><value>改进</value></data>
+  <data name="Update_KindFixed" xml:space="preserve"><value>修复</value></data>
+  <data name="Update_KindCount" xml:space="preserve"><value>{0} {1} 项</value></data>
+  <data name="Update_SummarySeparator" xml:space="preserve"><value>、</value></data>
+  <data name="Update_MoreItems" xml:space="preserve"><value>还有 {0} 条</value></data>
+  <data name="Notice_UpdateReady" xml:space="preserve"><value>Pane {0} 已下载好</value></data>
+  <data name="Notice_Ignore" xml:space="preserve"><value>忽略</value></data>
+  <data name="Notice_Updated" xml:space="preserve"><value>已更新到 {0}</value></data>
+  <data name="Notice_View" xml:space="preserve"><value>查看</value></data>
+  <data name="Notice_Dismiss" xml:space="preserve"><value>不再提示</value></data>
 </root>

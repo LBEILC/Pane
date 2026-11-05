@@ -28,7 +28,7 @@ internal abstract class LauncherSource(string group,int order,string prefix):ILa
 }
 internal sealed class ApplicationSource(ILauncherExecutor executor,Action<string> used):LauncherSource(LauncherGroups.Applications,1,"app:")
 {
-    public override int Limit(SourceContext c)=>14;
+    public override int Limit(SourceContext c)=>c.Settings.AppRows*(c.Settings.Width switch{LauncherWidth.Compact=>6,LauncherWidth.Wide=>9,_=>7});
     static LauncherItem Item(IndexedApp app,string group)=>new(app.Id,LauncherItemKind.App,group,app.Name.Name,Strings.Launcher_ApplicationSubtitle,new("app",app.Icon));
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();
@@ -87,7 +87,7 @@ internal sealed class CommandSource(ILauncherExecutor executor):EntrySource(Laun
 }
 internal sealed class FileSource(ILauncherFiles files,ILauncherExecutor executor):LauncherSource(LauncherGroups.Files,3,"file:")
 {
-    public override int Limit(SourceContext c)=>3;
+    public override int Limit(SourceContext c)=>c.Settings.FileRows;
     public override TimeSpan Timeout=>TimeSpan.FromMilliseconds(150);
     public override async Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();if(c.Query.Length<2)return [];

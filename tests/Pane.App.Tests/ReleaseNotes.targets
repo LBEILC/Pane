@@ -1,0 +1,6 @@
+<Project>
+  <Target Name="TestReleaseNotes" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File &quot;$(MSBuildProjectDirectory)/../../scripts/release-notes.ps1&quot; -Source &quot;$(MSBuildProjectDirectory)/../../src/Pane.App/ReleaseNotes&quot; -Output &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)release-notes&quot; -Version &quot;0.1.999999&quot;" />
+    <ItemGroup><EmbeddedResource Include="$(IntermediateOutputPath)release-notes/catalog.json" LogicalName="Pane.ReleaseNotes.json" /></ItemGroup>
+  </Target>
+</Project>

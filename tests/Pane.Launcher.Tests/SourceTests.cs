@@ -4,6 +4,11 @@ using Pane.Settings;
 
 static partial class Program
 {
+    sealed class ManyFiles062:ILauncherFiles
+    {
+        public Task<IReadOnlyList<LauncherItem>> SearchAsync(string query,int limit,CancellationToken token)=>
+            Task.FromResult<IReadOnlyList<LauncherItem>>(new LauncherFileRows(Enumerable.Range(0,limit).Select(i=>new LauncherItem("file:"+i,LauncherItemKind.File,LauncherGroups.Files,"fixture"+i,"",new("doc"))).ToArray(),100));
+    }
     static async Task SourceTests(){
         var snapshot=IndexBuilder.Build(new FakeCatalog(20),[new(@"C:\fixture\银行.txt",false)],default).Snapshot;
         var context=new SourceContext("wx",snapshot,Defaults().Launcher with{PinnedApps=["app:2"]},new Dictionary<string,AppUse>());
@@ -15,6 +20,19 @@ static partial class Program
         await CommandSourceTests(context,executor);
         await AiSourceTests(context);
         await WebSourceTests(context,executor);
+        var many=IndexBuilder.Build(new FakeCatalog(100),[],default).Snapshot;
+        var apps=new ApplicationSource(executor,_=>{});
+        foreach(var width in Enum.GetValues<LauncherWidth>())foreach(int rowCount in new[]{1,2,3,4}){
+            var c=context with{Query="app",Snapshot=many,Settings=context.Settings with{Width=width,AppRows=rowCount}};
+            int expected=rowCount*(width==LauncherWidth.Compact?6:width==LauncherWidth.Wide?9:7);
+            Check(apps.Limit(c)==expected&&(await apps.SearchAsync(c,default)).Count==expected,"062 application width/rows");
+        }
+        var fileSource=new FileSource(new ManyFiles062(),executor);
+        foreach(int limit in new[]{3,5,8,10}){
+            var c=context with{Settings=context.Settings with{FileRows=limit}};
+            var result=await fileSource.SearchAsync(c,default);
+            Check(result.Count==limit&&result is LauncherFileRows page&&page.Total==100,"062 file rows and total");
+        }
     }
     static async Task ApplicationSourceTests(SourceContext c,FakeExecutor executor){
         int before=checks;string? used=null;var source=new ApplicationSource(executor,id=>used=id);

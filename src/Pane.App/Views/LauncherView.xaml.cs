@@ -27,8 +27,31 @@ namespace Pane.Views;
 
 public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 {
-    const double Width_ = 592, SearchRowHeight = 60, ResultsMaxHeight = 452, FootHeight = 34;
-    const int MaxApps = 14, MaxFiles = 3;
+    const double SearchRowHeight = 60, FootHeight = 34;
+    // 宽度、应用行数、文件个数跟设置走（issue 24，docs/design.md「启动器尺寸与显示数量」）：格子 82 宽，左右内边距各 8 + 1，
+    // 紧凑 / 标准 / 宽 = 一行 6 / 7 / 9 个 = 510 / 592 / 756。每次呼出时按当前设置算一次
+    double Width_ = 592, ResultsMaxHeight = 452;
+    int columns = 7;
+    int MaxApps => Math.Clamp(Options.AppRows, 1, 4) * columns;
+    static int MaxFiles => Options.FileRows is 3 or 5 or 8 or 10 ? Options.FileRows : 3;
+    internal static (double Width, int Columns) Geometry(Settings.LauncherWidth width) => width switch
+    {
+        Settings.LauncherWidth.Compact => (510, 6),
+        Settings.LauncherWidth.Wide => (756, 9),
+        _ => (592, 7),
+    };
+    // 结果区最高：所在显示器工作区高度的 70% 减去搜索行和底栏，至少 300（原来固定 452）
+    void ApplyGeometry(PanelShowContext context)
+    {
+        (Width_, columns) = Geometry(Options.Width);
+        Root.Width = Width_;
+        double work = 1080, scale = XamlRoot?.RasterizationScale is > 0 and var r ? r : 1;
+        var point = context.AnchorPhysical is { } a ? new Hosting.GlassPanel.Point { X = (int)a.X, Y = (int)a.Y } : new Hosting.GlassPanel.Point();
+        var info = new Hosting.GlassPanel.MonitorInfo { Size = System.Runtime.InteropServices.Marshal.SizeOf<Hosting.GlassPanel.MonitorInfo>() };
+        if (Hosting.GlassPanel.GetMonitorInfoW(Hosting.GlassPanel.MonitorFromPoint(point, 2), ref info)) work = (info.Work.Bottom - info.Work.Top) / scale;
+        ResultsMaxHeight = Math.Max(300, Math.Floor(work * 0.7) - SearchRowHeight - FootHeight - 1);
+        Scroller.MaxHeight = ResultsMaxHeight;
+    }
     static string Placeholder => Strings.Launcher_SearchPlaceholder;
     // 设置 → 启动器：「复制后自动带入」时长、「再次呼出时」怎么处理上次输入、动作行
     static Settings.LauncherSettings Options => ((App)Application.Current).Store.Current.Launcher;
@@ -48,7 +71,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     int selected = -1;
     bool activate, aiMode;
     CancellationTokenSource? pending;
-    double lastHeight;
+    double lastHeight, lastWidth = 592, noticeHeight;
     ClipEntry? attachment, pendingAttachment;
     nint previousWindow;
     string shownQuery = "";
@@ -84,6 +107,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         this.clipboard = clipboard;
         InitializeComponent();
         Controls.PaneCaret.Attach(Input);
+        // 提示条（062）：「重启更新」「查看」交给宿主（查看会打开设置，启动器收起）；「忽略」「×」只收起这一条
+        Notice.Primary += (_, n) => { CloseRequested?.Invoke(this, EventArgs.Empty); ((App)Application.Current).NoticePrimary(n); };
+        Notice.Dismiss += (_, n) => { ((App)Application.Current).NoticeDismiss(n); noticeHeight = Notice.Show(null); RequestHeight(); };
 
         highlight = new SlidingHighlight(HighlightLayer);
         Loaded += (_, _) => HideClearButton();
@@ -110,6 +136,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     {
         activate = context.Activate;
         previousWindow = context.PreviousForegroundWindow;
+        ApplyGeometry(context);
+        var notice = ((App)Application.Current).CurrentNotice();
+        noticeHeight = Notice.Show(notice);
+        if (notice != null) ((App)Application.Current).NoticeShown(notice);
         ExitAi();
         menuItem = null;   // 每次呼出都从结果列表开始
         // 附件：交过来的优先；否则复制后几秒内呼出（设置里定，0 = 关），带入刚复制的内容（不清空系统剪贴板）
@@ -510,12 +540,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 
     void RequestHeight()
     {
-        double h = SearchRowHeight;
+        double h = noticeHeight + SearchRowHeight;
         if (aiMode) { UpdateLayout(); h += 1 + Card.ActualHeight + Card.Margin.Top + Card.Margin.Bottom; }
         else if (rows.Count > 0) h += 1 + Math.Min(ResultsContent.ActualHeight, ResultsMaxHeight) + FootHeight;
         h = Math.Ceiling(h);
-        if (Math.Abs(h - lastHeight) < 0.5) return;
-        lastHeight = h;
+        if (Math.Abs(h - lastHeight) < 0.5 && Math.Abs(Width_ - lastWidth) < 0.5) return;
+        lastHeight = h; lastWidth = Width_;
         SizeRequested?.Invoke(this, new Size(Width_, h));
     }
 

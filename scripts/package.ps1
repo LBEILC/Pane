@@ -34,7 +34,7 @@ $version="$($v.FileMajorPart).$($v.FileMinorPart).$($v.FileBuildPart)"
 $stage=Join-Path $work 'payload'
 New-Item -ItemType Directory -Path $stage | Out-Null
 foreach($file in Get-ChildItem -LiteralPath $source -File -Recurse){
-    if($file.Extension -eq '.pdb'){continue}
+    if($file.Extension -eq '.pdb' -or $file.Name -eq 'release-notes.md'){continue}
     $relative=$file.FullName.Substring($source.TrimEnd('\').Length+1)
     $target=Join-Path $stage $relative
     New-Item -ItemType Directory -Path (Split-Path $target -Parent) -Force | Out-Null
@@ -58,6 +58,8 @@ if($LASTEXITCODE -ne 0){throw '安装外壳构建失败'}
 Assert-ForbiddenFiles -Files (@("$work/wrapper/Pane.Setup.exe")+@(Get-ChildItem -LiteralPath $stage -File -Recurse | ForEach-Object {$_.FullName})) -Rules $rules
 $dist=Join-Path $repo 'dist'
 New-Item -ItemType Directory -Path $dist -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $source 'release-notes.md') -Destination (Join-Path $dist 'release-notes.md') -Force
+Assert-ForbiddenFiles -Files @((Join-Path $dist 'release-notes.md')) -Rules $rules
 $installer=Join-Path $dist "Pane 安装 $version.exe"
 Copy-Item -LiteralPath "$work/wrapper/Pane.Setup.exe" -Destination $installer -Force
 $releaseInstaller=Join-Path $dist "Pane-Setup-$version.exe"

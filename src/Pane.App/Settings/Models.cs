@@ -14,7 +14,11 @@ public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=nu
     [System.Text.Json.Serialization.JsonIgnore] public Hotkey Menu=>MenuHotkey??DefaultMenu;
 }
 // 软件内更新（设计加，2026-10-30，023）：AutoUpdate 开着就自动检查并在后台下载，下载好后提示重启更新
-public sealed record UpdateSettings(bool AutoUpdate=true);
+// 设计加（2026-11-05，issue 25、062）：InstallOnStartup = 下次启动时自动安装已下载好的更新（默认关）；
+// IgnoredVersion = 提示条上点了「忽略」的版本；SeenVersion = 看过「更新后」提示的版本，NewsShown = 这一版的提示已经出现过几次（最多 3 次）；
+// AutoInstallFailedVersion = 启动时自动安装失败过的版本，同一版本不再自动装（服务写）
+public sealed record UpdateSettings(bool AutoUpdate=true, bool InstallOnStartup=false, string? IgnoredVersion=null,
+    string? SeenVersion=null, int NewsShown=0, string? AutoInstallFailedVersion=null);
 // 批量重命名（设计加，2026-10-31，040）：存下来的规则组合（预设）；LastRules = 上次执行时的规则，下次打开窗口接着用
 public sealed record RenamePreset(string Name, Pane.Contracts.RenameRule[] Rules);
 public sealed record RenameSettings
@@ -53,12 +57,15 @@ public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
 // 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
 public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing }
+public enum LauncherWidth { Compact, Standard, Wide }
 public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=null,
     bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.Clear,
     int AutoAttachSeconds=3, int FileResultCount=8, LauncherHome Home=LauncherHome.RecentAndPinned,
     // 设计加（2026-10-31，037）：RememberCommands = 记住 > 运行过的最近 20 条命令用来补全（空格开头的不记）；
     // WebSuggestions = 用搜索关键字搜网页时（如「bd 天气」）向那个站点取搜索建议，平时打字不联网
-    bool RememberCommands=true, bool WebSuggestions=true)
+    bool RememberCommands=true, bool WebSuggestions=true,
+    // 设计加（2026-11-05，issue 24、062）：宽度三档（510 / 592 / 756，一行 6 / 7 / 9 个应用）、应用最多几行（1～4）、文件最多几个（3 / 5 / 8 / 10）
+    LauncherWidth Width=LauncherWidth.Standard, int AppRows=2, int FileRows=3)
 {
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   启动器（设计负责人）。照原型 prototype/launcher.html #lx（2026-10-29 新排法，docs/design.md「启动器排法与二级窗口」）。
-  宽 592；搜索行 60；结果区最高 452，内边距 4 8 8；格子一行 7 个（82 × 92，图标 40，名字最多两行）；列表行 48；底部提示栏 34。
+  宽 592（设置可选 紧凑 510 / 宽 756，一行 6 / 9 个，issue 24）；搜索行 60；结果区最高 = 工作区 70% 减搜索行和底栏（至少 300），内边距 4 8 8；格子 82 × 92（图标 40，名字最多两行）；列表行 48；底部提示栏 34。
   顺序：算式 → 应用（格子）→ 动作行（格子）→ 文件（列表，前 3 个 + 「查看全部」）。空输入是「最近使用 / 已固定」格子；有附件时是动作列表。
 -->
 <UserControl
@@ -109,7 +109,7 @@
                     <ItemsControl ItemsSource="{x:Bind Rows}" ItemTemplate="{StaticResource TileTemplate}" IsTabStop="False">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="82" ItemHeight="92" MaximumRowsOrColumns="7"/>
+                                <VariableSizedWrapGrid Orientation="Horizontal" ItemWidth="82" ItemHeight="92" MaximumRowsOrColumns="9"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                     </ItemsControl>
@@ -127,13 +127,17 @@
 
     <Grid x:Name="Root" Width="592" VerticalAlignment="Top">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="60"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- 提示条（issue 25、062）：新版本已下载好 / 已更新到；只能用鼠标点 -->
+        <c:NoticeStrip x:Name="Notice"/>
+
         <!-- 搜索行：输入框以外的部分（放大镜、Pane 标签、两侧留白）可拖动整个启动器，双击恢复默认位置（宿主处理） -->
-        <Grid x:Name="SearchRow" Padding="20,0,20,0" ColumnSpacing="12" Background="Transparent">
+        <Grid x:Name="SearchRow" Grid.Row="1" Padding="20,0,20,0" ColumnSpacing="12" Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -173,7 +177,7 @@
         </Grid>
 
         <!-- 结果区：上沿一条分隔线；滚动条隐藏 -->
-        <Grid x:Name="ResultsArea" Grid.Row="1" Visibility="Collapsed">
+        <Grid x:Name="ResultsArea" Grid.Row="2" Visibility="Collapsed">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
             <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" MaxHeight="452"
                           VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
@@ -188,7 +192,7 @@
         </Grid>
 
         <!-- 底部提示栏：选中的那一项按 Enter / Tab / Ctrl+Enter 会做什么 -->
-        <Grid x:Name="Foot" Grid.Row="2" Height="34" Padding="20,0,20,0" ColumnSpacing="14" Visibility="Collapsed"
+        <Grid x:Name="Foot" Grid.Row="3" Height="34" Padding="20,0,20,0" ColumnSpacing="14" Visibility="Collapsed"
               BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>

@@ -65,6 +65,9 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         Sections.PointerMoved += OnListPointerMoved;
         Sections.Tapped += OnListTapped;
         Chips.Tapped += OnChipTapped;
+        // 提示条（062）：「重启更新」「查看」交给宿主（查看会打开设置，剪贴板收起）；「忽略」「×」只收起这一条
+        Notice.Primary += (_, n) => { CloseRequested?.Invoke(this, EventArgs.Empty); ((App)Application.Current).NoticePrimary(n); };
+        Notice.Dismiss += (_, n) => { ((App)Application.Current).NoticeDismiss(n); Notice.Show(null); };
         // 输入框自己会处理按下，所以要连「已处理」的一起收（059：不激活方式下点搜索框切到激活）
         Input.AddHandler(PointerPressedEvent, new PointerEventHandler(OnInputPointerPressed), true);
         Loaded += (_, _) => { BuildFoot(); HideClearButton(); };
@@ -81,6 +84,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     {
         visible = true;
         if (IsLoaded) BuildFoot();
+        if (((App)Application.Current).CurrentNotice() is { } notice) { Notice.Show(notice); ((App)Application.Current).NoticeShown(notice); }
+        else Notice.Show(null);
         activate = context.Activate;
         previousWindow = context.PreviousForegroundWindow;
         filter = "all";

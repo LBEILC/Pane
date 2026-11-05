@@ -47,6 +47,7 @@ static class Program
   checks+=await SetupTests.Run(settings);
   checks+=UninstallTests.Run();
   checks+=await UpdateTests.Run();
+  checks+=await ReleaseNotes062Tests.Run(settings);
   Console.WriteLine($"PASS app assertions={checks}; systemClipboard=0; input=0");
   TestResults.Pass();
  }

@@ -147,12 +147,16 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- 提示条（issue 25、062）：新版本已下载好 / 已更新到；面板总高不变，占的是列表的高度。只能用鼠标点，不抢焦点 -->
+        <c:NoticeStrip x:Name="Notice"/>
+
         <!-- 搜索框：聚焦时外圈一道主题色光环（主题色只用于焦点） -->
-        <Grid Padding="16,16,16,8">
+        <Grid Grid.Row="1" Padding="16,16,16,8">
             <Border x:Name="FocusRing" Margin="-2" CornerRadius="12" BorderThickness="2" BorderBrush="{StaticResource PaneAccentBrush}" Opacity="0"/>
             <Border Height="32" Padding="10,0,10,0" CornerRadius="{StaticResource PaneRadiusControl}"
                     Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
@@ -172,7 +176,7 @@
         </Grid>
 
         <!-- 类型筛选：选中项高亮滑动 -->
-        <Grid Grid.Row="1" Padding="16,0,16,8">
+        <Grid Grid.Row="2" Padding="16,0,16,8">
             <Canvas x:Name="ChipHighlightLayer" IsHitTestVisible="False"/>
             <ItemsControl x:Name="Chips" ItemTemplate="{StaticResource ChipTemplate}" IsTabStop="False">
                 <ItemsControl.ItemsPanel>
@@ -184,7 +188,7 @@
         </Grid>
 
         <!-- 列表 -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="3">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
             <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
                 <Grid x:Name="ListContent" Padding="8,4,8,8">
@@ -197,7 +201,7 @@
         </Grid>
 
         <!-- 快捷键提示 -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="4">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
             <c:WrapPanel x:Name="Foot" Margin="16,9,16,9" HorizontalSpacing="12" VerticalSpacing="4"/>
             <!-- 快捷键提示的样板（隐藏），代码照它的样式生成 -->

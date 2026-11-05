@@ -46,6 +46,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         http.DefaultRequestHeaders.UserAgent.ParseAdd("Pane/" + version);
         http.Timeout = TimeSpan.FromMinutes(10);
         timer = new Timer(_ => _ = TickAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(24));
+        RestoreReady();
     }
     async Task TickAsync() { if (!disposed && automatic()) await CheckAsync(lifetime.Token).ConfigureAwait(false); }
     void Set(UpdateState state, string? error = null) { State = state; Error = error; FailedStep = state == UpdateState.Failed ? activeStep : null; Changed?.Invoke(this, EventArgs.Empty); }
@@ -71,9 +72,10 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             var package = files.Single(f => f.GetProperty("name").GetString() == name);
             asset = ValidateUrl(package.GetProperty("browser_download_url").GetString()!);
             sums = ValidateUrl(files.Single(f => f.GetProperty("name").GetString() == "SHA256SUMS.txt").GetProperty("browser_download_url").GetString()!);
-            string notes = PlainNotes(root.GetProperty("body").GetString() ?? "");
-            Latest = new(version, notes, root.GetProperty("published_at").GetDateTimeOffset(), package.GetProperty("size").GetInt64(),
-                ValidateUrl(root.GetProperty("html_url").GetString()!).AbsoluteUri);
+            string body = root.GetProperty("body").GetString() ?? "";
+            var published = root.GetProperty("published_at").GetDateTimeOffset();
+            Latest = new(version, PlainNotes(body), published, package.GetProperty("size").GetInt64(),
+                ValidateUrl(root.GetProperty("html_url").GetString()!).AbsoluteUri, ReleaseNotesCatalog.ParseMarkdown(body, version, published));
             Set(UpdateState.Available);
             if (automatic() || File.Exists(Path.Combine(directory, name))) await DownloadCore(cancel.Token).ConfigureAwait(false);
         }
@@ -105,7 +107,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
                 .Where(m => m.Success && m.Groups[2].Value == name).ToArray();
             if (entries.Length != 1) throw new InvalidDataException();
             string hash = entries[0].Groups[1].Value;
-            if (File.Exists(target) && await Valid(target, hash, token).ConfigureAwait(false)) { Ready(target); return; }
+            if (File.Exists(target) && await Valid(target, hash, token).ConfigureAwait(false)) { CacheReady(target, hash); return; }
             File.Delete(target);
             using var response = await GetAsync(asset!, token).ConfigureAwait(false);
             await using (var input = await response.Content.ReadAsStreamAsync(token).ConfigureAwait(false))
@@ -122,7 +124,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
                 }
             }
             if (!await Valid(partial, hash, token).ConfigureAwait(false)) throw new InvalidDataException();
-            File.Move(partial, target, true); Ready(target);
+            File.Move(partial, target, true); CacheReady(target, hash);
         }
         finally { File.Delete(partial); }
     }
@@ -144,6 +146,29 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             url.Scheme == "https" && (url.Host == "github.com" || url.Host == "api.github.com" || url.Host.EndsWith(".githubusercontent.com", StringComparison.OrdinalIgnoreCase));
         if (!allowed || url.UserInfo.Length != 0) throw new InvalidDataException();
         return url;
+    }
+    void CacheReady(string path, string hash)
+    {
+        string record = Path.Combine(directory, "ready.json"), temporary = record + ".tmp";
+        File.WriteAllText(temporary, JsonSerializer.Serialize(new CachedUpdate(Latest!, hash), ReleaseNotesJson.Default.CachedUpdate));
+        File.Move(temporary, record, true);
+        Ready(path);
+    }
+    void RestoreReady()
+    {
+        try
+        {
+            string record = Path.Combine(directory, "ready.json");
+            if (!File.Exists(record)) return;
+            var cache = JsonSerializer.Deserialize(File.ReadAllText(record), ReleaseNotesJson.Default.CachedUpdate);
+            if (cache?.Release is not {} release || !Regex.IsMatch(release.Version, @"^\d+\.\d+\.\d+(\.\d+)?$") || SetupFiles.CompareVersions(release.Version, CurrentVersion) <= 0) return;
+            string path = Path.Combine(directory, $"Pane-Setup-{release.Version}.exe");
+            if (!File.Exists(path) || new FileInfo(path).Length != release.SizeBytes) return;
+            using var stream = File.OpenRead(path);
+            if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(cache.Hash, StringComparison.OrdinalIgnoreCase)) return;
+            Latest = release; readyPath = path; DownloadProgress = 1; State = UpdateState.Ready;
+        }
+        catch (Exception e) when (Expected(e)) { new SelectionLog(Path.GetDirectoryName(directory)!).Write("update-cache skipped: " + e.GetType().Name); }
     }
     async Task<HttpResponseMessage> GetAsync(Uri url, CancellationToken token)
     {

@@ -16,7 +16,8 @@ public enum UpdateStep { Check, Download, Install }
 /// <param name="Notes">更新说明（Release 正文的纯文本，去掉 Markdown 标记，最多约 2000 字）。</param>
 /// <param name="SizeBytes">安装包大小。</param>
 /// <param name="PageUrl">这个版本的 Release 网页（「查看详情」打开它）。</param>
-public sealed record UpdateRelease(string Version, string Notes, DateTimeOffset PublishedAt, long SizeBytes, string PageUrl);
+/// <param name="Details">从 Release 正文解析出的结构化更新说明（## 新增 / ## 改进 / ## 修复，062）；正文不是这个格式时为 null，界面退回显示 Notes。</param>
+public sealed record UpdateRelease(string Version, string Notes, DateTimeOffset PublishedAt, long SizeBytes, string PageUrl, ReleaseNotes? Details = null);
 
 public interface IUpdateService
 {

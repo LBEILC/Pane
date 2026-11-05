@@ -11,7 +11,7 @@ internal static class Program
         if(Pane.Hosting.SetupEntry.TryRun(args,RunApplication))return;
         if(args.FirstOrDefault()=="--launcher-index") { Environment.ExitCode=Pane.Services.Launcher.IndexWorker.Run(args);return; }
         var command=Pane.Hosting.LaunchArguments.Parse(args);if(command==Pane.Hosting.LaunchCommand.Invalid){Environment.ExitCode=2;return;}
-        try {Pane.Hosting.RestartProcess.WaitForParent();if(!Pane.Hosting.SingleInstance.Enter(command))return;RunApplication();}
+        try {Pane.Hosting.RestartProcess.WaitForParent();if(!Pane.Hosting.SingleInstance.Enter(command))return;if(Pane.App.TryStartupUpdate())return;RunApplication();}
         catch(Exception error){if(Pane.Hosting.RuntimeMode.Current.IsProduction)new Pane.Hosting.CrashLog(Pane.Hosting.RuntimeMode.Current.DataDirectory).Write(error);Environment.ExitCode=1;}
         finally {Pane.Hosting.SingleInstance.Release();}
         if(Pane.Hosting.RestartProcess.Requested && Environment.ExitCode==0) {

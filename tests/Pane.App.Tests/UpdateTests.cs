@@ -113,6 +113,7 @@ internal sealed class UpdateServer : IAsyncDisposable
     public Uri Url { get; }
     public byte[] Payload = new byte[512 * 1024];
     public string Version = "0.1.100";
+    public string Body = "# 标题\n**更新内容**";
     public bool Draft, Preview, BadHash, Disconnect, BreakDownload, Slow, UserAgent, Credentials;
     public int Status = 200, Requests, Downloads;
     public UpdateServer() { listener.Start(); Url = new($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}/latest"); loop = Accept(); }
@@ -138,7 +139,7 @@ internal sealed class UpdateServer : IAsyncDisposable
             if (package) { Interlocked.Increment(ref Downloads); body = Payload; }
             else if (first.Contains("/SHA256SUMS.txt ")) body = Encoding.UTF8.GetBytes((BadHash ? new string('0', 64) : Convert.ToHexString(SHA256.HashData(Payload))) + "  " + name + "\n");
             else body = Encoding.UTF8.GetBytes($$"""
-                {"tag_name":"v{{Version}}","draft":{{Draft.ToString().ToLowerInvariant()}},"prerelease":{{Preview.ToString().ToLowerInvariant()}},"body":"# 标题\n**更新内容**","published_at":"2026-10-30T00:00:00Z","html_url":"{{host}}/release","assets":[{"name":"{{name}}","size":{{Payload.Length}},"browser_download_url":"{{host}}/{{name}}"},{"name":"SHA256SUMS.txt","size":{{Encoding.UTF8.GetByteCount(Convert.ToHexString(SHA256.HashData(Payload)) + "  " + name + "\n")}},"browser_download_url":"{{host}}/SHA256SUMS.txt"}]}
+                {"tag_name":"v{{Version}}","draft":{{Draft.ToString().ToLowerInvariant()}},"prerelease":{{Preview.ToString().ToLowerInvariant()}},"body":{{System.Text.Json.JsonSerializer.Serialize(Body, UpdateTestJson.Default.String)}},"published_at":"2026-10-30T00:00:00Z","html_url":"{{host}}/release","assets":[{"name":"{{name}}","size":{{Payload.Length}},"browser_download_url":"{{host}}/{{name}}"},{"name":"SHA256SUMS.txt","size":{{Encoding.UTF8.GetByteCount(Convert.ToHexString(SHA256.HashData(Payload)) + "  " + name + "\n")}},"browser_download_url":"{{host}}/SHA256SUMS.txt"}]}
                 """);
             byte[] headers = Encoding.ASCII.GetBytes($"HTTP/1.1 {Status} Test\r\nContent-Length: {body.Length}\r\nConnection: close\r\nRetry-After: 3600\r\n\r\n");
             await stream.WriteAsync(headers, stop.Token);
@@ -150,3 +151,6 @@ internal sealed class UpdateServer : IAsyncDisposable
     }
     public async ValueTask DisposeAsync() { stop.Cancel(); listener.Stop(); await loop; await Task.WhenAll(clients); stop.Dispose(); }
 }
+
+[System.Text.Json.Serialization.JsonSerializable(typeof(string))]
+internal partial class UpdateTestJson : System.Text.Json.Serialization.JsonSerializerContext { }

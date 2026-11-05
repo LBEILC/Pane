@@ -8,7 +8,15 @@ namespace Pane.DesignData;
 public sealed class UpdateSample : IUpdateService
 {
     static readonly UpdateRelease Release = new("0.1.150", "启动器：应用和动作改成格子，文件改成列表，底部提示栏写明按键\n新增文件、翻译、AI 对话三个窗口\n超级面板：选中外文自动翻译\n修复：按住右键快速滚轮切标签后停不下来",
-        DateTimeOffset.Now.AddDays(-1), 34_416_640, "https://github.com/");
+        DateTimeOffset.Now.AddDays(-1), 34_416_640, "https://github.com/",
+        // 062：结构化说明，关于页按 新增 / 改进 / 修复 分组显示
+        new("0.1.150", DateOnly.FromDateTime(DateTime.Today.AddDays(-1)), [
+            new(ReleaseNoteKind.New, "设置 → 关于里能直接看到这一版和以前每个版本的更新内容。", true),
+            new(ReleaseNoteKind.New, "新版本下载好后，呼出启动器或剪贴板时最上面会提示，可以直接重启更新，或者忽略这个版本。"),
+            new(ReleaseNoteKind.Improved, "启动器可以调宽度，以及最多显示几行应用、几个文件。"),
+            new(ReleaseNoteKind.Fixed, "安装程序清理旧临时文件出错时会让安装失败。"),
+            new(ReleaseNoteKind.Fixed, "安装失败时只说「没有装上」，看不出是哪一步出的错。"),
+        ]));
 
     public UpdateSample()
     {

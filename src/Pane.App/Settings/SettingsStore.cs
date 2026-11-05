@@ -28,10 +28,12 @@ public sealed class SettingsStore
     {
         Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json");
-        if(!File.Exists(path)) return;
+        if(!File.Exists(path)) { Save(Current with{Update=Current.Update with{SeenVersion=CurrentVersion()}}); return; }
         try {
             using var document=JsonDocument.Parse(File.ReadAllText(path));
             var value=document.RootElement.Deserialize(SettingsJson.Default.PaneSettings)??throw new JsonException();
+            if(!document.RootElement.TryGetProperty("Update",out var update)||!update.TryGetProperty("SeenVersion",out _))
+                value=value with{Update=value.Update with{SeenVersion="0"}};
             // 源生成反序列化会为缺失的 init 布尔属性传入 false，显式保留旧文件默认开启。
             if(document.RootElement.TryGetProperty("Launcher",out var launcher)&&!launcher.TryGetProperty("RememberOpenedPrograms",out _))
                 value=value with{Launcher=value.Launcher with{RememberOpenedPrograms=true}};
@@ -43,6 +45,7 @@ public sealed class SettingsStore
         Changed?.Invoke(this,EventArgs.Empty);
     }
     readonly object writeLock=new();
+    internal static string CurrentVersion()=>typeof(SettingsStore).Assembly.GetName().Version is {} v?$"{v.Major}.{v.Minor}.{Math.Max(0,v.Build)}":"0.1.0";
     public void Save(PaneSettings value)
     {
         lock(writeLock)SaveCore(value);
@@ -74,7 +77,7 @@ public sealed class SettingsStore
         static bool ValidKey(Hotkey? key) => key is null || ((key.Modifiers & mask)!=0 && (key.Modifiers & ~mask)==0 && key.VirtualKey is >0 and <=255);
         return value with { JumpHotkey=ValidKey(value.JumpHotkey)?value.JumpHotkey:null, MenuHotkey=ValidKey(value.MenuHotkey)?value.MenuHotkey:null };
     }
-    static void Validate(PaneSettings s)
+    internal static void Validate(PaneSettings s)
     {
         if(s.Rename.Presets.Length>30||!ValidRules(s.Rename.LastRules)||s.Rename.Presets.Any(p=>p==null||string.IsNullOrWhiteSpace(p.Name)||!ValidRules(p.Rules)))throw new ArgumentException(Strings.Settings_Rename_Invalid);
         if(s.Ai==null)throw new ArgumentException(Strings.Settings_Ai_Invalid);
@@ -85,6 +88,8 @@ public sealed class SettingsStore
         var c=s.Clipboard;
         if((!c.RecordText&&!c.RecordImages&&!c.RecordFiles)||c.Limit is not (200 or 500 or 1000 or 5000)||c.ExcludedPrograms.Any(p=>string.IsNullOrWhiteSpace(p)||p.IndexOfAny(['/', '\\', '\r', '\n'])>=0))throw new ArgumentException(Strings.Settings_Clipboard_Invalid);
         var l=s.Launcher;
+        if(!Enum.IsDefined(l.Width)||l.AppRows is <1 or >4||l.FileRows is not (3 or 5 or 8 or 10))throw new ArgumentException(Strings.Settings_Launcher_Invalid);
+        if(s.Update.NewsShown<0)throw new ArgumentException(Strings.Settings_InvalidNumber);
         if(l.ActionRow==null||l.ActionRow.Any(string.IsNullOrWhiteSpace)||!Enum.IsDefined(l.KeepInput)||l.AutoAttachSeconds is not (0 or 1 or 3 or 5)||l.FileResultCount is not (5 or 8 or 12)||l.Favorites==null||l.SearchEngines==null||l.PinnedApps==null||l.SearchEngines.Length==0)throw new ArgumentException(Strings.Settings_Launcher_Invalid);
         if(l.Favorites.Any(f=>f==null||string.IsNullOrWhiteSpace(f.Path))||l.PinnedApps.Any(string.IsNullOrWhiteSpace))throw new ArgumentException(Strings.Settings_LauncherEntry_Invalid);
         if(l.SearchEngines.Any(e=>e==null||string.IsNullOrWhiteSpace(e.Name)||string.IsNullOrWhiteSpace(e.Keyword)||e.Keyword.Any(char.IsWhiteSpace)||e.UrlTemplate==null||!e.UrlTemplate.Contains("{query}",StringComparison.Ordinal)||!Uri.TryCreate(e.UrlTemplate.Replace("{query}","test"),UriKind.Absolute,out var uri)||uri.Scheme is not ("http" or "https"))||l.SearchEngines.Select(e=>e.Keyword).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=l.SearchEngines.Length||!l.SearchEngines.Any(e=>string.Equals(e.Keyword,l.DefaultEngine,StringComparison.OrdinalIgnoreCase)))throw new ArgumentException(Strings.Settings_SearchEngine_Invalid);
