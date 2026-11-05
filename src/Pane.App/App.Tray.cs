@@ -26,9 +26,12 @@ public sealed partial class App
             u is {State:UpdateState.Ready,Latest:{} r}?r.Version:null,
             HotkeyBox.Names(Store.Current.Launcher.Hotkey).ToList(),
             HotkeyBox.Names(Store.Current.Clipboard.Hotkey).ToList(),
-            gestureService!=null,gestureService?.IsPaused??false,
+            Modules.IsActive(ModuleIds.Gestures),gestureService?.IsPaused??false,
             pause is {} k?HotkeyBox.Names(new Settings.Hotkey((Settings.KeyModifiers)(int)k.Modifiers,k.VirtualKey)).ToList():[],
-            Store.Current.Clipboard.Enabled));
+            Modules.IsActive(ModuleIds.Clipboard),Modules.IsActive(ModuleIds.Launcher),
+            Modules.IsActive(ModuleIds.Rename)&&!Modules.IsActive(ModuleIds.Launcher)&&!Modules.IsActive(ModuleIds.SuperPanel),   /* 055：按能力列菜单项 */
+            Modules.IsActive(ModuleIds.PowerTimer)&&PowerTimer!=null,
+            PowerTimer?.Current is {} timer?string.Format(Strings.Tray_TimerStatus,(object?)PowerTimerText.State(timer),(object?)PowerTimerText.Span(timer.At-DateTimeOffset.Now)):null));   /* 058 */
         foreach(var other in panels.Values)if(other!=trayPanel)other.Hide();
         current=trayPanel;
         trayPanel.Show(true,x,y,!demo);
@@ -40,6 +43,9 @@ public sealed partial class App
             case "update":Updates?.InstallAndRestart();break;
             case "launcher":Command("show-launcher");break;
             case "clipboard":Command("show-clipboard");break;
+            case "rename":ShowRename([],0);break;
+            case "timer":ShowTimer();break;   /* 058 */
+            case "timer-cancel":PowerTimer?.Cancel();break;   /* 055：启动器和超级面板都停用时的入口，空窗口里拖文件进来 */
             case "settings":Command("show-settings");break;
             case "pause":Command("pause-gestures");break;
             case "exit":Command("exit");break;

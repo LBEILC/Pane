@@ -9,7 +9,7 @@ using Pane.Services.Icons;
 namespace Pane.Services.Launcher;
 
 internal sealed record PersistedIndex(int Version,LauncherSnapshot Snapshot,IndexMetrics Metrics,DateTimeOffset BuiltAt);
-internal sealed record IndexRequest(FavoriteEntry[] Favorites) { public IconSettings Icons {get;init;}=new(); }
+internal sealed record IndexRequest(FavoriteEntry[] Favorites) { public IconSettings Icons {get;init;}=new(); public PortableEntry[] Portable {get;init;}=[]; }
 [JsonSerializable(typeof(PersistedIndex))]
 [JsonSerializable(typeof(IndexRequest))]
 internal partial class IndexJson:JsonSerializerContext { }
@@ -49,7 +49,7 @@ internal static class IndexWorker
             if(args.Length!=4)return 2;
             using var process=Process.GetCurrentProcess();process.PriorityClass=ProcessPriorityClass.BelowNormal;
             var request=JsonSerializer.Deserialize(File.ReadAllText(args[2]),IndexJson.Default.IndexRequest)??throw new InvalidDataException();
-            var value=IndexBuilder.Build(new WindowsAppCatalog(args[1]),request.Favorites,default);
+            var value=IndexBuilder.Build(new WindowsAppCatalog(args[1],portable:request.Portable),request.Favorites,default);
             IndexStorage.Write(args[3]+".raw",value);
             value=IconProcessing.Apply(value,args[1],request.Icons,default);
             IndexStorage.Write(args[3],value);return 0;
@@ -76,6 +76,7 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
     public int LastProcessId {get;private set;}
     public int? LastExitCode {get;private set;}
     public string Outcome {get;private set;}="none";
+    public Func<PortableEntry[]> PortableProvider {get;set;}=()=>[];
     public Func<IconSettings> IconSettingsProvider {get;set;}=()=>new();
     public event Action<PersistedIndex>? OriginalsReady;
     string ResultPath=>Path.Combine(directory,"launcher-index.json");
@@ -87,7 +88,7 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
             using var lease=new FileStream(Path.Combine(directory,"launcher-index.lock"),FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None);
             string request=Path.Combine(directory,"launcher-index-request.json"),candidate=Path.Combine(directory,"launcher-index-candidate.json");
             File.Delete(candidate);File.Delete(candidate+".tmp");File.Delete(candidate+".raw");File.Delete(candidate+".raw.tmp");
-            File.WriteAllText(request,JsonSerializer.Serialize(new IndexRequest(favorites){Icons=IconSettingsProvider()},IndexJson.Default.IndexRequest));
+            File.WriteAllText(request,JsonSerializer.Serialize(new IndexRequest(favorites){Icons=IconSettingsProvider(),Portable=PortableProvider()},IndexJson.Default.IndexRequest));
             var start=new ProcessStartInfo(executable??Environment.ProcessPath!){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden};
             foreach(var arg in new[]{"--launcher-index",directory,request,candidate})start.ArgumentList.Add(arg);
             using var child=new Process{StartInfo=start};var watch=Stopwatch.StartNew();PeakWorkingSet=0;LastProcessId=0;LastExitCode=null;Outcome="starting";

@@ -7,6 +7,7 @@ static partial class Program
 {
     // 只在测试 exe 中支持故障夹具；产品索引模式没有故障注入开关。
     static int FixtureWorker(string[] args){
+        if(Path.GetFileName(args[1]).StartsWith("057-worker-",StringComparison.Ordinal))return IndexWorker.Run(args);
         try{
             var request=JsonSerializer.Deserialize(File.ReadAllText(args[2]),IndexJson.Default.IndexRequest)!;
             string mode=request.Favorites.FirstOrDefault()?.Path??"";
@@ -17,7 +18,7 @@ static partial class Program
     }
     static bool Exited(int id){try{using var p=Process.GetProcessById(id);return p.HasExited;}catch(ArgumentException){return true;}}
     static async Task IndexTests(){
-        int before=checks,loads=PinyinTable.Loads;string directory=Path.Combine(AppContext.BaseDirectory,"results","index-"+Guid.NewGuid().ToString("N"));
+        int before=checks,loads=PinyinTable.Loads;string directory=TestResults.NewDirectory("index-");
         var provider=new ProcessLauncherIndex(directory);Check(provider.Load()==null,"first run no index");
         var value=await provider.BuildAsync([new(@"C:\fixture\银行.txt",false)],default);
         Check(value.Snapshot.Apps.Length==2&&value.Snapshot.Apps[0].Name.Match("weixin")!=null&&value.Snapshot.Favorites[0].Name.Match("yh")!=null,"snapshot roundtrip names/tokens");

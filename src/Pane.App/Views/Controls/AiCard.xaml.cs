@@ -9,6 +9,10 @@ namespace Pane.Views.Controls;
 public sealed partial class AiCard : UserControl
 {
     readonly Microsoft.UI.Dispatching.DispatcherQueueTimer blink;
+    readonly Windows.Foundation.TypedEventHandler<Microsoft.UI.Dispatching.DispatcherQueueTimer, object> blinkTick;
+
+    /// <summary>所在视图永久销毁时调用：停掉生成并退订光标闪烁计时器（计时器不参与 XAML 引用跟踪，不退订会把整个视图留住）。</summary>
+    public void Release() { Cancel(); blink.Stop(); blink.Tick -= blinkTick; }
     CancellationTokenSource? running;
     IAiService? ai;
     AiRequest? request;
@@ -19,7 +23,8 @@ public sealed partial class AiCard : UserControl
         InitializeComponent();
         blink = DispatcherQueue.CreateTimer();
         blink.Interval = TimeSpan.FromMilliseconds(450); // 原型 caret 0.9s 两步
-        blink.Tick += (_, _) => Caret.Opacity = Caret.Opacity > 0 ? 0 : 1;
+        blinkTick = (_, _) => Caret.Opacity = Caret.Opacity > 0 ? 0 : 1;
+        blink.Tick += blinkTick;
         Unloaded += (_, _) => Cancel();
     }
 

@@ -11,6 +11,14 @@ namespace Pane.Services.Ai;
 
 public sealed partial class AiService : IAiService,IAiSetup,IDisposable
 {
+    volatile bool moduleEnabled=true;
+    CancellationTokenSource moduleLifetime=new();
+    CancellationToken ModuleToken(){lock(gate){if(!moduleEnabled)throw new AiCredentialException("AI 未启用");return moduleLifetime.Token;}} // TODO(design): 移入资源。
+    internal void SetModuleEnabled(bool enabled)
+    {
+        lock(gate){if(moduleEnabled==enabled)return;moduleEnabled=enabled;if(enabled){moduleLifetime.Dispose();moduleLifetime=new();}else{moduleLifetime.Cancel();pendingLogin?.Cancel();foreach(var client in clients.Values){client.CancelPendingRequests();client.Dispose();}clients.Clear();}}
+        Notify();
+    }
     readonly SettingsStore store;
     readonly SecretStore secrets;
     readonly AiEndpoints endpoints;
@@ -37,7 +45,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public event EventHandler? Changed;
     void Notify(){StatusChanged?.Invoke(this,EventArgs.Empty);Changed?.Invoke(this,EventArgs.Empty);}
     void SettingsChanged(object? sender,EventArgs e){lock(gate){models=[];modelsSource=null;}Notify();}
-    public AiStatus Status=>store.Current.Ai.Provider==AiProvider.Api?(AiSettings.ValidUrl(store.Current.Ai.ApiBaseUrl)&&!string.IsNullOrWhiteSpace(key)&&!string.IsNullOrWhiteSpace(store.Current.Ai.ApiModel)?AiStatus.Ready:AiStatus.NotConfigured):Account!=null?AiStatus.Ready:AiStatus.NeedsSignIn;
+    public AiStatus Status=>!moduleEnabled?AiStatus.NotConfigured:store.Current.Ai.Provider==AiProvider.Api?(AiSettings.ValidUrl(store.Current.Ai.ApiBaseUrl)&&!string.IsNullOrWhiteSpace(key)&&!string.IsNullOrWhiteSpace(store.Current.Ai.ApiModel)?AiStatus.Ready:AiStatus.NotConfigured):Account!=null?AiStatus.Ready:AiStatus.NeedsSignIn;
     public string? CurrentModelId {get{var s=store.Current.Ai;return s.Provider==AiProvider.Api?s.ApiModel:s.ChatGptModel??models.FirstOrDefault()?.Id;}}
     string? ModelName(string? id)=>models.FirstOrDefault(m=>m.Id==id)?.DisplayName??id;
     public string? CurrentModelName=>ModelName(CurrentModelId);
@@ -61,7 +69,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     }
     internal HttpClient Client(AiSettings settings)
     {
-        lock(gate){ObjectDisposedException.ThrowIf(lifetime.IsCancellationRequested,this);var proxy=(settings.Proxy,settings.Proxy==AiProxyMode.Custom?settings.ProxyUrl??"":"");
+        lock(gate){if(!moduleEnabled)throw new AiCredentialException("AI 未启用"); /* TODO(design): 移入资源。 */ ObjectDisposedException.ThrowIf(lifetime.IsCancellationRequested,this);var proxy=(settings.Proxy,settings.Proxy==AiProxyMode.Custom?settings.ProxyUrl??"":"");
             if(!clients.TryGetValue(proxy,out var client)){
                 var handler=CreateHandler(settings);
                 clients[proxy]=client=new HttpClient(endpoints.WrapHandler?.Invoke(handler)??handler){Timeout=Timeout.InfiniteTimeSpan};
@@ -71,7 +79,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public async Task TestProxyAsync(CancellationToken cancellationToken)
     {
         var settings=store.Current.Ai;
-        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token);
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,ModuleToken());
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
         // 只探测地址，不发送认证、正文，也不跟随重定向。
         using var request=new HttpRequestMessage(HttpMethod.Head,settings.Provider==AiProvider.ChatGpt?endpoints.Probe:settings.ApiBaseUrl);
@@ -133,13 +141,13 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     async IAsyncEnumerable<string> Stream(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,[EnumeratorCancellation] CancellationToken cancellationToken)
     {
         CancellationToken sessionToken;lock(gate)sessionToken=settings.Provider==AiProvider.ChatGpt?session.Token:default;
-        using var total=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken);total.CancelAfter(TotalTimeout);
+        using var total=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken,ModuleToken());total.CancelAfter(TotalTimeout);
         using var first=CancellationTokenSource.CreateLinkedTokenSource(total.Token);first.CancelAfter(FirstTimeout);
         await using var iterator=RunCore(settings,messages,modelId,first,first.Token).GetAsyncEnumerator(first.Token);
         while(true){
             bool next;
             try{next=await iterator.MoveNextAsync();}
-            catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested&&!sessionToken.IsCancellationRequested){throw new AiNetworkException(Strings.Ai_NoResponse);}
+            catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested&&!sessionToken.IsCancellationRequested&&moduleEnabled){throw new AiNetworkException(Strings.Ai_NoResponse);}
             catch(IOException){throw new AiNetworkException(Strings.Ai_StreamInterrupted);}
             catch(HttpRequestException){throw new AiNetworkException(Strings.Ai_StreamInterrupted);}
             if(!next)yield break;yield return iterator.Current;
@@ -187,11 +195,11 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public async Task<IReadOnlyList<AiModel>> ListModelsAsync(CancellationToken cancellationToken)
     {
         var settings=store.Current.Ai;CancellationToken sessionToken;lock(gate)sessionToken=settings.Provider==AiProvider.ChatGpt?session.Token:default;
-        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken);timeout.CancelAfter(FirstTimeout);
-        try{return await Models(settings,timeout.Token);}catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested&&!sessionToken.IsCancellationRequested){throw new AiNetworkException(Strings.Ai_NoResponse);}
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken,ModuleToken());timeout.CancelAfter(FirstTimeout);
+        try{return await Models(settings,timeout.Token);}catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested&&!sessionToken.IsCancellationRequested&&moduleEnabled){throw new AiNetworkException(Strings.Ai_NoResponse);}
     }
     public async Task TestAsync(CancellationToken cancellationToken){await foreach(var _ in RunAsync(new("ask","",null,"只回答一个字：好"),cancellationToken)){} } // 不翻译：协议提示词
-    public void Dispose(){store.Changed-=SettingsChanged;lifetime.Cancel();lock(gate){pendingLogin?.Cancel();foreach(var client in clients.Values)client.Dispose();clients.Clear();}}
+    public void Dispose(){store.Changed-=SettingsChanged;lifetime.Cancel();moduleLifetime.Cancel();lock(gate){pendingLogin?.Cancel();foreach(var client in clients.Values)client.Dispose();clients.Clear();}}
 }
 
 internal sealed record AiEndpoints

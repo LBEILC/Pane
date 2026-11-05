@@ -51,7 +51,7 @@
             </Grid>
             <Border x:Name="UpdateSeparator" Style="{StaticResource Separator}" Visibility="Collapsed"/>
 
-            <Grid Tag="launcher" Style="{StaticResource ItemRow}">
+            <Grid x:Name="LauncherItem" Tag="launcher" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <c:PaneIcon Glyph="search" Style="{StaticResource ItemIcon}"/>
                 <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_OpenLauncher}" Style="{StaticResource ItemText}"/>
@@ -62,6 +62,21 @@
                 <c:PaneIcon Glyph="clipboard" Style="{StaticResource ItemIcon}"/>
                 <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_OpenClipboard}" Style="{StaticResource ItemText}"/>
                 <StackPanel x:Name="ClipboardKeys" Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"/>
+            </Grid>
+            <Grid x:Name="TimerItem" Tag="timer" Style="{StaticResource ItemRow}" Visibility="Collapsed">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <c:PaneIcon Glyph="timer" Style="{StaticResource ItemIcon}"/>
+                <TextBlock x:Name="TimerText" Grid.Column="1" Style="{StaticResource ItemText}"/>
+            </Grid>
+            <Grid x:Name="TimerCancelItem" Tag="timer-cancel" Style="{StaticResource ItemRow}" Visibility="Collapsed">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <c:PaneIcon Glyph="close" Style="{StaticResource ItemIcon}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_TimerCancel}" Style="{StaticResource ItemText}"/>
+            </Grid>
+            <Grid x:Name="RenameItem" Tag="rename" Style="{StaticResource ItemRow}" Visibility="Collapsed">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <c:PaneIcon Glyph="pencil" Style="{StaticResource ItemIcon}"/>
+                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Tray_OpenRename}" Style="{StaticResource ItemText}"/>
             </Grid>
             <Grid Tag="settings" Style="{StaticResource ItemRow}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>

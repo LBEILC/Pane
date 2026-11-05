@@ -1,8 +1,22 @@
 ﻿$ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
+. (Join-Path (Split-Path (Split-Path $root -Parent) -Parent) 'scripts/remove-tree.ps1')
 function New-Result([string]$name){
     $dir=Join-Path $root 'bin/results';New-Item -ItemType Directory -Force $dir | Out-Null
+    Remove-StaleResults $dir
     Join-Path $dir ($name+'-'+[Guid]::NewGuid().ToString('N'))
+}
+# 7 天没动过的旧结果顺手删掉，免得无限累积；同名带 .error 失败标记的整组留作现场。
+function Remove-StaleResults([string]$dir){
+    $stale=[DateTime]::Now.AddDays(-7)
+    $entries=@(Get-ChildItem -LiteralPath $dir -Force)
+    $failed=@{};foreach($entry in $entries){if($entry.Name -like '*.error'){$failed[$entry.Name.Substring(0,$entry.Name.Length-6)]=$true}}
+    foreach($entry in $entries){
+        if($entry.LastWriteTime -gt $stale){continue}
+        $base=if($entry.PSIsContainer){$entry.Name -replace '-data$',''}else{$entry.Name.Split('.')[0]}
+        if($failed.ContainsKey($base)){continue}
+        try {Remove-LinkSafeTree $entry.FullName}catch{Write-Warning "旧结果没删掉：$($entry.FullName)"}
+    }
 }
 function Start-Pane([string]$mode,[string]$prefix,[bool]$demo=$false,[string]$dataDirectory='',[bool]$isolated=$true){
     if(!$dataDirectory){$dataDirectory=$prefix+'-data'}

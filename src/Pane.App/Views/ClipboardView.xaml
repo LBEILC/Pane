@@ -2,6 +2,7 @@
 <!--
   剪贴板（设计负责人）。照原型 prototype/index.html #clipboard 和 style.css「剪贴板」一节。
   宽 372、高 640：搜索框 → 类型筛选 → 分组列表（已固定 / 今天 / 更早）→ 底部快捷键提示。
+  已固定区多于 3 条时收起，末尾一行展开行（docs/design.md「剪贴板已固定区可折叠」）。
 -->
 <UserControl
     x:Class="Pane.Views.ClipboardView"
@@ -42,7 +43,9 @@
                     <!-- 图片（以及复制的单个图片文件）：按原图比例显示，宽图铺满一行、竖图限高靠左（2026-11-01 用户：一条横条看不出竖图） -->
                     <Border Width="{x:Bind ThumbWidth}" Height="{x:Bind ThumbHeight}" HorizontalAlignment="{x:Bind ThumbAlign}" CornerRadius="8"
                             Background="{x:Bind Thumb}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
-                            Visibility="{x:Bind ThumbVisibility}"/>
+                            Visibility="{x:Bind ThumbVisibility}">
+                        <Image Source="{x:Bind ThumbPicture}" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
                     <!-- 文件：每行一个文件名 -->
                     <ItemsControl ItemsSource="{x:Bind FileLines}" Visibility="{x:Bind FilesVisibility}" IsTabStop="False">
                         <ItemsControl.ItemTemplate>
@@ -80,7 +83,7 @@
                             <StackPanel Orientation="Horizontal" Spacing="2" Opacity="{x:Bind ActionsOpacity, Mode=OneWay}"
                                         IsHitTestVisible="{x:Bind ActionsHitTest, Mode=OneWay}">
                                 <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
-                                        Click="{x:Bind Send}" ToolTipService.ToolTip="{x:Bind loc:Strings.Clipboard_SendToLauncherHint}">
+                                        Click="{x:Bind Send}" Visibility="{x:Bind SendVisibility}" ToolTipService.ToolTip="{x:Bind loc:Strings.Clipboard_SendToLauncherHint}">
                                     <c:PaneIcon Glyph="R" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>
                                 <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
@@ -102,6 +105,23 @@
             <StackPanel>
                 <TextBlock Style="{StaticResource PaneGroupLabel}" Text="{x:Bind Label}"/>
                 <ItemsControl ItemsSource="{x:Bind Rows}" ItemTemplate="{StaticResource ClipTemplate}" IsTabStop="False"/>
+                <!-- 已固定区的展开行（原型 .more-row）：箭头在类型图标那一列，次要文字色；选中 / 悬停变正文色 -->
+                <Grid x:Name="MoreRow" DataContext="{x:Bind More}" Visibility="{x:Bind MoreVisibility}"
+                      Height="{StaticResource PaneControlMd}" Padding="12,0,12,0" ColumnSpacing="10" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="28"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <c:PaneIcon Glyph="chev-d" Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Foreground="{ThemeResource PaneText1Brush}" Opacity="{x:Bind More.TextOpacity, Mode=OneWay}" RenderTransformOrigin="0.5,0.5">
+                        <c:PaneIcon.RenderTransform>
+                            <RotateTransform Angle="{x:Bind More.Angle}"/>
+                        </c:PaneIcon.RenderTransform>
+                    </c:PaneIcon>
+                    <TextBlock Grid.Column="1" Text="{x:Bind More.Label}" VerticalAlignment="Center"
+                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"
+                               Foreground="{ThemeResource PaneText1Brush}" Opacity="{x:Bind More.TextOpacity, Mode=OneWay}"/>
+                </Grid>
             </StackPanel>
         </DataTemplate>
 

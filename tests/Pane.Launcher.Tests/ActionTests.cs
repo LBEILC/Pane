@@ -35,7 +35,7 @@ static partial class Program
         var app=new LauncherItem("app:1",LauncherItemKind.App,LauncherGroups.Applications,"fixture",null,new("app"));
         var indexed=new IndexedApp(app.Id,new PinyinTable().Create("fixture"),"fixture.lnk",false,null);
         var resolved=actions.Target(app,indexed);
-        Check(actions.Get(app,resolved).SequenceEqual(Enum.GetValues<LauncherItemAction>()),"ordered app actions");
+        Check(actions.Get(app,resolved).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.Uninstall]),"ordered app actions");
         Check(actions.Target(app,indexed with{Packaged=true})==null,"store no actions");
         Check(actions.Target(app,indexed with{Launch="missing"})==null,"unresolved shortcut no actions");
         foreach(var kind in new[]{LauncherItemKind.Command,LauncherItemKind.Calculation,LauncherItemKind.Web,LauncherItemKind.Ai,LauncherItemKind.Action})Check(actions.Get(app with{Kind=kind},actions.Target(app with{Kind=kind},null)).Count==0,"non file no actions");
@@ -44,7 +44,7 @@ static partial class Program
             Check(actions.Get(file,actions.Target(file,null)).SequenceEqual([LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties]),"file actions");
         }
         Check(actions.Target(app with{Kind=LauncherItemKind.File,Id=@"file:\\server\share\file.txt"},null)?.Path==@"\\server\share\file.txt","network file path preserved");
-        foreach(var action in Enum.GetValues<LauncherItemAction>())await actions.Run(app,resolved,action,default);
+        foreach(var action in actions.Get(app,resolved))await actions.Run(app,resolved,action,default);
         Check(executor.Calls.SequenceEqual(["reveal:"+target,"copy:"+target]),"fake reveal and clipboard target");
         Check(platform.Property==target,"fake properties target");
         Check(process.Request is {FileName:"MsiExec.exe",Elevated:false}&&process.Request.Arguments.SequenceEqual(["/X{fixture}"]),"MSI untouched");
@@ -56,7 +56,7 @@ static partial class Program
         platform.Entries=[];
         Check(!actions.Get(app,resolved).Contains(LauncherItemAction.Uninstall),"no matching uninstall");
         try{await actions.Run(app,resolved,LauncherItemAction.Uninstall,default);Check(false,"removed registry entry");}catch(LauncherActionException){Check(true,"removed registry entry");}
-        var store=new SettingsStore(Path.Combine(AppContext.BaseDirectory,"results","actions-"+Guid.NewGuid()),Defaults());
+        var store=new SettingsStore(TestResults.NewDirectory("actions-"),Defaults());
         using var service=new LauncherSearch(store,new FixtureIndex(new FakeCatalog()),new FakeFiles(),executor,process:process,actionPlatform:platform);await service.Indexing;
         int reads=platform.Reads,resolves=platform.Resolves;await service.SearchAsync("wx",default);
         Check(platform.Reads==reads&&platform.Resolves==resolves,"search never invokes actions");
@@ -69,7 +69,8 @@ static partial class Program
         try{await service.GetActionsAsync(app,cancel.Token);Check(false,"cancel get");}catch(OperationCanceledException){Check(true,"cancel get");}
         try{await service.RunAsync(app,LauncherItemAction.CopyPath,cancel.Token);Check(false,"cancel run");}catch(OperationCanceledException){Check(true,"cancel run");}
         var sample=new Pane.DesignData.LauncherSampleSearch();
-        Check((await sample.GetActionsAsync(app with{Title="微信"},default)).Count==5,"sample full actions");
+        // 设计定（057）：演示微信是安装的软件，五项含卸载，不给「从应用列表移除」
+        Check((await sample.GetActionsAsync(app with{Title="微信"},default)).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.Uninstall]),"sample full actions");
         Check((await sample.GetActionsAsync(app with{Title="Visual Studio Code"},default)).Count==4,"sample no uninstall");
         Check((await sample.GetActionsAsync(app with{Title="终端"},default)).Count==0,"sample packaged");
         Console.WriteLine($"PASS actions assertions={checks-start};realExecutions=0;clipboardWrites=0");

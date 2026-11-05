@@ -9,6 +9,10 @@ constexpr uintptr_t InputTag = 0x45303130UL;
 constexpr bool ownInput(uintptr_t tag) { return tag==InputTag || tag==0x50414E45303130ULL; }
 // 与发送线程共享；计数支持并发发送，标记负责异步到达的事件。
 inline std::atomic<unsigned> simulatingInput=0;
+// 面板吞掉的按键下游双击钩子看不到；序号让未完成的双击轮次失效。
+inline std::atomic<unsigned> panelKeySerial=0;
+// 鼠标钩子发布按下序号，键盘线程只读；不为双击另挂鼠标钩子。
+inline std::atomic<uint64_t> mouseDownSerial=0;
 inline std::atomic<bool> inputBypass=false;
 struct SimulationScope {SimulationScope(){simulatingInput++;}~SimulationScope(){simulatingInput--;}};
 enum Kind { Move, Down, Up, Wheel, Tick };

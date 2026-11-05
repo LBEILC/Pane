@@ -8,6 +8,10 @@ static partial class Program
         p.SameRoot=true;Check(transfer.Equivalent(1,2),"root owner foreground");p.SameRoot=false;
         p.SameProcess=true;Check(transfer.Equivalent(1,2),"same process foreground");p.SameProcess=false;
         Check(!transfer.Equivalent(1,2)&&!transfer.Equivalent(0,0),"unrelated and null rejected");
+        foreach(int mode in new[]{0,1,2}){
+            var ready=new PasteFake{Foreground=mode==0?1:2,SameRoot=mode==1,SameProcess=mode==2};
+            Check(new PasteTransfer(ready).Focus(1,default)&&ready.Restores==0&&ready.Activations==0&&ready.Attaches.Count==0&&ready.Tops==0,"already foreground never changes focus");
+        }
         p.ActivateWorks=false;p.FallbackWorks=true;Check(transfer.Focus(1,default)&&p.Attaches.SequenceEqual([true,false])&&p.Tops==1,"fallback attach and detach");
         p=new(){ActivateWorks=false};transfer=new(p);Check(!transfer.Focus(1,default)&&p.Now==300,"bounded focus polling");
         p=new(){LogicalKeys=[91]};transfer=new(p);transfer.PrepareModifiers(default);Check(p.Keys.SequenceEqual([(91,false)]),"stale logical key released");
@@ -47,15 +51,15 @@ static partial class Program
         public bool Alive=true,SameRoot,SameProcess,ActivateWorks=true,FallbackWorks,KeyWorks=true,LoseOnLogical,ThrowTop;
         public bool? HigherValue=false;
         public HashSet<int> PhysicalKeys=[],LogicalKeys=[];
-        public List<(int,bool)> Keys=[];public List<bool> Attaches=[];public int Tops,FailKeyAt;
+        public List<(int,bool)> Keys=[];public List<bool> Attaches=[];public int Tops,FailKeyAt,Restores,Activations;
         public bool Exists(nint w)=>Alive;
         public uint Process(nint w)=>SameProcess?1:(uint)w;
         public nint Root(nint w)=>SameRoot?1:w;
         public uint Thread(nint w)=>(uint)w;
-        public bool Activate(nint w){if(ActivateWorks||FallbackWorks&&Attaches.Contains(true)){Foreground=w;return true;}return false;}
+        public bool Activate(nint w){Activations++;if(ActivateWorks||FallbackWorks&&Attaches.Contains(true)){Foreground=w;return true;}return false;}
         public bool Attach(uint a,uint b,bool attach){Attaches.Add(attach);return true;}
         public void Top(nint w){Tops++;if(ThrowTop)throw new InvalidOperationException();}
-        public void Restore(nint w){}
+        public void Restore(nint w){Restores++;}
         public bool Physical(int k)=>PhysicalKeys.Contains(k);
         public bool Logical(int k){if(LoseOnLogical)Foreground=2;return LogicalKeys.Contains(k);}
         public bool Key(ushort k,bool down){Keys.Add((k,down));return KeyWorks&&Keys.Count!=FailKeyAt;}

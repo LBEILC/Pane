@@ -34,7 +34,7 @@ static partial class Program
             Console.WriteLine("seed=500;images=50;systemClipboard=0");return;
         }
         foreach(var pair in new (string,ClipKind)[]{("hello",ClipKind.Text),(" https://example.test/a?q=1 ",ClipKind.Link),("http://example.test",ClipKind.Link),("https://a.test https://b.test",ClipKind.Text),("ftp://example.test",ClipKind.Text),("#abc",ClipKind.Color),("#ABCDEF",ClipKind.Color),("#88aabbcc",ClipKind.Color),("#abcd",ClipKind.Text),("#ggg",ClipKind.Text),("rgb(0, 255, 1)",ClipKind.Color),("rgba(0,1,2,.5)",ClipKind.Color),("rgba(0,1,2,1.0)",ClipKind.Color),("rgb(256,0,0)",ClipKind.Text),("rgb(0,0,0,1)",ClipKind.Text),("rgba(0,0,0)",ClipKind.Text),("rgba(0,0,0,2)",ClipKind.Text),("blue",ClipKind.Text),("public void X() {\n    return;\n}",ClipKind.Code),("def x():\n    return 1",ClipKind.Code),("购物清单\n    苹果;",ClipKind.Text),("text {\nwords; }",ClipKind.Text)})Check(ClipboardClassifier.Classify(pair.Item1)==pair.Item2,"classification");
-        string root=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));var settings=new SettingsStore(root,Defaults());
+        string root=TestResults.NewDirectory();var settings=new SettingsStore(root,Defaults());
         string json=JsonSerializer.Serialize(Defaults(),SettingsJson.Default.PaneSettings);
         using(var doc=JsonDocument.Parse(json)){
             string old="{"+string.Join(',',doc.RootElement.EnumerateObject().Select(p=>p.Name=="Clipboard"?"\"Clipboard\":{\"Hotkey\":{\"Modifiers\":\"Ctrl\",\"VirtualKey\":86}}":"\""+p.Name+"\":"+p.Value.GetRawText()))+"}";
@@ -85,6 +85,7 @@ static partial class Program
         await FileThumbnailTests();
         PasteTests();
         Console.WriteLine($"PASS clipboard assertions={checks};systemClipboardRead=0;systemClipboardWrite=0;listenerStopped=1");
+        TestResults.Pass();
     }
     internal static byte[] Png(int width,int height,int seed)
     {

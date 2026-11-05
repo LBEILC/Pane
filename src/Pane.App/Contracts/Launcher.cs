@@ -123,10 +123,31 @@ public static class LauncherGroups
     public const string Images = "images";
     public const string Other = "other";
     public const string Actions = "actions";
+    public const string Timer = "timer";   // 定时关机（058）：「30 分钟后关机」这类说法的结果，排在最前，列表样式
 }
 
-/// <summary>启动器结果的附加操作（050，issue 10）。顺序就是菜单里的顺序。</summary>
-public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall }
+/// <summary>
+/// 启动器结果的附加操作（050，issue 10）。顺序就是菜单里的顺序。
+/// RemoveFromApps（057，issue 19）：只给单独添加的便携程序和记住的程序，从 LauncherSettings.Portable 里去掉（不删文件），之后重建索引；
+/// 文件夹扫描出来的、安装的软件都不给。
+/// </summary>
+public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps }
+
+/// <summary>便携软件某一项的扫描状态（057）。</summary>
+public enum PortableScanState { Scanning, Ready, Missing }
+
+/// <param name="Programs">文件夹：扫到几个程序（去掉辅助程序和与已安装软件重复的之后）；程序：1。Scanning / Missing 时为 0。</param>
+public sealed record PortableStatus(PortableScanState State, int Programs);
+
+/// <summary>
+/// 设置页「便携软件」每一行的副标题用（057）。键是 PortableEntry.Path（不分大小写）。
+/// 索引重建完成、文件夹或程序被删时触发 Changed（可在后台线程，界面自己切回）；没扫过的路径返回 Scanning。
+/// </summary>
+public interface IPortableAppsStatus
+{
+    PortableStatus Get(string path);
+    event EventHandler? Changed;
+}
 
 /// <summary>
 /// 右键 / Ctrl+K 菜单的数据。LauncherSearch 和 DesignData/LauncherSampleSearch 都实现它。

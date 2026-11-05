@@ -47,6 +47,7 @@ public sealed class WindowsSystem(Action pause,Func<bool>? isActive=null) : ISys
 internal static class Win
 {
     const string Dll="Pane.Native.dll";
+    [DllImport(Dll)] internal static extern int PaneMouseActive();
     [DllImport(Dll)] internal static extern int PaneStart(int observe);
     [DllImport(Dll)] internal static extern int PaneEnterTestDesktop();
     [DllImport(Dll)] internal static extern void PaneLeaveTestDesktop();

@@ -1,7 +1,10 @@
 namespace Pane.Settings;
 [Flags] public enum KeyModifiers { None=0, Ctrl=1, Alt=2, Shift=4, Win=8 }
 public enum ThemeMode { System, Light, Dark }
-public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); } }
+public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); }
+    // 能力模块的启用状态（设计加，2026-11-04，055）：键是 Pane.Contracts.ModuleIds，没写的用 ModuleInfo.DefaultEnabled。
+    // 旧设置文件没有这项时，按旧的总开关迁移（Clipboard / SuperPanel / FolderJump 的 Enabled），见 docs/design.md「能力模块」
+    Dictionary<string,bool>? modules; public Dictionary<string,bool>? Modules { get=>modules; init=>modules=value; } }
 // 文件对话框跳转（设计加，2026-11-01，046）：用户要能在设置里调。Ctrl+G / Ctrl+Shift+G 可改（null = 默认组合）；
 // AutoJump = 对话框刚打开时自动跳到最近用过的资源管理器文件夹（只跳一次）；ShowRecent = 菜单里列出最近用过的文件夹；MenuWhenMany（047）= 开着多个资源管理器时 Ctrl+G 改为弹菜单让用户选
 public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=null, Hotkey? MenuHotkey=null, bool AutoJump=false, bool ShowRecent=true, bool MenuWhenMany=false)
@@ -37,7 +40,14 @@ public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton Trig
 }
 public sealed record GlassThemeParameters(double TintOpacity, double LuminosityOpacity, double Saturation, double Highlight, double Shadow, double ExtraBlur);
 public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } /* 界面语言（设计加，2026-11-02，任务 048）：null = 跟随系统（繁体系统用繁体，其余用简体）；"zh-Hans" / "zh-Hant"，以后加 "en"。重启后生效 */ public string? UiLanguage { get; init; } }
-public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey);
+// DoubleTap（设计加，2026-11-04，054，issue 18）：true = 连按两下单个修饰键呼出，这时 Modifiers = None，
+// VirtualKey 只能是左右区分的修饰键 VK_LSHIFT / VK_RSHIFT / VK_LCONTROL / VK_RCONTROL / VK_LMENU / VK_RMENU（0xA0～0xA5）。
+// 只有启动器和剪贴板的热键允许这样设；不能用 RegisterHotKey 注册，宿主改用键盘钩子识别，没选时不挂钩子
+public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey)
+{
+    public bool DoubleTap { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsValidDoubleTap=>DoubleTap&&Modifiers==KeyModifiers.None&&VirtualKey is >= 0xA0 and <= 0xA5;
+}
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
@@ -82,7 +92,16 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     public string[] AskKeywords { get=>askKeywords; init=>askKeywords=value??["ai"]; }
     string[] filesKeywords=["f"];
     public string[] FilesKeywords { get=>filesKeywords; init=>filesKeywords=value??["f"]; }
+    // 便携软件（设计加，2026-11-04，057，issue 19，见 docs/design.md「便携软件」）：文件夹（扫描本身和下一层）、单独添加的程序、
+    // 用 Pane 打开过而记住的程序（最多 100 个）。三种都进「应用」组。路径不分大小写去重，顺序就是设置页列表的顺序
+    PortableEntry[] portable=[];
+    public PortableEntry[] Portable { get=>portable; init=>portable=value??[]; }
+    // 在 Pane 的文件结果里打开不在应用列表里的 .exe 时记住它；关掉后不再记新的，已记住的保留
+    public bool RememberOpenedPrograms { get; init; } = true;
 }
+public enum PortableKind { Folder, Program, Learned }
+/// <param name="AddedAt">加入时间；记住的程序满 100 个时，按启动器使用记录去掉最久没用的，没用过的按这个时间。</param>
+public sealed record PortableEntry(string Path, PortableKind Kind, DateTimeOffset AddedAt);
 public sealed record LauncherPosition(string MonitorId, double X, double Y);
 public sealed record ClipboardSettings(Hotkey Hotkey,
     bool RecordText=true,bool RecordImages=true,bool RecordFiles=true,int Limit=500,

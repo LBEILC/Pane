@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsAotCompatible>true</IsAotCompatible></PropertyGroup>
-  <ItemGroup>
+  <ItemGroup><Compile Include="../../src/Pane.App/Contracts/PowerTimer.cs" Link="PowerTimer.cs"/><Compile Include="../../src/Pane.App/Services/PowerTimerService.cs" Link="PowerTimerService.cs"/>
     <Compile Include="../../src/Pane.App/DesignData/LauncherSampleSearch.cs" Link="DesignData/LauncherSampleSearch.cs" />
     <Compile Include="../../src/Pane.App/Contracts/FileIcons.cs" Link="Contracts/FileIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Files.cs" Link="Contracts/Files.cs" />
@@ -13,4 +13,4 @@
     <Content Include="../../src/Pane.App/Services/Launcher/Data/*" Link="LauncherData/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../src/Pane.App/bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
-<Import Project="../Localization.targets" /></Project>
+<ItemGroup><Compile Include="../TestResults.cs" Link="TestResults.cs"/></ItemGroup><Import Project="../Localization.targets" /></Project>

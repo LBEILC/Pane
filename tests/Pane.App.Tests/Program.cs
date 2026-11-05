@@ -27,10 +27,12 @@ static class Program
   ClipboardHistorySuppression.IgnoreNext(2);Check(ClipboardHistorySuppression.TryConsume()&&ClipboardHistorySuppression.TryConsume()&&!ClipboardHistorySuppression.TryConsume(),"ignore next N");
   ClipboardHistorySuppression.IgnoreSequence(42);ClipboardHistorySuppression.CancelPending();Check(ClipboardHistorySuppression.TryConsume(42)&&!ClipboardHistorySuppression.TryConsume(43),"delayed notification sequence");
   var hotkey=new Hotkey(KeyModifiers.Alt,32);
+  checks+=DoubleTapBindingsTests.Run();
   var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(hotkey),new(new(KeyModifiers.Ctrl,86)));
   string json=JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings);using var document=JsonDocument.Parse(json);var old=string.Join(",",document.RootElement.EnumerateObject().Where(p=>p.Name!="SuperPanel").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()));
   var loaded=JsonSerializer.Deserialize("{"+old+"}",SettingsJson.Default.PaneSettings)!;Check(loaded.SuperPanel.TriggerButton==SuperPanelButton.X1&&loaded.SuperPanel.HoldMilliseconds==400&&loaded.SuperPanel.ClipboardFallback,"old settings defaults");
   var dir=Path.Combine(AppContext.BaseDirectory,"results","settings");var store=new SettingsStore(dir,settings);store.Save(settings with{SuperPanel=new(true,SuperPanelButton.Middle,650,false,false){DisabledPrograms=["test.exe"]}});store.Load();Check(store.Current.SuperPanel.HoldMilliseconds==650&&store.Current.SuperPanel.TriggerButton==SuperPanelButton.Middle,"super settings roundtrip");
+  checks+=await ModuleTests.Run(settings);
   checks+=FolderJumpSettingsTests.Run(settings);
   checks+=await RenameTests.Run(settings);
   checks+=await FolderListingTests.Run();
@@ -41,6 +43,7 @@ static class Program
   checks+=UninstallTests.Run();
   checks+=await UpdateTests.Run();
   Console.WriteLine($"PASS app assertions={checks}; systemClipboard=0; input=0");
+  TestResults.Pass();
  }
  sealed class Fake:ISelectionPlatform {
   public List<string> Calls=[];public SelectionFailure Failure=SelectionFailure.Unsupported;public bool Changes=true,SnapshotFails;public int DirectDelay;public string Data="original-all-formats";uint sequence;

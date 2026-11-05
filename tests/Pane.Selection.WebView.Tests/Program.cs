@@ -8,11 +8,11 @@ using Pane.Contracts;
 
 internal static class Program
 {
-    [STAThread] static void Main(){ApplicationConfiguration.Initialize();Application.Run(new Fixture());}
+    [STAThread] static void Main(){ApplicationConfiguration.Initialize();Application.Run(new Fixture());if(Environment.ExitCode==0)TestResults.Pass();}
     sealed class Fixture:Form
     {
         readonly WebView2 web=new(){Dock=DockStyle.Fill};
-        readonly string directory=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));
+        readonly string directory=TestResults.NewDirectory();
         readonly System.Windows.Forms.Timer timeout=new(){Interval=30000};
         protected override bool ShowWithoutActivation=>true;
         protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000080;return p;}}

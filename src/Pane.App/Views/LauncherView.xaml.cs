@@ -25,15 +25,15 @@ using Windows.UI.Core;
 
 namespace Pane.Views;
 
-public sealed partial class LauncherView : UserControl, IPanelView
+public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 {
     const double Width_ = 592, SearchRowHeight = 60, ResultsMaxHeight = 452, FootHeight = 34;
     const int MaxApps = 14, MaxFiles = 3;
     static string Placeholder => Strings.Launcher_SearchPlaceholder;
     // 设置 → 启动器：「复制后自动带入」时长、「再次呼出时」怎么处理上次输入、动作行
     static Settings.LauncherSettings Options => ((App)Application.Current).Store.Current.Launcher;
-    // AI 总开关（issue 8）：关掉后动作行、附件动作里的 AI 条目都不出现
-    static bool AiOn => ((App)Application.Current).Store.Current.Ai.Enabled;
+    // AI 停用（issue 8；055 起由「能力」页开关）：动作行、附件动作里的 AI 条目都不出现
+    static bool AiOn => ((App)Application.Current).Store.Current.Ai.Enabled && ModuleGate.On(Contracts.ModuleIds.Ai);
     DateTimeOffset hiddenAt = DateTimeOffset.MinValue;
 
     readonly ILauncherSearch search;
@@ -64,6 +64,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
     public event Action<string>? OpenTranslate;
     /// <summary>批量重命名（040）：文件附件给出文件；命令不带文件，宿主读呼出前那个资源管理器窗口（第二个参数）里选中的。</summary>
     public event Action<IReadOnlyList<string>?, nint>? OpenRename;
+    /// <summary>「定时关机…」（058）：打开定时窗口。</summary>
+    public event Action? OpenTimer;
     /// <summary>AI 对话窗口：要直接发出的问题，或带过去的一问一答（「继续对话」）。</summary>
     public event Action<string?, IReadOnlyList<AiChatMessage>?>? OpenChat;
     /// <summary>文件格 Ctrl+Enter「打开所在文件夹」用；宿主设置（021 之前演示模式用假服务）。</summary>
@@ -149,6 +151,20 @@ public sealed partial class LauncherView : UserControl, IPanelView
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_LAUNCHER_MENU") == "1") _ = OpenMenu(selected);
     }
 
+    // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
+    // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
+    public void Dispose()
+    {
+        Icons.Ready -= OnIconReady;
+        pending?.Cancel();
+        if (armTimer is not null) { armTimer.Stop(); armTimer.Tick -= OnArmExpired; }
+        Card.Release();
+        highlight.Dispose();
+        Sections.ItemsSource = null;
+        rows = [];
+        sections = [];
+    }
+
     public void OnHidden()
     {
         hiddenAt = DateTimeOffset.Now;
@@ -222,7 +238,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
             items.Add(new("open", LauncherItemKind.Action, LauncherGroups.Files, Strings.Common_Open, System.IO.Path.GetFileName(first), new("folder")));
             items.Add(new("reveal", LauncherItemKind.Action, LauncherGroups.Files, Strings.Common_OpenContainingFolder, Strings.Launcher_Explorer, new("folder")));
             items.Add(new("copy-path", LauncherItemKind.Action, LauncherGroups.Files, Strings.Common_CopyPath, string.Format(Strings.Launcher_PathCount, (object?)(a.Files?.Count ?? 0)), new("link")));
-            items.Add(new("rename", LauncherItemKind.Action, LauncherGroups.Files, Strings.Common_Rename, string.Format(Strings.Launcher_FileCount, (object?)(a.Files?.Count ?? 0)), new("pencil")));
+            if (ModuleGate.On(Contracts.ModuleIds.Rename)) items.Add(new("rename", LauncherItemKind.Action, LauncherGroups.Files, Strings.Common_Rename, string.Format(Strings.Launcher_FileCount, (object?)(a.Files?.Count ?? 0)), new("pencil")));
         }
         else if (a.Kind == ClipKind.Image)
         {
@@ -363,6 +379,9 @@ public sealed partial class LauncherView : UserControl, IPanelView
     void Render(LauncherResult result, string query, bool attachmentMode, bool keepSelection = false)
     {
         if (menuItem is not null) { lastResult = result; return; }   // 列着操作时晚到的结果先记下，Esc 回去再画
+        // 停用的能力不出现在结果里（055）：「批量重命名」「剪贴板」这两条命令
+        if (!ModuleGate.On(Contracts.ModuleIds.Rename) || !ModuleGate.On(Contracts.ModuleIds.Clipboard))
+            result = result with { Items = result.Items.Where(i => !(i.Kind == LauncherItemKind.Command && (i.Id == "rename" && !ModuleGate.On(Contracts.ModuleIds.Rename) || i.Id == "command:clipboard" && !ModuleGate.On(Contracts.ModuleIds.Clipboard)))).ToList() };
         var q = query.Trim();
         var keep = keepSelection && selected >= 0 && selected < rows.Count && selected != DefaultSelection() ? rows[selected].Item.Id : null;
         shownQuery = q;
@@ -424,10 +443,17 @@ public sealed partial class LauncherView : UserControl, IPanelView
         }
         else if (q.Length > 0)
         {
+            // 定时关机（058）：「30 分钟后关机」这类说法排在最前、列表样式，默认选中
+            var timers = result.Items.Where(i => i.Group == LauncherGroups.Timer).ToList();
+            if (timers.Count > 0)
+            {
+                var s = Section(Strings.Launcher_Group_Timer, LauncherSectionKind.List);
+                foreach (var item in timers) Add(s, item, LauncherCell.Command);
+            }
             // 服务给的 AI / 网页两组不用了（动作行代替）
             foreach (var item in result.Items.Where(i => i.Kind == LauncherItemKind.Calculation).Take(1))
                 Add(Section("", LauncherSectionKind.Calc), item, LauncherCell.Calc);
-            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command && i.Group != LauncherGroups.Settings).Take(MaxApps).ToList();
+            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command && i.Group is not (LauncherGroups.Settings or LauncherGroups.Timer)).Take(MaxApps).ToList();
             if (apps.Count > 0)
             {
                 var s = Section(Strings.Launcher_Group_Applications, LauncherSectionKind.Tiles);
@@ -511,6 +537,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
             LauncherCell.Command when item.Group == LauncherGroups.Terminal => (string.Format(Strings.Launcher_RunInTerminal, (object?)(item.Subtitle)), [(["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_RunAsAdmin)]),
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
+            LauncherCell.Command when item.Group == LauncherGroups.Timer => (item.Title.TrimEnd('…'), [(["Enter"], item.Id == "power:panel" ? Strings.Common_Open : item.Id == "power:cancel" ? Strings.Common_Execute : Strings.Timer_Go)]),
             LauncherCell.Command when item.Group == LauncherGroups.Settings => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
             LauncherCell.Command => (item.Title, [(["Enter"], Strings.Common_Execute)]),
             LauncherCell.File => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Tab"], Strings.Launcher_ViewInFiles), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
@@ -910,6 +937,13 @@ public sealed partial class LauncherView : UserControl, IPanelView
                 break;
         }
 
+        // 定时关机（058）：「定时关机…」由界面打开定时窗口；定好 / 取消照常走服务
+        if (item.Id == "power:panel")
+        {
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+            OpenTimer?.Invoke();
+            return;
+        }
         // 批量重命名：命令（040，Id = rename）和文件附件的动作都由界面打开重命名窗口
         if (item.Id == "rename" && item.Kind is LauncherItemKind.Command or LauncherItemKind.Action)
         {
@@ -990,6 +1024,7 @@ public sealed partial class LauncherView : UserControl, IPanelView
         LauncherItemAction.OpenLocation => (Strings.Common_OpenContainingFolder, "folder"),
         LauncherItemAction.CopyPath => (Strings.Common_CopyPath, "copy"),
         LauncherItemAction.Properties => (Strings.Launcher_Properties, "info"),
+        LauncherItemAction.RemoveFromApps => (Strings.Launcher_RemoveFromApps, "eye-off"),   // 057：不删文件，只是不再列出
         _ => (Strings.Launcher_Uninstall, "trash"),
     };
 
@@ -1014,6 +1049,8 @@ public sealed partial class LauncherView : UserControl, IPanelView
             else if (search is ILauncherItemActions actions) await actions.RunAsync(item, a, CancellationToken.None);
         }
         catch (Exception e) { MenuFailed(row, e); return; }
+        // 从应用列表移除（057）：不收起启动器，回到结果重新搜，这一项就不在了
+        if (action == LauncherItemAction.RemoveFromApps) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -1063,17 +1100,23 @@ public sealed partial class LauncherView : UserControl, IPanelView
     }
 }
 
-/// <summary>可重启的一次性计时器（输入防抖）。</summary>
-sealed class DispatcherQueueTimerHolder
+/// <summary>
+/// 可重启的一次性计时器（输入防抖）。视图永久销毁时要调 Dispose：DispatcherQueueTimer 不参与 XAML 的引用跟踪，
+/// 「计时器 → Tick 处理函数 → 视图 → 计时器」这个环 GC 收不掉，视图连同整棵原生树一直留着（每开关一次窗口 1～2 MiB）。
+/// </summary>
+sealed class DispatcherQueueTimerHolder : IDisposable
 {
     readonly Microsoft.UI.Dispatching.DispatcherQueueTimer timer;
+    readonly Windows.Foundation.TypedEventHandler<Microsoft.UI.Dispatching.DispatcherQueueTimer, object> handler;
     public DispatcherQueueTimerHolder(Microsoft.UI.Dispatching.DispatcherQueue queue, TimeSpan interval, Action tick)
     {
         timer = queue.CreateTimer();
         timer.Interval = interval;
         timer.IsRepeating = false;
-        timer.Tick += (_, _) => tick();
+        handler = (_, _) => tick();
+        timer.Tick += handler;
     }
     public void Restart() { timer.Stop(); timer.Start(); }
     public void Stop() => timer.Stop();
+    public void Dispose() { timer.Stop(); timer.Tick -= handler; }
 }

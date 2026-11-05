@@ -99,6 +99,7 @@
   <data name="Clipboard_ImageMissing" xml:space="preserve"><value>缺少完整图片</value></data>
   <data name="Clipboard_JustNow" xml:space="preserve"><value>刚刚</value></data>
   <data name="Clipboard_MinutesAgo" xml:space="preserve"><value>{0} 分钟前</value></data>
+  <data name="Clipboard_MorePinned" xml:space="preserve"><value>还有 {0} 条</value></data>
   <data name="Clipboard_NoMatches" xml:space="preserve"><value>没有匹配的记录</value></data>
   <data name="Clipboard_NoPlainText" xml:space="preserve"><value>此条目没有纯文本</value></data>
   <data name="Clipboard_Pin" xml:space="preserve"><value>固定</value></data>
@@ -174,6 +175,10 @@
   <data name="Common_OpenContainingFolder" xml:space="preserve"><value>打开所在文件夹</value></data>
   <data name="Common_Paste" xml:space="preserve"><value>粘贴</value></data>
   <data name="Common_RecordHotkey" xml:space="preserve"><value>按下新的组合键…</value></data>
+  <data name="Common_RecordHotkeyOrDoubleTap" xml:space="preserve"><value>按下组合键，或连按两下 Ctrl / Alt / Shift</value></data>
+  <data name="Common_LeftKey" xml:space="preserve"><value>左 {0}</value></data>
+  <data name="Common_RightKey" xml:space="preserve"><value>右 {0}</value></data>
+  <data name="Common_DoubleTapKey" xml:space="preserve"><value>双击{0}</value></data>
   <data name="Common_RecordKey" xml:space="preserve"><value>按下要发送的键…</value></data>
   <data name="Common_Regenerate" xml:space="preserve"><value>重新生成</value></data>
   <data name="Common_ReleaseWinVFailed" xml:space="preserve"><value>无法释放 Win+V 热键</value></data>
@@ -324,6 +329,7 @@
 附件：
 {1}</value></data>
   <data name="Launcher_RemoveAttachmentHint" xml:space="preserve"><value>去掉附件（Esc）</value></data>
+  <data name="Launcher_RemoveFromApps" xml:space="preserve"><value>从应用列表移除</value></data>
   <data name="Launcher_RestoreClipboard" xml:space="preserve"><value>重新放回剪贴板</value></data>
   <data name="Launcher_RunAsAdmin" xml:space="preserve"><value>以管理员身份运行</value></data>
   <data name="Launcher_RunFailed" xml:space="preserve"><value>运行失败：{0}</value></data>
@@ -802,6 +808,7 @@
   <data name="Settings_Clipboard_StorageFailed" xml:space="preserve"><value>历史没能保存</value></data>
   <data name="Settings_Clipboard_StorageFailedDescription" xml:space="preserve"><value>重启 Pane 后这段时间复制的内容会丢；详细记录在数据目录的 logs 里</value></data>
   <data name="Settings_Clipboard_WinVActive" xml:space="preserve"><value>Win+V 也会打开 Pane 的剪贴板</value></data>
+  <data name="Settings_DropToAdd" xml:space="preserve"><value>松开添加</value></data>
   <data name="Settings_Everything_Connected" xml:space="preserve"><value>已连接 Everything {0}</value></data>
   <data name="Settings_Everything_ConnectedLegacy" xml:space="preserve"><value>已连接 Everything 1.4</value></data>
   <data name="Settings_Everything_FilesUnavailable" xml:space="preserve"><value>Everything 没有运行，文件搜索暂不可用</value></data>
@@ -1008,6 +1015,7 @@
   <data name="Settings_Hotkey_ConflictDescription" xml:space="preserve"><value>换一个组合，或者在占用它的程序里改掉</value></data>
   <data name="Settings_Hotkey_DevelopmentOverride" xml:space="preserve"><value>开发模式：实际注册的是 {0}（PANE_DEV_HOTKEYS）</value></data>
   <data name="Settings_Hotkey_Duplicate" xml:space="preserve"><value>和另一个热键重复了</value></data>
+  <data name="Settings_Hotkey_DoubleTapHint" xml:space="preserve"><value>按键不会被拦下，和输入法等软件的同类快捷键冲突时换一个键</value></data>
   <data name="Settings_Hotkey_Occupied" xml:space="preserve"><value>{0} 被其他程序占用</value></data>
   <data name="Settings_Hotkey_WinVOccupied" xml:space="preserve"><value>Win+V 被系统占用，换一个组合</value></data>
   <data name="Settings_Hotkey_WinVReplacement" xml:space="preserve"><value>Win+V 被系统占用；想用它打开剪贴板，打开下面的「用 Pane 替换 Win+V」</value></data>
@@ -1056,11 +1064,13 @@
   <data name="Settings_Launcher_AddEngine" xml:space="preserve"><value>添加搜索站点</value></data>
   <data name="Settings_Launcher_AddFile" xml:space="preserve"><value>添加文件</value></data>
   <data name="Settings_Launcher_AddFolder" xml:space="preserve"><value>添加文件夹</value></data>
+  <data name="Settings_Launcher_AddProgram" xml:space="preserve"><value>添加程序</value></data>
   <data name="Settings_Launcher_AttachFiveSeconds" xml:space="preserve"><value>5 秒</value></data>
   <data name="Settings_Launcher_AttachOneSecond" xml:space="preserve"><value>1 秒</value></data>
   <data name="Settings_Launcher_AttachThreeSeconds" xml:space="preserve"><value>3 秒</value></data>
   <data name="Settings_Launcher_AutoAttach" xml:space="preserve"><value>复制后自动带入</value></data>
   <data name="Settings_Launcher_AutoAttachDescription" xml:space="preserve"><value>复制后这么久内呼出，刚复制的内容作为附件带入；不会清空剪贴板</value></data>
+  <data name="Settings_Launcher_ClearRememberedWarning" xml:space="preserve"><value>记住的程序会从应用列表里去掉，文件本身不动</value></data>
   <data name="Settings_Launcher_CommandsCleared" xml:space="preserve"><value>已清空</value></data>
   <data name="Settings_Launcher_CommandsDescription" xml:space="preserve"><value>最近 20 条，用来补全；以空格开头的命令不记</value></data>
   <data name="Settings_Launcher_DefaultEngineCannotDelete" xml:space="preserve"><value>默认站点不能删</value></data>
@@ -1073,7 +1083,7 @@
   <data name="Settings_Launcher_EngineRequired" xml:space="preserve"><value>三项都要填</value></data>
   <data name="Settings_Launcher_EngineSchemeRequired" xml:space="preserve"><value>地址要以 http:// 或 https:// 开头</value></data>
   <data name="Settings_Launcher_Favorites" xml:space="preserve"><value>常用文件和文件夹</value></data>
-  <data name="Settings_Launcher_FavoritesDescription" xml:space="preserve"><value>常用的文件和文件夹在启动器里排在普通文件前面，也能用拼音搜到。</value></data>
+  <data name="Settings_Launcher_FavoritesDescription" xml:space="preserve"><value>常用的文件和文件夹在启动器里排在普通文件前面，也能用拼音搜到。也可以把文件或文件夹拖到这里。</value></data>
   <data name="Settings_Launcher_DirectKeywords" xml:space="preserve"><value>关键字直达</value></data>
   <data name="Settings_Launcher_DirectKeywordsDescription" xml:space="preserve"><value>在启动器里输入「关键字 空格 内容」，按 Enter 直接执行，比如「fy hello」直接翻译。多个关键字用空格隔开，留空就不用；和网页搜索的关键字重复时，网页搜索优先。</value></data>
   <data name="Settings_Launcher_KeywordNone" xml:space="preserve"><value>不用</value></data>
@@ -1094,12 +1104,22 @@
   <data name="Settings_Launcher_KeepInput" xml:space="preserve"><value>再次呼出时</value></data>
   <data name="Settings_Launcher_KeepInputDescription" xml:space="preserve"><value>上次输入的文字怎么处理</value></data>
   <data name="Settings_Launcher_KeepOneMinute" xml:space="preserve"><value>1 分钟内保留</value></data>
+  <data name="Settings_Launcher_Portable" xml:space="preserve"><value>便携软件</value></data>
+  <data name="Settings_Launcher_PortableDescription" xml:space="preserve"><value>文件夹里的程序会和安装的软件一样出现在搜索结果里；扫描文件夹本身和下一层子文件夹。可以把文件夹、程序或快捷方式拖到这里。</value></data>
+  <data name="Settings_Launcher_PortableFolderMissing" xml:space="preserve"><value>找不到这个文件夹 · {0}</value></data>
+  <data name="Settings_Launcher_PortableProgramMissing" xml:space="preserve"><value>找不到这个程序 · {0}</value></data>
+  <data name="Settings_Launcher_PortableScanned" xml:space="preserve"><value>扫描到 {0} 个程序 · {1}</value></data>
+  <data name="Settings_Launcher_PortableScanning" xml:space="preserve"><value>正在扫描… · {0}</value></data>
   <data name="Settings_Launcher_Position" xml:space="preserve"><value>位置</value></data>
   <data name="Settings_Launcher_PositionDefault" xml:space="preserve"><value>在鼠标所在屏幕的上部居中；拖动搜索行空白处可以挪开，会记住位置</value></data>
   <data name="Settings_Launcher_PositionSaved" xml:space="preserve"><value>已记住拖动后的位置。双击启动器搜索行的空白处也能恢复</value></data>
   <data name="Settings_Launcher_RememberCommands" xml:space="preserve"><value>记住运行过的命令</value></data>
+  <data name="Settings_Launcher_RememberOpened" xml:space="preserve"><value>记住用 Pane 打开过的程序</value></data>
+  <data name="Settings_Launcher_RememberOpenedDescription" xml:space="preserve"><value>在 Pane 的文件结果里打开过、又不在应用列表里的程序，下次直接能搜到</value></data>
+  <data name="Settings_Launcher_RememberedCount" xml:space="preserve"><value>已记住 {0} 个；在启动器里选中按 Ctrl+K 可以单独移除</value></data>
   <data name="Settings_Launcher_ResetPosition" xml:space="preserve"><value>恢复默认位置</value></data>
   <data name="Settings_Launcher_SetDefault" xml:space="preserve"><value>设为默认</value></data>
+  <data name="Settings_Launcher_SkippedNotPrograms" xml:space="preserve"><value>已跳过 {0} 个不是程序的文件</value></data>
   <data name="Settings_Launcher_Terminal" xml:space="preserve"><value>终端命令</value></data>
   <data name="Settings_Launcher_TerminalDescription" xml:space="preserve"><value>在启动器里输入 &gt; 加命令：Enter 在终端里运行，Ctrl+Shift+Enter 以管理员身份运行。</value></data>
   <data name="Settings_Launcher_WebSearch" xml:space="preserve"><value>网页搜索</value></data>
@@ -1343,4 +1363,78 @@
   <data name="Launcher_Properties" xml:space="preserve"><value>属性</value></data>
   <data name="Launcher_Uninstall" xml:space="preserve"><value>卸载</value></data>
   <data name="Launcher_ActionUnavailable" xml:space="preserve"><value>此项目已不支持该操作，请重新搜索后再试。</value></data>
+  <data name="Settings_Modules" xml:space="preserve"><value>能力</value></data>
+  <data name="Settings_Modules_Description" xml:space="preserve"><value>只开你要用的。停用的能力不占热键、不装钩子，设置也从左边收起。</value></data>
+  <data name="Settings_Modules_Note" xml:space="preserve"><value>已有的记录和设置都会保留，再启用时原样回来。</value></data>
+  <data name="Settings_Modules_NoneNote" xml:space="preserve"><value>全部停用了：Pane 只留托盘图标，右键它可以回到这里。</value></data>
+  <data name="Module_Gestures_Name" xml:space="preserve"><value>鼠标手势</value></data>
+  <data name="Module_FolderJump_Name" xml:space="preserve"><value>文件对话框跳转</value></data>
+  <data name="Module_Launcher_Description" xml:space="preserve"><value>热键呼出，搜应用、文件，算算式，搜网页。</value></data>
+  <data name="Module_Clipboard_Description" xml:space="preserve"><value>记下复制过的文字、图片和文件，随时找回来再粘贴。</value></data>
+  <data name="Module_Gestures_Description" xml:space="preserve"><value>按住右键画方向，执行快捷键、窗口操作等动作。</value></data>
+  <data name="Module_SuperPanel_Description" xml:space="preserve"><value>选中文字或文件后长按鼠标侧键，就地处理；短按侧键照常后退 / 前进。</value></data>
+  <data name="Module_Ai_Description" xml:space="preserve"><value>翻译、提问和对文字的快捷动作；要先在 AI 设置里接上服务。</value></data>
+  <data name="Module_FolderJump_Description" xml:space="preserve"><value>在「打开 / 另存为」对话框里一键跳到资源管理器开着的文件夹。</value></data>
+  <data name="Module_Rename_Description" xml:space="preserve"><value>一次给多个文件改名：替换文字、加编号、改扩展名，先预览再执行。</value></data>
+  <data name="Module_Launcher_WithAi" xml:space="preserve"><value>和 AI 一起用：直接翻译、问 AI</value></data>
+  <data name="Module_Launcher_WithClipboard" xml:space="preserve"><value>和剪贴板一起用：复制后呼出自动带入</value></data>
+  <data name="Module_Clipboard_WithAi" xml:space="preserve"><value>和 AI 一起用：翻译、总结某一条</value></data>
+  <data name="Module_Clipboard_WithLauncher" xml:space="preserve"><value>和启动器一起用：把一条交给启动器处理</value></data>
+  <data name="Module_Super_WithAi" xml:space="preserve"><value>和 AI 一起用：翻译、总结、润色选中的文字</value></data>
+  <data name="Module_Super_WithRename" xml:space="preserve"><value>和批量重命名一起用：给选中的文件改名</value></data>
+  <data name="Module_Rename_FromLauncher" xml:space="preserve"><value>从启动器打开：输入「重命名」，或对文件附件用</value></data>
+  <data name="Module_Rename_FromSuper" xml:space="preserve"><value>从超级面板打开：选中文件后长按侧键</value></data>
+  <data name="Module_Rename_FromTray" xml:space="preserve"><value>也可以从托盘菜单打开</value></data>
+  <data name="Module_PartnerOff" xml:space="preserve"><value>（{0}未启用）</value></data>
+  <data name="Module_NotEnabled" xml:space="preserve"><value>{0} 未启用</value></data>
+  <data name="Module_DependencyNotRunning" xml:space="preserve"><value>依赖的能力未运行</value></data>
+  <data name="Module_MouseHookFailed" xml:space="preserve"><value>鼠标钩子启动失败</value></data>
+  <data name="Module_FolderJumpHookFailed" xml:space="preserve"><value>文件对话框跳转钩子启动失败</value></data>
+  <data name="Module_RestartPending" xml:space="preserve"><value>重启 Pane 后生效</value></data>
+  <data name="Module_ClipboardRestoresWinV" xml:space="preserve"><value>现在是用 Pane 替换 Win+V。停用剪贴板会先把系统的 Win+V 恢复原样，剪贴板历史会保留。</value></data>
+  <data name="Module_DisableAndRestore" xml:space="preserve"><value>停用并恢复 Win+V</value></data>
+  <data name="Module_Enable" xml:space="preserve"><value>启用{0}</value></data>
+  <data name="Tray_OpenRename" xml:space="preserve"><value>批量重命名</value></data>
+  <data name="PowerTimer_Shutdown" xml:space="preserve"><value>关机</value></data>
+  <data name="PowerTimer_Restart" xml:space="preserve"><value>重启</value></data>
+  <data name="PowerTimer_Sleep" xml:space="preserve"><value>睡眠</value></data>
+  <data name="PowerTimer_AfterTitle" xml:space="preserve"><value>{0}后{1}</value></data>
+  <data name="PowerTimer_AtTitle" xml:space="preserve"><value>{0} {1}</value></data>
+  <data name="PowerTimer_Tomorrow" xml:space="preserve"><value>明天 {0}</value></data>
+  <data name="PowerTimer_Minutes" xml:space="preserve"><value>{0} 分钟</value></data>
+  <data name="PowerTimer_Hours" xml:space="preserve"><value>{0} 小时</value></data>
+  <data name="PowerTimer_HoursMinutes" xml:space="preserve"><value>{0} 小时 {1} 分钟</value></data>
+  <data name="PowerTimer_RowSubtitle" xml:space="preserve"><value>{0} · 回车定好，到点前 1 分钟提醒</value></data>
+  <data name="PowerTimer_RowReplaces" xml:space="preserve"><value>{0} · 会替换现在的：{1}</value></data>
+  <data name="PowerTimer_PanelTitle" xml:space="preserve"><value>定时关机…</value></data>
+  <data name="PowerTimer_PanelSubtitle" xml:space="preserve"><value>选动作和时间</value></data>
+  <data name="PowerTimer_PanelCurrent" xml:space="preserve"><value>现在：{0}，还剩 {1}</value></data>
+  <data name="PowerTimer_CancelTitle" xml:space="preserve"><value>取消定时：{0}</value></data>
+  <data name="PowerTimer_Remaining" xml:space="preserve"><value>还剩 {0}</value></data>
+  <data name="PowerTimer_Missed" xml:space="preserve"><value>定时{0}已过时，没有执行</value></data>
+  <data name="PowerTimer_Failed" xml:space="preserve"><value>定时{0}没有执行：{1}</value></data>
+  <data name="Module_PowerTimer_Name" xml:space="preserve"><value>定时关机</value></data>
+  <data name="Module_PowerTimer_Description" xml:space="preserve"><value>到点关机、重启或睡眠；到点前 1 分钟提醒，可以取消或推迟。</value></data>
+  <data name="Module_PowerTimer_WithLauncher" xml:space="preserve"><value>和启动器一起用：输入「30 分钟后关机」直接定</value></data>
+  <data name="Launcher_Group_Timer" xml:space="preserve"><value>定时</value></data>
+  <data name="Timer_Action" xml:space="preserve"><value>动作</value></data>
+  <data name="Timer_Time" xml:space="preserve"><value>时间</value></data>
+  <data name="Timer_After" xml:space="preserve"><value>多久以后</value></data>
+  <data name="Timer_At" xml:space="preserve"><value>指定时刻</value></data>
+  <data name="Timer_MinutesUnit" xml:space="preserve"><value>分钟</value></data>
+  <data name="Timer_Tomorrow" xml:space="preserve"><value>明天</value></data>
+  <data name="Timer_Summary" xml:space="preserve"><value>将在 {0} {1}（{2}后）</value></data>
+  <data name="Timer_ErrorNumber" xml:space="preserve"><value>填分钟数</value></data>
+  <data name="Timer_ErrorMin" xml:space="preserve"><value>最短 1 分钟</value></data>
+  <data name="Timer_ErrorMax" xml:space="preserve"><value>最长 24 小时</value></data>
+  <data name="Timer_ErrorTime" xml:space="preserve"><value>时间格式是 23:00</value></data>
+  <data name="Timer_Go" xml:space="preserve"><value>定好</value></data>
+  <data name="Timer_Change" xml:space="preserve"><value>改成这个</value></data>
+  <data name="Timer_Cancel" xml:space="preserve"><value>取消定时</value></data>
+  <data name="Timer_Foot" xml:space="preserve"><value>到点前 1 分钟会提醒，可以取消或推迟。Pane 退出后定时会取消。</value></data>
+  <data name="Reminder_Title" xml:space="preserve"><value>1 分钟后{0}</value></data>
+  <data name="Reminder_Postpone" xml:space="preserve"><value>推迟 10 分钟</value></data>
+  <data name="Tray_TimerOpen" xml:space="preserve"><value>定时关机…</value></data>
+  <data name="Tray_TimerStatus" xml:space="preserve"><value>{0} · 还剩 {1}</value></data>
+  <data name="Tray_TimerCancel" xml:space="preserve"><value>取消定时</value></data>
 </root>

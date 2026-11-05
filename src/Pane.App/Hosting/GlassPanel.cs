@@ -90,7 +90,7 @@ public sealed partial class GlassPanel : IDisposable
         root.PointerPressed+=DragPressed;root.PointerMoved+=DragMoved;root.PointerReleased+=DragReleased;root.PointerCaptureLost+=DragCaptureLost;
         island.Content=root;island.SystemBackdrop=new TransparentBackdrop();island.SiteBridge.Show();Layout(0,0);
         childWindow=Microsoft.UI.Win32Interop.GetWindowFromWindowId(island.SiteBridge.WindowId);
-        if(settingsWindow)Native.SetWindowSubclass(childWindow,childProc,1,0);
+        Native.SetWindowSubclass(childWindow,childProc,1,0);   // 设置窗口：边框改大小；面板：不激活方式下点击不激活（059）
         root.Measure(new Windows.Foundation.Size(Width,Height));root.Arrange(new Windows.Foundation.Rect(0,0,Width,Height));
         parameters.Changed+=ParametersChanged;view.SizeRequested+=ViewSize;view.CloseRequested+=ViewClose;ParametersChanged(null,EventArgs.Empty);
     }
@@ -116,9 +116,19 @@ public sealed partial class GlassPanel : IDisposable
     static (double,double) Spring(double x,double v,double target,double omega,double dt){double d=x-target,e=Math.Exp(-omega*dt),k=(v+omega*d)*dt;return (target+(d+k)*e,(v-omega*k)*e);}
     internal void Prepare(){Layout(0,0);root.Measure(new Windows.Foundation.Size(Width,Height));root.Arrange(new Windows.Foundation.Rect(0,0,Width,Height));root.UpdateLayout();}
     internal bool Prepared=>root.ActualWidth>0&&root.Children.Count>0;
-    public void Show(bool near=false,int px=0,int py=0,bool activate=true)
+    /// <summary>
+    /// 不激活方式（剪贴板，issue 20、059）：面板显示在最前，但前台和键盘焦点留在原窗口（Previous），点面板也不激活。
+    /// 按键由 IPanelKeyRouter 转过来；Engage 切到激活方式。原窗口不再是前台、点面板外面时收起。
+    /// </summary>
+    public bool Passive {get;private set;}
+    /// <summary>开始收起（Hide 被调用、面板原来是显示状态）时。剪贴板用它结束按键接管。</summary>
+    public event EventHandler? Hiding;
+    public void Show(bool near=false,int px=0,int py=0,bool activate=true,bool passive=false)
     {
         if(disposing)return;
+        passive=passive&&interactive&&!settingsWindow&&!demo;
+        if(passive)activate=false;
+        SetPassive(passive);
         // 设计改（2026-10-31）：前台是本面板或另一个随用随收的面板（启动器 → 剪贴板、面板已开再呼出）时，
         // 沿用它记下的原窗口；原来直接记成面板自己，收起后粘贴切不回去，误报「没有权限往这个窗口输入」
         var foreground=Native.GetForegroundWindow();
@@ -153,6 +163,35 @@ public sealed partial class GlassPanel : IDisposable
         try{BringWindowToTop(Input);Native.SetForegroundWindow(Input);}
         finally{if(attached)AttachThreadInput(mine,theirs,false);}
     }
+    // WS_EX_NOACTIVATE 只在不激活方式下加上；激活方式（含 Engage 之后）去掉，点击照常激活
+    void SetPassive(bool on)
+    {
+        Passive=on;
+        nint style=GetWindowLongPtrW(Input,-20);nint next=on?style|0x08000000:style&~(nint)0x08000000;
+        if(next!=style)SetWindowLongPtrW(Input,-20,next);
+    }
+    /// <summary>从不激活方式切到激活方式（打字搜索、点搜索框）：激活面板并聚焦。之后失去焦点照常收起。</summary>
+    public void Engage()
+    {
+        if(!Passive||!Shown||disposing)return;
+        SetPassive(false);Activate();
+        if(root.IsLoaded)Focus();else pendingFocus=true;
+    }
+    // 不激活方式下原窗口不再是前台（切走、关掉）就收起；Pane 自己的窗口（如收起途中别的面板）不算
+    void CheckPassiveForeground()
+    {
+        var foreground=Native.GetForegroundWindow();
+        if(foreground==0||foreground==Previous||foreground==Input||foreground==Visual)return;
+        if(GetAncestor(foreground,3)is var root0&&root0!=0&&root0==GetAncestor(Previous,3))return;
+        GetWindowThreadProcessId(foreground,out uint pid);
+        if(pid==(uint)Environment.ProcessId)return;
+        GetWindowThreadProcessId(Previous,out uint previousPid);
+        if(pid!=0&&pid==previousPid)return;
+        Hide();
+    }
+    [DllImport("user32.dll")] static extern nint GetAncestor(nint window,uint flags);
+    [DllImport("user32.dll")] static extern nint GetWindowLongPtrW(nint window,int index);
+    [DllImport("user32.dll")] static extern nint SetWindowLongPtrW(nint window,int index,nint value);
     // 保险：面板开着却不在前台时（激活仍被拒绝），在面板外面按下鼠标左 / 右 / 中键也照常收起；只认新按下的那一下
     int outsideButtons;
     static int MouseButtonsDown()=>((GetAsyncKeyState(1)&0x8000)!=0?1:0)|((GetAsyncKeyState(2)&0x8000)!=0?2:0)|((GetAsyncKeyState(4)&0x8000)!=0?4:0);
@@ -185,7 +224,7 @@ public sealed partial class GlassPanel : IDisposable
         Native.GetWindowRect(Visual,out var v);Native.GetWindowRect(Input,out var i);
         return $"material={MaterialAttached};opacity={opacity};scale={scale};dpi={dpi};visual=0x{Visual:X};input=0x{Input:X};visualRect={v.Left},{v.Top},{v.Right},{v.Bottom};inputRect={i.Left},{i.Top},{i.Right},{i.Bottom}";
     }
-    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;minimizing=false;if(revealing){revealing=false;revealVersion++;Cloak(false);}Animate();}
+    public void Hide(){if(!Shown)return;Shown=false;pendingFocus=false;Hiding?.Invoke(this,EventArgs.Empty);minimizing=false;if(revealing){revealing=false;revealVersion++;Cloak(false);}Animate();}
     // 隐身显示（DWMWA_CLOAK）：窗口照常显示、照常合成，只是不画到屏幕上
     bool revealing,shownOnce;int revealVersion;
     void Cloak(bool on){int v=on?1:0;Native.DwmSetWindowAttribute(Visual,13,ref v,4);Native.DwmSetWindowAttribute(Input,13,ref v,4);}
@@ -254,6 +293,7 @@ public sealed partial class GlassPanel : IDisposable
         if(deferFrames>0&&--deferFrames==0){if(Shown&&!IsIconic(Input))FollowTo(deferredRect);else ElementCompositionPreview.GetElementVisual(root).Opacity=opacity;}
         if(rectAnimating)StepRect();
         if(Shown&&!animating)CheckOutsideClick();
+        if(Shown&&!animating&&Passive)CheckPassiveForeground();
         if(!animating)return;
         double t=animation.Elapsed.TotalMilliseconds,duration=GlassParameters.Token(Showing?"PaneDurSlow":"PaneDurFast")*parameters.Current.MotionSpeed;
         double a=Ease(Math.Min(1,t/duration),Showing?spring:smooth);
@@ -306,6 +346,7 @@ public sealed partial class GlassPanel : IDisposable
     }
     nint ChildWndProc(nint h,uint m,nuint w,nint l,nuint id,nuint data) {
         if(m==0x84 && settingsWindow){var hit=HitTest(l);if(hit!=1)return -1;}
+        if(m==0x21 && Passive)return 3;   // WM_MOUSEACTIVATE → MA_NOACTIVATE
         return Native.DefSubclassProc(h,m,w,l);
     }
     nint HitTest(nint l){
@@ -350,10 +391,11 @@ public sealed partial class GlassPanel : IDisposable
                 ElementCompositionPreview.GetElementVisual(root).Opacity=0;TickRequested?.Invoke();
             }
         }
+        if(h==Input && m==0x21 && Passive)return 3;   // 不激活方式：点面板不激活（MA_NOACTIVATE）
         if(m==0x10){Hide();return 0;}
         if(m==0x14)return 1;
         if(h==Input&&m==6&&(w&0xffff)==0&&Shown&&interactive&&!dragging&&!settingsWindow&&!demo&&l!=Input&&l!=Visual&&!Native.IsChild(Input,l)&&(HideOnBlur?.Invoke()??true))Hide();
-        if(h==Input&&m==7&&island!=null)Focus();
+        if(h==Input&&m==7&&island!=null&&!Passive)Focus();
         return Native.DefWindowProcW(h,m,w,l);
     }
     void FollowInputWindow()
@@ -406,7 +448,7 @@ public sealed partial class GlassPanel : IDisposable
     [DllImport("user32.dll")] static extern bool IsZoomed(nint window);
     [DllImport("user32.dll")] static extern bool IsIconic(nint window);
     [DllImport("user32.dll")] static extern nint MonitorFromWindow(nint window,uint flags);
-    public void Dispose(){if(disposing)return;disposing=true;transient.Remove(this);if(settingsWindow)Native.RemoveWindowSubclass(childWindow,childProc,1);parameters.Changed-=ParametersChanged;view.SizeRequested-=ViewSize;view.CloseRequested-=ViewClose;Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);root.RemoveHandler(UIElement.KeyDownEvent,keyHandler);root.PointerPressed-=DragPressed;root.PointerMoved-=DragMoved;root.PointerReleased-=DragReleased;root.PointerCaptureLost-=DragCaptureLost;root.Children.Clear();island.Content=null;island.SystemBackdrop=null;island.Dispose();target.Root=null;target.Dispose();scene.Dispose();compositor.Dispose();Native.DestroyWindow(Input);Native.DestroyWindow(Visual);Native.UnregisterClassW(className,Native.GetModuleHandleW(null));}
+    public void Dispose(){if(disposing)return;disposing=true;transient.Remove(this);(view as IDisposable)?.Dispose();Native.RemoveWindowSubclass(childWindow,childProc,1);parameters.Changed-=ParametersChanged;view.SizeRequested-=ViewSize;view.CloseRequested-=ViewClose;Native.ShowWindow(Input,0);Native.ShowWindow(Visual,0);root.RemoveHandler(UIElement.KeyDownEvent,keyHandler);root.PointerPressed-=DragPressed;root.PointerMoved-=DragMoved;root.PointerReleased-=DragReleased;root.PointerCaptureLost-=DragCaptureLost;root.Children.Clear();island.Content=null;island.SystemBackdrop=null;island.Dispose();target.Root=null;target.Dispose();scene.Dispose();compositor.Dispose();Native.DestroyWindow(Input);Native.DestroyWindow(Visual);Native.UnregisterClassW(className,Native.GetModuleHandleW(null));}
     [StructLayout(LayoutKind.Sequential)] internal struct Point{internal int X,Y;}
     [StructLayout(LayoutKind.Sequential)] internal struct MonitorInfo{internal int Size;internal Native.Rect Monitor,Work;internal uint Flags;}
     [DllImport("user32.dll")] internal static extern nint MonitorFromPoint(Point point,uint flags);

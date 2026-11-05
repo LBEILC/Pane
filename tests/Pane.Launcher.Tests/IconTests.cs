@@ -38,7 +38,7 @@ static partial class Program
         Check(IconRenderer.Analyze(new byte[256*256*4]).Empty,"透明图标");
         var settings=new IconSettings{Overrides=new(){["a"]=IconMode.ForceMask,["b"]=IconMode.Raw},CustomIcons=new(){["a"]="custom.png"}};
         Check(IconProcessing.Mode(settings,"a")==IconMode.ForceMask&&IconProcessing.Mode(settings with{MaskByDefault=false},"a")==IconMode.Raw,"全局关闭优先");
-        string dir=Path.Combine(AppContext.BaseDirectory,"results","icons-"+Guid.NewGuid().ToString("N"));var store=new SettingsStore(dir,Defaults());store.Save(Defaults() with{Icons=settings});store.Load();
+        string dir=TestResults.NewDirectory("icons-");var store=new SettingsStore(dir,Defaults());store.Save(Defaults() with{Icons=settings});store.Load();
         Check(store.Current.Icons.Overrides["b"]==IconMode.Raw&&store.Current.Icons.CustomIcons["a"]=="custom.png","图标设置读写");
         string json=JsonSerializer.Serialize(Defaults(),SettingsJson.Default.PaneSettings);using(var doc=JsonDocument.Parse(json))File.WriteAllText(Path.Combine(dir,"settings.json"),"{"+string.Join(',',doc.RootElement.EnumerateObject().Where(p=>p.Name!="Icons").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()))+"}");store.Load();
         Check(store.Current.Icons.MaskByDefault&&store.Current.Icons.Overrides.Count==0&&store.Current.Icons.CustomIcons.Count==0,"旧设置缺少 Icons 使用默认值");

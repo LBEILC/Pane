@@ -32,7 +32,7 @@ internal sealed class EverythingIpc:IEverythingIpc
         return await work.WaitAsync(token).ConfigureAwait(false);
     }
 }
-internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor):IFileSearch
+internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,Func<string,CancellationToken,Task>? openFile=null):IFileSearch
 {
     internal static readonly IReadOnlyDictionary<FileCategory,string> Extensions=new Dictionary<FileCategory,string>{
         [FileCategory.Document]="doc docx odt rtf wps pages",
@@ -97,6 +97,6 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor):
         finally{lock(countsLock){if(ReferenceEquals(countsBudget,budget))countsBudget=null;}budget.Dispose();}
     }
     public Task<FilePreview> PreviewAsync(FileHit hit,CancellationToken token)=>FilePreviewReader.ReadAsync(hit,token);
-    public Task OpenAsync(string path,CancellationToken token)=>executor.OpenAsync(path,false,token);
+    public Task OpenAsync(string path,CancellationToken token)=>openFile!=null?openFile(path,token):executor.OpenAsync(path,false,token);
     public Task RevealAsync(string path,CancellationToken token)=>executor.RevealAsync(path,token);
 }

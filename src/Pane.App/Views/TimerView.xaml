@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  定时窗口（二级窗口，设计负责人，058）。照原型 prototype/timer.html #tw（docs/design.md「定时关机」）。
+  420 × 400，最小同大小。头 56：窗口种类 + 关闭；底 38：提醒说明。
+  有定时时最上面是状态卡（大字剩余时间、取消定时）；下面选动作、选多久以后或指定时刻，摘要一行 + 主按钮「定好」。
+  Enter 定好；Esc 不关窗口；Ctrl+W 关。
+-->
+<UserControl
+    x:Class="Pane.Views.TimerView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:loc="using:Pane.Localization"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="False">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="38"/>
+        </Grid.RowDefinitions>
+
+        <Grid x:Name="Head" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Height="28" Padding="8,0,10,0" CornerRadius="14" VerticalAlignment="Center"
+                    Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:PaneIcon Glyph="timer" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Module_PowerTimer_Name}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                </StackPanel>
+            </Border>
+            <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
+                <c:PaneIcon Glyph="close" Width="16" Height="16"/>
+            </Button>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Padding="18,16,18,18" Spacing="14">
+            <!-- 状态卡：有定时时才显示 -->
+            <Border x:Name="StateCard" Visibility="Collapsed" Padding="16,12,12,12" CornerRadius="{StaticResource PaneRadiusItem}"
+                    Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <Grid ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock x:Name="LeftText" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextHero}" FontWeight="SemiBold"
+                                   Foreground="{ThemeResource PaneText1Brush}"/>
+                        <TextBlock x:Name="AtText" Margin="0,2,0,0" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                    </StackPanel>
+                    <Button Grid.Column="1" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" VerticalAlignment="Center"
+                            Foreground="{ThemeResource PaneDangerBrush}" Content="{x:Bind loc:Strings.Timer_Cancel}" Click="OnCancel"/>
+                </Grid>
+            </Border>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="36"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{x:Bind loc:Strings.Timer_Action}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                <Border x:Name="ActionHost" Grid.Column="1"/>
+            </Grid>
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="36"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{x:Bind loc:Strings.Timer_Time}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                <Border x:Name="ModeHost" Grid.Column="1"/>
+            </Grid>
+
+            <!-- 多久以后：常用时长 + 自己填分钟 -->
+            <StackPanel x:Name="AfterRow" Orientation="Horizontal" Spacing="6" Margin="48,0,0,0">
+                <StackPanel x:Name="Picks" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"/>
+                <!-- 输入框照组件库 .field：控件底 + 描边；清除按钮去掉（框太窄） -->
+                <Border Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1" CornerRadius="{StaticResource PaneRadiusControl}" VerticalAlignment="Center">
+                    <TextBox x:Name="MinutesBox" Width="48" Height="{StaticResource PaneControlSm}" MinHeight="0" Padding="8,4,8,0" TextAlignment="Center"
+                             FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" InputScope="Number" TextChanged="OnMinutesChanged"
+                             IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+                </Border>
+                <TextBlock Text="{x:Bind loc:Strings.Timer_MinutesUnit}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            </StackPanel>
+            <!-- 指定时刻：HH:MM，过了就是明天 -->
+            <StackPanel x:Name="AtRow" Orientation="Horizontal" Spacing="8" Margin="48,0,0,0" Visibility="Collapsed">
+                <Border Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1" CornerRadius="{StaticResource PaneRadiusControl}" VerticalAlignment="Center">
+                    <TextBox x:Name="TimeBox" Width="80" Height="{StaticResource PaneControlSm}" MinHeight="0" Padding="8,4,8,0" TextAlignment="Center"
+                             FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" TextChanged="OnTimeChanged"
+                             IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"/>
+                </Border>
+                <TextBlock x:Name="TomorrowText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            </StackPanel>
+
+            <Grid ColumnSpacing="12" Margin="0,2,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Ellipse x:Name="WarnDot" Width="6" Height="6" Fill="{ThemeResource PaneWarningBrush}" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock x:Name="SummaryText" VerticalAlignment="Center" TextWrapping="Wrap" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+                </StackPanel>
+                <Button x:Name="GoButton" Grid.Column="1" Style="{StaticResource PanePrimaryButton}" Height="{StaticResource PaneControlMd}" MinHeight="0" CornerRadius="16" Padding="18,0,18,0"
+                        Background="{StaticResource PaneAccentBrush}" Click="OnGo"/>
+            </Grid>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Padding="16,0,16,0" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
+            <TextBlock Text="{x:Bind loc:Strings.Timer_Foot}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+        </Grid>
+
+        <!-- 样板：代码从这些隐藏元素的强类型属性取样式和颜色（NativeAOT） -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="SmallProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="SmallStrongProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="XsProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <Border x:Name="FillProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="SelectedProto" Background="{ThemeResource PaneFillSelectedBrush}"/>
+            <Border x:Name="AccentProto" Background="{StaticResource PaneAccentBrush}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

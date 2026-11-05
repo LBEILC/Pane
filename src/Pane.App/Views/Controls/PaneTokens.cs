@@ -15,6 +15,9 @@ internal static class PaneTokens
     public static double ControlMd => D("PaneControlMd");
     public static double ControlLg => D("PaneControlLg");
 
+    /// <summary>控件圆角（随面板圆角变，max(4, 面板 - 10)）。</summary>
+    public static CornerRadius RadiusControl => (CornerRadius)Application.Current.Resources["PaneRadiusControl"];
+
     /// <summary>状态色：只用于出错 / 成功 / 留意的小字、小标签和危险操作。</summary>
     public static Brush Danger => (Brush)Application.Current.Resources["PaneDangerBrush"];
     public static Brush Success => (Brush)Application.Current.Resources["PaneSuccessBrush"];

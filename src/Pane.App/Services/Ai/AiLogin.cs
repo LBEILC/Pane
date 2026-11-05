@@ -106,7 +106,7 @@ public sealed partial class AiService
     }
     public async Task SignInAsync(CancellationToken cancellationToken)
     {
-        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token);timeout.CancelAfter(LoginTimeout);
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,ModuleToken());timeout.CancelAfter(LoginTimeout);
         int version;LoginRecord old;
         lock(gate){if(pendingLogin!=null)throw new AiSignInRequiredException(Strings.Ai_LoginPending);pendingLogin=timeout;version=epoch;old=login;SaveLogin(old);}
         var settings=store.Current.Ai;var listener=new TcpListener(IPAddress.Loopback,0);
@@ -162,7 +162,7 @@ public sealed partial class AiService
     {
         LoginRecord old;lock(gate){pendingLogin?.Cancel();old=login;}ClearSession();
         if(old.RefreshToken==null)return;
-        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token);timeout.CancelAfter(FirstTimeout);
+        using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,ModuleToken());timeout.CancelAfter(FirstTimeout);
         try{var s=store.Current.Ai;var metadata=await Discovery(s,timeout.Token);using var request=new HttpRequestMessage(HttpMethod.Post,AiProtocol.String(metadata,"revocation_endpoint"));request.Content=new FormUrlEncodedContent(new Dictionary<string,string>{["token"]=old.RefreshToken,["token_type_hint"]="refresh_token",["client_id"]=old.ClientId!});using var response=await Send(request,s,timeout.Token);}
         catch(AiException){}catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested){}
     }

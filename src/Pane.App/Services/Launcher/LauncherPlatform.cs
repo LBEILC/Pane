@@ -22,10 +22,12 @@ internal static class LauncherNative
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherCopy(string text);
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherCommand(int command);
 }
-internal sealed record IndexedApp(string Id,SearchName Name,string Launch,bool Packaged,string? Icon) { public string? DarkIcon {get;init;} public string? LightIcon {get;init;} }
+internal sealed record IndexedApp(string Id,SearchName Name,string Launch,bool Packaged,string? Icon) { public string? DarkIcon {get;init;} public string? LightIcon {get;init;} public string? Target {get;init;} public string[] Arguments {get;init;}=[]; public string? PortablePath {get;init;} public Pane.Settings.PortableKind? PortableKind {get;init;} }
 internal sealed record IndexMetrics(int AppsFolder,int Shortcuts,int Filtered,int Duplicates,int Total,int Icons,double Milliseconds)
 {
     public Dictionary<string,string> Aliases {get;init;}=[];
+    public Dictionary<string,PortableStatus> PortableStatus {get;init;}=[];
+    public string[] TruncatedPortableFolders {get;init;}=[];
     public int AcceptedAppsFolder {get;init;}
     public int AcceptedShortcuts {get;init;}
     public int UnresolvedIconMetadata {get;init;}
@@ -33,7 +35,7 @@ internal sealed record IndexMetrics(int AppsFolder,int Shortcuts,int Filtered,in
 }
 internal sealed record AppIndex(IndexedApp[] Apps,IndexMetrics Metrics);
 internal interface IAppCatalog { AppIndex Build(PinyinTable table,CancellationToken token); }
-internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProcessingStep>? steps=null):IAppCatalog
+internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProcessingStep>? steps=null,Pane.Settings.PortableEntry[]? portable=null):IAppCatalog
 {
     internal static bool IsAuxiliaryName(string name) { string lower=name.ToLowerInvariant(); return lower.Contains("uninstall")||lower.Contains("unins0")||lower.Contains("卸载")||lower.Contains("卸載")||lower.Contains("帮助")||lower.Contains("幫助")||lower.Contains("說明")||lower.Contains("readme")||lower.Contains(" help")||lower.StartsWith("help"); } // 不翻译：外部数据匹配
     public AppIndex Build(PinyinTable table,CancellationToken token)
@@ -56,6 +58,8 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
             }catch(Exception e){failure=e;}
         };
         int hr=LauncherNative.PaneLauncherEnumerate(row);GC.KeepAlive(row);token.ThrowIfCancellationRequested();if(failure!=null)throw failure;if(hr<0)Marshal.ThrowExceptionForHR(hr);
+        var scan=PortableCatalog.Scan(portable??[],token);
+        candidates.AddRange(scan.Candidates.Select(c=>c.Row));
         var groups=AppDeduplication.Resolve(candidates);var aliases=new Dictionary<string,string>();var evidence=new List<CatalogEvidence>();
         foreach(var group in groups){
             token.ThrowIfCancellationRequested();var app=group.Rows[0];bool packaged=app.Id.Contains('!');
@@ -72,11 +76,12 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
             if(image!=null&&File.Exists(image+".source")){var info=File.ReadAllText(image+".source").Split(',');width=int.Parse(info[0]);height=int.Parse(info[1]);direct=bool.Parse(info[2]);}
             if(iconResult!=1)iconFailures[iconResult]=iconFailures.GetValueOrDefault(iconResult)+1;
             if(image!=null){foreach(var step in steps??[])image=step.Process(image,token);icons++;}
-            apps.Add(new(group.StableId,table.Create(app.Name),packaged?app.Id:app.Parsing,packaged,image));
+            var origin=app.Source==2?scan.Candidates.First(c=>c.Row==app):null;
+            apps.Add(new(group.StableId,table.Create(app.Name),packaged?app.Id:app.Parsing,packaged,image){Target=app.Target,Arguments=app.Args.Length==0?[]:WindowsLauncherActionPlatform.Split("placeholder.exe "+app.Args)[1..],PortablePath=origin?.Owner,PortableKind=origin?.Kind});
             evidence.Add(new(app.Name,AppDeduplication.Key(app),group.Rows.Select(g=>g.Name).ToArray(),app.IconResource,app.IconIndex,width,height,direct));
         }
         File.WriteAllText(Path.Combine(directory,"catalog-evidence.json"),System.Text.Json.JsonSerializer.Serialize(evidence,CatalogEvidenceJson.Default.ListCatalogEvidence));
-        return new(apps.ToArray(),new(shell,links,filtered,candidates.Count-groups.Length,apps.Count,icons,watch.Elapsed.TotalMilliseconds){Aliases=aliases,AcceptedAppsFolder=groups.Count(g=>g.Rows[0].Source==0),AcceptedShortcuts=groups.Count(g=>g.Rows[0].Source==1),UnresolvedIconMetadata=unresolvedMetadata,IconFailures=iconFailures});
+        return new(apps.ToArray(),new(shell,links,filtered,candidates.Count-groups.Length,apps.Count,icons,watch.Elapsed.TotalMilliseconds){Aliases=aliases,PortableStatus=PortableCatalog.Counts(scan,groups),TruncatedPortableFolders=scan.Truncated,AcceptedAppsFolder=groups.Count(g=>g.Rows[0].Source==0),AcceptedShortcuts=groups.Count(g=>g.Rows[0].Source==1),UnresolvedIconMetadata=unresolvedMetadata,IconFailures=iconFailures});
     }
 }
 internal interface ILauncherExecutor

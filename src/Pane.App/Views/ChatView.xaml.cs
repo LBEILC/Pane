@@ -18,7 +18,7 @@ using Windows.UI.Core;
 
 namespace Pane.Views;
 
-public sealed partial class ChatView : UserControl, ISecondaryView
+public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 {
     sealed class Message(AiChatRole role, string text)
     {
@@ -87,6 +87,10 @@ public sealed partial class ChatView : UserControl, ISecondaryView
     public void OnShowing(PanelShowContext context) { }
     public void OnShown() => Input.Focus(FocusState.Programmatic);
     public void OnHidden() => Stop();
+
+    // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
+    // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
+    public void Dispose() => Stop();
 
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 

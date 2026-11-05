@@ -10,6 +10,12 @@ public sealed class GestureService : IGestureService
     readonly bool observe;
     readonly bool isolatedTest;
     volatile bool stop,paused,hotkeysSuspended;
+    volatile bool recognitionEnabled=true;
+    readonly TaskCompletionSource startCompletion=new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task Ready=>startCompletion.Task;
+    public bool RecognitionEnabled=>recognitionEnabled;
+    public bool HookActive=>started&&Win.PaneMouseActive()!=0;
+    public void SetRecognitionEnabled(bool enabled){recognitionEnabled=enabled;if(started&&!enabled)Win.PaneCancelCapture();WakePolicy();}
     public bool IsPaused=>paused;
     public int RegisteredHotkeyCount=>hotkeyRegistered?1:0;
     public void SetHotkeysSuspended(bool value){hotkeysSuspended=value;WakePolicy();}
@@ -17,6 +23,8 @@ public sealed class GestureService : IGestureService
     sealed record SuperPolicy(int Button,int Hold,bool Fullscreen,string[] Disabled);
     SuperPolicy superPolicy=new(4,400,true,[]);
     bool started,hotkeyRegistered;
+    string? emergencyKey;
+    public string DiagnosticHotkeys=>$"pause={(hotkeyRegistered?registeredChord?.ToString():null)},emergency={emergencyKey}";
     GestureServiceState state;
     readonly Channel<TrailSample> trail=Channel.CreateBounded<TrailSample>(new BoundedChannelOptions(4096){FullMode=BoundedChannelFullMode.DropOldest,SingleWriter=true});
     readonly CommandQueue commands=new();
@@ -52,7 +60,7 @@ public sealed class GestureService : IGestureService
             &&!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_DATA_DIR"))
             &&!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_INSTANCE"));
         observe=observeOnly&&!isolatedTest;
-        system=new WindowsSystem(()=>SetPaused(!paused),()=>!stop);executor=new(system);
+        system=new WindowsSystem(()=>SetPaused(!paused),()=>!stop&&recognitionEnabled);executor=new(system);
         serviceThread=new Thread(Loop){IsBackground=true,Name="Pane 手势服务"};
         commandThread=new Thread(CommandLoop){IsBackground=true,Name="Pane 手势命令"};
     }
@@ -68,14 +76,14 @@ public sealed class GestureService : IGestureService
     void Outcome(GestureOutcome value)=>Finished?.Invoke(this,value);
     void Queue(CommandRequest request)
     {
-        if(observe)return;
+        if(observe||!recognitionEnabled&&request.Phase!=CommandPhase.EndAware)return;
         commands.Add(request);
     }
     void CommandLoop()
     {
         foreach(var request in commands.GetConsumingEnumerable())
         {
-            if(stop&&request.Phase!=CommandPhase.EndAware)continue;
+            if((stop||!recognitionEnabled)&&request.Phase!=CommandPhase.EndAware)continue;
             if(request.Phase==CommandPhase.Execute && request.Binding.Command is WebSearchCommand or RunCommand or OpenCommand or WindowCommand)
             {
                 if(!slowSlots.Wait(0)){Outcome(new(GestureOutcomeKind.Failed,request.Binding.Name,"慢操作仍在等待系统，当前请求已放弃"));continue;}
@@ -83,7 +91,7 @@ public sealed class GestureService : IGestureService
                 int completion=0;long deadline=Environment.TickCount64+1500;
                 var timeout=new Timer(_=>{if(Interlocked.CompareExchange(ref completion,2,0)==0&&!stop)Outcome(new(GestureOutcomeKind.Failed,request.Binding.Name,"系统操作等待超时；已提交给系统的操作可能仍在结束"));},null,1500,Timeout.Infinite);
                 var thread=new Thread(()=>{try{
-                    using var slowExecutor=new CommandExecutor(new WindowsSystem(()=>SetPaused(!paused),()=>!stop&&Environment.TickCount64<deadline));
+                    using var slowExecutor=new CommandExecutor(new WindowsSystem(()=>SetPaused(!paused),()=>!stop&&recognitionEnabled&&Environment.TickCount64<deadline));
                     ExecuteRequest(request,result=>{if(Interlocked.CompareExchange(ref completion,1,0)==0)Outcome(result);},slowExecutor);
                 }finally{timeout.Dispose();slowSlots.Release();}}){IsBackground=true,Name="Pane 外部命令"};thread.SetApartmentState(ApartmentState.STA);thread.Start();
             }
@@ -114,8 +122,12 @@ public sealed class GestureService : IGestureService
             wgRunning=IsWGesturesRunning()&&!isolatedTest;
             PublishPressPolicy();
             if(observe||!wgRunning){hook=Win.PaneStart(observe?1:0)!=0;if(!hook){SetState(GestureServiceState.HookFailed);return;}}
-            {emergency=isolatedTest?Win.RegisterHotKey(0,102,0x4000|1|2|4,0x87):Win.RegisterHotKey(0,102,0x4000|1|2,0x7B)||Win.RegisterHotKey(0,102,0x4000|2|4,0x7B);if(!emergency)PauseHotkeyUnavailable?.Invoke(this,"应急退出 Ctrl+Alt+F12 / Ctrl+Shift+F12");}
+            if(isolatedTest){emergency=Win.RegisterHotKey(0,102,0x4000|1|2|4,0x87);if(emergency)emergencyKey="Ctrl+Alt+Shift+F24";}
+            else if(Win.RegisterHotKey(0,102,0x4000|1|2,0x7B)){emergency=true;emergencyKey="Ctrl+Alt+F12";}
+            else if(Win.RegisterHotKey(0,102,0x4000|2|4,0x7B)){emergency=true;emergencyKey="Ctrl+Shift+F12";}
+            if(!emergency)PauseHotkeyUnavailable?.Invoke(this,"应急退出 Ctrl+Alt+F12 / Ctrl+Shift+F12");
             SetState(!observe&&wgRunning?GestureServiceState.WGesturesRunning:GestureServiceState.Running);
+            startCompletion.TrySetResult();
             while(!stop)
             {
                 long now=Environment.TickCount64;
@@ -136,10 +148,11 @@ public sealed class GestureService : IGestureService
             }
         }catch(Exception e){SetState(GestureServiceState.HookFailed);Outcome(new(GestureOutcomeKind.Failed,null,SafeReason(e)));}
         finally{
+            startCompletion.TrySetException(new InvalidOperationException("鼠标钩子启动失败"));
             session?.End(true);session=null;Win.PaneStop();
             Win.PaneSetWakeEvent(0);
             if(hotkeyRegistered)Win.UnregisterHotKey(0,101);if(emergency)Win.UnregisterHotKey(0,102);
-            hotkeyRegistered=false;trail.Writer.TryComplete();commands.CompleteAdding();
+            hotkeyRegistered=false;emergencyKey=null;trail.Writer.TryComplete();commands.CompleteAdding();
             if(isolatedTest)Win.PaneLeaveTestDesktop();
         }
     }
@@ -147,7 +160,7 @@ public sealed class GestureService : IGestureService
     {
         PublishPressPolicy();
         var c=Config;
-        var desiredChord=hotkeysSuspended?null:c.Settings.PauseHotkey;
+        var desiredChord=hotkeysSuspended||!recognitionEnabled?null:c.Settings.PauseHotkey;
         if(registeredChord!=desiredChord){
             if(hotkeyRegistered)Win.UnregisterHotKey(0,101);hotkeyRegistered=false;registeredChord=desiredChord;
             if(registeredChord is {} k){uint mods=0x4000|((k.Modifiers&KeyModifiers.Alt)!=0?1u:0)|((k.Modifiers&KeyModifiers.Ctrl)!=0?2u:0)|((k.Modifiers&KeyModifiers.Shift)!=0?4u:0)|((k.Modifiers&KeyModifiers.Win)!=0?8u:0);
@@ -162,7 +175,7 @@ public sealed class GestureService : IGestureService
         }
         ulong revision=Win.PanePolicyBegin();
         var (target,dpi,full)=WindowTargets.UnderCursor();
-        bool blocked=paused||wgRunning||c.Settings.PauseInFullscreen&&full||GestureMatcher.Rule(c,target.ExePath,target.WindowClass)?.Mode==AppRuleMode.Disabled;
+        bool blocked=!recognitionEnabled||paused||wgRunning||c.Settings.PauseInFullscreen&&full||GestureMatcher.Rule(c,target.ExePath,target.WindowClass)?.Mode==AppRuleMode.Disabled;
         SetState(wgRunning?GestureServiceState.WGesturesRunning:paused?GestureServiceState.Paused:c.Settings.PauseInFullscreen&&full?GestureServiceState.PausedByFullscreen:GestureServiceState.Running);
         var sp=Volatile.Read(ref superPolicy);
         bool superBlocked=paused||wgRunning||sp.Fullscreen&&full||sp.Disabled.Any(p=>string.Equals(p,target.ExePath,StringComparison.OrdinalIgnoreCase));
@@ -174,19 +187,20 @@ public sealed class GestureService : IGestureService
     }
     GestureConfig? publishedPressConfig;
     SuperPolicy? publishedSuperPolicy;
-    bool publishedPressPaused;
+    bool publishedPressPaused,publishedRecognition=true;
     void PublishPressPolicy()
     {
         var c=Config;var sp=Volatile.Read(ref superPolicy);bool blocked=paused||wgRunning;
-        if(ReferenceEquals(c,publishedPressConfig)&&ReferenceEquals(sp,publishedSuperPolicy)&&blocked==publishedPressPaused)return;
-        Win.PanePressPolicyBegin((int)c.Settings.EnabledButtons,c.Settings.StationaryTimeoutMs??0,c.Settings.PauseInFullscreen?1:0,blocked?1:0,sp.Button,sp.Hold,sp.Fullscreen?1:0);
+        if(ReferenceEquals(c,publishedPressConfig)&&ReferenceEquals(sp,publishedSuperPolicy)&&blocked==publishedPressPaused&&recognitionEnabled==publishedRecognition)return;
+        Win.PanePressPolicyBegin(recognitionEnabled?(int)c.Settings.EnabledButtons:0,c.Settings.StationaryTimeoutMs??0,c.Settings.PauseInFullscreen?1:0,blocked?1:0,sp.Button,sp.Hold,sp.Fullscreen?1:0);
         foreach(var rule in c.Apps)Win.PanePressPolicyRule(rule.ExePath,rule.WindowClass,rule.Mode==AppRuleMode.Disabled?1:0,0);
         foreach(var path in sp.Disabled)Win.PanePressPolicyRule(path,null,1,1);
         Win.PanePressPolicyCommit();
-        publishedPressConfig=c;publishedSuperPolicy=sp;publishedPressPaused=blocked;
+        publishedPressConfig=c;publishedSuperPolicy=sp;publishedPressPaused=blocked;publishedRecognition=recognitionEnabled;
     }
     void Consume(Win.NativeEvent e)
     {
+        if(!recognitionEnabled&&e.Kind is >=1 and <=4)return;
         lastX=e.X;lastY=e.Y;
         switch(e.Kind){
             case 1:

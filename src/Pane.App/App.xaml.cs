@@ -51,7 +51,7 @@ public sealed partial class App : Application
         again.Tick+=(t,_)=>{t.Stop();GC.Collect(2,GCCollectionMode.Forced,true);};again.Start();
     }
     public void SetHotkeysSuspended(bool suspended){if(closing)return;shell?.SetHotkeysSuspended(suspended);gestureService?.SetHotkeysSuspended(suspended);}
-    protected override void OnLaunched(LaunchActivatedEventArgs args){
+    protected override async void OnLaunched(LaunchActivatedEventArgs args){
         if(SetupEntry.Active){
             // 设计预览排查用：PANE_RESULT 设了就把界面异常写进 .error（正式安装模式不写文件）
             var previewLog=SetupEntry.Preview!=null?Environment.GetEnvironmentVariable("PANE_RESULT"):null;
@@ -64,35 +64,17 @@ public sealed partial class App : Application
         try {
             GlassParameters.InitializeResources(Resources);queue.EnsureSystemDispatcherQueue();manager=WindowsXamlManager.InitializeForCurrentThread();
             string data=RuntimeMode.Current.DataDirectory;
-            FileIcons=demo?new Pane.DesignData.FileIconsSample(data):new Pane.Services.Icons.FileIcons(data);   /* 设计：演示模式按扩展名取真实系统图标 */
             Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();ApplyUiLanguage();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
             var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry());Autostart=autostart;autostart.Align();
-            aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;
+            aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;aiService.SetModuleEnabled(false);
             Glass=new GlassParameters(Store.Current.General);
-            Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(Store.Current);ApplySuperSettings();folderJump?.Apply(Store.Current.FolderJump);};
+            Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(ModuleShellSettings());ApplySuperSettings();folderJump?.Apply(Store.Current.FolderJump);};
             if(Enum.TryParse<ThemeMode>(Environment.GetEnvironmentVariable("PANE_THEME"),true,out var theme))Glass.Apply(Glass.Current with {Theme=theme});
-            if(!demo){FileSelection=new Pane.Services.FileSelection();Renamer=new Pane.Services.Rename.BatchRenamer();}
-            selectionReader=new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),()=>Store.Current.SuperPanel.ClipboardFallback,files:FileSelection as Pane.Services.FileSelection);
-            Pane.Contracts.ISelectionActions actions=demo?new Pane.DesignData.SelectionActionsSample():new Pane.Services.SelectionActions();
-            int startupLevel=MemoryStartupLevel();LauncherView? launcher=null;
-            if(!demo&&startupLevel>=5){shell=new ShellHost(Command,Store.Current);shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
-            StartWinV();
-            if(!demo&&startupLevel>=5)FolderJump=new Pane.Services.FolderJumpService();
+            int startupLevel=MemoryStartupLevel();
+            if(!demo&&startupLevel>=5){shell=new ShellHost(Command,ModuleShellSettings());shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
+            await StartWinV();
+            await StartModules();
             hotkeysReadyMs=(DateTime.UtcNow-System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
-            if(!demo&&startupLevel>=6)StartGestures(data);
-            if(demo)ClipboardHistory=new Pane.DesignData.ClipboardSample();
-            else {clipboardSource=new(Store,Environment.GetEnvironmentVariable("PANE_OBSERVE")=="1"||Environment.GetEnvironmentVariable("PANE_VERIFY")=="1");clipboardService=new(Store,clipboardSource,new Pane.Services.Clipboard.WindowsClipboardWriter(),new Pane.Services.Clipboard.WindowsClipboardImages());ClipboardHistory=clipboardService;}
-            var everything=new Pane.Services.Launcher.EverythingSearch();FileSearchStatus=everything;
-            if(startupLevel>=1){
-            Files=demo?new Pane.DesignData.FileSearchSample():new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(),new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
-            if(!demo)launcherSearch=new(Store,new Pane.Services.Launcher.WindowsAppCatalog(data),everything,new Pane.Services.Launcher.WindowsLauncherExecutor(command=>queue.TryEnqueue(()=>Command(command))));
-            if(!demo){WebSuggestions=new Pane.Services.Launcher.WebSuggestions(()=>Store.Current.Launcher.WebSuggestions);TerminalHistory=launcherSearch!.TerminalHistory;}
-            launcher=new LauncherView((Pane.Contracts.ILauncherSearch?)launcherSearch??new Pane.DesignData.LauncherSampleSearch(),Ai,actions,demo?new Pane.DesignData.LauncherAttachmentActionsSample():new Pane.Services.Clipboard.ClipboardAttachmentActions(launcherSearch!),new Pane.Services.Clipboard.LauncherClipboardHistory(ClipboardHistory,Store));panels.Add("launcher",new(Strings.Common_Launcher,launcher,launcher,Glass));
-            panels["launcher"].PositionStore=Store;panels["launcher"].HideOnBlur=()=>Store.Current.Launcher.HideOnBlur;WireSecondary(launcher,actions);/* 设计接线：二级窗口 */}
-            if(startupLevel>=2){var clipboard=new ClipboardView(ClipboardHistory);clipboard.SendToLauncher+=(_,entry)=>{launcher!.AttachNext(entry);Command("show-launcher");};/* 设计接线：剪贴板「交给启动器」 */panels.Add("clipboard",new(Strings.Common_Clipboard,clipboard,clipboard,Glass){Placement=PanelPlacement.Pointer});}
-            if(startupLevel>=3){var super=new SuperView(Ai,actions);superView=super;secondaryActions??=actions;WireSuper(super);panels.Add("super",new(Strings.Common_SuperPanel,super,super,Glass){Placement=PanelPlacement.Pointer});}
-            foreach(var panel in panels.Values){WatchFrames(panel);panel.Prepare();}
-            if(startupLevel>=4){gestures=new GestureOverlay(Glass);gestures.TickRequested+=WakeFrames;ApplyGestureDisplay();}/* 设计：手势轨迹与提示框，手势服务的接线由工程做。手势服务在上面先启动，那时提示框还没建、显示设置没应用上（issue 16），建好后再应用一次 */
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
                 var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
@@ -111,11 +93,15 @@ public sealed partial class App : Application
     void Command(string command)=>Command(command,null);
     // 测试宿主可注入前台句柄；产品入口始终读取系统前台窗口。
     void Command(string command,nint? foregroundOverride){
+        string? moduleId=command.StartsWith("show-",StringComparison.Ordinal)?command[5..]:
+            command.StartsWith("hotkey-",StringComparison.Ordinal)?command[7..]:command=="pause-gestures"?Pane.Contracts.ModuleIds.Gestures:null;
+        if(moduleId=="super")moduleId=Pane.Contracts.ModuleIds.SuperPanel;
+        if(moduleId!=null&&Modules!=null&&Modules.Modules.Any(m=>m.Id==moduleId)&&!AllowModule(moduleId))return;
         if(command.StartsWith("hotkey-",StringComparison.Ordinal)){
             string name=command[7..];command="show-"+name;
             nint foreground=foregroundOverride??Native.GetForegroundWindow();
             if(panels.TryGetValue(name,out var target)&&ShellHotkeyBindings.ShouldHide(target.Shown,
-                foreground==target.Input||foreground==target.Visual)){
+                foreground==target.Input||foreground==target.Visual||target.Passive)){   // 不激活方式（059）：前台是原窗口，照样算「开着」
                 target.Hide();WakeFrames();return;
             }
         }
@@ -130,6 +116,9 @@ public sealed partial class App : Application
             if(settings==null){var view=new SettingsView();if(controlsEnabled)TrackSettings(view);settings=new(Strings.Common_Settings,view,view,Glass,true);WatchFrames(settings);settings.Hidden+=(_,_)=>{var old=settings;if(controlsEnabled&&old!=null){retiredSettings.Add(new WeakReference(old.View));retiredHosts.Add(new WeakReference(old));}settings=null;if(current==old)current=null;old?.Dispose();(Fonts as Pane.Services.FontCatalog)?.ClearCache();ReclaimAfterSettings();};settings.Prepare();}current=settings;
         }else if(command.StartsWith("show-")&&panels.TryGetValue(command[5..],out var panel)){foreach(var other in panels.Values)if(other!=panel)other.Hide();current=panel;}
         else return;
+        // 剪贴板默认不激活打开（059）；接管不了时照原来激活
+        if(command=="show-clipboard"&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&ShowClipboardPassive(current))return;
+        if(current.View is ClipboardView clipView)clipView.Passive=false;
         current.Show(activate:!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");
     }
     readonly Dictionary<string,string> controlPaths=[];
@@ -144,7 +133,7 @@ public sealed partial class App : Application
         if(controlsEnabled&&Take("exit",out _)){Shutdown();return;}
         DrainTrail();
         foreach(var panel in panels.Values)panel.Tick();settings?.Tick();TickSecondaries();gestures?.Tick();
-        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");if(IsProduction&&shell!=null){var log=new CrashLog(Store.DirectoryPath);if(log.Pending() is {} crash){shell.NotifyOnce(string.Format(Strings.Common_CrashLog, crash));log.MarkNotified(crash);}}if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics)));}
+        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");if(IsProduction&&shell!=null){var log=new CrashLog(Store.DirectoryPath);if(log.Pending() is {} crash){shell.NotifyOnce(string.Format(Strings.Common_CrashLog, crash));log.MarkNotified(crash);}}if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics))+"\n"+ModuleDiagnostics());}
         if(ready)DesignOpen();
         if(!ready||!controlsEnabled)return;
         if(pendingAck!=null){if(Settled){Ack(pendingAck);pendingAck=null;}return;}
@@ -163,7 +152,7 @@ public sealed partial class App : Application
         foreach(var (name,command) in showCommands)if(Take(command,out var point)){
             Command(command);if(name=="super"&&!string.IsNullOrWhiteSpace(point)){var xy=Pair(point);current!.Show(true,(int)xy.Width,(int)xy.Height,false);}pendingAck="shown-"+name;return;
         }
-        if(DiagnosticCommand())return;
+        if(ModuleControls()||DiagnosticCommand())return;
         if(Take("import-wgestures",out var source)){ImportGestures(source);return;}
         if(Take("hide",out _)){Command("hide");pendingAck="hidden";return;}
         if(Take("gesture",out var gesture)){DemoGesture(gesture);pendingAck="gesture-shown";return;}
@@ -192,7 +181,7 @@ public sealed partial class App : Application
         if(controlsEnabled&&gestureService!=null)Clean(()=>File.WriteAllText(output+".gesture-stopped",$"unhook={gestureService.Statistics().UnhookSucceeded};pause={gestureService.RegisteredHotkeyCount}"));
         Clean(()=>shell?.Dispose());
         Clean(()=>(FolderJump as IDisposable)?.Dispose());
-        if(shell?.CleanupSucceeded==false||ReleaseProbeEnabled&&gestureService?.Statistics().UnhookSucceeded!=1)Environment.ExitCode=1;
+        if(shell?.CleanupSucceeded==false||ReleaseProbeEnabled&&gestureService!=null&&gestureService.Statistics().UnhookSucceeded!=1)Environment.ExitCode=1;
         Clean(()=>clipboardService?.Dispose());if(clipboardSource?.Removed==false||clipboardService?.StorageFailures>0)Environment.ExitCode=1;
         if(controlsEnabled&&clipboardSource!=null)Clean(()=>File.WriteAllText(output+".clipboard-stopped",$"registered={clipboardSource.Registered};removed={clipboardSource.Removed};notifications={clipboardSource.Notifications};failures={clipboardSource.Failures};storageFailures={clipboardService?.StorageFailures}"));
         Clean(()=>(FileIcons as IDisposable)?.Dispose());

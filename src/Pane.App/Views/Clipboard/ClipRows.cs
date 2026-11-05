@@ -19,14 +19,20 @@ public sealed partial class ClipRow : INotifyPropertyChanged
 {
     readonly IClipRowActions actions;
 
-    public ClipRow(ClipEntry entry, int index, string query, IClipRowActions actions)
+    /// <param name="index">在可选中序列里的位置（含已固定区的展开行）。</param>
+    /// <param name="number">Alt+数字的编号，1～9；0 = 不编号（已固定区的条目，见 docs/design.md「剪贴板已固定区可折叠」）。</param>
+    public ClipRow(ClipEntry entry, int index, int number, string query, IClipRowActions actions)
     {
         Entry = entry;
         Index = index;
+        Number = number;
         this.actions = actions;
         Body = new ClipText(entry.Text ?? string.Empty, query);
         FileLines = (entry.Files ?? []).Select(f => new ClipText(System.IO.Path.GetFileName(f), query)).ToList();
-        if (entry.Thumbnail is { } t) Thumb = PictureBrush(t);
+        // 有本机位图就用 Image 显示（issue 21：ImageBrush 画在背景上时，图解码好了也常常要等别的东西触发重绘才出来，看着就是空白很久）；
+        // 没有路径的（演示数据）用渐变底
+        if (entry.Thumbnail is { Path: { } path }) ThumbPicture = new BitmapImage(new Uri(path));
+        else if (entry.Thumbnail is { } t) Thumb = Gradient(t.GradientFrom ?? "#808080", t.GradientTo ?? "#404040");
         if (entry.Kind == ClipKind.Color && TryColor(entry.Text, out var c)) Swatch = new SolidColorBrush(c);
         SourcePicture = LoadIcon(entry.SourceIcon?.ImagePath);
         if (SourcePicture is null && entry.SourceIcon is { GradientFrom: { } from, GradientTo: { } to }) SourceBrush = Gradient(from, to);
@@ -36,9 +42,14 @@ public sealed partial class ClipRow : INotifyPropertyChanged
 
     public ClipEntry Entry { get; }
     public int Index { get; }
+    public int Number { get; }
     public ClipText Body { get; }
     public List<ClipText> FileLines { get; }
+    /// <summary>缩略图框的底：只有演示数据（没有位图路径）用渐变。</summary>
     public Brush? Thumb { get; }
+    /// <summary>缩略图位图（服务生成好的本机 PNG）。</summary>
+    public ImageSource? ThumbPicture { get; }
+    bool HasThumb => Entry.Thumbnail is not null;
     public Brush? Swatch { get; }
     public Brush? SourceBrush { get; }
     /// <summary>来源程序的真实小图标（服务缓存的 PNG）。有它就不画渐变图块。</summary>
@@ -52,17 +63,17 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         ClipKind.Color => "drop",
         ClipKind.Image => "image",
         // 文件：复制的是图片（服务给了缩略图）用图片图标；看着都是文件夹（没有扩展名）用文件夹；其余用文档（原来一律是文件夹）
-        ClipKind.Files => Thumb is not null ? "image" : (Entry.Files ?? []).All(f => !System.IO.Path.HasExtension(f)) ? "folder" : "doc",
+        ClipKind.Files => HasThumb ? "image" : (Entry.Files ?? []).All(f => !System.IO.Path.HasExtension(f)) ? "folder" : "doc",
         _ => "text",
     };
     public string SourceGlyph => Entry.SourceIcon?.Glyph ?? "app";
-    public string Hotkey => Index < 9 ? $"Alt {Index + 1}" : "";
+    public string Hotkey => Number > 0 ? $"Alt {Number}" : "";
 
     static Visibility V(bool b) => b ? Visibility.Visible : Visibility.Collapsed;
     public Visibility TextVisibility => V(Entry.Kind is ClipKind.Text or ClipKind.Link);
     public Visibility CodeVisibility => V(Entry.Kind == ClipKind.Code);
     public Visibility ColorVisibility => V(Entry.Kind == ClipKind.Color);
-    public Visibility ThumbVisibility => V(Thumb is not null);
+    public Visibility ThumbVisibility => V(HasThumb);
 
     // 缩略图框：按原图比例。行内容宽约 290；宽图铺满一行（高按比例，最矮 56，太扁的裁两边），
     // 不够宽的图限高 ThumbMaxHeight、宽按比例靠左
@@ -76,7 +87,8 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public Visibility PinVisibility => V(Entry.Pinned);
     public Visibility SourceVisibility => V(SourceBrush is not null);
     public Visibility SourcePictureVisibility => V(SourcePicture is not null);
-    public Visibility HotkeyVisibility => V(Index < 9);
+    public Visibility HotkeyVisibility => V(Number > 0);
+    public Visibility SendVisibility => V(ModuleGate.On(Contracts.ModuleIds.Launcher));   // 启动器停用时没有「交给启动器」（055）
     public bool Pinned => Entry.Pinned;
     public string PinTip => Entry.Pinned ? Strings.Clipboard_UnpinHint : Strings.Clipboard_PinHint;
 
@@ -113,12 +125,6 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         if (min < 1440) return string.Format(Strings.Clipboard_HoursAgo, (object?)(min / 60));
         if (min < 2880) return Strings.Clipboard_Yesterday;
         return string.Format(Strings.Clipboard_DaysAgo, (object?)(min / 1440));
-    }
-
-    static Brush PictureBrush(ClipPicture p)
-    {
-        if (p.Path is { } path) return new ImageBrush { ImageSource = new BitmapImage(new Uri(path)), Stretch = Stretch.UniformToFill };
-        return Gradient(p.GradientFrom ?? "#808080", p.GradientTo ?? "#404040");
     }
 
     // 来源图标只有几十个程序，按路径缓存；14px 显示，按逻辑像素解码
@@ -200,10 +206,39 @@ public interface IClipRowActions
     void Delete(ClipRow row);
 }
 
+/// <summary>
+/// 已固定区底下的展开行（原型 .more-row）：收起时「还有 N 条」，展开后「收起」，箭头转 180°。
+/// 和条目一样能被选中，没有编号；选中 / 悬停时文字从次要色变正文色。
+/// </summary>
+public sealed partial class ClipMoreRow : INotifyPropertyChanged
+{
+    public ClipMoreRow(int index, int hidden, bool expanded)
+    {
+        Index = index;
+        Label = expanded ? Strings.Common_Collapse : string.Format(Strings.Clipboard_MorePinned, (object?)hidden);
+        Angle = expanded ? 180 : 0;
+    }
+    public int Index { get; }
+    public string Label { get; }
+    public double Angle { get; }
+    bool selected;
+    public bool IsSelected
+    {
+        get => selected;
+        set { if (selected == value) return; selected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(TextOpacity))); }
+    }
+    // 次要色近似：正文色 × 透明度（同筛选小标签）
+    public double TextOpacity => selected ? 1 : 0.68;
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
 public sealed partial class ClipSection
 {
-    public ClipSection(string label) { Label = label; }
+    public ClipSection(string label, ClipMoreRow? more = null) { Label = label; More = more; }
     public string Label { get; }
+    /// <summary>已固定区折叠时的展开行；其余分组为 null。</summary>
+    public ClipMoreRow? More { get; }
+    public Visibility MoreVisibility => More is null ? Visibility.Collapsed : Visibility.Visible;
     /// <summary>可追加：列表往下滚时分批补条目，不重建已有的行。</summary>
     public System.Collections.ObjectModel.ObservableCollection<ClipRow> Rows { get; } = [];
 }

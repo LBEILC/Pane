@@ -32,6 +32,11 @@ public sealed class ClipboardSample : IClipboardHistory
         [
             T(ClipKind.Text, "pane@example.com", "Edge", 9000, pinned: true),
             T(ClipKind.Text, "上海市徐汇区漕溪北路 88 号 6 楼 前台转设计组", "微信", 20000, pinned: true),
+            T(ClipKind.Code, "dotnet publish src/Pane.App -c Release -r win-x64", "终端", 3000, pinned: true),
+            T(ClipKind.Text, "您好，文件已收到，我们核对后今天下班前回复您。", "微信", 12000, pinned: true),
+            T(ClipKind.Color, "#5874C9", "Photoshop", 26000, pinned: true),
+            T(ClipKind.Text, "发票抬头：示例科技有限公司　税号 91310000XXXXXXXX0X", "记事本", 40000, pinned: true),
+            T(ClipKind.Link, "https://github.com/example/pane/issues", "Edge", 50000, pinned: true),
             T(ClipKind.Code, "git commit -m \"[设计] 网页风格原型\" -- prototype/index.html", "终端", 2),
             I("截图", 1280, 720, "#f8b195", "#6c5b7b", "截图工具", 6),
             T(ClipKind.Link, "https://learn.microsoft.com/windows/apps/winui/winui3/", "Edge", 14),
@@ -46,6 +51,10 @@ public sealed class ClipboardSample : IClipboardHistory
             T(ClipKind.Link, "https://www.example.com/blog/acrylic-material-deep-dive", "Edge", 2900),
             T(ClipKind.Text, "WiFi：Pane-Studio-5G", "记事本", 4300),
         ];
+        // 截图核对用：PANE_DESIGN_CLIP_PINS=N 只保留前 N 条固定（看没有固定、固定很少时的已固定区；默认 7 条）
+        if (int.TryParse(Environment.GetEnvironmentVariable("PANE_DESIGN_CLIP_PINS"), out var keepPins))
+            for (var i = 0; i < entries.Count; i++)
+                if (entries[i].Pinned && keepPins-- <= 0) entries[i] = entries[i] with { Pinned = false };
         // 截图核对用：PANE_DESIGN_CLIP_IMAGES=「缩略图路径|原图宽|原图高;…」时，再插几条用真实位图的图片条目（固定在最前，看各种比例的排版）
         var real = Environment.GetEnvironmentVariable("PANE_DESIGN_CLIP_IMAGES");
         if (!string.IsNullOrEmpty(real))

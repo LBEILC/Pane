@@ -137,6 +137,7 @@ LRESULT CALLBACK hook(int code,WPARAM m,LPARAM data){
  case WM_XBUTTONDOWN:case WM_XBUTTONUP:i.button=HIWORD(p->mouseData)==1?4:8;i.kind=m==WM_XBUTTONDOWN?pane::Down:pane::Up;break;
  case WM_LBUTTONDOWN:case WM_LBUTTONUP:i.button=16;i.kind=m==WM_LBUTTONDOWN?pane::Down:pane::Up;break;default:valid=false;}
  if(valid){
+ if(i.kind==pane::Down)pane::mouseDownSerial.fetch_add(1);
  if(!i.injected&&i.kind==pane::Down&&safety.physicalDown()){bypass=false;}
  if(safety.tripped)return CallNextHookEx(nullptr,code,m,data);
  bool deny=false;if(!capture.active){auto v=version.load(std::memory_order_acquire);auto w=pw.load();auto pid=pp.load();auto dpi=pdpi.load();auto x=px.load(),y=py.load();
@@ -229,3 +230,5 @@ API void PaneCancelCapture(){cancelCapture=true;if(running)PostThreadMessageW(th
 API void PaneStats(uint64_t* events,double* mean,double* max,int* hookError,int* unhookOk){*events=count;*mean=count?double(total)/double(count)/frequency.QuadPart*1e6:0;*max=double(maximum)/frequency.QuadPart*1e6;*hookError=error;*unhookOk=unhook;}
 
 API uint64_t PaneReinstallCount(){return reinstallCount;}
+
+API int PaneMouseActive(){return running.load()&&ready.load()&&error.load()==0&&unhook.load()==0?1:0;}

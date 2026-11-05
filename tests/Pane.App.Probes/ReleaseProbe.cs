@@ -9,6 +9,7 @@ public sealed partial class App
     static bool ReleaseProbeEnabled=>Environment.GetEnvironmentVariable("PANE_OBSERVE")=="1"&&!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_INSTANCE"))&&!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_DATA_DIR"));
     double hotkeysReadyMs;
     Task? releaseProbe;
+    bool panelKeysIdlePrepared;
     IStartupRegistry CreateStartupRegistry()=>ReleaseProbeEnabled?new ProbeRegistry():new WindowsStartupRegistry();
     sealed class ProbeRegistry:IStartupRegistry
     {
@@ -28,7 +29,14 @@ public sealed partial class App
                     using var pipe=new NamedPipeServerStream("Pane-release-probe-"+Environment.ProcessId,PipeDirection.Out,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
                     await pipe.WaitForConnectionAsync(cancellation.Token);
                     var snapshot=new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-                    if(!queue.TryEnqueue(()=>snapshot.TrySetResult($"ready={ready};hotkeys={shell?.RegisteredCount};hotkeysMs={hotkeysReadyMs:F2};tray={shell?.TrayCreated};visible={panels.Values.Count(p=>p.Shown)};hook={gestureService?.State};clipboard={clipboardSource?.Registered};production={IsProduction}")))break;
+                    if(!queue.TryEnqueue(()=>{
+                        // 059 空闲测量只在隔离观察实例中做一次启停，不启用控制文件轮询。
+                        if(ready&&!panelKeysIdlePrepared&&Environment.GetEnvironmentVariable("PANE_PANELKEYS_IDLE")=="1"&&Environment.GetEnvironmentVariable("PANE_VERIFY")=="1"){
+                            panelKeysIdlePrepared=PanelKeys?.Begin(panels["clipboard"].Input,true)==true;
+                            PanelKeys?.End();
+                        }
+                        snapshot.TrySetResult($"ready={ready};hotkeys={shell?.RegisteredCount};hotkeysMs={hotkeysReadyMs:F2};tray={shell?.TrayCreated};visible={panels.Values.Count(p=>p.Shown)};hook={gestureService?.State};clipboard={clipboardSource?.Registered};production={IsProduction};panelkeys={(PanelKeyRouter.HookInstalled?1:0)};panelCycle={panelKeysIdlePrepared}");
+                    }))break;
                     string value=await snapshot.Task.WaitAsync(cancellation.Token);
                     using var writer=new StreamWriter(pipe){AutoFlush=true};await writer.WriteLineAsync(value);
                 }catch(OperationCanceledException){break;}catch(IOException){}

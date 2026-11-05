@@ -7,7 +7,7 @@ using Pane.Localization;
 
 namespace Pane.Services.Launcher;
 
-internal sealed record ActionTarget(string Path,string[] Arguments);
+internal sealed record ActionTarget(string Path,string[] Arguments) { public string? RawArguments {get;init;} }
 internal sealed record UninstallEntry(string Id,string? Location,string? Icon,string? Command,bool SystemComponent);
 
 internal static class UninstallMatching
@@ -65,17 +65,17 @@ internal sealed class WindowsLauncherActionPlatform:LauncherActionPlatform
     }
     internal override ActionTarget? Resolve(string launch)
     {
-        string? path=UninstallMatching.Normalize(launch);string[] args=[];
+        string? path=UninstallMatching.Normalize(launch);string[] args=[];string raw="";
         if(path==null||!Path.GetExtension(path).Equals(".exe",StringComparison.OrdinalIgnoreCase)){
             int hr=CoInitializeEx(0,0);
             try{
                 var target=new StringBuilder(32768);var arguments=new StringBuilder(32768);var icon=new StringBuilder(32768);
                 if(LauncherNative.PaneLauncherResolve(launch,target,arguments,icon,out _)!=1)return null;
                 path=UninstallMatching.Normalize(target.ToString());
-                if(arguments.Length>0)args=Split("placeholder.exe "+arguments)[1..];
+                raw=arguments.ToString();if(arguments.Length>0)args=Split("placeholder.exe "+arguments)[1..];
             }finally{if(hr>=0)CoUninitialize();}
         }
-        return path!=null&&Path.GetExtension(path).Equals(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(path)?new(path,args):null;
+        return path!=null&&Path.GetExtension(path).Equals(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(path)?new(path,args){RawArguments=raw}:null;
     }
     internal override IReadOnlyList<UninstallEntry> ReadUninstall()
     {
@@ -115,13 +115,13 @@ internal sealed class LauncherActions(LauncherActionPlatform platform,ILauncherE
         LauncherItemKind.File or LauncherItemKind.Folder=>UninstallMatching.Normalize(item.Id.StartsWith("favorite:")?item.Id[9..]:item.Id.StartsWith("file:")?item.Id[5..]:null,false) is {} path?new(path,[]):null,
         _=>null
     };
-    internal IReadOnlyList<LauncherItemAction> Get(LauncherItem item,ActionTarget? target)
+    internal IReadOnlyList<LauncherItemAction> Get(LauncherItem item,ActionTarget? target,bool portable=false)
     {
         if(target==null)return [];
         var result=new List<LauncherItemAction>();
         if(item.Kind==LauncherItemKind.App)result.Add(LauncherItemAction.RunAsAdmin);
         result.AddRange([LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties]);
-        if(item.Kind==LauncherItemKind.App&&UninstallMatching.Match(target.Path,platform.ReadUninstall())!=null)result.Add(LauncherItemAction.Uninstall);
+        if(!portable&&item.Kind==LauncherItemKind.App&&UninstallMatching.Match(target.Path,platform.ReadUninstall())!=null)result.Add(LauncherItemAction.Uninstall);
         return result;
     }
     internal async Task Run(LauncherItem item,ActionTarget? target,LauncherItemAction action,CancellationToken token)
@@ -147,13 +147,13 @@ internal sealed partial class LauncherSearch
     IndexedApp? ActionApp(LauncherItem item)=>Volatile.Read(ref snapshot).Apps.FirstOrDefault(a=>a.Id==item.Id);
     public async Task<IReadOnlyList<LauncherItemAction>> GetActionsAsync(LauncherItem item,CancellationToken cancellationToken)
     {
-        try{return await Task.Run(()=>{cancellationToken.ThrowIfCancellationRequested();var result=actions.Get(item,actions.Target(item,ActionApp(item)));cancellationToken.ThrowIfCancellationRequested();return result;},cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);}
+        try{return await Task.Run(()=>{cancellationToken.ThrowIfCancellationRequested();var app=ActionApp(item);var result=actions.Get(item,actions.Target(item,app),app?.PortablePath!=null).ToList();if(app?.PortableKind is Pane.Settings.PortableKind.Program or Pane.Settings.PortableKind.Learned)result.Add(LauncherItemAction.RemoveFromApps);cancellationToken.ThrowIfCancellationRequested();return result;},cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);}
         catch(OperationCanceledException){throw;}
         catch(Exception){throw new LauncherActionException(Strings.Launcher_ActionFailed);}
     }
     public async Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken)
     {
-        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();await actions.Run(item,actions.Target(item,ActionApp(item)),action,cancellationToken).ConfigureAwait(false);},cancellationToken).ConfigureAwait(false);}
+        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);},cancellationToken).ConfigureAwait(false);}
         catch(Win32Exception e) when(e.NativeErrorCode==1223){}
         catch(OperationCanceledException){throw;}
         catch(LauncherActionException){throw;}

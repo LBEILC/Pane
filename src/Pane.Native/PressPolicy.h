@@ -35,10 +35,13 @@ inline PressIdentity pressIdentity(const PolicyGeometry& g,bool needPath){
 inline bool samePath(const std::wstring& a,const std::wstring& b){
  return !a.empty()&&!b.empty()&&CompareStringOrdinal(a.c_str(),-1,b.c_str(),-1,TRUE)==CSTR_EQUAL;
 }
+inline bool pressFullscreen(const PolicyGeometry& g,const wchar_t* name){
+ return g.valid&&wcscmp(name,L"Progman")!=0&&wcscmp(name,L"WorkerW")!=0
+  &&g.rect.left<=g.monitor.left&&g.rect.top<=g.monitor.top&&g.rect.right>=g.monitor.right&&g.rect.bottom>=g.monitor.bottom;
+}
 struct PressDecision {int enabled,superButton;};
 inline PressDecision decidePress(const PressPolicy& policy,const PolicyGeometry& g,const PressIdentity& identity){
- bool full=g.valid&&identity.windowClass!=L"Progman"&&identity.windowClass!=L"WorkerW"
-  &&g.rect.left<=g.monitor.left&&g.rect.top<=g.monitor.top&&g.rect.right>=g.monitor.right&&g.rect.bottom>=g.monitor.bottom;
+ bool full=pressFullscreen(g,identity.windowClass.c_str());
  bool disabled=false,superDisabled=false;const PressRule* matched=nullptr;
  for(const auto& rule:policy.rules){
   if(!samePath(rule.path,identity.path))continue;

@@ -6,8 +6,18 @@ $repo=Split-Path $PSScriptRoot -Parent
 if(!$PolicyPath){$PolicyPath=Join-Path $repo 'docs/internal.md'}
 $rules=@(Read-ForbiddenRules $PolicyPath)
 $dotnet=(Get-Command dotnet.exe -ErrorAction Stop).Source
-$work=Join-Path $repo ('src/Pane.Setup/bin/package-'+[Guid]::NewGuid().ToString('N'))
+. (Join-Path $PSScriptRoot 'remove-tree.ps1')
+$setupBin=Join-Path $repo 'src/Pane.Setup/bin'
+$work=Join-Path $setupBin ('package-'+[Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
+# 失败时整个临时目录留作现场，写明原因；成功打包时只保留最近 3 次失败。
+trap {
+    if($work -and (Test-Path -LiteralPath $work)){
+        [IO.File]::WriteAllText((Join-Path $work 'FAILED.txt'),"$([DateTime]::Now.ToString('s'))`r`n$($_ | Out-String)",[Text.UTF8Encoding]::new($false))
+        Write-Host "打包失败，现场保留在：$work"
+    }
+    break
+}
 if($NoBuild){
     $last=Join-Path $repo 'dist/package.json'
     $source=if(Test-Path -LiteralPath $last){(Get-Content -LiteralPath $last -Encoding UTF8 -Raw | ConvertFrom-Json).source}else{Join-Path $repo 'src/Pane.App/bin/aot'}
@@ -59,5 +69,15 @@ Assert-ForbiddenFiles -Files @($installer,$releaseInstaller,(Join-Path $dist 'SH
 $payload=Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object Length -Sum
 $result=[ordered]@{version=$version;source=$source;stage=$stage;installer=$installer;rawFiles=$raw.Count;rawBytes=$raw.Sum;files=$payload.Count;bytes=$payload.Sum;compressedBytes=(Get-Item -LiteralPath $zip).Length;installerBytes=(Get-Item -LiteralPath $installer).Length}
 $result | ConvertTo-Json | Set-Content -LiteralPath "$dist/package.json" -Encoding UTF8
+# 成功后删掉其他打包临时目录（每个约 0.2～0.3 GB）。保留本次（package.json 指向它）、-NoBuild 用到的来源、
+# 最近 3 次失败的现场，以及 2 小时内新建的（可能有另一次打包正在跑）。
+$keep=@([IO.Path]::GetFullPath($work).TrimEnd('\'))
+if($source -match '[\\/](package-[0-9a-f]{32})[\\/]'){$keep+=[IO.Path]::GetFullPath((Join-Path $setupBin $Matches[1])).TrimEnd('\')}
+$packages=@(Get-ChildItem -LiteralPath $setupBin -Directory -Filter 'package-*')
+$keep+=@($packages | Where-Object {Test-Path -LiteralPath (Join-Path $_.FullName 'FAILED.txt')} | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {$_.FullName.TrimEnd('\')})
+foreach($old in $packages){
+    if($keep -contains $old.FullName.TrimEnd('\') -or $old.CreationTime -gt [DateTime]::Now.AddHours(-2)){continue}
+    try {Remove-LinkSafeTree $old.FullName}catch{Write-Warning "旧打包目录没删掉：$($old.FullName)：$($_.Exception.Message)"}
+}
 $result | ConvertTo-Json
 # 017 将仓库外可执行文件统一认作正式版；未扩展该身份规则前不输出会误用正式数据的绿色版。

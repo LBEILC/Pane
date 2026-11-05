@@ -30,6 +30,24 @@ HRESULT Encode(IWICImagingFactory* f,IWICBitmapSource* source,IStream* stream){
  if(SUCCEEDED(hr))hr=frame->Initialize(nullptr);if(SUCCEEDED(hr))hr=frame->WriteSource(source,nullptr);if(SUCCEEDED(hr))hr=frame->Commit();if(SUCCEEDED(hr))hr=encoder->Commit();return hr;
 }
 HRESULT Save(IWICImagingFactory* f,IWICBitmapSource* source,const wchar_t* path){ComPtr<IWICStream> stream;HRESULT hr=f->CreateStream(&stream);if(SUCCEEDED(hr))hr=stream->InitializeFromFilename(path,GENERIC_WRITE);return SUCCEEDED(hr)?Encode(f,source,stream.Get()):hr;}
+// 用直通 BGRA 检查，避免预乘 alpha 抹掉透明像素的颜色。
+bool RepairEmptyAlpha(BYTE* pixels,size_t size){
+ for(size_t i=3;i<size;i+=4)if(pixels[i]!=0)return false;
+ for(size_t i=3;i<size;i+=4)pixels[i]=255;
+ return true;
+}
+HRESULT NormalizeImage(IWICImagingFactory* f,IWICBitmapSource* source,ComPtr<IWICBitmapSource>& result){
+ UINT w=0,h=0;HRESULT hr=source->GetSize(&w,&h);if(FAILED(hr))return hr;
+ if(!w||!h||static_cast<unsigned long long>(w)*h>MAXDWORD/4)return E_INVALIDARG;
+ ComPtr<IWICFormatConverter> convert;hr=f->CreateFormatConverter(&convert);
+ if(SUCCEEDED(hr))hr=convert->Initialize(source,GUID_WICPixelFormat32bppBGRA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom);
+ if(FAILED(hr))return hr;
+ const UINT size=w*h*4;std::vector<BYTE> pixels(size);hr=convert->CopyPixels(nullptr,w*4,size,pixels.data());if(FAILED(hr))return hr;
+ // 任一像素有 alpha 时保留原始源；完整图和缩略图共用修正结果。
+ if(!RepairEmptyAlpha(pixels.data(),pixels.size())){result=source;return S_OK;}
+ ComPtr<IWICBitmap> bitmap;hr=f->CreateBitmapFromMemory(w,h,GUID_WICPixelFormat32bppBGRA,w*4,size,pixels.data(),&bitmap);
+ if(SUCCEEDED(hr))result=bitmap;return hr;
+}
 HGLOBAL Memory(const void* data,size_t size){auto h=GlobalAlloc(GMEM_MOVEABLE,size);if(!h)return nullptr;auto p=GlobalLock(h);if(!p){GlobalFree(h);return nullptr;}memcpy(p,data,size);GlobalUnlock(h);return h;}
 bool Put(UINT format,HGLOBAL& memory){if(!SetClipboardData(format,memory))return false;memory=nullptr;return true;}
 }
@@ -62,7 +80,8 @@ API int PaneClipImageAlloc(void** output,int* length){
  }else bytes.assign(p,p+size);GlobalUnlock(handle);
  HRESULT hr=f->CreateStream(&input);if(SUCCEEDED(hr))hr=input->InitializeFromMemory(bytes.data(),static_cast<DWORD>(bytes.size()));
  if(SUCCEEDED(hr))hr=f->CreateDecoderFromStream(input.Get(),nullptr,WICDecodeMetadataCacheOnLoad,&decoder);if(SUCCEEDED(hr))hr=decoder->GetFrame(0,&frame);
- ComPtr<IStream> encoded;if(SUCCEEDED(hr))hr=CreateStreamOnHGlobal(nullptr,TRUE,&encoded);if(SUCCEEDED(hr))hr=Encode(f.Get(),frame.Get(),encoded.Get());
+ if(SUCCEEDED(hr))hr=NormalizeImage(f.Get(),frame.Get(),source);
+ ComPtr<IStream> encoded;if(SUCCEEDED(hr))hr=CreateStreamOnHGlobal(nullptr,TRUE,&encoded);if(SUCCEEDED(hr))hr=Encode(f.Get(),source.Get(),encoded.Get());
  STATSTG stats{};if(SUCCEEDED(hr))hr=encoded->Stat(&stats,STATFLAG_NONAME);if(FAILED(hr)||stats.cbSize.QuadPart>INT_MAX)return 0;
  *length=static_cast<int>(stats.cbSize.QuadPart);*output=CoTaskMemAlloc(*length);if(!*output)return 0;LARGE_INTEGER zero{};encoded->Seek(zero,STREAM_SEEK_SET,nullptr);ULONG read=0;hr=encoded->Read(*output,*length,&read);
  if(FAILED(hr)||read!=static_cast<ULONG>(*length)){CoTaskMemFree(*output);*output=nullptr;return 0;}return 1;
@@ -71,8 +90,9 @@ API int PaneClipSaveImage(const wchar_t* input,const wchar_t* full,const wchar_t
  Apartment apartment;auto f=Factory();if(!f)return 0;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> frame;ComPtr<IWICBitmapScaler> scale;
  HRESULT hr=f->CreateDecoderFromFilename(input,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder);if(SUCCEEDED(hr))hr=decoder->GetFrame(0,&frame);
  UINT w=0,h=0;if(SUCCEEDED(hr))hr=frame->GetSize(&w,&h);if(!w||!h||w>INT_MAX||h>INT_MAX)return 0;*width=static_cast<int>(w);*height=static_cast<int>(h);
- if(SUCCEEDED(hr)&&full)hr=Save(f.Get(),frame.Get(),full);if(SUCCEEDED(hr))hr=f->CreateBitmapScaler(&scale);double k=std::min(1.0,640.0/std::max(w,h));
- if(SUCCEEDED(hr))hr=scale->Initialize(frame.Get(),std::max(1u,static_cast<UINT>(w*k)),std::max(1u,static_cast<UINT>(h*k)),WICBitmapInterpolationModeFant);
+ ComPtr<IWICBitmapSource> source;if(SUCCEEDED(hr))hr=NormalizeImage(f.Get(),frame.Get(),source);
+ if(SUCCEEDED(hr)&&full)hr=Save(f.Get(),source.Get(),full);if(SUCCEEDED(hr))hr=f->CreateBitmapScaler(&scale);double k=std::min(1.0,640.0/std::max(w,h));
+ if(SUCCEEDED(hr))hr=scale->Initialize(source.Get(),std::max(1u,static_cast<UINT>(w*k)),std::max(1u,static_cast<UINT>(h*k)),WICBitmapInterpolationModeFant);
  if(SUCCEEDED(hr))hr=Save(f.Get(),scale.Get(),thumb);return SUCCEEDED(hr);
 }
 API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars){

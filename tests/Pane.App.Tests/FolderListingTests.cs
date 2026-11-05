@@ -11,7 +11,7 @@ static class FolderListingTests
         int checks=0;
         void Check(bool ok,string name){if(!ok)throw new Exception("folder: "+name);checks++;}
         async Task Throws<T>(Func<Task> action) where T:Exception {try{await action();throw new Exception("missing "+typeof(T).Name);}catch(T){checks++;}}
-        string root=Path.Combine(AppContext.BaseDirectory,"results","folder-"+Guid.NewGuid().ToString("N"));
+        string root=TestResults.NewDirectory("folder-");
         Directory.CreateDirectory(root);
         var service=new BatchRenamer();
         string FileAt(string relative,FileAttributes attributes=FileAttributes.Normal){string path=Path.Combine(root,relative);Directory.CreateDirectory(Path.GetDirectoryName(path)!);File.WriteAllText(path,"");File.SetAttributes(path,attributes);return path;}

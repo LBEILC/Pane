@@ -27,7 +27,7 @@ static class RenameTests
         Rule("Alpha Beta.txt",new RenameRule(RenameRuleKind.Insert){Enabled=false,Text="!"});
         Check(Transform("a.txt",new RenameRule(RenameRuleKind.Insert){Text="b"},new RenameRule(RenameRuleKind.Replace){Find="ab",Text="c"})=="c.txt","order");
         Check(BatchRenamer.Transform("Dir.Name",true,date,date,0,[new RenameRule(RenameRuleKind.Extension){Text="jpg"},new RenameRule(RenameRuleKind.Case){Case=RenameCase.Upper}])=="DIR.NAME","folder no extension");
-        string root=Path.Combine(AppContext.BaseDirectory,"results","rename-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+        string root=TestResults.NewDirectory("rename-");Directory.CreateDirectory(root);
         try{
             string FileAt(string name){var p=Path.Combine(root,name);File.WriteAllText(p,name);return p;}
             var a=FileAt("a.txt");var b=FileAt("b.txt");var c=FileAt("c.txt");var service=new BatchRenamer();

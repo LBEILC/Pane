@@ -17,9 +17,11 @@ public sealed partial class App
     public IWebSuggestions? WebSuggestions {get;set;}
     /// <summary>终端命令历史（037）：设置页「清空」用。工程赋真实实现。</summary>
     public ITerminalHistory? TerminalHistory {get;set;}
-    enum SecondaryId { Files, Translate, Chat, Rename }
+    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
     readonly Dictionary<SecondaryId,GlassPanel> secondaries=[];
     readonly Dictionary<SecondaryId,(int X,int Y,double W,double H)> secondaryBounds=[];
+    // 销毁窗口前要做的退订（关窗口、能力停用两条路径都调用）
+    readonly Dictionary<SecondaryId,Action> secondaryRelease=[];
     ISelectionActions? secondaryActions;
 
     void WireSecondary(LauncherView launcher,ISelectionActions actions)
@@ -32,6 +34,7 @@ public sealed partial class App
         launcher.OpenTranslate+=text=>ShowTranslate(text);
         launcher.OpenChat+=(q,history)=>ShowChat(q,history);
         launcher.OpenRename+=(files,window)=>ShowRename(files,window);
+        launcher.OpenTimer+=ShowTimer;   /* 058：「定时关机…」 */
     }
 
     public void ShowFiles(string query,string? focus)=>Present(SecondaryId.Files, Strings.Common_Files,()=>new FilesView(Files,secondaryActions!),v=>((FilesView)v).Open(query,focus));
@@ -47,7 +50,7 @@ public sealed partial class App
     /// </summary>
     public async void ShowRename(IReadOnlyList<string>? files,nint window)
     {
-        if(closing||Renamer is not { } renamer)return;
+        if(closing||!AllowModule(ModuleIds.Rename)||Renamer is not { } renamer)return;
         if(files is null&&window!=0&&FileSelection is { } selection)
         {
             try{files=await selection.ReadAsync(window,CancellationToken.None);}
@@ -62,15 +65,19 @@ public sealed partial class App
     void Present(SecondaryId id,string name,Func<Microsoft.UI.Xaml.Controls.UserControl> make,Action<IPanelView> open)
     {
         if(closing)return;
+        var owner=id switch { SecondaryId.Files=>ModuleIds.Launcher, SecondaryId.Rename=>ModuleIds.Rename, SecondaryId.Timer=>ModuleIds.PowerTimer, _=>ModuleIds.Ai };
+        if(!AllowModule(owner))return;
         if(!secondaries.TryGetValue(id,out var panel)){
             var view=make();var sv=(ISecondaryView)view;
             panel=new GlassPanel(name,view,sv,Glass,true,true,sv.MinimumSize){EscapeHides=false};
             WatchFrames(panel);
             if(secondaryBounds.TryGetValue(id,out var b)){panel.Width=b.W;panel.Height=b.H;panel.RememberedOrigin=(b.X,b.Y);}
-            sv.TopmostChanged+=(_,on)=>panel.SetTopmost(on);
+            // 关窗口时要退订：原生 XAML 在内容岛释放后仍会抓着视图外壳，视图再经这个处理函数抓着宿主，宿主连同整套玻璃材质都回收不了（每开关一次 1～2 MiB）
+            EventHandler<bool> topmost=(_,on)=>panel.SetTopmost(on);sv.TopmostChanged+=topmost;secondaryRelease[id]=()=>sv.TopmostChanged-=topmost;
             var host=panel;
             host.Hidden+=(_,_)=>{
                 secondaryBounds[id]=(host.Origin.X,host.Origin.Y,host.Width,host.Height);
+                if(secondaryRelease.Remove(id,out var release))release();
                 secondaries.Remove(id);if(current==host)current=null;host.Dispose();ReclaimAfterSettings();
             };
             panel.Prepare();secondaries[id]=panel;
@@ -95,6 +102,7 @@ public sealed partial class App
         switch(Environment.GetEnvironmentVariable("PANE_DESIGN_OPEN")){
             case "files":ShowFiles(q??"报价",null);break; // 不翻译：演示数据
             case "clipboard":Command("show-clipboard");break;
+            case "launcher":Command("show-launcher");break;   /* 带上 PANE_DESIGN_QUERY 看启动器结果 */
             case "translate":ShowTranslate(q??"Glassmorphism relies on background blur, translucency and a subtle highlight border.");break;
             case "tray":{var m=GlassPanel.MonitorFromPoint(new GlassPanel.Point(),1);var info=new GlassPanel.MonitorInfo{Size=System.Runtime.InteropServices.Marshal.SizeOf<GlassPanel.MonitorInfo>()};GlassPanel.GetMonitorInfoW(m,ref info);ShowTrayMenu($"{info.Monitor.Right-140},{info.Monitor.Bottom-24}");break;}/* 演示：模拟任务栏右下角的托盘图标 */
             case "folder-jump":/* 演示：屏幕中间偏左上，像对话框文件名框的左下角 */
@@ -104,6 +112,7 @@ public sealed partial class App
                 ShowFolderJump(new FolderJumpRequest(0,info.Monitor.Left+(info.Monitor.Right-info.Monitor.Left)/3,info.Monitor.Top+(info.Monitor.Bottom-info.Monitor.Top)/3));
                 break;
             }
+            case "timer":ShowTimer();break;   /* 058：PANE_DESIGN_TIMER=分钟数 先定一个 */
             case "rename":
                 ShowRename(q=="empty"?[]:Pane.DesignData.RenameSample.Photos,0);
                 if(q!="empty"&&secondaries.TryGetValue(SecondaryId.Rename,out var rw))((RenameView)rw.View).UseRules(Pane.DesignData.RenameSample.SampleRules);

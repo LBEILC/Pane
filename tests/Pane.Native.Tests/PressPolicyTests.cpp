@@ -79,6 +79,24 @@ int main(){running=true;observe=false;configure();
  check(HookHealth::slow(1001,1000),"slow callback requests repair");
  check(!HookHealth::slow(1001,0),"invalid clock ignored");
  check(HookHealth::slow(2000,1000),"long callback requests repair");
+ // 055：仅超级面板的策略不拦右键，也不产生手势会话；侧键仍保留短按补发和长按。
+ reset();PanePressPolicyBegin(0,0,1,0,4,400,1);PanePressPolicyCommit();
+ for(DWORD flags:{DWORD(0),DWORD(LLMHF_INJECTED)}){
+  check(raw(WM_RBUTTONDOWN,0,flags)==0,"super only right down passes");
+  check(raw(WM_MOUSEMOVE,100,flags)==0,"super only move passes");
+  check(raw(WM_RBUTTONUP,100,flags)==0,"super only right up passes");
+  Event sample{};check(PanePoll(&sample)==0&&!capture.active,"super only no gesture events");
+ }
+ side={};side.mouseData=XBUTTON1<<16;
+ check(hook(HC_ACTION,WM_XBUTTONDOWN,reinterpret_cast<LPARAM>(&side))==1,"super only side down captured");
+ check(hook(HC_ACTION,WM_XBUTTONUP,reinterpret_cast<LPARAM>(&side))==1,"super only side up captured");
+ Event sample{};PanePoll(&sample);check(PanePoll(&sample)&&sample.kind==pane::Replay,"super only short press replay retained");reset();
+ check(hook(HC_ACTION,WM_XBUTTONDOWN,reinterpret_cast<LPARAM>(&side))==1,"super only hold starts");
+ capture.started=GetTickCount64()-400;MSG tick{};tick.message=WM_TIMER;tick.wParam=captureTimer;dispatch(tick);
+ bool superRequest=false;while(PanePoll(&sample))superRequest|=sample.kind==pane::Super;
+ check(superRequest,"super only hold requests panel");reset();
+ PanePressPolicyBegin(0,0,1,0,0,400,1);PanePressPolicyCommit();
+ check(hook(HC_ACTION,WM_XBUTTONDOWN,reinterpret_cast<LPARAM>(&side))==0,"both off side key passes");
  auto process=queryProcessIdentity(GetCurrentProcessId());IdentitySnapshot cache;cache.processes.push_back(process);
  check(findIdentity(cache,GetCurrentProcessId())==process.get()&&process->known,"real identity cached and integrity known");
  check(findIdentity(cache,0)==nullptr,"cache miss");

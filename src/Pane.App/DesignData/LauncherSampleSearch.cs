@@ -14,7 +14,8 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
         IReadOnlyList<LauncherItemAction> result = item.Kind switch
         {
             LauncherItemKind.App when item.Title == "终端" => [],
-            LauncherItemKind.App when item.Title == "微信" => Enum.GetValues<LauncherItemAction>(),
+            // 安装的软件：全部附加操作（含卸载）；「从应用列表移除」只给便携程序（057），这里不给
+            LauncherItemKind.App when item.Title == "微信" => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties, LauncherItemAction.Uninstall],
             LauncherItemKind.App => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
             LauncherItemKind.File or LauncherItemKind.Folder => [LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
             _ => []
@@ -112,6 +113,13 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
                          .Concat(cmd.Contains(' ') ? [] : Programs.Where(n => n.StartsWith(first, StringComparison.OrdinalIgnoreCase) && n != first)).Take(6))
                 items.Add(new("complete:" + c, LauncherItemKind.Action, LauncherGroups.Completion, c, History.Contains(c) ? "最近运行过" : "程序", new(History.Contains(c) ? "refresh" : "terminal")));
             return Task.FromResult(new LauncherResult(items, false));
+        }
+        // 定时关机（058）：真实解析在服务里，演示只认几种说法，够看排法
+        if (q.Contains("关机") || q.StartsWith("gj", StringComparison.Ordinal) || q.Contains("定时")) // 不翻译：演示用的说法
+        {
+            var at = DateTimeOffset.Now.AddMinutes(30);
+            if (q.Any(char.IsDigit)) items.Add(new($"power:shutdown@{at.ToUnixTimeSeconds()}", LauncherItemKind.Command, LauncherGroups.Timer, "30 分钟后关机", $"{at:HH:mm} · 回车定好，到点前 1 分钟提醒", new("power"))); // 不翻译：演示数据
+            else items.Add(new("power:panel", LauncherItemKind.Command, LauncherGroups.Timer, "定时关机…", "选动作和时间", new("timer"))); // 不翻译：演示数据
         }
         var v = Calc(raw);
         if (v is not null) items.Add(new("calc", LauncherItemKind.Calculation, LauncherGroups.Calculation, v, t + " =", new("equal")));

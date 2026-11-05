@@ -5,10 +5,22 @@ namespace Pane.Hosting;
 public sealed record HotkeyConflict(string Target,Hotkey Hotkey,int Error);
 internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
 {
+    // 复用隐藏顶层窗口接收广播，模块停止时移除订阅，不增加线程。
+    internal event Action? PowerTimeChanged;
+    internal int PowerTimeListeners => PowerTimeChanged?.GetInvocationList().Length ?? 0;
     bool winVRequested;
     volatile bool stopping;
     readonly uint taskbarCreated=RegisterWindowMessageW("TaskbarCreated");
     readonly System.Collections.Concurrent.ConcurrentQueue<(bool Enabled,TaskCompletionSource<bool> Done)> winVRequests=new();
+    readonly System.Collections.Concurrent.ConcurrentQueue<TaskCompletionSource> barriers=new();
+    // 等待前面的重绑消息完成，不改变 Win+V 的选择。
+    internal Task FlushAsync()
+    {
+        var done=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        barriers.Enqueue(done);
+        if(stopping||!PostMessageW(shellWindow,0x8006,0,0))done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
+        return done.Task;
+    }
     public event Action<bool>? WinVRegistrationChanged;
     public Task<bool> SetAsync(bool enabled)
     {
@@ -26,7 +38,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         }
         lock(conflicts)conflicts.RemoveAll(c=>c.Target=="winv");
         bool active=false;
-        if(winVRequested&&!suspended)
+        if(winVRequested&&!suspended&&(currentSettings?.Clipboard.Enabled??false))
         {
             var key=new Hotkey(KeyModifiers.Win,86);
             active=clipboard==key&&registered.Contains(2);
@@ -56,9 +68,14 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     public event EventHandler<HotkeyConflict>? HotkeyOccupied;
     readonly List<HotkeyConflict> conflicts=[];
     public IReadOnlyList<HotkeyConflict> Conflicts {get {lock(conflicts)return conflicts.ToArray();}}
-    public List<string> Diagnostics {get;}=[];
+    readonly List<string> diagnostics=[];
+    public List<string> Diagnostics {get {lock(diagnostics)return [..diagnostics,$"panelkeys={(Pane.Services.PanelKeyRouter.HookInstalled?1:0)}"];}}
     public int RegisteredCount=>registered.Count;
     public bool TrayCreated=>tray;
+    volatile bool keyboardStarted;
+    public bool KeyboardHookActive=>keyboardStarted&&PaneKeyboardActive()!=0;
+    nuint keyboardGeneration;
+    void StopKeyboardHook(){if(keyboardStarted){PaneKeyboardStop();keyboardStarted=false;}}
     public bool CleanupSucceeded {get;private set;}=true;
     const uint Callback=0x8001;
     public ShellHost(Action<string> command,PaneSettings settings) {
@@ -77,33 +94,50 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     static Hotkey Override(string name,Hotkey value){
         var text=Environment.GetEnvironmentVariable("PANE_DEV_HOTKEYS");if(string.IsNullOrWhiteSpace(text))return value;
         foreach(var pair in text.Split(';')){var parts=pair.Split('=',2);if(parts.Length!=2||parts[0]!=name)continue;
-            var keys=parts[1].Split('+');KeyModifiers mods=0;foreach(var k in keys[..^1])mods|=Enum.Parse<KeyModifiers>(k,true);
-            string last=keys[^1];ushort vk=last.Equals("Space",StringComparison.OrdinalIgnoreCase)?(ushort)32:last.Length==1?(ushort)char.ToUpperInvariant(last[0]):throw new FormatException("开发热键格式无效");return new(mods,vk); // 不翻译：异常
+            return ShellHotkeyBindings.ParseOverride(parts[1]);
         }return value;
     }
     void ApplyCore(PaneSettings settings){
         currentSettings=settings;
+        lock(diagnostics)diagnostics.Clear();
         var a=Override("launcher",settings.Launcher.Hotkey);var b=Override("clipboard",settings.Clipboard.Hotkey);
         lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;
-        ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Clipboard.Enabled,suspended);
+        // 先停止旧线程；代数丢弃已经排队的旧配置通知。
+        keyboardGeneration++;StopKeyboardHook();
+        ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
+        var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
+        if(keys.Launcher!=0||keys.Clipboard!=0){
+            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard);
+            keyboardStarted=code==0;
+            if(code!=0){if(keys.Launcher!=0)RegistrationResult("launcher",a,false,code);if(keys.Clipboard!=0)RegistrationResult("clipboard",b,false,code);}
+        }
+        lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
         ApplyWinV();
         if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");} // 不翻译：日志异常
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
     }
     void Register(int id,string name,Hotkey key){
+        if(key.DoubleTap){RegistrationResult(name,key,false,87);return;}
         var chord=Pane.Services.HotkeyConversions.ToGesture(key);
         uint mods=ShellHotkeyBindings.NoRepeat;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Ctrl))mods|=2;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Alt))mods|=1;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Shift))mods|=4;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Win))mods|=8;
         bool ok=Native.RegisterHotKey(shellWindow,id,mods,key.VirtualKey);int code=ok?0:Marshal.GetLastWin32Error();if(ok)registered.Add(id);
-        lock(Diagnostics)Diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
+        RegistrationResult(name,key,ok,code);
+    }
+    void RegistrationResult(string name,Hotkey key,bool ok,int code){
+        lock(diagnostics)diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
         if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
             // 设计加（2026-10-30）：注册失败时提示一次，否则按了没反应也不知道为什么
             var what=name=="launcher"?Strings.Common_Launcher:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
+        // 只处理 AUTOMATIC 恢复广播，避免随后 RESUMESUSPEND 重复延长倒数。
+        if(m==0x1e || m==0x218 && w==0x12){PowerTimeChanged?.Invoke();return m==0x218?1:0;}
+        if(m==0x8006){while(barriers.TryDequeue(out var done))done.TrySetResult();return 0;}
         // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
         if(taskbarCreated!=0&&m==taskbarCreated){tray=false;if(currentSettings?.General.ShowTrayIcon==true)tray=Shell_NotifyIconW(0,ref data);return 0;}
         if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;request.Done.TrySetResult(ApplyWinV());}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
         if(m==0x312){if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
+        if(m==0x8005){if(!suspended&&w==keyboardGeneration&&ShellHotkeyBindings.Command((nuint)l) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8003){while(notifications.TryDequeue(out var text)){data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
         if(m==0x8002){if(pending is {} s)ApplyCore(s);return 0;}
         // 设计改（2026-10-30）：右键弹 Pane 自己的玻璃菜单（App.Tray.cs），不再用系统菜单。
@@ -118,6 +152,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     void Dispatch(string value)=>queue.TryEnqueue(()=>command(value));
     void Cleanup(){
         stopping=true;
+        while(barriers.TryDequeue(out var done))done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
+        keyboardGeneration++;StopKeyboardHook();
         while(winVRequests.TryDequeue(out var request))request.Done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
         foreach(var id in registered)CleanupSucceeded &= Native.UnregisterHotKey(shellWindow,id);registered.Clear();
         if(tray){CleanupSucceeded &= Shell_NotifyIconW(2,ref data);tray=false;}
@@ -144,4 +180,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     [DllImport("user32.dll")] static extern bool PostMessageW(nint h,uint m,nuint w,nint l);
     [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessageW(string name);
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard);
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern void PaneKeyboardStop();
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardActive();
 }

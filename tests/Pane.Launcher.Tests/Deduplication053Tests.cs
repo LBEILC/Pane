@@ -78,7 +78,7 @@ static partial class Program
     static async Task Migration053(CatalogGroup group){
         var aliases=group.MergedIds.ToDictionary(id=>id,_=>group.StableId);
         Check(aliases.Count>0,"053 夹具包含被合并旧 Id");
-        string dir=Path.Combine(AppContext.BaseDirectory,"results","053-migration-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dir);
+        string dir=TestResults.NewDirectory("053-migration-");Directory.CreateDirectory(dir);
         string oldId=group.MergedIds[0],id=group.StableId,custom=Path.Combine(dir,"custom.png");
         IconRenderer.Save(custom,IconRenderer.Render(IconRenderer.Analyze(TestImage(200,200)),IconKind.Raw,true));
         var uses=new Dictionary<string,AppUse>{[oldId]=new(7,DateTimeOffset.UtcNow),[id]=new(3,DateTimeOffset.UtcNow.AddDays(-1))};

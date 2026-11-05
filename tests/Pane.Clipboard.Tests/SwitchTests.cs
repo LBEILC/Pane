@@ -9,7 +9,7 @@ static partial class Program
     static async Task SwitchTests()
     {
         int before=checks;
-        string root=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));
+        string root=TestResults.NewDirectory();
         var store=new SettingsStore(root,Defaults());var source=new SwitchSource();var images=new SwitchImages();
         string index=Path.Combine(root,"clipboard","history.json");
         using(var history=new ClipboardHistory(store,source,new FakeWriter(),images)){

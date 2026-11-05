@@ -20,7 +20,7 @@ using Windows.UI.Core;
 
 namespace Pane.Views;
 
-public sealed partial class FilesView : UserControl, ISecondaryView
+public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
 {
     const int Batch = 50;
     const double RowHeight = 50;
@@ -93,6 +93,16 @@ public sealed partial class FilesView : UserControl, ISecondaryView
     public void OnShowing(PanelShowContext context) { }
     public void OnShown() => Input.Focus(FocusState.Programmatic);
     public void OnHidden() { pending?.Cancel(); previewPending?.Cancel(); }
+
+    // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
+    // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
+    public void Dispose()
+    {
+        OnHidden();
+        Icons.Ready -= OnIconReady;
+        debounce.Dispose(); previewDebounce.Dispose(); thumbFade.Dispose();
+        listHighlight.Dispose(); railHighlight.Dispose(); railHover.Dispose();
+    }
 
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 

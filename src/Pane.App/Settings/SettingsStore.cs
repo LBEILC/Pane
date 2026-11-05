@@ -29,22 +29,45 @@ public sealed class SettingsStore
         Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json");
         if(!File.Exists(path)) return;
-        try { var value=JsonSerializer.Deserialize(File.ReadAllText(path),SettingsJson.Default.PaneSettings) ?? throw new JsonException(); value=Normalize(value); Validate(value); Current=value; }
+        try {
+            using var document=JsonDocument.Parse(File.ReadAllText(path));
+            var value=document.RootElement.Deserialize(SettingsJson.Default.PaneSettings)??throw new JsonException();
+            // 源生成反序列化会为缺失的 init 布尔属性传入 false，显式保留旧文件默认开启。
+            if(document.RootElement.TryGetProperty("Launcher",out var launcher)&&!launcher.TryGetProperty("RememberOpenedPrograms",out _))
+                value=value with{Launcher=value.Launcher with{RememberOpenedPrograms=true}};
+            value=Normalize(value);Validate(value);Current=value;
+        }
         catch(Exception e) when(e is JsonException or ArgumentException or NotSupportedException) {
             var backup=path+".bad-"+Guid.NewGuid().ToString("N"); File.Move(path,backup); Current=defaults; CorruptFile?.Invoke(this,backup);
         }
         Changed?.Invoke(this,EventArgs.Empty);
     }
+    readonly object writeLock=new();
     public void Save(PaneSettings value)
+    {
+        lock(writeLock)SaveCore(value);
+        Changed?.Invoke(this,EventArgs.Empty);
+    }
+    internal void Update(Func<PaneSettings,PaneSettings> change)
+    {
+        lock(writeLock){var value=change(Current);if(ReferenceEquals(value,Current))return;SaveCore(value);}
+        Changed?.Invoke(this,EventArgs.Empty);
+    }
+    void SaveCore(PaneSettings value)
     {
         value=Normalize(value); Validate(value); Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json"); var temp=path+".tmp";
         using(var stream=new FileStream(temp,FileMode.Create,FileAccess.Write,FileShare.None)) {
             JsonSerializer.Serialize(stream,value,SettingsJson.Default.PaneSettings); stream.Flush(true);
         }
-        File.Move(temp,path,true); Current=value; Changed?.Invoke(this,EventArgs.Empty);
+        File.Move(temp,path,true); Current=value;
     }
-    static PaneSettings Normalize(PaneSettings value) => value with { FolderJump=NormalizeFolderJump(value.FolderJump) };
+    static PaneSettings Normalize(PaneSettings value) => value with {
+        Ai=value.Ai with {Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
+        Launcher=value.Launcher with {Portable=value.Launcher.Portable.DistinctBy(e=>e.Path,StringComparer.OrdinalIgnoreCase).ToArray()},
+        Clipboard=value.Clipboard with {Enabled=value.Modules?.GetValueOrDefault("clipboard",true)??value.Clipboard.Enabled},
+        SuperPanel=value.SuperPanel with {Enabled=value.Modules?.GetValueOrDefault("super-panel",true)??value.SuperPanel.Enabled},
+        FolderJump=NormalizeFolderJump(value.FolderJump) with {Enabled=value.Modules?.GetValueOrDefault("folder-jump",true)??value.FolderJump.Enabled} };
     internal static FolderJumpSettings NormalizeFolderJump(FolderJumpSettings value)
     {
         const KeyModifiers mask=KeyModifiers.Ctrl|KeyModifiers.Alt|KeyModifiers.Shift|KeyModifiers.Win;

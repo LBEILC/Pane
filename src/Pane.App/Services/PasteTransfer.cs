@@ -36,6 +36,8 @@ internal sealed class PasteTransfer(IPastePlatform platform,Action<string>? log=
          platform.Process(target)!=0&&platform.Process(target)==platform.Process(foreground));
     internal bool Focus(nint target,CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
+        if(Equivalent(target,platform.Foreground))return true;
         platform.Restore(target);
         bool activated=platform.Activate(target);
         if(!activated||!Equivalent(target,platform.Foreground)){

@@ -16,6 +16,7 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
     FolderJumpSettings settings = new();
     long generation;
     string? problem;
+    internal int DiagnosticBits { get { lock(gate) return disposed?0:PaneFolderJumpDiagnostics(service); } }
     public string? HotkeyProblem => Volatile.Read(ref problem);
     public event EventHandler? ProblemChanged;
     public event EventHandler<FolderJumpRequest>? MenuRequested;
@@ -24,6 +25,7 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
     {
         trigger = OnTrigger;
         service = PaneFolderJumpStart(trigger);
+        if(service==0)throw new InvalidOperationException(Pane.Localization.Strings.Module_FolderJumpHookFailed);
     }
 
     public void Apply(FolderJumpSettings value)
@@ -157,6 +159,7 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
         0xC0 => "`", 0xBD => "-", 0xBB => "=", 0xDB => "[", 0xDD => "]", 0xDC => "\\", 0xBA => ";", 0xDE => "'", 0xBC => ",", 0xBE => ".", 0xBF => "/",
         _ => string.Format(Strings.FolderJump_KeyCode, (object?)(vk)),
     };
+    [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern int PaneFolderJumpDiagnostics(nint service);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpApply(nint service, int enabled, uint jumpMods, uint jumpKey, uint menuMods, uint menuKey, int automatic);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpEntriesFiltered(nint service, EntryCallback callback, int recent);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)] static extern int PaneFolderJumpAutoTo(nint service, nint dialog, string path);

@@ -15,7 +15,7 @@ internal static partial class Program
         if(args.Length==2&&args[0]=="server"){
             await using var fake=new FakeServer();File.WriteAllText(args[1]+".url",fake.Url);while(!File.Exists(args[1]+".stop"))await Task.Delay(100);return;
         }
-        string directory=Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
+        string directory=TestResults.NewDirectory();Directory.CreateDirectory(directory);
         var store=new SettingsStore(directory,Defaults());
         foreach(var message in new[]{"不支援 reasoning", "不識別思考參數"}) { using var error=JsonDocument.Parse("\""+message+"\""); Check(AiProtocol.UnsupportedReasoning(error.RootElement), "繁体推理参数错误:"+message); }
         var settings=new AiSettings();
@@ -56,6 +56,20 @@ internal static partial class Program
         server.Mode="malformed";await Error<AiNetworkException>(()=>Run(ai),"malformed");
         server.Mode="cancel";server.Disconnected=new();server.Connected=new();
         using(var cancel=new CancellationTokenSource()){var task=Run(ai,cancel.Token);await server.Connected.Task.WaitAsync(TimeSpan.FromSeconds(5));cancel.Cancel();await Error<OperationCanceledException>(()=>task,"cancel");await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));Check(true,"cancel disconnected");}
+        server.Mode="cancel";server.Disconnected=new();server.Connected=new();
+        var moduleRequest=Run(ai);await server.Connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var keyBefore=File.ReadAllBytes(Path.Combine(directory,"ai-key.bin"));
+        ai.SetModuleEnabled(false);
+        await Error<OperationCanceledException>(()=>moduleRequest,"module disable cancels active stream");
+        await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        int requestCount=server.Requests.Count;
+        await Error<AiCredentialException>(()=>Run(ai),"disabled run");
+        await Error<AiCredentialException>(async()=>{await ai.ListModelsAsync(default);},"disabled models");
+        await Error<AiCredentialException>(()=>ai.TestProxyAsync(default),"disabled proxy test");
+        await Error<AiCredentialException>(()=>ai.SignInAsync(default),"disabled sign in");
+        Check(server.Requests.Count==requestCount,"disabled module sends no requests");
+        Check(keyBefore.SequenceEqual(File.ReadAllBytes(Path.Combine(directory,"ai-key.bin"))),"module leaves credentials unchanged");
+        ai.SetModuleEnabled(true);server.Mode="normal";Check(await Run(ai)=="你好","module can resume");
         server.Mode="stall";server.Disconnected=new();ai.FirstTimeout=TimeSpan.FromMilliseconds(150);
         await Error<AiNetworkException>(()=>Run(ai),"first timeout");await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));Check(true,"timeout disconnected");ai.FirstTimeout=TimeSpan.FromSeconds(30);
         server.Mode="cancel";server.Disconnected=new();ai.TotalTimeout=TimeSpan.FromMilliseconds(180);await Error<AiNetworkException>(()=>Run(ai),"total timeout after first");await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));ai.TotalTimeout=TimeSpan.FromSeconds(120);
@@ -84,5 +98,6 @@ internal static partial class Program
         Check(ai.Actions.Single().Id=="custom","action change");await Run(ai);using(var changed=JsonDocument.Parse(server.LastBody!))Check(changed.RootElement.GetProperty("model").GetString()=="changed-model","model change");
         server.Mode="403";try{await Run(ai);}catch(AiException e){Check(!e.ToString().Contains(fakeKey),"credential redaction");}
         Console.WriteLine($"PASS ai assertions={count}; loopbackOnly=True; realCredentials=0; listenersStoppedOnExit=True");
+        TestResults.Pass();
     }
 }

@@ -20,7 +20,8 @@ namespace Pane.Views;
 
 public sealed partial class SettingsView : UserControl, IPanelView
 {
-    sealed record Section(string Id, string Name, string Glyph, string Desc, Action Render);
+    // Mod：这个分区属于哪块能力（055），能力停用时分区从导航里收起；null = 不属于任何能力，总在
+    sealed record Section(string Id, string Name, string Glyph, string Desc, Action Render, string? Mod = null);
 
     readonly App app = (App)Application.Current;
     readonly List<Section> sections;
@@ -38,12 +39,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
         sections =
         [
             new("general", Strings.Settings_General, "gear", Strings.Settings_General_Description, RenderGeneral),
-            new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher),
-            new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard),
-            new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture),
-            new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper),
-            new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump),
-            new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi),
+            new("modules", Strings.Settings_Modules, "blocks", Strings.Settings_Modules_Description, RenderModules),
+            new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher, ModuleIds.Launcher),
+            new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard, ModuleIds.Clipboard),
+            new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures),
+            new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel),
+            new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump),
+            new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi, ModuleIds.Ai),
             new("icons", Strings.Settings_Icons, "app", Strings.Settings_Icons_Description, RenderIcons),
             new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout),
         ];
@@ -53,13 +55,25 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (design?.Split('@') is [var id, var px] && double.TryParse(px, out var y))
         {
             design = id;
-            Loaded += (_, _) => DispatcherQueue.TryEnqueue(() => Scroller.ChangeView(null, y, null, true));
+            // 页面长时刚加载那一下内容高度还不够，滚不到位；稍后再滚一次
+            Loaded += async (_, _) => { Scroller.ChangeView(null, y, null, true); await Task.Delay(800); Scroller.ChangeView(null, y, null, true); };
         }
         // 设计预览（只在演示模式）：PANE_DESIGN_ICONS=list 预置几条按应用设置；search:关键字 同时打开「添加应用」搜索框
         if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_ICONS") is { Length: > 0 } iconPreview)
         {
             SaveIcons(x => x with { Overrides = new() { ["app:photoshop"] = IconMode.ForceMask, ["app:obs"] = IconMode.Auto, ["app:steam"] = IconMode.Raw }, CustomIcons = new() { ["app:obs"] = "obs.png" } });
             if (iconPreview.StartsWith("search:", StringComparison.Ordinal)) iconQuery = iconPreview[7..];
+        }
+        // 设计预览（只在演示模式）：PANE_DESIGN_PORTABLE=1 预置几条便携软件（扫到的、找不到的、单个程序）和 5 个记住的程序
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_PORTABLE") == "1")
+        {
+            var now = DateTimeOffset.Now;
+            PortableEntry[] seed =
+            [
+                new(@"D:\绿色软件", PortableKind.Folder, now), new(@"D:\便携工具", PortableKind.Folder, now), new(@"C:\Windows\System32\notepad.exe", PortableKind.Program, now), // 不翻译：演示数据
+                .. Enumerable.Range(1, 5).Select(i => new PortableEntry($@"D:\下载\工具{i}.exe", PortableKind.Learned, now)), // 不翻译：演示数据
+            ];
+            SaveLauncher(x => x with { Portable = seed });
         }
         // 设计预览（只在演示模式）：PANE_DESIGN_GESTURE_EDIT=new 或手势序号，直接打开手势编辑器
         if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_GESTURE_EDIT") is { Length: > 0 } edit)
@@ -80,8 +94,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (design == "ai-chatgpt" && Environment.GetEnvironmentVariable("PANE_DEMO") == "1") { SaveAi(x => x with { Provider = AiProvider.ChatGpt }); design = "ai"; }
         if (design == "glass") { glassOpen = true; Loaded += (_, _) => DispatcherQueue.TryEnqueue(() => Scroller.ChangeView(null, Scroller.ScrollableHeight, null, true)); }
         else if (sections.Find(s => s.Id == design) is { } preview) current = preview;
+        // 设计预览（只在演示模式）：PANE_DESIGN_MODULES=launcher,super-panel 先停用这几块能力（看「能力」页和导航收起）
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_MODULES") is { Length: > 0 } off)
+            foreach (var modId in off.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                if (app.Modules.Modules.Any(m => m.Id == modId)) _ = app.Modules.ApplyAsync(app.Modules.Preview(modId, false), CancellationToken.None);
         navHighlight = new SlidingHighlight(NavLayer);
-        foreach (var s in sections) Nav.Children.Add(NavItem(s));
+        BuildNav();
         var logo = Path.Combine(AppContext.BaseDirectory, "Assets", "pane-app.svg");
         if (File.Exists(logo)) Logo.Source = new SvgImageSource(new Uri(logo));
 
@@ -98,6 +116,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
         app.AiSetup.Changed += OnAiChanged;
         if (app.Updates is { } up) up.Changed += OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed += OnWinVChanged;
+        if (PortableApps is { } pa) pa.Changed += OnFileSearchChanged;   // 扫描完成：同样只重建启动器分区
+        app.Modules.Changed += OnModulesChanged;
         Unloaded += OnUnloaded;
         Show(current);
     }
@@ -115,6 +135,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
         app.AiSetup.Changed -= OnAiChanged;
         if (app.Updates is { } up) up.Changed -= OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed -= OnWinVChanged;
+        if (PortableApps is { } pa) pa.Changed -= OnFileSearchChanged;
+        app.Modules.Changed -= OnModulesChanged;
         signIn?.Cancel();
         app.SetHotkeysSuspended(false);
         rerender.Stop();
@@ -135,6 +157,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     // ================= 外壳 =================
 
+    bool Visible(Section s) => s.Mod is null || app.Modules.IsActive(s.Mod);
+
+    // 导航只列启用了的能力的分区；当前分区所属的能力被停用了，就回到「能力」页
+    void BuildNav()
+    {
+        Nav.Children.Clear();
+        navItems.Clear();
+        if (!Visible(current)) current = sections.First(s => s.Id == "modules");
+        navPlaced = false;
+        foreach (var s in sections.Where(Visible)) Nav.Children.Add(NavItem(s));
+    }
+
     Grid NavItem(Section s)
     {
         var text = new TextBlock { Text = s.Name, VerticalAlignment = VerticalAlignment.Center, FontFamily = LabelProto.FontFamily, FontSize = LabelProto.FontSize };
@@ -153,14 +187,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         bool changed = s != current;
         current = s;
-        if (navPlaced) navHighlight.MoveTo(navItems[sections.IndexOf(s)]);
+        if (navPlaced && navItems.Find(i => ReferenceEquals(i.Tag, s)) is { } item) navHighlight.MoveTo(item);
         Render(resetScroll: changed);
     }
 
     /// <summary>打开到某个分区（各处「去设置」用，issue 11）；认不出的 Id 不动。</summary>
     public void ShowSection(string id)
     {
-        if (sections.Find(s => s.Id == id) is { } s) Show(s);
+        if (sections.Find(s => s.Id == id) is { } s && Visible(s)) Show(s);
     }
 
     void Render() => Render(false);
@@ -410,14 +444,153 @@ public sealed partial class SettingsView : UserControl, IPanelView
         return Row(label, Strings.Settings_Autostart_Description, toggle);
     }
 
+    // ================= 能力（055，原型 settings.js renderModules） =================
+
+    // 每块能力：名字、图标、一句话说明，以及和别的能力搭配时多出来的用法（软依赖）
+    static (string Name, string Glyph, string Desc, (string Other, string Text)[] Links) ModuleCopy(string id) => id switch
+    {
+        ModuleIds.Launcher => (Strings.Common_Launcher, "search", Strings.Module_Launcher_Description,
+            [(ModuleIds.Ai, Strings.Module_Launcher_WithAi), (ModuleIds.Clipboard, Strings.Module_Launcher_WithClipboard)]),
+        ModuleIds.Clipboard => (Strings.Common_Clipboard, "clipboard", Strings.Module_Clipboard_Description,
+            [(ModuleIds.Ai, Strings.Module_Clipboard_WithAi), (ModuleIds.Launcher, Strings.Module_Clipboard_WithLauncher)]),
+        ModuleIds.Gestures => (Strings.Module_Gestures_Name, "gesture", Strings.Module_Gestures_Description, []),
+        ModuleIds.SuperPanel => (Strings.Common_SuperPanel, "pointer", Strings.Module_SuperPanel_Description,
+            [(ModuleIds.Ai, Strings.Module_Super_WithAi), (ModuleIds.Rename, Strings.Module_Super_WithRename)]),
+        ModuleIds.Ai => ("AI", "ai", Strings.Module_Ai_Description, []),
+        ModuleIds.FolderJump => (Strings.Module_FolderJump_Name, "folder", Strings.Module_FolderJump_Description, []),
+        ModuleIds.Rename => (Strings.Common_Rename, "pencil", Strings.Module_Rename_Description,
+            [(ModuleIds.Launcher, Strings.Module_Rename_FromLauncher), (ModuleIds.SuperPanel, Strings.Module_Rename_FromSuper)]),
+        ModuleIds.PowerTimer => (Strings.Module_PowerTimer_Name, "timer", Strings.Module_PowerTimer_Description,
+            [(ModuleIds.Launcher, Strings.Module_PowerTimer_WithLauncher)]),
+        _ => (id, "app", "", []),   // 以后加的能力还没配文案时：至少能开关
+    };
+
+    string? moduleConfirm;   // 停用前要先确认的那块能力（剪贴板替换着 Win+V 时）
+
+    // 能力状态变了（可能在后台线程）：导航增减分区；等开关动画播完再整页重建
+    void OnModulesChanged(object? sender, string id) => DispatcherQueue.TryEnqueue(() =>
+    {
+        var shown = navItems.Select(i => (Section)i.Tag).ToList();
+        if (!sections.Where(Visible).SequenceEqual(shown)) BuildNav();
+        Later();
+    });
+
+    void RenderModules()
+    {
+        var catalog = app.Modules;
+        var grid = new Grid { ColumnSpacing = 12, RowSpacing = 12, Margin = new Thickness(0, 8, 0, 0) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var list = catalog.Modules;
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (i % 2 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var card = CapCard(list[i], catalog.StateOf(list[i].Id));
+            Grid.SetRow(card, i / 2);
+            Grid.SetColumn(card, i % 2);
+            grid.Children.Add(card);
+        }
+        bool none = list.All(m => !catalog.StateOf(m.Id).Enabled);
+        var group = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+        group.Children.Add(grid);
+        group.Children.Add(new TextBlock { Text = none ? Strings.Settings_Modules_NoneNote : Strings.Settings_Modules_Note, Margin = new Thickness(2, 10, 2, 0), TextWrapping = TextWrapping.Wrap, LineHeight = 18, FontFamily = DescProto.FontFamily, FontSize = DescProto.FontSize, Foreground = DescProto.Foreground });
+        Body.Children.Add(group);
+    }
+
+    // 能力卡片（组件库 .cap）：图标块 + 名字 + 开关；一句话说明；搭配用法；出错 / 待重启 / 停用确认
+    FrameworkElement CapCard(ModuleInfo info, ModuleState state)
+    {
+        var (name, glyph, desc, links) = ModuleCopy(info.Id);
+        bool on = state.Enabled;
+        var tile = new Border
+        {
+            Width = PaneTokens.ControlMd, Height = PaneTokens.ControlMd, CornerRadius = PaneTokens.RadiusControl,
+            Background = SelectedProto.Background, BorderBrush = FillProto.BorderBrush, BorderThickness = new Thickness(1), Opacity = on ? 1 : 0.4,
+            Child = new PaneIcon { Glyph = glyph, Width = 17, Height = 17, Foreground = LabelProto.Foreground },
+        };
+        var title = Text(name, LabelProto);
+        title.FontWeight = FontWeights.SemiBold;
+        if (!on) title.Foreground = SmallProto.Foreground;
+        var toggle = Switch(on, v => SetModule(info.Id, v));
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(toggle, string.Format(Strings.Module_Enable, (object?)name));
+        var head = new Grid { ColumnSpacing = 10, MinHeight = PaneTokens.ControlMd };
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        head.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        head.Children.Add(tile);
+        Grid.SetColumn(title, 1); head.Children.Add(title);
+        toggle.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(toggle, 2); head.Children.Add(toggle);
+
+        var body = new StackPanel { Spacing = 6 };
+        body.Children.Add(head);
+        body.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, LineHeight = 18, FontFamily = DescProto.FontFamily, FontSize = DescProto.FontSize, Foreground = SmallProto.Foreground });
+        foreach (var (other, text) in links)
+            body.Children.Add(CapLine("link", catalog(other) ? text : text + string.Format(Strings.Module_PartnerOff, (object?)ModuleCopy(other).Name), false));
+        // 启动器和超级面板都停用时，批量重命名改从托盘菜单打开
+        if (info.Id == ModuleIds.Rename && !catalog(ModuleIds.Launcher) && !catalog(ModuleIds.SuperPanel))
+            body.Children.Add(CapLine("link", Strings.Module_Rename_FromTray, false));
+        if (state.Status == ModuleStatus.Failed && state.Problem is { Length: > 0 } problem)
+            body.Children.Add(CapLine("warn", problem, true));
+        if (state.Status == ModuleStatus.RestartPending)
+        {
+            body.Children.Add(CapLine("warn", state.Problem ?? Strings.Module_RestartPending, true));
+            body.Children.Add(Button(Strings.Common_RestartNow, "refresh", app.Restart));
+        }
+        if (moduleConfirm == info.Id)
+        {
+            body.Children.Add(CapLine("warn", Strings.Module_ClipboardRestoresWinV, true));
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 2, 0, 0) };
+            buttons.Children.Add(Button(Strings.Module_DisableAndRestore, null, () => { moduleConfirm = null; _ = ApplyModule(app.Modules.Preview(info.Id, false)); }));
+            buttons.Children.Add(Button(Strings.Common_Cancel, null, () => { moduleConfirm = null; Render(); }));
+            body.Children.Add(buttons);
+        }
+        return new Border
+        {
+            CornerRadius = RowsProto.CornerRadius, Background = RowsProto.Background, BorderBrush = RowsProto.BorderBrush, BorderThickness = new Thickness(1),
+            Padding = new Thickness(16, 12, 12, 12), Child = body,
+        };
+
+        bool catalog(string id) => app.Modules.StateOf(id).Enabled;
+    }
+
+    FrameworkElement CapLine(string glyph, string text, bool warn)
+    {
+        var line = new Grid { ColumnSpacing = 5 };
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        line.Children.Add(new PaneIcon { Glyph = glyph, Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 3, 0, 0),
+            Foreground = warn ? PaneTokens.Warning : DescProto.Foreground });
+        var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, LineHeight = 18, FontFamily = DescProto.FontFamily, FontSize = DescProto.FontSize, Foreground = warn ? SmallProto.Foreground : DescProto.Foreground };
+        Grid.SetColumn(t, 1);
+        line.Children.Add(t);
+        return line;
+    }
+
+    void SetModule(string id, bool enable)
+    {
+        var change = app.Modules.Preview(id, enable);
+        // 停用会先恢复系统设置（剪贴板替换着 Win+V）：卡片里先说明，用户点「停用并恢复」才执行；开关弹回去
+        if (change.RestoresSystemSetting) { moduleConfirm = id; Later(); return; }
+        moduleConfirm = null;
+        _ = ApplyModule(change);
+    }
+
+    async Task ApplyModule(ModuleChange change)
+    {
+        try { await app.Modules.ApplyAsync(change, CancellationToken.None); }
+        catch (Exception) { /* 宿主把失败记在能力状态里（Failed + 原因），卡片会显示 */ }
+        Later();
+    }
+
     // ================= 启动器 =================
 
     void RenderLauncher()
     {
         var s = app.Store.Current;
         var conflict = app.HotkeyConflicts.FirstOrDefault(c => c.Target == "launcher");
-        var hotkey = Hotkey(s.Launcher.Hotkey, s.Clipboard.Hotkey, h => app.Store.Save(app.Store.Current with { Launcher = app.Store.Current.Launcher with { Hotkey = h } }));
-        string? hotkeyDesc = conflict != null ? null : DevHotkey("launcher");
+        var hotkey = Hotkey(s.Launcher.Hotkey, s.Clipboard.Hotkey, h => app.Store.Save(app.Store.Current with { Launcher = app.Store.Current.Launcher with { Hotkey = h } }), doubleTap: true);
+        string? hotkeyDesc = conflict != null ? null : DevHotkey("launcher") ?? (s.Launcher.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null);
         var hotkeyRow = conflict != null
             ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
             : Row(Strings.Settings_Hotkey, hotkeyDesc, hotkey);
@@ -464,7 +637,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
         // 关键字直达（052，issue 11 / 12）：「关键字 空格 内容」直接翻译、问 AI、进文件窗口；AI 关着时只列搜文件
         var direct = new List<FrameworkElement>();
-        if (s.Ai.Enabled)
+        if (s.Ai.Enabled && app.Modules.IsActive(ModuleIds.Ai))
         {
             direct.Add(KeywordRow(Strings.Common_Translate, "translate", l.TranslateKeywords));
             direct.Add(KeywordRow(Strings.Launcher_AskAi, "ask", l.AskKeywords));
@@ -478,7 +651,32 @@ public sealed partial class SettingsView : UserControl, IPanelView
         favorites.Add(AddRow(
             Button(Strings.Settings_Launcher_AddFile, "plus", async () => { if (await PickFavorite(false) is { } e) AddFavorite(e); }),
             Button(Strings.Settings_Launcher_AddFolder, "folder-plus", async () => { if (await PickFavorite(true) is { } e) AddFavorite(e); })));
-        Group(Strings.Settings_Launcher_Favorites, favorites.ToArray(), Strings.Settings_Launcher_FavoritesDescription);
+        // 也能把文件、文件夹拖进来（057）
+        Group(Strings.Settings_Launcher_Favorites, favorites.ToArray(), Strings.Settings_Launcher_FavoritesDescription,
+            paths => { foreach (var p in paths) AddFavorite(new FavoriteEntry(p, Directory.Exists(p)), render: false); Render(); });
+
+        // 便携软件（057，issue 19）：文件夹（扫描本身和下一层）/ 单个程序，能拖进来；最后一行「记住用 Pane 打开过的程序」。
+        // 记住的程序不逐条列出（最多 100 个），只显示个数；单独移除在启动器里 Ctrl+K
+        var scan = PortableApps ?? PortableAppsSample.Instance;
+        var portable = l.Portable.Where(p => p.Kind != PortableKind.Learned).Select(p => PortableRow(p, scan)).ToList<FrameworkElement>();
+        portable.Add(AddRow(
+            Button(Strings.Settings_Launcher_AddFolder, "folder-plus", async () => { if (await PickFavorite(true) is { } e) AddPortable([e.Path]); }),
+            Button(Strings.Settings_Launcher_AddProgram, "plus", async () => { if (await PickPortableProgram() is { } path) AddPortable([path]); })));
+        var learned = l.Portable.Count(p => p.Kind == PortableKind.Learned);
+        // 清空要点两次（同剪贴板「清空历史」）
+        var clearLearned = Button(learnedArmed ? Strings.Settings_Clipboard_ConfirmClear : Strings.Common_Clear, null, () =>
+        {
+            if (!learnedArmed) { learnedArmed = true; Render(); _ = DisarmLearned(); return; }
+            learnedArmed = false;
+            SaveLauncher(x => x with { Portable = x.Portable.Where(p => p.Kind != PortableKind.Learned).ToArray() });
+            Render();
+        });
+        var remember = Switch(l.RememberOpenedPrograms, v => SaveLauncher(x => x with { RememberOpenedPrograms = v }));
+        portable.Add(Row(Strings.Settings_Launcher_RememberOpened,
+            learnedArmed ? Strings.Settings_Launcher_ClearRememberedWarning
+                : learned > 0 ? string.Format(Strings.Settings_Launcher_RememberedCount, (object?)learned) : Strings.Settings_Launcher_RememberOpenedDescription,
+            learned > 0 ? new FrameworkElement[] { clearLearned, remember } : [remember]));
+        Group(Strings.Settings_Launcher_Portable, portable.ToArray(), portableNote ?? Strings.Settings_Launcher_PortableDescription, AddPortable);
 
         var engines = l.SearchEngines.Select(e =>
         {
@@ -544,10 +742,82 @@ public sealed partial class SettingsView : UserControl, IPanelView
     static string FavoriteTitle(string path) =>
         Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) is { Length: > 0 } n ? n : path;
 
-    void AddFavorite(FavoriteEntry entry)
+    void AddFavorite(FavoriteEntry entry, bool render = true)
     {
         SaveLauncher(x => x with { Favorites = x.Favorites.Any(f => string.Equals(f.Path, entry.Path, StringComparison.OrdinalIgnoreCase)) ? x.Favorites : [.. x.Favorites, entry] });
+        if (render) Render();
+    }
+
+    // ---------------- 便携软件（057） ----------------
+
+    /// <summary>扫描状态。工程在启动器能力装配时设（057）；没设时用演示数据。</summary>
+    internal static IPortableAppsStatus? PortableApps { get; set; }
+
+    FrameworkElement PortableRow(PortableEntry p, IPortableAppsStatus scan)
+    {
+        var folder = p.Kind == PortableKind.Folder;
+        var state = scan.Get(p.Path);
+        var sub = state.State switch
+        {
+            PortableScanState.Missing => string.Format(folder ? Strings.Settings_Launcher_PortableFolderMissing : Strings.Settings_Launcher_PortableProgramMissing, (object?)p.Path),
+            PortableScanState.Scanning when folder => string.Format(Strings.Settings_Launcher_PortableScanning, (object?)p.Path),
+            _ when folder => string.Format(Strings.Settings_Launcher_PortableScanned, state.Programs, p.Path),
+            _ => p.Path,
+        };
+        var title = folder ? FavoriteTitle(p.Path) : Path.GetFileNameWithoutExtension(p.Path);
+        return ListRow(folder ? "folder" : "app", title, sub, false,
+            IconButton("close", Strings.Common_Remove, () => { SaveLauncher(x => x with { Portable = x.Portable.Where(e => e != p).ToArray() }); Render(); }));
+    }
+
+    // 文件夹、.exe、.lnk 收下；别的跳过并在组说明里写跳过几个（3 秒后复原）。已有的不重复加，记住的程序被手动加时改成「程序」
+    void AddPortable(IReadOnlyList<string> paths)
+    {
+        int skipped = 0;
+        var list = app.Store.Current.Launcher.Portable.ToList();
+        foreach (var path in paths)
+        {
+            PortableKind kind;
+            if (Directory.Exists(path)) kind = PortableKind.Folder;
+            else if (Path.GetExtension(path) is var ext && (ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) || ext.Equals(".lnk", StringComparison.OrdinalIgnoreCase))) kind = PortableKind.Program;
+            else { skipped++; continue; }
+            int at = list.FindIndex(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase));
+            if (at < 0) list.Add(new PortableEntry(path, kind, DateTimeOffset.Now));
+            else if (list[at].Kind == PortableKind.Learned) list[at] = list[at] with { Kind = PortableKind.Program };
+        }
+        SaveLauncher(x => x with { Portable = [.. list] });
+        portableNote = skipped > 0 ? string.Format(Strings.Settings_Launcher_SkippedNotPrograms, (object?)skipped) : null;
         Render();
+        if (skipped > 0) _ = ClearPortableNote();
+    }
+
+    string? portableNote;
+    bool learnedArmed;
+
+    async Task ClearPortableNote()
+    {
+        await Task.Delay(3000);
+        if (portableNote is null) return;
+        portableNote = null;
+        if (current.Id == "launcher") Render();
+    }
+
+    async Task DisarmLearned()
+    {
+        await Task.Delay(3000);
+        if (!learnedArmed) return;
+        learnedArmed = false;
+        if (current.Id == "launcher") Render();
+    }
+
+    // 程序选择框：只认 .exe 和快捷方式（系统选择框选快捷方式时一般直接给目标程序）
+    async Task<string?> PickPortableProgram()
+    {
+        var owner = Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId);
+        var open = new Windows.Storage.Pickers.FileOpenPicker();
+        open.FileTypeFilter.Add(".exe");
+        open.FileTypeFilter.Add(".lnk");
+        WinRT.Interop.InitializeWithWindow.Initialize(open, owner);
+        return (await open.PickSingleFileAsync())?.Path;
     }
 
     // 系统的文件 / 文件夹选择框，以设置窗口为所有者
@@ -618,23 +888,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         var s = app.Store.Current;
         var c = s.Clipboard;
-        // 总开关（2026-10-31，033）：用别的剪贴板工具的人可以整个关掉。关着时只留这一行和「数据」（旧记录还能清）
-        // Win+V 替换着时不让直接关：先在下面把 Win+V 还给系统（要不要重启资源管理器得用户选），免得 Win+V 两头都不管
-        var winvOn = app.WinV is { State: not WinVState.Off };
-        var master = Switch(c.Enabled, v => { SaveClipboard(x => x with { Enabled = v }); Later(); });
-        if (c.Enabled && winvOn) Enable(master, false);
-        Group(Strings.Settings_Clipboard_Basic, Row(Strings.Settings_Clipboard_Enable, c.Enabled
-                ? (winvOn ? Strings.Settings_Clipboard_DisableWinVFirst : Strings.Settings_Clipboard_EnableDescription)
-                : Strings.Settings_Clipboard_Disabled,
-            master));
-        if (!c.Enabled) { RenderClipboardData(); return; }
+        // 总开关（033）挪到「能力」页（055）；停用时宿主先把 Win+V 还给系统
         var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
-        var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }));
+        var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }), doubleTap: true);
         var winv = app.WinV;
         var call = new List<FrameworkElement>
         {
             conflict != null ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
-                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? Strings.Settings_Clipboard_WinVActive : null), hotkey),
+                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? Strings.Settings_Clipboard_WinVActive : c.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null), hotkey),
         };
         if (winv != null) call.AddRange(WinVRows(winv));
         Group(Strings.Settings_Clipboard_Activation, call.ToArray());
@@ -785,7 +1046,6 @@ public sealed partial class SettingsView : UserControl, IPanelView
     // ================= 鼠标手势 =================
 
     static readonly string[] ArrowGlyphs = ["U", "9", "R", "3", "D", "1", "L", "7"]; // 顺序同 GestureDirection
-    G.GestureButton gestureButtonsBeforeOff = G.GestureButton.Right;
     G.ImportPreview? importPreview;
     string? importStatus;
     bool importOk;
@@ -802,7 +1062,6 @@ public sealed partial class SettingsView : UserControl, IPanelView
             return;
         }
         var st = config.Settings;
-        bool on = st.EnabledButtons != G.GestureButton.None;
 
         var state = app.GestureState switch
         {
@@ -819,22 +1078,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
             bool has = st.EnabledButtons.HasFlag(b);
             chips.Children.Add(ToggleChip(name, null, has, buttons == 1, v => SaveGestureSettings(x => x with { EnabledButtons = v ? x.EnabledButtons | b : x.EnabledButtons & ~b }, render: true)));
         }
-        if (!on) { chips.Opacity = 0.4; chips.IsHitTestVisible = false; }
 
         var trail = Switch(st.ShowTrail, v => SaveGestureSettings(x => x with { ShowTrail = v }, render: true, delay: true));
         var fade = Switch(st.FadeTrail, v => SaveGestureSettings(x => x with { FadeTrail = v }));
         var hint = Switch(st.ShowCommandName, v => SaveGestureSettings(x => x with { ShowCommandName = v }));
         var fullscreen = Switch(st.PauseInFullscreen, v => SaveGestureSettings(x => x with { PauseInFullscreen = v }));
-        foreach (var c in new Control[] { trail, hint, fullscreen }) Enable(c, on);
-        Enable(fade, on && st.ShowTrail);
+        Enable(fade, st.ShowTrail);
 
         var rows = new List<FrameworkElement>();
         if (state != null) rows.Add(Row(Strings.Settings_Gestures_Status, null, Status(false, state)));
-        rows.Add(Row(Strings.Settings_Gestures_Enable, null, Switch(on, v =>
-        {
-            if (!v) gestureButtonsBeforeOff = app.GestureConfig.Settings.EnabledButtons;
-            SaveGestureSettings(x => x with { EnabledButtons = v ? (gestureButtonsBeforeOff == G.GestureButton.None ? G.GestureButton.Right : gestureButtonsBeforeOff) : G.GestureButton.None }, render: true, delay: true);
-        })));
         rows.Add(Row(Strings.Settings_Gestures_Buttons, Strings.Settings_Gestures_ButtonsDescription, chips));
         rows.Add(Row(Strings.Settings_Gestures_ShowTrail, null, trail));
         rows.Add(Row(Strings.Settings_Gestures_TrailFade, Strings.Settings_Gestures_TrailFadeDescription, fade));
@@ -1257,12 +1509,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     void RenderAi()
     {
-        var a = app.Store.Current.Ai;
-        // AI 总开关（issue 8，照原型 settings.js）：关掉后只留这一行
-        Group(Strings.Settings_Ai_Basic, Row(Strings.Settings_Ai_Enable, a.Enabled ? Strings.Settings_Ai_EnableDescription
-                : Strings.Settings_Ai_Disabled,
-            Switch(a.Enabled, v => { SaveAi(x => x with { Disabled = !v }); Later(); })));
-        if (!a.Enabled) return;
+        var a = app.Store.Current.Ai;   // AI 总开关（issue 8）挪到「能力」页（055）
         var setup = app.AiSetup;
         bool api = a.Provider == AiProvider.Api;
         var rows = new List<FrameworkElement>
@@ -2011,11 +2258,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         hold.Committed += (_, _) => { int ms = (int)Math.Round(hold.Value); if (ms != app.Store.Current.SuperPanel.HoldMilliseconds) SaveSuper(x => x with { HoldMilliseconds = ms }); };
         var fullscreen = Switch(p.PauseInFullscreen, v => SaveSuper(x => x with { PauseInFullscreen = v }));
         var borrow = Switch(p.ClipboardFallback, v => SaveSuper(x => x with { ClipboardFallback = v }));
-        // 关掉超级面板时其余各项变灰（原型 .srow.disabled）
-        foreach (var c in new Control[] { trigger, hold, fullscreen, borrow }) Enable(c, p.Enabled);
-        holdValue.Opacity = p.Enabled ? 1 : 0.4;
         Group(Strings.Settings_Super_Basic,
-            Row(Strings.Settings_Super_Enable, null, Switch(p.Enabled, v => { SaveSuper(x => x with { Enabled = v }); Later(); })),
             Row(Strings.Settings_Super_Trigger, Strings.Settings_Super_TriggerDescription, trigger),
             Row(Strings.Settings_Super_HoldDuration, Strings.Settings_Super_HoldDurationDescription, hold, holdValue),
             Row(Strings.Settings_Super_DisableFullscreen, Strings.Settings_Super_DisableFullscreenDescription, fullscreen),
@@ -2057,7 +2300,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 SaveSuper(x => { var list = Shown(x).Where(a => a != id).ToList(); if (v) list.Add(id); return x with { Actions = list.ToArray() }; });
                 Render();
             });
-            Enable(toggle, p.Enabled && (on || !full));
+            Enable(toggle, on || !full);
             tools.Add(toggle);
             rows.Add(ListRow(glyph, name, on ? string.Format(Strings.Settings_Super_ActionPosition, (object?)(pos + 1)) : full ? Strings.Settings_Super_ActionsFull : Strings.Settings_Super_ActionHidden, false, tools.ToArray()));
         }
@@ -2078,11 +2321,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var recent = Switch(f.ShowRecent, v => SaveFolderJump(x => x with { ShowRecent = v }));
         // 047（用户：开了三个资源管理器，Ctrl+G 只跳其中一个）：默认跳最近用过的那个（同 Listary），想自己挑的改成弹菜单
         var many = Seg([("recent", Strings.Settings_FolderJump_Recent), ("menu", Strings.Settings_FolderJump_Menu)], f.MenuWhenMany ? "menu" : "recent", v => SaveFolderJump(x => x with { MenuWhenMany = v == "menu" }));
-        foreach (var c in new Control[] { jump, menu, many, auto, recent }) Enable(c, f.Enabled);
-        var problem = f.Enabled ? app.FolderJump?.HotkeyProblem : null;
-        Group(Strings.Settings_FolderJump_Basic,
-            Row(Strings.Settings_FolderJump_Enable, f.Enabled ? Strings.Settings_FolderJump_EnableDescription : Strings.Settings_FolderJump_Disabled,
-                Switch(f.Enabled, v => { SaveFolderJump(x => x with { Enabled = v }); Later(); })));
+        var problem = app.FolderJump?.HotkeyProblem;   // 总开关（046）挪到「能力」页（055）
         Group(Strings.Settings_FolderJump_Hotkeys,
             problem != null ? Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_Hotkey_ConflictDescription, Status(false, problem), jump)
                             : Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_FolderJump_CurrentFolderDescription, jump),
@@ -2209,14 +2448,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
 
     void Group(string? title, params FrameworkElement[] rows) => Group(title, rows, null);
 
-    void Group(string? title, FrameworkElement[] rows, string? note)
+    void Group(string? title, FrameworkElement[] rows, string? note) => Group(title, rows, note, null);
+
+    // drop：这一组能把文件拖进来添加（原型 .drop-zone），松开时拿到完整路径
+    void Group(string? title, FrameworkElement[] rows, string? note, Action<IReadOnlyList<string>>? drop)
     {
         var group = new StackPanel { Margin = new Thickness(0, Body.Children.Count == 0 ? 8 : 20, 0, 0) };
         if (title != null) group.Children.Add(new TextBlock { Text = title, Margin = new Thickness(2, 0, 0, 8), FontFamily = GroupTitleProto.FontFamily, FontSize = GroupTitleProto.FontSize, FontWeight = GroupTitleProto.FontWeight, Foreground = GroupTitleProto.Foreground });
         var list = new StackPanel();
         for (int i = 0; i < rows.Length; i++)
             list.Children.Add(new Border { BorderBrush = RowsProto.BorderBrush, BorderThickness = new Thickness(0, i == 0 ? 0 : 1, 0, 0), Child = rows[i] });
-        group.Children.Add(new Border { CornerRadius = RowsProto.CornerRadius, Background = RowsProto.Background, BorderBrush = RowsProto.BorderBrush, BorderThickness = new Thickness(1), Child = list });
+        var box = new Border { CornerRadius = RowsProto.CornerRadius, Background = RowsProto.Background, BorderBrush = RowsProto.BorderBrush, BorderThickness = new Thickness(1), Child = list };
+        group.Children.Add(drop is null ? box : DropZone.Wrap(box, RowsProto.CornerRadius, drop));
         if (note != null) group.Children.Add(new TextBlock { Text = note, Margin = new Thickness(2, 6, 2, 0), TextWrapping = TextWrapping.Wrap, LineHeight = 18, FontFamily = DescProto.FontFamily, FontSize = DescProto.FontSize, Foreground = DescProto.Foreground });
         Body.Children.Add(group);
     }
@@ -2407,10 +2650,11 @@ public sealed partial class SettingsView : UserControl, IPanelView
         return s;
     }
 
-    HotkeyBox Hotkey(Settings.Hotkey value, Settings.Hotkey other, Action<Settings.Hotkey> changed)
+    HotkeyBox Hotkey(Settings.Hotkey value, Settings.Hotkey other, Action<Settings.Hotkey> changed, bool doubleTap = false)
     {
         var box = new HotkeyBox(value, SmallProto, KbdProto, FillProto.Background, FillProto.BorderBrush, Accent())
         {
+            AllowDoubleTap = doubleTap,
             Validate = h => h == other ? Strings.Settings_Hotkey_Duplicate
                 : h.Modifiers == KeyModifiers.Win && h.VirtualKey == 'V' ? (app.WinV is null ? Strings.Settings_Hotkey_WinVOccupied : Strings.Settings_Hotkey_WinVReplacement)
                 : null,

@@ -26,7 +26,7 @@ static partial class Program
     sealed class Clock037:TimeProvider{public DateTimeOffset Now=DateTimeOffset.UtcNow;public override DateTimeOffset GetUtcNow()=>Now;}
     static async Task SystemTerminalTests(bool live=false)
     {
-        string directory=Path.Combine(AppContext.BaseDirectory,"results","037-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(directory);
+        string directory=TestResults.NewDirectory("037-");Directory.CreateDirectory(directory);
         var store=new SettingsStore(directory,Defaults());var platform=new Environment037();var process=new Process037();var executor=new FakeExecutor();var files=new FakeFiles{ReturnRow=true};
         try{WindowsLauncherExecutor.CheckResult(-1223);Check(false,"系统组件 UAC 取消");}catch(System.ComponentModel.Win32Exception e){Check(e.NativeErrorCode==1223,"系统组件保留 UAC 取消码");}
         var programs=new TerminalPrograms([], ["python","powershell","ping","pwsh","print","pip","pydoc","pytest"],false);

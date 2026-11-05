@@ -22,6 +22,7 @@ internal static class LauncherGroupLabels
         LauncherGroups.Images => Strings.Launcher_Group_Images,
         LauncherGroups.Other => Strings.Launcher_Group_Other,
         LauncherGroups.Actions => Strings.Launcher_Group_Actions,
+        LauncherGroups.Timer => Strings.Launcher_Group_Timer,
         _ => group
     };
 }

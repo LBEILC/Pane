@@ -65,6 +65,10 @@ public sealed partial class App
         finally{WakeFrames();}
     }
     bool DiagnosticCommand(){
+        if(Take("panelkeys-probe",out _)){_ = PanelKeysProbe();return true;}
+        if(Take("panelkeys-end",out _)){PanelKeys?.End();File.WriteAllText(output+".panelkeys-end-result",$"panelkeys={(Pane.Services.PanelKeyRouter.HookInstalled?1:0)}");return true;}
+        if(Take("panelkeys-begin",out _)){bool ok=PanelKeys?.Begin(panels["clipboard"].Input,true)==true;File.WriteAllText(output+".panelkeys-begin-result",$"begin={ok};panelkeys={(Pane.Services.PanelKeyRouter.HookInstalled?1:0)}");return true;}
+        if(Take("doubletap-probe",out _)){_ = DoubleTapProbe();return true;}
         if(Take("hotkey-probe",out _)){_ = HotkeyProbe();return true;}
         if(Take("localization-probe",out _)){File.WriteAllLines(output+".localization-result",new[]{UiLanguage}.Concat(new TrayMenuView().LocalizationProbe()));return true;}
         if(Take("frames-probe",out _)){_ = FramesProbe();return true;}
@@ -84,9 +88,45 @@ public sealed partial class App
         if(Take("super-test",out _)){_ = SuperProbe();return true;}
         if(Take("settings-section",out var section)){SelectSettingsSection(int.Parse(section));pendingAck="section-shown";return true;}
         if(Take("hotkeys-suspend",out var suspend)){SetHotkeysSuspended(bool.Parse(suspend));Ack("hotkeys-requested");return true;}
-        if(Take("service-status",out _)){File.WriteAllText(output+".service-status-result",$"hotkeys={shell?.RegisteredCount??0};pause={gestureService?.RegisteredHotkeyCount??0};state={gestureService?.State};hookError={gestureService?.Statistics().Error}");return true;}
+        if(Take("service-status",out _)){File.WriteAllText(output+".service-status-result",$"hotkeys={shell?.RegisteredCount??0};keyhook={(shell?.KeyboardHookActive==true?1:0)};panelkeys={(Pane.Services.PanelKeyRouter.HookInstalled?1:0)};pause={gestureService?.RegisteredHotkeyCount??0};state={gestureService?.State};hookError={gestureService?.Statistics().Error}");return true;}
         if(Take("settings-gc",out _)){GC.Collect();GC.WaitForPendingFinalizers();GC.Collect();File.WriteAllText(output+".settings-gc-result",$"views={retiredSettings.Count(w=>w.IsAlive)};total={retiredSettings.Count};managed={GC.GetTotalMemory(false)};hosts={retiredHosts.Count(w=>w.IsAlive)};unloaded={settingsUnloaded};hotkeySubscribers={HotkeyOccupied?.GetInvocationList().Count(d=>d.Target is SettingsView)??0}");File.WriteAllLines(output+".settings-children-result",retiredChildren.GroupBy(v=>v.Type).Select(g=>$"{g.Key};alive={g.Count(v=>v.Reference.IsAlive)};observations={g.Count()}"));return true;}
         return false;
+    }
+    async Task DoubleTapProbe(){
+        try{
+            if(!demo||shell!=null||clipboardSource!=null||!controlsEnabled||string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_INSTANCE"))||string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_DATA_DIR")))throw new InvalidOperationException("双击探针只允许隔离演示实例");
+            int checks=0;void Check(bool ok,string name){if(!ok)throw new InvalidOperationException(name);checks++;}
+            var chord=new Pane.Settings.Hotkey(Pane.Settings.KeyModifiers.Ctrl|Pane.Settings.KeyModifiers.Alt|Pane.Settings.KeyModifiers.Shift,0x86);
+            var clipChord=chord with{VirtualKey=0x87};
+            var left=Pane.Hosting.ShellHotkeyBindings.ParseOverride("2xLCtrl");
+            var right=Pane.Hosting.ShellHotkeyBindings.ParseOverride("2xRCtrl");
+            var settings=Store.Current with{Modules=null,General=Store.Current.General with{ShowTrayIcon=false},Launcher=Store.Current.Launcher with{Hotkey=chord},Clipboard=Store.Current.Clipboard with{Enabled=true,Hotkey=clipChord}};
+            shell=new Pane.Hosting.ShellHost(_=>{},settings);
+            Check(!shell.KeyboardHookActive&&shell.RegisteredCount==2,"组合键不挂键盘钩子："+string.Join(";",shell.Diagnostics));
+            async Task Applied(Pane.Settings.PaneSettings next,bool hook,int registered){
+                shell.Apply(next);
+                // Win+V 请求在同一宿主消息队列中充当设置应用屏障。
+                await shell.SetAsync(false);
+                Check(shell.KeyboardHookActive==hook&&shell.RegisteredCount==registered,"设置变更立即应用");
+            }
+            settings=settings with{Launcher=settings.Launcher with{Hotkey=left}};await Applied(settings,true,1);
+            shell.SetHotkeysSuspended(true);await shell.SetAsync(false);Check(!shell.KeyboardHookActive&&shell.RegisteredCount==0,"录入卸载钩子");
+            shell.SetHotkeysSuspended(false);await shell.SetAsync(false);Check(shell.KeyboardHookActive&&shell.RegisteredCount==1,"录入结束恢复");
+            settings=settings with{Launcher=settings.Launcher with{Hotkey=chord},Clipboard=settings.Clipboard with{Hotkey=right}};await Applied(settings,true,1);
+            settings=settings with{Clipboard=settings.Clipboard with{Enabled=false}};await Applied(settings,false,1);
+            settings=settings with{Clipboard=settings.Clipboard with{Enabled=true,Hotkey=clipChord}};await Applied(settings,false,2);
+            settings=settings with{Launcher=settings.Launcher with{Hotkey=left},Clipboard=settings.Clipboard with{Hotkey=left}};await Applied(settings,true,0);Check(shell.Conflicts.Count==0,"重复双击只给启动器");
+            bool winV=await shell.SetAsync(true);
+            Check(winV||shell.Conflicts.Any(c=>c.Target=="winv"&&c.Error==1409),"Win+V 独立注册或现有占用");Check(shell.RegisteredCount==(winV?1:0)&&shell.KeyboardHookActive,"Win+V 不影响双击");await shell.SetAsync(false);
+            settings=settings with{Launcher=settings.Launcher with{Hotkey=left with{VirtualKey=65}},Clipboard=settings.Clipboard with{Enabled=false}};await Applied(settings,false,0);
+            Check(shell.Conflicts.Count==1&&shell.Conflicts[0].Error==87,"非法双击错误码 87");
+            settings=settings with{Launcher=settings.Launcher with{Hotkey=left}};await Applied(settings,true,0);
+            await Applied(settings with{Modules=new(){["launcher"]=false,["clipboard"]=false}},false,0);
+            await Applied(settings with{Modules=new(){["launcher"]=false,["clipboard"]=true},Clipboard=settings.Clipboard with{Enabled=true,Hotkey=left}},true,0);
+            await Applied(settings with{Modules=new(){["launcher"]=false,["clipboard"]=false}},false,0);
+            await Applied(settings,true,0);
+            File.WriteAllText(output+".doubletap-result",$"PASS assertions={checks};keyhook=1;gestures=0;clipboard=0;awaitingExit=1");
+        }catch(Exception e){File.WriteAllText(output+".error",e.ToString());}
     }
     async Task HotkeyProbe(){
         try{

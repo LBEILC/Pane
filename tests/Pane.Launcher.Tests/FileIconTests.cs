@@ -37,7 +37,7 @@ static partial class Program
     static async Task FileIconTests()
     {
         int start = checks;
-        string root = Path.Combine(AppContext.BaseDirectory, "results", "file-icons-" + Guid.NewGuid().ToString("N"));
+        string root = TestResults.NewDirectory("file-icons-");
         Directory.CreateDirectory(root);
         string Fixture(string name) => Path.Combine(root, name);
         var fake = new FileIconExtractor { Block = true };

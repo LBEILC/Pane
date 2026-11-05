@@ -32,5 +32,6 @@
   <Target Name="PublishAppResources" AfterTargets="Publish">
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)resources.pri" />
   </Target>
+  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/PanelKeysProbe.cs" Link="Diagnostics/PanelKeysProbe.cs" /></ItemGroup>
   <Import Project="Localization/Localization.targets" />
 </Project>

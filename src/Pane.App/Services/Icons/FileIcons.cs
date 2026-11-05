@@ -180,6 +180,6 @@ internal sealed class FileIcons : IFileIcons, IDisposable
     public void Dispose()
     {
         // Shell 扩展可能很慢；关闭界面不等待它。后台线程完成当前调用后自行释放。
-        lock (sync) { if (closing) return; closing = true; wake.Set(); }
+        lock (sync) { if (closing) return; closing = true; Ready = null; wake.Set(); }
     }
 }

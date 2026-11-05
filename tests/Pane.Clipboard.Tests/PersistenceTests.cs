@@ -10,7 +10,7 @@ static partial class Program
         var watch=Stopwatch.StartNew();
         while(!condition()){if(watch.ElapsedMilliseconds>milliseconds)throw new TimeoutException("等待测试条件超时");await Task.Delay(20);}
     }
-    static string TestRoot()=>Path.Combine(AppContext.BaseDirectory,"results",Guid.NewGuid().ToString("N"));
+    static string TestRoot()=>TestResults.NewDirectory();
     static async Task PersistenceTests()
     {
         int before=checks;string root=TestRoot();var source=new FakeSource();var storage=new FaultStorage();

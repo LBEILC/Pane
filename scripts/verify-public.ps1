@@ -13,4 +13,9 @@ try {
         & dotnet @arguments
         if($LASTEXITCODE -ne 0){throw "单元测试失败：$name"}
     }
+    # 全部通过后删掉副本里的构建输出（约 0.6 GB）：增量导出要求副本没有未跟踪文件。失败时不删，留作现场。
+    . (Join-Path $PSScriptRoot 'remove-tree.ps1')
+    $built=& git.exe @('-C',$Root,'-c','core.quotepath=false','ls-files','-o','-i','--exclude-standard','--directory','-z')
+    if($LASTEXITCODE -ne 0){throw '读取副本构建输出失败'}
+    foreach($relative in (($built -join '').Split([char]0) | Where-Object {$_ -match '^(src|tests)/[^/]+/(bin|obj)/$'})){Remove-LinkSafeTree (Join-Path $Root $relative)}
 } finally {$env:PATH=$oldPath}

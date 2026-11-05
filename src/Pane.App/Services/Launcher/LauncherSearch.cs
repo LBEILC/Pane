@@ -16,6 +16,7 @@ internal sealed record LauncherSnapshot(IndexedApp[] Apps,SearchEntry[] Favorite
 }
 internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
 {
+    internal Func<IPowerTimer?> PowerTimerProvider { get; set; } = () => null;
     readonly TerminalService terminal;
     public ITerminalHistory TerminalHistory=>terminal.History;
     readonly SettingsStore store;readonly ILauncherIndex index;readonly ILauncherSource[] sources;readonly ILauncherExecutor executor;
@@ -23,6 +24,8 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     LauncherSnapshot snapshot=LauncherSnapshot.Empty;
     Dictionary<string,AppUse> uses=[];Task indexing=Task.CompletedTask;bool dirty=true,disposed;DateTimeOffset lastBuilt;
     FavoriteEntry[] lastFavorites;
+    PortableEntry[] lastPortable;
+    readonly LauncherActionPlatform portablePlatform;
     string lastIcons="";
     public IndexMetrics? Metrics {get;private set;}
     public string? IndexError {get;private set;}
@@ -38,29 +41,33 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null,LauncherActionPlatform? actionPlatform=null)
     {
         var started=System.Diagnostics.Stopwatch.StartNew();
-        this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();
+        this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();lastPortable=store.Current.Launcher.Portable.ToArray();
         environment??=new LauncherEnvironment();process??=new LaunchProcess();
         terminal=new(store,environment,process,programs);
-        actions=new(actionPlatform??new WindowsLauncherActionPlatform(),executor,process);
-        sources=[new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
+        portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
+        actions=new(portablePlatform,executor,process);
+        sources=[new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
         var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
         try{if(File.Exists(path))uses=JsonSerializer.Deserialize(File.ReadAllText(path),LauncherJson.Default.DictionaryStringAppUse)??[];}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
         try{if(index.Load() is {} saved){Publish(saved);CachedApps=saved.Snapshot.Apps.Length;CachedQuery=saved.Snapshot.Apps.FirstOrDefault()?.Name.Name;CachedReadyMilliseconds=started.Elapsed.TotalMilliseconds;}}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException or InvalidDataException){IndexError="snapshot:"+e.GetType().Name;}
-        lastIcons=IconsStamp();if(index is ProcessLauncherIndex processIndex){processIndex.IconSettingsProvider=()=>store.Current.Icons;processIndex.OriginalsReady+=PublishOriginals;}
+        lastIcons=IconsStamp();if(index is ProcessLauncherIndex processIndex){processIndex.PortableProvider=()=>store.Current.Launcher.Portable.ToArray();processIndex.IconSettingsProvider=()=>store.Current.Icons;processIndex.OriginalsReady+=PublishOriginals;}
         store.Changed+=SettingsChanged;RefreshIndex();
     }
     string IconsStamp()=>Pane.Services.Icons.IconProcessing.SettingsKey(store.Current.Icons);
     void PublishOriginals(PersistedIndex value){if(Volatile.Read(ref snapshot).Apps.Length==0)Publish(value);}
-    void SettingsChanged(object? sender,EventArgs args){lock(sync){var current=store.Current.Launcher.Favorites;var icons=IconsStamp();if(lastFavorites.SequenceEqual(current)&&lastIcons==icons)return;lastIcons=icons;lastFavorites=current.ToArray();dirty=true;}RefreshIndex();}
+    void SettingsChanged(object? sender,EventArgs args){lock(sync){var current=store.Current.Launcher.Favorites;var icons=IconsStamp();var portable=store.Current.Launcher.Portable;if(lastFavorites.SequenceEqual(current)&&lastIcons==icons&&lastPortable.SequenceEqual(portable))return;lastPortable=portable.ToArray();
+            // 列表删除立即生效，旧构建不能把已删除的入口重新发布。
+            PrunePortable();lastIcons=icons;lastFavorites=current.ToArray();dirty=true;}RefreshIndex();}
     public void RefreshIndex()
     {
         lock(sync){
             if(disposed||!indexing.IsCompleted||!dirty&&DateTimeOffset.UtcNow-lastBuilt<TimeSpan.FromMinutes(2))return;
-            dirty=false;var favorites=lastFavorites.ToArray();building=true;
+            dirty=false;var favorites=lastFavorites.ToArray();building=true;MarkPortableScanning();
             indexing=Task.Run(async()=>{
                 try{
+                    if(!disposed)PortableChanged?.Invoke(this,EventArgs.Empty);
                     Publish(await index.BuildAsync(favorites,lifetime.Token).ConfigureAwait(false));
                     // 构建阶段结束后压缩临时对象占过的 GC 段并归还空段；不修剪进程工作集。
                     // 在后台线程执行，不等待需要回到 UI 线程的终结器。
@@ -74,25 +81,27 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
                         // 设置变更发生在构建中时，等本轮结束再刷新。
                         _=indexing.ContinueWith(_=>RefreshIndex(),CancellationToken.None,TaskContinuationOptions.None,TaskScheduler.Default);
                     }else building=false;}
-                    if(!disposed)IconsChanged?.Invoke(this,EventArgs.Empty);
+                    if(!disposed){IconsChanged?.Invoke(this,EventArgs.Empty);PortableChanged?.Invoke(this,EventArgs.Empty);}
                 }
             });
         }
     }
     void Publish(PersistedIndex value){
         lock(sync){
-            var settings=AppSettingsMigration.Apply(store.Current,value.Metrics.Aliases);
-            if(!ReferenceEquals(settings,store.Current)){
+            // 与后台记忆、设置页保存串行合并，迁移不能覆盖刚添加的便携条目。
+            var previousIcons=lastIcons;
+            try{store.Update(current=>{
+                var settings=AppSettingsMigration.Apply(current,value.Metrics.Aliases);
                 // 子进程已用相同别名处理图标；保存迁移结果不再触发一次等价重建。
-                var previousIcons=lastIcons;lastIcons=Pane.Services.Icons.IconProcessing.SettingsKey(settings.Icons);
-                try{store.Save(settings);}catch{lastIcons=previousIcons;throw;}
-            }
+                if(!ReferenceEquals(settings,current))lastIcons=Pane.Services.Icons.IconProcessing.SettingsKey(settings.Icons);
+                return settings;
+            });}catch{lastIcons=previousIcons;throw;}
             var migrated=new Dictionary<string,AppUse>(uses);
             if(AppDeduplication.MergeUsage(migrated,value.Metrics.Aliases)){
                 Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
                 File.WriteAllText(path+".tmp",JsonSerializer.Serialize(migrated,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);uses=migrated;
             }
-            Volatile.Write(ref snapshot,value.Snapshot with{Aliases=value.Metrics.Aliases});Metrics=value.Metrics;lastBuilt=value.BuiltAt;IndexError=null;
+            Volatile.Write(ref snapshot,value.Snapshot with{Aliases=value.Metrics.Aliases});Metrics=value.Metrics;PrunePortable();portableStatus=new(value.Metrics.PortableStatus??[],StringComparer.OrdinalIgnoreCase);lastBuilt=value.BuiltAt;IndexError=null;
         }
     }
     // ---- 设置页「应用图标」（设计加，IAppIconCatalog）----
@@ -135,10 +144,11 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     }
     internal static SearchEngine DefaultEngine(LauncherSettings settings)=>settings.SearchEngines.First(e=>string.Equals(e.Keyword,settings.DefaultEngine,StringComparison.OrdinalIgnoreCase));
     internal static string BuildUrl(SearchEngine engine,string text)=>engine.UrlTemplate.Replace("{query}",Uri.EscapeDataString(text),StringComparison.Ordinal);
-    public Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
+    public async Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename")return Task.CompletedTask;if(TerminalService.Owns(item))return terminal.ExecuteAsync(item,false,cancellationToken);var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
-        return source.ExecuteAsync(item,Context(""),cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();if(item.Id is "rename" or "power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
+        await source.ExecuteAsync(item,Context(""),cancellationToken).ConfigureAwait(false);
+        if(item.Kind==LauncherItemKind.File&&item.Id.StartsWith("file:",StringComparison.Ordinal))await RememberOpenedAsync(item.Id[5..]).ConfigureAwait(false);
     }
     public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,token):ExecuteAsync(item,token);
     void RecordUse(string id){

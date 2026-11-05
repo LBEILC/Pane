@@ -108,6 +108,7 @@ bool RegisterKey(int id,KeyBinding key={}){
 }
 struct Configuration {bool enabled=true,automatic=false;KeyBinding jump{},menu{MOD_CONTROL|MOD_SHIFT,'G'};};
 struct ApplyRequest {Configuration config;HANDLE done;};
+struct DiagnosticRequest { HANDLE done; int bits=0; };
 struct Service;
 thread_local Service* current=nullptr;
 struct Service {
@@ -198,6 +199,7 @@ struct Service {
         Apply(config);SetEvent(ready);
         while(GetMessageW(&msg,nullptr,0,0)>0){
             if(msg.message==WM_APP+46){auto request=reinterpret_cast<ApplyRequest*>(msg.lParam);Apply(request->config);SetEvent(request->done);}
+            else if(msg.message==WM_APP+55){auto r=reinterpret_cast<DiagnosticRequest*>(msg.lParam);r->bits=(hook?1:0)|(destroyHook?2:0)|(timer?4:0)|(keys.direct?8:0)|(keys.menu?16:0);SetEvent(r->done);}
             else if(msg.message==WM_TIMER&&timer&&msg.wParam==timer)TryPending();
             else if(msg.message==WM_HOTKEY&&config.enabled&&keys.dialog&&foreground()==keys.dialog){
                 auto edit=Filename(keys.dialog);RECT r{};
@@ -263,3 +265,11 @@ API void PaneFolderJumpApply(void* value,int enabled,UINT jumpMods,UINT jumpKey,
 }
 API void PaneFolderJumpEntriesFiltered(void* value,EntryCallback callback,int recent){try{for(const auto& e:Entries(static_cast<Service*>(value),recent!=0))callback(e.path.c_str(),e.name.c_str(),e.recent?1:0);}catch(...){}}
 API int PaneFolderJumpAutoTo(void* value,HWND dialog,const wchar_t* path){try{return value&&static_cast<Service*>(value)->AutomaticTo(dialog,path)?1:0;}catch(...){return 0;}}
+
+// 只在服务线程读取真实句柄和注册状态；调用方负责与停止串行。
+API int PaneFolderJumpDiagnostics(void* value){
+    auto service=static_cast<Service*>(value);if(!service)return 0;
+    DiagnosticRequest request{CreateEventW(nullptr,TRUE,FALSE,nullptr)};
+    if(request.done&&PostThreadMessageW(service->thread,WM_APP+55,0,reinterpret_cast<LPARAM>(&request)))WaitForSingleObject(request.done,INFINITE);
+    if(request.done)CloseHandle(request.done);return request.bits;
+}

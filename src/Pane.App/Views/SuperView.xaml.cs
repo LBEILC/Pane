@@ -36,7 +36,7 @@ public sealed partial class SuperAction : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
-public sealed partial class SuperView : UserControl, IPanelView
+public sealed partial class SuperView : UserControl, IPanelView, IDisposable
 {
     const string DemoSelection = "Glassmorphism relies on background blur, translucency and a subtle highlight border.";
 
@@ -93,7 +93,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         var list = new List<SuperAction>();
         foreach (var id in ids)
         {
-            if (!AiOptions.Enabled && id.StartsWith("ai:", StringComparison.Ordinal)) continue;   // AI 总开关关着（issue 8）
+            if (!(AiOptions.Enabled && ModuleGate.On(Contracts.ModuleIds.Ai)) && id.StartsWith("ai:", StringComparison.Ordinal)) continue;   // AI 停用（issue 8；055 起在「能力」页）
             SuperAction? a = id switch
             {
                 "search" => new("search", Strings.Common_Search, "globe", false),
@@ -137,7 +137,7 @@ public sealed partial class SuperView : UserControl, IPanelView
         {
             ShowFiles(files);
             StartAuto(null);
-            SetItems(fileActions);
+            SetItems(ModuleGate.On(Contracts.ModuleIds.Rename) ? fileActions : fileActions.Where(a => a.Id != "rename").ToList());   // 批量重命名停用（055）
             foreach (var a in items) a.Enabled = true;
             highlight.Hide();
             selected = 0;
@@ -201,6 +201,10 @@ public sealed partial class SuperView : UserControl, IPanelView
     }
 
     public void OnHidden() { Card.Cancel(); autoRun?.Cancel(); }
+
+    // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
+    // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
+    public void Dispose() { OnHidden(); Card.Release(); highlight.Dispose(); Actions.ItemsSource = null; }
 
     // ---------------- 自动翻译 ----------------
 
