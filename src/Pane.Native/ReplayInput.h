@@ -3,6 +3,13 @@
 // 纯构造边界，便于验证坐标、成对事件和自身标记；不调用输入 API。
 inline bool replayInputs(INPUT (&inputs)[2],int button,int x,int y,unsigned dpi,POINT cursor,RECT desktop){
  if(button!=1&&button!=2&&button!=4&&button!=8)return false;
+ // 侧键在当前位置补发，不依赖原坐标、距离或桌面尺寸。
+ if(button==4||button==8){
+  for(auto& i:inputs){i={};i.type=INPUT_MOUSE;i.mi.dwExtraInfo=pane::InputTag;i.mi.mouseData=button==4?XBUTTON1:XBUTTON2;}
+  inputs[0].mi.dwFlags=MOUSEEVENTF_XDOWN;
+  inputs[1].mi.dwFlags=MOUSEEVENTF_XUP;
+  return true;
+ }
  double dx=double(cursor.x)-x,dy=double(cursor.y)-y;
  if(dx*dx+dy*dy>=64.0*dpi*dpi/(96.0*96.0))return false;
  int width=desktop.right-desktop.left,height=desktop.bottom-desktop.top;

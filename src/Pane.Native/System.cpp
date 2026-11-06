@@ -42,7 +42,7 @@ API int PaneReplay(int button){if(pane::inputBypass)return 0;pane::SimulationSco
  input[0].mi.dwFlags=button==1?MOUSEEVENTF_RIGHTDOWN:button==2?MOUSEEVENTF_MIDDLEDOWN:MOUSEEVENTF_XDOWN;
  input[1].mi.dwFlags=button==1?MOUSEEVENTF_RIGHTUP:button==2?MOUSEEVENTF_MIDDLEUP:MOUSEEVENTF_XUP;return SendInput(2,input,sizeof(INPUT))==2;
 }
-// 保留按下位置；异步补发前移开超过原门槛时不把指针拉回。
+// 右键、中键保留按下位置和移动门槛；侧键在当前位置补发。
 API int PaneReplayAt(int button,int x,int y,unsigned dpi){
  POINT cursor{};if(!GetCursorPos(&cursor))return 0;
  int left=GetSystemMetrics(SM_XVIRTUALSCREEN),top=GetSystemMetrics(SM_YVIRTUALSCREEN);

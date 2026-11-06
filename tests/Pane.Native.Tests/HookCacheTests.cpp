@@ -62,5 +62,17 @@ int main(){try{
  check(!replayInputs(pair,1,0,0,96,{8,0},desktop),"movement threshold prevents pointer pullback");
  check(replayInputs(pair,1,0,0,192,{15,0},desktop),"DPI scaled movement preserved");
  check(!replayInputs(pair,1,0,0,192,{16,0},desktop),"DPI scaled threshold boundary");
+ for(int button:{4,8}){
+  for(RECT bounds:{desktop,RECT{0,0,0,0},RECT{100,100,0,0}}){
+   check(replayInputs(pair,button,-100,20,96,{400,20},bounds),"side replay ignores distance and invalid desktop");
+   check(pair[0].mi.dwFlags==MOUSEEVENTF_XDOWN&&pair[1].mi.dwFlags==MOUSEEVENTF_XUP,"side replay only has down and up flags");
+   for(const auto& event:pair){
+    check((event.mi.dwFlags&(MOUSEEVENTF_MOVE|MOUSEEVENTF_ABSOLUTE|MOUSEEVENTF_VIRTUALDESK))==0,"side replay never moves pointer");
+    check(event.mi.mouseData==static_cast<DWORD>(button==4?XBUTTON1:XBUTTON2),"side replay preserves button identity");
+    check(event.type==INPUT_MOUSE&&event.mi.dwExtraInfo==pane::InputTag,"side replay preserves input type and own tag");
+    check(event.mi.dx==0&&event.mi.dy==0,"side replay has no coordinates");
+   }
+  }
+ }
  running=false;std::cout<<"assertions="<<checks<<" failures=0; realInput=0; globalHook=0\n";return 0;
  }catch(const std::exception& e){reset();running=false;std::cerr<<e.what()<<'\n';return 1;}}
