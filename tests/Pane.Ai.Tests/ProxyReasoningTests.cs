@@ -42,7 +42,7 @@ internal static partial class Program
         }
         await using var server=new FakeServer();
         var store=new SettingsStore(Path.Combine(directory,"042"),Defaults());
-        store.Save(store.Current with{Ai=settings with{ApiBaseUrl=server.Url,ApiModel="fixture-model",ProxyMode=AiProxyMode.None}});
+        store.Save(store.Current with{Ai=settings with{ApiEndpoint="custom-00000001",Endpoints=[FixtureEndpoint(server.Url)],ProxyMode=AiProxyMode.None}});
         var handlers=new List<CountingHandler>();
         using var ai=new AiService(store,new(){Api=server.Url,Issuer=server.Url,Probe=server.Url,OpenBrowser=server.Browser,WrapHandler=h=>{var wrapper=new CountingHandler(h);handlers.Add(wrapper);return wrapper;}});
         ai.SaveApiKey("fixture-key-042");
@@ -61,7 +61,7 @@ internal static partial class Program
             Check(server.LastBody!.Contains('"'+field+'"'),"chat has effort");
             await foreach(var _ in ai.RunAsync(new("summary","fixture",null,null),default)){}
             Check(server.LastBody!.Contains('"'+field+'"'),"action has effort");
-            store.Save(store.Current with{Ai=store.Current.Ai with{TranslationModel="translation-model"}});
+            store.Save(store.Current with{Ai=WithTranslation(store.Current.Ai,"translation-model")});
             server.Mode="reasoning-message";int start=server.Requests.Count;
             await foreach(var _ in ai.RunAsync(new("translate","fixture",null,null),default)){}
             Check(server.Requests.Count==start+2&&!server.LastBody!.Contains('"'+field+'"'),"translation retries once");
@@ -82,7 +82,7 @@ internal static partial class Program
         Check(handlers.Count==clients,"all operations reuse cached client");
         Check(handlers[0].Paths.Contains("/api/accounts/oauth/token")&&server.Refreshes==1&&handlers[0].Paths.Contains("/keys")&&handlers[0].Paths.Contains("/models")&&handlers[0].Paths.Contains("/responses")&&handlers[0].Paths.Contains("/chat/completions"),"login refresh models and generation same handler");
         await ai.SignOutAsync(default);
-        store.Save(store.Current with{Ai=store.Current.Ai with{Provider=AiProvider.Api,ProxyMode=AiProxyMode.Custom,ProxyUrl=server.Url,ApiBaseUrl="http://target.invalid/v1"}});
+        store.Save(store.Current with{Ai=store.Current.Ai with{Provider=AiProvider.Api,ProxyMode=AiProxyMode.Custom,ProxyUrl=server.Url,Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl="http://target.invalid/v1"}]}});
         await ai.TestProxyAsync(default);Check(server.LastHeaders[0].StartsWith("HEAD http://target.invalid/v1"),"probe uses local proxy");
         async Task ProbeFailure(string expected){try{await ai.TestProxyAsync(default);throw new Exception("expected probe failure");}catch(AiNetworkException e){Check(e.Message.Contains(expected),"probe reason "+expected);}}
         server.Mode="407";await ProbeFailure("代理拒绝");
@@ -91,7 +91,7 @@ internal static partial class Program
         server.Mode="normal";
         var closed=new TcpListener(IPAddress.Loopback,0);closed.Start();string closedUrl="http://127.0.0.1:"+((IPEndPoint)closed.LocalEndpoint).Port;closed.Stop();
         store.Save(store.Current with{Ai=store.Current.Ai with{ProxyUrl=closedUrl}});await ProbeFailure("连不上代理");
-        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.None,ApiBaseUrl=closedUrl}});await ProbeFailure("目标连不上");
+        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.None,Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl=closedUrl}]}});await ProbeFailure("目标连不上");
         foreach(var scheme in new[]{"socks5","socks5h"})await SocksProbe(store,ai,scheme);
     }
     static async Task SocksProbe(SettingsStore store,AiService ai,string scheme)
@@ -110,7 +110,7 @@ internal static partial class Program
             using var reader=new StreamReader(stream,Encoding.ASCII,leaveOpen:true);while(await reader.ReadLineAsync(stop.Token) is {Length:>0}){}
             await stream.WriteAsync(Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"),stop.Token);
         });
-        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.Custom,ProxyUrl=$"{scheme}://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}",ApiBaseUrl="http://fixture.invalid/v1"}});
+        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.Custom,ProxyUrl=$"{scheme}://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}",Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl="http://fixture.invalid/v1"}]}});
         try{await ai.TestProxyAsync(default);await serving;Check(target=="fixture.invalid","socks remote DNS");}
         finally{stop.Cancel();listener.Stop();try{await serving;}catch(OperationCanceledException){}}
     }

@@ -13,7 +13,7 @@ internal static partial class Program
             foreach(var url in new[]{preset.BaseUrl,preset.BaseUrl+"/",preset.BaseUrl.ToUpperInvariant()+"///"})Check(AiPresets.Match(url)==preset,preset.Id+" match");
             await using var server=new FakeServer();
             var store=new SettingsStore(Path.Combine(directory,"052-"+preset.Id),Defaults());
-            store.Save(store.Current with{Ai=new(){ApiBaseUrl=server.Url,ApiModel=preset.Model,TranslationModel=preset.TranslationModel,ProxyMode=AiProxyMode.None,Reasoning=AiReasoningEffort.Medium}});
+            store.Save(store.Current with{Ai=new(){ApiEndpoint="custom-00000001",Endpoints=[FixtureEndpoint(server.Url) with{Model=preset.Model,TranslationModel=preset.TranslationModel}],ProxyMode=AiProxyMode.None,Reasoning=AiReasoningEffort.Medium}});
             using var ai=new AiService(store);ai.SaveApiKey("fixture-052");
             // 以下仅按官方协议合成响应，不表示真实账号或线上模型已实测。
             string mode="normal";
@@ -51,7 +51,7 @@ internal static partial class Program
         Check(AiPresets.Match(null)==null&&AiPresets.Match("https://custom.invalid/v1")==null,"custom preset");
         await using(var server=new FakeServer{Mode="thinking-first"}){
             var store=new SettingsStore(Path.Combine(directory,"052-thinking"),Defaults());
-            store.Save(store.Current with{Ai=new(){ApiBaseUrl=server.Url,ApiModel="fixture",ProxyMode=AiProxyMode.None}});
+            store.Save(store.Current with{Ai=new(){ApiEndpoint="custom-00000001",Endpoints=[FixtureEndpoint(server.Url) with{Model="fixture"}],ProxyMode=AiProxyMode.None}});
             using var ai=new AiService(store){FirstTimeout=TimeSpan.FromMilliseconds(200)};ai.SaveApiKey("fixture-052");
             Check(await Run(ai)=="你好","thinking token prevents false first-token timeout without exposing reasoning");
         }

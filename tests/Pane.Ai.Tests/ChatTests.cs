@@ -20,12 +20,12 @@ internal static partial class Program
             if(account)Check(!root.GetProperty("store").GetBoolean(),"account no storage");
         }
         Check(store.Current==saved&&ai.CurrentModelId=="fixture-model","override not persisted");
-        store.Save(saved with{Ai=saved.Ai with{TranslationModel="fast-model"}});
+        store.Save(saved with{Ai=WithTranslation(saved.Ai,"fast-model")});
         Check(ai.TranslationModelName=="fast-model","translation name");
         await foreach(var _ in ai.RunAsync(new("translate","fixture",null,null),default)){}
         using(var doc=JsonDocument.Parse(server.LastBody!))Check(doc.RootElement.GetProperty("model").GetString()=="fast-model","translation model");
         await Chat();using(var doc=JsonDocument.Parse(server.LastBody!))Check(doc.RootElement.GetProperty("model").GetString()=="fixture-model","chat main model");
-        foreach(var invalid in new[]{""," "})await Error<ArgumentException>(()=>{store.Save(saved with{Ai=saved.Ai with{TranslationModel=invalid}});return Task.CompletedTask;},"translation validation");
+        foreach(var invalid in new[]{""," "})await Error<ArgumentException>(()=>{store.Save(saved with{Ai=WithTranslation(saved.Ai,invalid)});return Task.CompletedTask;},"translation validation");
         foreach(var invalid in new string[][]{[null!],[""],[" "]})await Error<ArgumentException>(()=>{store.Save(saved with{Launcher=saved.Launcher with{ActionRow=invalid}});return Task.CompletedTask;},"action row validation");
         store.Save(saved with{Launcher=saved.Launcher with{ActionRow=["future-action"]}});
         Check(store.Current.Launcher.ActionRow[0]=="future-action","unknown action accepted");

@@ -13,6 +13,7 @@
 #include <string>
 #include <atomic>
 #include "BoundedOpen.h"
+#include "LauncherOpenPolicy.h"
 using Microsoft::WRL::ComPtr;
 #define API extern "C" __declspec(dllexport)
 namespace {
@@ -171,7 +172,16 @@ int launcherOpen(const wchar_t* target,int packaged){
  }
  SHELLEXECUTEINFOW info{sizeof(info)};info.fMask=SEE_MASK_NOCLOSEPROCESS|SEE_MASK_NOASYNC|SEE_MASK_FLAG_NO_UI;info.lpVerb=L"open";info.lpFile=target;info.nShow=SW_SHOWNORMAL;
  PIDLIST_ABSOLUTE item=nullptr;if(wcsncmp(target,L"::",2)==0&&SUCCEEDED(SHParseDisplayName(target,nullptr,&item,0,nullptr))){info.fMask|=SEE_MASK_IDLIST;info.lpIDList=item;info.lpFile=nullptr;}
- bool ok=ShellExecuteExW(&info)!=0;DWORD error=ok?ERROR_SUCCESS:GetLastError();if(info.hProcess){AllowSetForegroundWindow(GetProcessId(info.hProcess));CloseHandle(info.hProcess);}CoTaskMemFree(item);return !ok&&error==ERROR_CANCELLED?-ERROR_CANCELLED:static_cast<int>(ok);
+ bool ok=false;DWORD error=ERROR_SUCCESS;
+ auto action=pane::LauncherOpenAction::Open;
+ while(action!=pane::LauncherOpenAction::Stop){
+  info.lpVerb=pane::launcherOpenVerb(action);info.hInstApp=nullptr;info.hProcess=nullptr;
+  SetLastError(ERROR_SUCCESS);ok=ShellExecuteExW(&info)!=0;error=ok?ERROR_SUCCESS:GetLastError();
+  auto next=pane::nextLauncherOpenAction(action,ok,error,reinterpret_cast<INT_PTR>(info.hInstApp),wcsncmp(target,L"::",2)==0);
+  if(info.hProcess){if(ok)AllowSetForegroundWindow(GetProcessId(info.hProcess));CloseHandle(info.hProcess);}
+  action=next;
+ }
+ CoTaskMemFree(item);return !ok&&error==ERROR_CANCELLED?-ERROR_CANCELLED:static_cast<int>(ok);
 }
 }
 API int PaneLauncherOpen(const wchar_t* target,int packaged){

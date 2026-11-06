@@ -75,6 +75,14 @@ public sealed partial class SettingsView : UserControl, IPanelView
             ];
             SaveLauncher(x => x with { Portable = seed });
         }
+        // 设计预览（只在演示模式）：PANE_DESIGN_AI_ENDPOINTS=1 预置两个自定义服务商（065），当前选中 Anthropic 格式的那个
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_AI_ENDPOINTS") == "1")
+            SaveAi(x => x with
+            {
+                Provider = AiProvider.Api, ApiEndpoint = "custom-0000c1a0",
+                Endpoints = [new("custom-00000e1a", "公司中转", "https://llm.example.com/v1", AiApiFormat.OpenAi, "gpt-6-luna", null), // 不翻译：演示数据
+                    new("custom-0000c1a0", "Claude", "https://api.anthropic.com/v1", AiApiFormat.Anthropic, "claude-sonnet-5-5", null)], // 不翻译：演示数据
+            });
         // 设计预览（只在演示模式）：PANE_DESIGN_GESTURE_EDIT=new 或手势序号，直接打开手势编辑器
         if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_GESTURE_EDIT") is { Length: > 0 } edit)
             draft = NewDraft(int.TryParse(edit, out var gi) ? gi : -1);
@@ -1516,6 +1524,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
     string? aiBusy;                           // "models" / "test" / "signin" / "proxy"
     string? aiLast;                           // aiResult 是哪一项的结果（测试代理的结果只显示在代理那一行）
     bool proxyCustomPending;                  // 选了「自定义」还没填地址
+    bool focusEndpoint;                       // 刚添加自定义服务商：这次渲染把焦点给地址框（只一次）
+    bool deleteEndpointArmed;                 // 「删除这个服务商」点过一次，3 秒内再点才删
     (bool Ok, string Text)? aiResult;
     string? aiFieldError;
     CancellationTokenSource? signIn;
@@ -1537,9 +1547,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (api)
         {
             rows.Add(VendorRow(a));
-            rows.Add(Row(Strings.Settings_Ai_Endpoint, Strings.Settings_Ai_EndpointDescription, CommitField("https://…/v1", 300, a.ApiBaseUrl, v =>
-                Uri.TryCreate(v, UriKind.Absolute, out var u) && u.Scheme is "http" or "https"
-                    ? Try(() => SaveAi(x => x with { ApiBaseUrl = v })) : Strings.Settings_Ai_EndpointInvalid)));
+            rows.AddRange(EndpointRows(a));
             rows.Add(KeyRow(setup));
         }
         else rows.AddRange(AccountRows(setup));
@@ -1551,6 +1559,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             rows.Add(aiResult is { } r && aiLast != "proxy" ? Row(Strings.Settings_Ai_TestConnection, null, Status(r.Ok, r.Text), test) : Row(Strings.Settings_Ai_TestConnection, Strings.Settings_Ai_TestConnectionDescription, test));
         }
         if (aiFieldError != null) rows.Add(Row(Strings.Common_NotSaved, null, Status(false, aiFieldError)));
+        if (api && AiPresets.Find(a.CurrentEndpoint.Id) is null) rows.Add(DeleteEndpointRow(a));
         // 思考程度（042，用户提）：ChatGPT 的推理模型等支持；不支持的模型服务自动去掉这个参数
         rows.Add(Row(Strings.Settings_Ai_Reasoning, a.Reasoning == AiReasoningEffort.Default ? Strings.Settings_Ai_DefaultReasoningDescription : Strings.Settings_Ai_ReasoningDescription,
             Seg([("Default", Strings.Common_Default), ("Low", Strings.Settings_Ai_ReasoningLow), ("Medium", Strings.Settings_Ai_ReasoningMedium), ("High", Strings.Settings_Ai_ReasoningHigh)], a.Reasoning.ToString(),
@@ -1661,35 +1670,56 @@ public sealed partial class SettingsView : UserControl, IPanelView
         await RunAi("signin", async _ => { await setup.SignInAsync(signIn.Token); return null; });
     }
 
-    // 服务商（052，issue 11）：一排可点的标签，点了就把地址、模型、翻译模型换成那一家的，只剩粘贴 key。
-    // 地址对不上任何一家时「自定义」亮着（自定义不可点：改下面的地址就是自定义）。认出来的给「获取 key」
+    // 服务商（052 → 065，2026-11-06 用户定）：一排标签 = 内置的几家 + 用户添加的自定义服务商 + 「添加」。
+    // 点哪个就切到哪个，每家各记各的地址、格式、模型和 key（key 由服务按服务商分开存）。内置的给「获取 key」
     FrameworkElement VendorRow(AiSettings a)
     {
-        var matched = AiPresets.Match(a.ApiBaseUrl);
+        var current = a.CurrentEndpoint;
         var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6 };
         Border VendorChip(string text, bool on)
         {
             var chip = Chip(text);
             chip.Height = PaneTokens.ControlSm;
-            chip.CornerRadius = new CornerRadius(13);
+            chip.CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2);
             if (on) chip.BorderBrush = Accent();
             chips.Children.Add(chip);
             return chip;
         }
-        foreach (var p in AiPresets.All)
+        foreach (var e in a.AllEndpoints)
         {
-            var chip = VendorChip(p.Name, p == matched);
-            if (p == matched) continue;
+            var chip = VendorChip(e.Name, e.Id == current.Id);
+            if (e.Id == current.Id) continue;
             chip.Tapped += (_, _) =>
             {
-                aiFieldError = Try(() => SaveAi(x => x with { ApiBaseUrl = p.BaseUrl, ApiModel = p.Model, TranslationModel = p.TranslationModel }));
-                aiModels = null; aiResult = null;
+                aiFieldError = Try(() => SaveAi(x => x with { ApiEndpoint = e.Id }));
+                aiModels = null; aiResult = null; deleteEndpointArmed = false;
                 Later(0);
             };
         }
-        VendorChip(Strings.Settings_Ai_CustomVendor, matched == null);
-        var row = matched is { } m
-            ? Row(Strings.Settings_Ai_Vendor, Strings.Settings_Ai_VendorDescription, Button(Strings.Settings_Ai_GetKey, "external", () => OpenUrl(m.KeyUrl)))
+        // 添加：名字先给「自定义 N」，格式默认 OpenAI 兼容，地址空着，焦点直接给地址框
+        if ((a.Endpoints ?? []).Count(e => AiPresets.Find(e.Id) is null) < 20)
+        {
+            var add = VendorChip(Strings.Settings_Ai_AddEndpoint, false);
+            var label = (TextBlock)add.Child;
+            add.Child = null;
+            var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+            content.Children.Add(new PaneIcon { Glyph = "plus", Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = label.Foreground });
+            content.Children.Add(label);
+            add.Child = content;
+            add.Tapped += (_, _) =>
+            {
+                var names = a.AllEndpoints.Select(e => e.Name).ToHashSet();
+                int n = 1;
+                while (names.Contains(string.Format(Strings.Settings_Ai_NewEndpointName, n))) n++;
+                var id = "custom-" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(4)).ToLowerInvariant();
+                var created = new AiEndpoint(id, string.Format(Strings.Settings_Ai_NewEndpointName, n), "", AiApiFormat.OpenAi, null, null);
+                aiFieldError = Try(() => SaveAi(x => x with { ApiEndpoint = id, Endpoints = [.. x.Endpoints ?? [], created] }));
+                aiModels = null; aiResult = null; deleteEndpointArmed = false; focusEndpoint = aiFieldError == null;
+                Later(0);
+            };
+        }
+        var row = AiPresets.Find(current.Id) is { } preset
+            ? Row(Strings.Settings_Ai_Vendor, Strings.Settings_Ai_VendorDescription, Button(Strings.Settings_Ai_GetKey, "external", () => OpenUrl(preset.KeyUrl)))
             : Row(Strings.Settings_Ai_Vendor, Strings.Settings_Ai_CustomVendorDescription);
         var stack = new StackPanel();
         stack.Children.Add(row);
@@ -1698,17 +1728,80 @@ public sealed partial class SettingsView : UserControl, IPanelView
         return stack;
     }
 
+    // 当前服务商的地址：内置的只显示（要换地址就添加一个自定义的）；自定义的可以改名字、接口格式和地址
+    IEnumerable<FrameworkElement> EndpointRows(AiSettings a)
+    {
+        var e = a.CurrentEndpoint;
+        if (AiPresets.Find(e.Id) is not null)
+        {
+            var url = new TextBlock { Text = e.BaseUrl, FontFamily = SmallProto.FontFamily, FontSize = SmallProto.FontSize, Foreground = SmallProto.Foreground, VerticalAlignment = VerticalAlignment.Center, IsTextSelectionEnabled = true };
+            yield return Row(Strings.Settings_Ai_Endpoint, Strings.Settings_Ai_PresetEndpointDescription, url);
+            yield break;
+        }
+        yield return Row(Strings.Common_Name, Strings.Settings_Ai_EndpointNameDescription, CommitField(Strings.Common_Name, 220, e.Name, v =>
+            v.Length is 0 or > 40 ? Strings.Settings_Ai_EndpointNameInvalid : Try(() => SaveEndpoint(x => x with { Name = v }))));
+        yield return Row(Strings.Settings_Ai_Format, null, Seg([("OpenAi", Strings.Settings_Ai_FormatOpenAi), ("Anthropic", Strings.Settings_Ai_FormatAnthropic)], e.Format.ToString(), v =>
+        {
+            aiFieldError = Try(() => SaveEndpoint(x => x with { Format = Enum.Parse<AiApiFormat>(v) }));
+            aiModels = null; aiResult = null;
+            Later(0);
+        }));
+        bool anthropic = e.Format == AiApiFormat.Anthropic;
+        yield return Row(Strings.Settings_Ai_Endpoint, anthropic ? Strings.Settings_Ai_EndpointAnthropicDescription : Strings.Settings_Ai_EndpointDescription,
+            CommitField(anthropic ? "https://api.anthropic.com/v1" : "https://…/v1", 300, e.BaseUrl, v =>
+            {
+                v = v.TrimEnd('/');
+                return AiSettings.ValidUrl(v) ? Try(() => SaveEndpoint(x => x with { BaseUrl = v })) : Strings.Settings_Ai_EndpointInvalid;
+            }, focus: focusEndpoint));
+        focusEndpoint = false;
+    }
+
+    // 删除自定义服务商：点两次（3 秒内）；删掉后切到它前面那一家，它的 key 由服务删掉
+    FrameworkElement DeleteEndpointRow(AiSettings a)
+    {
+        var e = a.CurrentEndpoint;
+        var button = Button(deleteEndpointArmed ? Strings.Settings_Ai_ConfirmDeleteEndpoint : Strings.Common_Delete, "trash", () =>
+        {
+            if (!deleteEndpointArmed) { deleteEndpointArmed = true; Render(); _ = DisarmDeleteEndpoint(); return; }
+            deleteEndpointArmed = false;
+            var all = a.AllEndpoints.ToList();
+            var next = all[Math.Max(0, all.FindIndex(x => x.Id == e.Id) - 1)];
+            aiFieldError = Try(() => SaveAi(x => x with { ApiEndpoint = next.Id, Endpoints = [.. (x.Endpoints ?? []).Where(y => y.Id != e.Id)] }));
+            aiModels = null; aiResult = null;
+            Later(0);
+        });
+        return Row(Strings.Settings_Ai_DeleteEndpoint, Strings.Settings_Ai_DeleteEndpointDescription, button);
+    }
+
+    async Task DisarmDeleteEndpoint()
+    {
+        await Task.Delay(3000);
+        if (!deleteEndpointArmed) return;
+        deleteEndpointArmed = false;
+        if (current.Id == "ai") Render();
+    }
+
+    // 改当前服务商：内置服务商第一次改模型时才写进列表（名字、地址、格式仍以预设为准）
+    void SaveEndpoint(Func<AiEndpoint, AiEndpoint> change) => SaveAi(x =>
+    {
+        var now = x.CurrentEndpoint;
+        var list = (x.Endpoints ?? []).ToList();
+        int i = list.FindIndex(e => e.Id == now.Id);
+        if (i >= 0) list[i] = change(now); else list.Add(change(now));
+        return x with { ApiEndpoint = now.Id, Endpoints = [.. list] };
+    });
+
     // 模型：可以手填；拉取列表后，下面按输入过滤出最多 12 个可点的候选
     FrameworkElement ModelRow(AiSettings a, bool api)
     {
-        string current = (api ? a.ApiModel : a.ChatGptModel) ?? "";
+        string current = (api ? a.CurrentEndpoint.Model : a.ChatGptModel) ?? "";
         var box = Field(api ? Strings.Settings_Ai_ModelId : Strings.Settings_Ai_FirstModelDefault, 220);
         box.Text = current;
         var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6, Margin = new Thickness(0, 4, 0, 0) };
         void Commit(string value)
         {
             var v = value.Trim();
-            aiFieldError = Try(() => SaveAi(x => api ? x with { ApiModel = v.Length == 0 ? null : v } : x with { ChatGptModel = v.Length == 0 ? null : v }));
+            aiFieldError = Try(() => { if (api) SaveEndpoint(x => x with { Model = v.Length == 0 ? null : v }); else SaveAi(x => x with { ChatGptModel = v.Length == 0 ? null : v }); });
         }
         void Fill()
         {
@@ -1774,15 +1867,18 @@ public sealed partial class SettingsView : UserControl, IPanelView
     }
 
     // 翻译用模型：单独指定一个快模型，空着 = 和主模型相同。候选用上面「拉取模型列表」拉到的
+    // 第三方 API 的存在当前服务商里（065），ChatGPT 的存在 AiSettings.TranslationModel
     FrameworkElement TranslationModelRow(AiSettings a)
     {
-        string current = a.TranslationModel ?? "";
+        bool api = a.Provider == AiProvider.Api;
+        string current = (api ? a.CurrentEndpoint.TranslationModel : a.TranslationModel) ?? "";
         var box = Field(Strings.Settings_Ai_SameAsMain, 220);
         box.Text = current;
         void Commit(string value)
         {
             var v = value.Trim();
-            aiFieldError = Try(() => SaveAi(x => x with { TranslationModel = v.Length == 0 ? null : v }));
+            var model = v.Length == 0 ? null : v;
+            aiFieldError = Try(() => { if (api) SaveEndpoint(x => x with { TranslationModel = model }); else SaveAi(x => x with { TranslationModel = model }); });
         }
         box.LostFocus += (_, _) => { if (box.Text.Trim() != current) { Commit(box.Text); Later(); } };
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(box.Text); Later(0); e.Handled = true; } };
@@ -1871,10 +1967,11 @@ public sealed partial class SettingsView : UserControl, IPanelView
     });
 
     // 输入框：离开或回车时提交；commit 返回 null 表示保存成功，否则是要显示的错误
-    Border CommitField(string placeholder, double width, string value, Func<string, string?> commit)
+    Border CommitField(string placeholder, double width, string value, Func<string, string?> commit, bool focus = false)
     {
         var box = Field(placeholder, width);
         box.Text = value;
+        if (focus) box.Loaded += (_, _) => box.Focus(FocusState.Programmatic);
         void Commit() { var v = box.Text.Trim(); if (v == value) return; aiFieldError = commit(v); Later(0); }
         box.LostFocus += (_, _) => Commit();
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(); e.Handled = true; } };

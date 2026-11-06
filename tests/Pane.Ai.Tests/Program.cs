@@ -21,6 +21,7 @@ internal static partial class Program
         var settings=new AiSettings();
         await ProxyReasoningTests(directory);
         await PresetTests(directory);
+        await EndpointTests(directory);
         Check(AiProtocol.Prompt(settings,new("translate","你好",null,null)).Contains("英文"),"auto han");
         Check(AiProtocol.Prompt(settings,new("translate","hi",null,null)).Contains("中文"),"auto latin");
         Check(AiProtocol.Prompt(settings,new("translate","中A",null,null)).Contains("英文"),"auto half");
@@ -33,17 +34,18 @@ internal static partial class Program
         var old=JsonSerializer.SerializeToElement(Defaults(),SettingsJson.Default.PaneSettings);
         File.WriteAllText(Path.Combine(directory,"settings.json"),"{"+string.Join(",",old.EnumerateObject().Where(p=>p.Name!="Ai").Select(p=>("\""+p.Name+"\"")+":"+p.Value.GetRawText()))+"}");
         store.Load();Check(store.Current.Ai.Actions.Length==4&&!Directory.GetFiles(directory,"*.bad-*").Any(),"old settings");
-        foreach(var bad in new[]{settings with{ApiBaseUrl="file:///x"},settings with{ProxyUrl="invalid"},settings with{Actions=[new("x","x","x","x"),new("x","y","y","y")]},settings with{Actions=[new("","x","x","x")]},settings with{Actions=[new("x","","x","x")]},settings with{Actions=[new("x","x","x","")]}})await Error<ArgumentException>(()=>{store.Save(store.Current with{Ai=bad});return Task.CompletedTask;},"validation");
+        foreach(var bad in new[]{settings with{Endpoints=[FixtureEndpoint("file:///x")]},settings with{ProxyUrl="invalid"},settings with{Actions=[new("x","x","x","x"),new("x","y","y","y")]},settings with{Actions=[new("","x","x","x")]},settings with{Actions=[new("x","","x","x")]},settings with{Actions=[new("x","x","x","")]}})await Error<ArgumentException>(()=>{store.Save(store.Current with{Ai=bad});return Task.CompletedTask;},"validation");
         await using var server=new FakeServer();
         using var ai=new AiService(store,new(){Api=server.Url,Issuer=server.Url,OpenBrowser=server.Browser});
         int events=0;ai.StatusChanged+=(_,_)=>events++;
         Check(ai.Status==AiStatus.NotConfigured,"not configured");
+        store.Save(store.Current with{Ai=settings with{ApiEndpoint="custom-00000001",Endpoints=[FixtureEndpoint(server.Url)]}});
         const string fakeKey="fixture-key-015-private";
         ai.SaveApiKey(fakeKey);Check(ai.ApiKeyMask=="fixt…vate","mask");
-        Check(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(directory,"ai-key.bin"))).Contains(fakeKey),"encrypted");
+        Check(!System.Text.Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(directory,AiService.KeyFile(store.Current.Ai.CurrentEndpoint.Id)))).Contains(fakeKey),"encrypted");
         using(var roundtrip=new AiService(store))Check(roundtrip.ApiKeyMask==ai.ApiKeyMask,"dpapi roundtrip");
         ai.SaveApiKey("tiny");Check(ai.ApiKeyMask=="••••","short mask");ai.SaveApiKey(fakeKey);
-        store.Save(store.Current with{Ai=settings with{ApiBaseUrl=server.Url,ApiModel="fixture-model"}});
+        store.Save(store.Current with{Ai=settings with{ApiEndpoint="custom-00000001",Endpoints=[FixtureEndpoint(server.Url)]}});
         Check(ai.Status==AiStatus.Ready&&events>=4,"ready and events");
         Check(await Run(ai)=="你好","split utf8 SSE blank invalid done");
         using(var body=JsonDocument.Parse(server.LastBody!)){Check(body.RootElement.GetProperty("stream").GetBoolean(),"stream true");Check(body.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()==AiProtocol.SystemPrompt,"system prompt");}
@@ -58,7 +60,7 @@ internal static partial class Program
         using(var cancel=new CancellationTokenSource()){var task=Run(ai,cancel.Token);await server.Connected.Task.WaitAsync(TimeSpan.FromSeconds(5));cancel.Cancel();await Error<OperationCanceledException>(()=>task,"cancel");await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));Check(true,"cancel disconnected");}
         server.Mode="cancel";server.Disconnected=new();server.Connected=new();
         var moduleRequest=Run(ai);await server.Connected.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        var keyBefore=File.ReadAllBytes(Path.Combine(directory,"ai-key.bin"));
+        var keyBefore=File.ReadAllBytes(Path.Combine(directory,AiService.KeyFile(store.Current.Ai.CurrentEndpoint.Id)));
         ai.SetModuleEnabled(false);
         await Error<OperationCanceledException>(()=>moduleRequest,"module disable cancels active stream");
         await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -68,7 +70,7 @@ internal static partial class Program
         await Error<AiCredentialException>(()=>ai.TestProxyAsync(default),"disabled proxy test");
         await Error<AiCredentialException>(()=>ai.SignInAsync(default),"disabled sign in");
         Check(server.Requests.Count==requestCount,"disabled module sends no requests");
-        Check(keyBefore.SequenceEqual(File.ReadAllBytes(Path.Combine(directory,"ai-key.bin"))),"module leaves credentials unchanged");
+        Check(keyBefore.SequenceEqual(File.ReadAllBytes(Path.Combine(directory,AiService.KeyFile(store.Current.Ai.CurrentEndpoint.Id)))),"module leaves credentials unchanged");
         ai.SetModuleEnabled(true);server.Mode="normal";Check(await Run(ai)=="你好","module can resume");
         server.Mode="stall";server.Disconnected=new();ai.FirstTimeout=TimeSpan.FromMilliseconds(150);
         await Error<AiNetworkException>(()=>Run(ai),"first timeout");await server.Disconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));Check(true,"timeout disconnected");ai.FirstTimeout=TimeSpan.FromSeconds(30);
@@ -94,7 +96,7 @@ internal static partial class Program
             using var socket=new System.Net.Sockets.TcpClient();await Error<System.Net.Sockets.SocketException>(()=>socket.ConnectAsync("127.0.0.1",port),"callback closed");Check(pending.Account==null,"cancel no session");
             pending.LoginTimeout=TimeSpan.FromMilliseconds(120);await Error<AiNetworkException>(()=>pending.SignInAsync(default),"login timeout");
         }
-        server.Mode="normal";ai.SaveApiKey(fakeKey);store.Save(store.Current with{Ai=store.Current.Ai with{ApiModel="changed-model",Actions=[new("custom","custom","ai","{lang}:{text}")]}});
+        server.Mode="normal";ai.SaveApiKey(fakeKey);store.Save(store.Current with{Ai=store.Current.Ai with{Endpoints=[store.Current.Ai.CurrentEndpoint with{Model="changed-model"}],Actions=[new("custom","custom","ai","{lang}:{text}")]}});
         Check(ai.Actions.Single().Id=="custom","action change");await Run(ai);using(var changed=JsonDocument.Parse(server.LastBody!))Check(changed.RootElement.GetProperty("model").GetString()=="changed-model","model change");
         server.Mode="403";try{await Run(ai);}catch(AiException e){Check(!e.ToString().Contains(fakeKey),"credential redaction");}
         Console.WriteLine($"PASS ai assertions={count}; loopbackOnly=True; realCredentials=0; listenersStoppedOnExit=True");

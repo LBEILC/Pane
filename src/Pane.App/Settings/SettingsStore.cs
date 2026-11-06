@@ -37,7 +37,9 @@ public sealed class SettingsStore
             // 源生成反序列化会为缺失的 init 布尔属性传入 false，显式保留旧文件默认开启。
             if(document.RootElement.TryGetProperty("Launcher",out var launcher)&&!launcher.TryGetProperty("RememberOpenedPrograms",out _))
                 value=value with{Launcher=value.Launcher with{RememberOpenedPrograms=true}};
+            bool migrate=value.Ai.ApiEndpoint==null;
             value=Normalize(value);Validate(value);Current=value;
+            if(migrate)SaveCore(value);
         }
         catch(Exception e) when(e is JsonException or ArgumentException or NotSupportedException) {
             var backup=path+".bad-"+Guid.NewGuid().ToString("N"); File.Move(path,backup); Current=defaults; CorruptFile?.Invoke(this,backup);
@@ -66,7 +68,7 @@ public sealed class SettingsStore
         File.Move(temp,path,true); Current=value;
     }
     static PaneSettings Normalize(PaneSettings value) => value with {
-        Ai=value.Ai with {Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
+        Ai=value.Ai.Migrate() with {Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
         Launcher=value.Launcher with {Portable=value.Launcher.Portable.DistinctBy(e=>e.Path,StringComparer.OrdinalIgnoreCase).ToArray()},
         Clipboard=value.Clipboard with {Enabled=value.Modules?.GetValueOrDefault("clipboard",true)??value.Clipboard.Enabled},
         SuperPanel=value.SuperPanel with {Enabled=value.Modules?.GetValueOrDefault("super-panel",true)??value.SuperPanel.Enabled},

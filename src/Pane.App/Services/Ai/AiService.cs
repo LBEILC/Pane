@@ -27,7 +27,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     readonly HashSet<(AiProvider Provider,string Endpoint,string Model)> unsupportedReasoning=[];
     readonly CancellationTokenSource lifetime=new();
     CancellationTokenSource session=new();
-    string? key;
+    HashSet<string> customIds=[];
     LoginRecord login=new();
     IReadOnlyList<AiModel> models=[];
     string? modelsSource;
@@ -37,22 +37,40 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     internal AiService(SettingsStore store,AiEndpoints endpoints)
     {
         this.store=store;this.endpoints=endpoints;secrets=new(store.DirectoryPath);
-        try{key=secrets.Read("ai-key.bin");}catch(AiException){}
+        var legacy=Path.Combine(store.DirectoryPath,"ai-key.bin");
+        var destination=Path.Combine(store.DirectoryPath,KeyFile(store.Current.Ai.CurrentEndpoint.Id));
+        if(File.Exists(legacy)){
+            // 直接移动 DPAPI 密文；崩溃恢复时保留已经保存的新密钥。
+            if(!File.Exists(destination))File.Move(legacy,destination);else File.Delete(legacy);
+        }
+        customIds=CustomIds(store.Current.Ai);
         try{var saved=secrets.Read("ai-account.bin");if(saved!=null)login=JsonSerializer.Deserialize(saved,AiJson.Default.LoginRecord)??new();}catch(Exception e) when(e is AiException or JsonException){}
         store.Changed+=SettingsChanged;
     }
     public event EventHandler? StatusChanged;
     public event EventHandler? Changed;
     void Notify(){StatusChanged?.Invoke(this,EventArgs.Empty);Changed?.Invoke(this,EventArgs.Empty);}
-    void SettingsChanged(object? sender,EventArgs e){lock(gate){models=[];modelsSource=null;}Notify();}
-    public AiStatus Status=>!moduleEnabled?AiStatus.NotConfigured:store.Current.Ai.Provider==AiProvider.Api?(AiSettings.ValidUrl(store.Current.Ai.ApiBaseUrl)&&!string.IsNullOrWhiteSpace(key)&&!string.IsNullOrWhiteSpace(store.Current.Ai.ApiModel)?AiStatus.Ready:AiStatus.NotConfigured):Account!=null?AiStatus.Ready:AiStatus.NeedsSignIn;
-    public string? CurrentModelId {get{var s=store.Current.Ai;return s.Provider==AiProvider.Api?s.ApiModel:s.ChatGptModel??models.FirstOrDefault()?.Id;}}
-    string? ModelName(string? id)=>models.FirstOrDefault(m=>m.Id==id)?.DisplayName??id;
+    internal static string KeyFile(string id)
+    {
+        if(AiPresets.Find(id)==null&&!AiSettings.CustomId(id))throw new ArgumentException(Strings.Settings_Ai_Invalid);
+        return "ai-key-"+id+".bin";
+    }
+    static HashSet<string> CustomIds(AiSettings settings)=>(settings.Endpoints??[]).Where(e=>AiSettings.CustomId(e.Id)).Select(e=>e.Id).ToHashSet(StringComparer.Ordinal);
+    string? Key(AiSettings settings){lock(gate){try{return secrets.Read(KeyFile(settings.CurrentEndpoint.Id));}catch(AiException){return null;}}}
+    void SettingsChanged(object? sender,EventArgs e){lock(gate){
+        var next=CustomIds(store.Current.Ai);
+        foreach(var id in customIds.Except(next))secrets.Write(KeyFile(id),null);
+        customIds=next;models=[];modelsSource=null;
+    }Notify();}
+    public AiStatus Status=>!moduleEnabled?AiStatus.NotConfigured:store.Current.Ai.Provider==AiProvider.Api?(AiSettings.ValidUrl(store.Current.Ai.CurrentEndpoint.BaseUrl)&&!string.IsNullOrWhiteSpace(Key(store.Current.Ai))&&!string.IsNullOrWhiteSpace(store.Current.Ai.CurrentEndpoint.Model)?AiStatus.Ready:AiStatus.NotConfigured):Account!=null?AiStatus.Ready:AiStatus.NeedsSignIn;
+    public string? CurrentModelId {get{var s=store.Current.Ai;return s.Provider==AiProvider.Api?s.CurrentEndpoint.Model:s.ChatGptModel??models.FirstOrDefault()?.Id;}}
+    string? ModelName(string? id){lock(gate)return modelsSource==ModelSource(store.Current.Ai)?models.FirstOrDefault(m=>m.Id==id)?.DisplayName??id:id;}
     public string? CurrentModelName=>ModelName(CurrentModelId);
-    public string? TranslationModelName=>ModelName(store.Current.Ai.TranslationModel??CurrentModelId);
+    static string? TranslationModel(AiSettings s)=>s.Provider==AiProvider.ChatGpt?s.TranslationModel:s.CurrentEndpoint.TranslationModel;
+    public string? TranslationModelName=>ModelName(TranslationModel(store.Current.Ai)??CurrentModelId);
     public IReadOnlyList<AiAction> Actions=>store.Current.Ai.Actions.Select(a=>new AiAction(a.Id,a.Name,a.Glyph,a.PromptTemplate)).ToArray();
-    public string? ApiKeyMask {get{var value=key;return value==null?null:value.Length<=8?"••••":value[..4]+"…"+value[^4..];}}
-    public void SaveApiKey(string value){value=value.Trim();if(value.Any(char.IsControl))throw new AiCredentialException(Strings.Ai_InvalidKeyFormat);lock(gate){secrets.Write("ai-key.bin",value.Length==0?null:value);key=value.Length==0?null:value;}Notify();}
+    public string? ApiKeyMask {get{var value=Key(store.Current.Ai);return value==null?null:value.Length<=8?"••••":value[..4]+"…"+value[^4..];}}
+    public void SaveApiKey(string value){value=value.Trim();if(value.Any(char.IsControl))throw new AiCredentialException(Strings.Ai_InvalidKeyFormat);lock(gate){secrets.Write(KeyFile(store.Current.Ai.CurrentEndpoint.Id),value.Length==0?null:value);}Notify();}
     internal static SocketsHttpHandler CreateHandler(AiSettings settings)
     {
         var handler=new SocketsHttpHandler{AllowAutoRedirect=false,UseCookies=false,PooledConnectionIdleTimeout=TimeSpan.FromSeconds(30)};
@@ -81,8 +99,9 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         var settings=store.Current.Ai;
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,ModuleToken());
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
+        if(settings.Provider==AiProvider.Api&&!AiSettings.ValidUrl(settings.CurrentEndpoint.BaseUrl))throw new AiCredentialException(Strings.Ai_NotConfigured);
         // 只探测地址，不发送认证、正文，也不跟随重定向。
-        using var request=new HttpRequestMessage(HttpMethod.Head,settings.Provider==AiProvider.ChatGpt?endpoints.Probe:settings.ApiBaseUrl);
+        using var request=new HttpRequestMessage(HttpMethod.Head,settings.Provider==AiProvider.ChatGpt?endpoints.Probe:settings.CurrentEndpoint.BaseUrl);
         try{
             using var response=await Client(settings).SendAsync(request,HttpCompletionOption.ResponseHeadersRead,timeout.Token);
             if(response.StatusCode==HttpStatusCode.ProxyAuthenticationRequired)throw new AiNetworkException(Strings.Ai_ProxyAuthenticationFailed);
@@ -108,23 +127,27 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     async Task<HttpResponseMessage> Authorized(AiSettings settings,string path,byte[]? body,CancellationToken ct,Func<JsonElement,byte[]?>? retryBody=null)
     {
         bool chat=settings.Provider==AiProvider.ChatGpt;
+        bool anthropic=!chat&&settings.CurrentEndpoint.Format==AiApiFormat.Anthropic;
+        if(!chat&&!AiSettings.ValidUrl(settings.CurrentEndpoint.BaseUrl))throw new AiCredentialException(Strings.Ai_NotConfigured);
+        var apiKey=chat?null:Key(settings);
         bool refreshed=false;
         for(;;){
-            var bearer=chat?(await Access(settings,ct)).AccessToken:key;
+            var bearer=chat?(await Access(settings,ct)).AccessToken:apiKey;
             if(string.IsNullOrEmpty(bearer))throw new AiCredentialException(Strings.Ai_NotConfigured);
-            using var request=new HttpRequestMessage(body==null?HttpMethod.Get:HttpMethod.Post,(chat?endpoints.Api:settings.ApiBaseUrl).TrimEnd('/')+path);
-            request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",bearer);
+            using var request=new HttpRequestMessage(body==null?HttpMethod.Get:HttpMethod.Post,(chat?endpoints.Api:settings.CurrentEndpoint.BaseUrl).TrimEnd('/')+path);
+            if(anthropic){request.Headers.Add("x-api-key",bearer);request.Headers.Add("anthropic-version","2023-06-01");}
+            else request.Headers.Authorization=new AuthenticationHeaderValue("Bearer",bearer);
             request.Headers.Accept.ParseAdd(body==null?"application/json":"text/event-stream");
-            if(body!=null){request.Content=new ByteArrayContent(body);request.Content.Headers.ContentType=new("application/json");}
+            if(body!=null||anthropic){request.Content=new ByteArrayContent(body??[]);request.Content.Headers.ContentType=new("application/json");}
             var response=await Send(request,settings,ct);
             if(response.IsSuccessStatusCode)return response;
             using(response){if(chat&&response.StatusCode==HttpStatusCode.Unauthorized&&!refreshed){refreshed=true;await Access(settings,ct,true);continue;}
                 var bodyError=await Json(response,ct);
-                if((int)response.StatusCode is 400 or 422&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
+                if((response.StatusCode==HttpStatusCode.BadRequest||!anthropic&&(int)response.StatusCode==422)&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
                 if(chat&&bodyError.ValueKind==JsonValueKind.Object&&bodyError.TryGetProperty("error",out var detail)&&AiProtocol.String(detail,"code")=="subscription_sharing_user_not_eligible"){
                     lock(gate)SaveLogin(login with{PlanDenied=true});Notify();
                 }
-                var error=AiProtocol.Error((int)response.StatusCode,bodyError,chat);
+                var error=anthropic?AnthropicProtocol.Error((int)response.StatusCode,bodyError):AiProtocol.Error((int)response.StatusCode,bodyError,chat);
                 if(error is AiSignInRequiredException)ClearSession();
                 throw error;
             }
@@ -133,17 +156,17 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public IAsyncEnumerable<string> RunAsync(AiRequest request,CancellationToken cancellationToken)
     {
         var settings=store.Current.Ai;
-        return Stream(settings,[new(AiChatRole.User,AiProtocol.Prompt(settings,request))],request.ActionId=="translate"?settings.TranslationModel:null,cancellationToken);
+        return Stream(settings,[new(AiChatRole.User,AiProtocol.Prompt(settings,request))],request.ActionId=="translate"?TranslationModel(settings):null,cancellationToken);
     }
     public IAsyncEnumerable<string> ChatAsync(IReadOnlyList<AiChatMessage> messages,string? modelId,CancellationToken cancellationToken)
         // TODO(design): Kimi K3 系列要求回传完整 assistant（含 reasoning_content）；当前契约只有 Text，需设计扩展消息与流式结果，不能声称多轮完全兼容。
         =>Stream(store.Current.Ai,messages.ToArray(),modelId,cancellationToken);
-    async IAsyncEnumerable<string> Stream(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,[EnumeratorCancellation] CancellationToken cancellationToken)
+    async IAsyncEnumerable<string> Stream(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,[EnumeratorCancellation] CancellationToken cancellationToken,bool test=false)
     {
         CancellationToken sessionToken;lock(gate)sessionToken=settings.Provider==AiProvider.ChatGpt?session.Token:default;
         using var total=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken,ModuleToken());total.CancelAfter(TotalTimeout);
         using var first=CancellationTokenSource.CreateLinkedTokenSource(total.Token);first.CancelAfter(FirstTimeout);
-        await using var iterator=RunCore(settings,messages,modelId,first,first.Token).GetAsyncEnumerator(first.Token);
+        await using var iterator=RunCore(settings,messages,modelId,first,first.Token,test).GetAsyncEnumerator(first.Token);
         while(true){
             bool next;
             try{next=await iterator.MoveNextAsync();}
@@ -153,26 +176,28 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             if(!next)yield break;yield return iterator.Current;
         }
     }
-    async IAsyncEnumerable<string> RunCore(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,CancellationTokenSource first,[EnumeratorCancellation] CancellationToken ct)
+    async IAsyncEnumerable<string> RunCore(AiSettings settings,IReadOnlyList<AiChatMessage> messages,string? modelId,CancellationTokenSource first,[EnumeratorCancellation] CancellationToken ct,bool test=false)
     {
         bool chat=settings.Provider==AiProvider.ChatGpt;
+        bool anthropic=!chat&&settings.CurrentEndpoint.Format==AiApiFormat.Anthropic;
         if(chat){await Access(settings,ct);if(Account?.CanUsePlan!=true)throw new AiQuotaException(Strings.Ai_SubscriptionUnavailable);}
-        string? model=modelId??(chat?settings.ChatGptModel:settings.ApiModel);
+        string? model=modelId??(chat?settings.ChatGptModel:settings.CurrentEndpoint.Model);
         if(chat&&model==null){lock(gate){if(modelsSource==ModelSource(settings))model=models.FirstOrDefault()?.Id;}model??=(await Models(settings,ct)).FirstOrDefault()?.Id;}
         if(string.IsNullOrWhiteSpace(model))throw new AiCredentialException(Strings.Ai_ModelRequired);
-        var capability=(settings.Provider,chat?endpoints.Api:settings.ApiBaseUrl.TrimEnd('/'),model);
-        AiReasoningEffort effort;lock(gate)effort=unsupportedReasoning.Contains(capability)?AiReasoningEffort.Default:settings.Reasoning;
-        using var response=await Authorized(settings,chat?"/responses":"/chat/completions",AiProtocol.Body(model,messages,chat,effort),ct,error=>{
-            if(effort==AiReasoningEffort.Default||!AiProtocol.UnsupportedReasoning(error))return null;
+        var capability=(settings.Provider,chat?endpoints.Api:ModelSource(settings),model);
+        AiReasoningEffort effort;lock(gate)effort=test||unsupportedReasoning.Contains(capability)?AiReasoningEffort.Default:settings.Reasoning;
+        byte[] Body(AiReasoningEffort value)=>anthropic?AnthropicProtocol.Body(model,messages,value,test):AiProtocol.Body(model,messages,chat,value);
+        using var response=await Authorized(settings,chat?"/responses":anthropic?"/messages":"/chat/completions",Body(effort),ct,error=>{
+            if(effort==AiReasoningEffort.Default||!(anthropic?AnthropicProtocol.UnsupportedThinking(error):AiProtocol.UnsupportedReasoning(error)))return null;
             lock(gate)unsupportedReasoning.Add(capability);
-            return AiProtocol.Body(model,messages,chat);
+            return Body(AiReasoningEffort.Default);
         });
         using var stream=await response.Content.ReadAsStreamAsync(ct);using var reader=new StreamReader(stream,Encoding.UTF8);
         var frame=new StringBuilder();bool firstText=true;
         while(true){
             var line=await reader.ReadLineAsync(ct);
             if(line==null)throw new AiNetworkException(Strings.Ai_StreamIncomplete);
-            if(line.Length==0){if(frame.Length==0)continue;var result=AiProtocol.Frame(frame.ToString().TrimEnd('\n'),chat);frame.Clear();
+            if(line.Length==0){if(frame.Length==0)continue;var result=anthropic?AnthropicProtocol.Frame(frame.ToString().TrimEnd('\n')):AiProtocol.Frame(frame.ToString().TrimEnd('\n'),chat);frame.Clear();
                 if(result.Done)yield break;
                 // 思考增量也表示已收到首个 token；仍受总超时限制，不把思考内容输出给界面。
                 if(firstText&&result.Progress){first.CancelAfter(Timeout.InfiniteTimeSpan);firstText=false;}
@@ -180,7 +205,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             }else if(line.StartsWith("data:",StringComparison.Ordinal)){frame.Append(line.AsSpan(5).TrimStart());frame.Append('\n');if(frame.Length>4*1024*1024)throw new AiNetworkException(Strings.Ai_ResponseTooLarge);}
         }
     }
-    string ModelSource(AiSettings settings)=>settings.Provider+":"+(settings.Provider==AiProvider.Api?settings.ApiBaseUrl:login.ClientId);
+    string ModelSource(AiSettings settings)=>settings.Provider+":"+(settings.Provider==AiProvider.Api?settings.CurrentEndpoint.Id+":"+settings.CurrentEndpoint.Format+":"+settings.CurrentEndpoint.BaseUrl:login.ClientId);
     async Task<IReadOnlyList<AiModel>> Models(AiSettings settings,CancellationToken ct)
     {
         string source=ModelSource(settings);
@@ -190,7 +215,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         else if(root.ValueKind==JsonValueKind.Object&&root.TryGetProperty("models",out data)&&data.ValueKind==JsonValueKind.Array)
             foreach(var item in data.EnumerateArray()){var id=AiProtocol.String(item,"slug");if(AiProtocol.String(item,"visibility")=="list"&&!string.IsNullOrEmpty(id))result.Add(new(id,AiProtocol.String(item,"display_name")??id));}
         if(result.Count==0)throw new AiCredentialException(Strings.Ai_NoModels);
-        lock(gate){models=result;modelsSource=source;}return result;
+        lock(gate){if(source==ModelSource(store.Current.Ai)){models=result;modelsSource=source;}}return result;
     }
     public async Task<IReadOnlyList<AiModel>> ListModelsAsync(CancellationToken cancellationToken)
     {
@@ -198,7 +223,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         using var timeout=CancellationTokenSource.CreateLinkedTokenSource(cancellationToken,lifetime.Token,sessionToken,ModuleToken());timeout.CancelAfter(FirstTimeout);
         try{return await Models(settings,timeout.Token);}catch(OperationCanceledException) when(!cancellationToken.IsCancellationRequested&&!lifetime.IsCancellationRequested&&!sessionToken.IsCancellationRequested&&moduleEnabled){throw new AiNetworkException(Strings.Ai_NoResponse);}
     }
-    public async Task TestAsync(CancellationToken cancellationToken){await foreach(var _ in RunAsync(new("ask","",null,"只回答一个字：好"),cancellationToken)){} } // 不翻译：协议提示词
+    public async Task TestAsync(CancellationToken cancellationToken){await foreach(var _ in Stream(store.Current.Ai,[new(AiChatRole.User,"只回答一个字：好")],null,cancellationToken,store.Current.Ai.Provider==AiProvider.Api&&store.Current.Ai.CurrentEndpoint.Format==AiApiFormat.Anthropic)){} } // 不翻译：协议提示词
     public void Dispose(){store.Changed-=SettingsChanged;lifetime.Cancel();moduleLifetime.Cancel();lock(gate){pendingLogin?.Cancel();foreach(var client in clients.Values)client.Dispose();clients.Clear();}}
 }
 

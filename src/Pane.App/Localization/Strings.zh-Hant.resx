@@ -698,13 +698,25 @@
   <data name="Settings_Ai_Enable" xml:space="preserve"><value>啟用 AI</value></data>
   <data name="Settings_Ai_EnableDescription" xml:space="preserve"><value>不用 AI 時可以關掉</value></data>
   <data name="Settings_Ai_Endpoint" xml:space="preserve"><value>介面位址</value></data>
-  <data name="Settings_Ai_EndpointDescription" xml:space="preserve"><value>相容 OpenAI 介面格式的服務</value></data>
+  <data name="Settings_Ai_EndpointDescription" xml:space="preserve"><value>OpenAI 相容格式；通常以 /v1 結尾，Pane 會在後面接 /chat/completions</value></data>
   <data name="Settings_Ai_Vendor" xml:space="preserve"><value>服務商</value></data>
-  <data name="Settings_Ai_VendorDescription" xml:space="preserve"><value>位址和模型已經填好，只需要貼上 key；換了服務商記得換 key</value></data>
+  <data name="Settings_Ai_VendorDescription" xml:space="preserve"><value>位址和模型已經填好，只需要貼上 key；每家的 key 分開儲存</value></data>
   <data name="Settings_Ai_CustomVendor" xml:space="preserve"><value>自訂</value></data>
-  <data name="Settings_Ai_CustomVendorDescription" xml:space="preserve"><value>點一家服務商，位址和模型自動填好；也可以在下面自己填位址</value></data>
+  <data name="Settings_Ai_CustomVendorDescription" xml:space="preserve"><value>自己取名稱、選介面格式、填位址和 key；可以新增多個</value></data>
   <data name="Settings_Ai_GetKey" xml:space="preserve"><value>取得 key</value></data>
   <data name="Settings_Ai_EndpointInvalid" xml:space="preserve"><value>介面位址要以 http:// 或 https:// 開頭</value></data>
+  <data name="Settings_Ai_AddEndpoint" xml:space="preserve"><value>新增</value></data>
+  <data name="Settings_Ai_NewEndpointName" xml:space="preserve"><value>自訂 {0}</value></data>
+  <data name="Settings_Ai_EndpointNameDescription" xml:space="preserve"><value>顯示在上面的標籤裡</value></data>
+  <data name="Settings_Ai_EndpointNameInvalid" xml:space="preserve"><value>名稱要 1～40 個字</value></data>
+  <data name="Settings_Ai_Format" xml:space="preserve"><value>介面格式</value></data>
+  <data name="Settings_Ai_FormatOpenAi" xml:space="preserve"><value>OpenAI 相容</value></data>
+  <data name="Settings_Ai_FormatAnthropic" xml:space="preserve"><value>Anthropic</value></data>
+  <data name="Settings_Ai_EndpointAnthropicDescription" xml:space="preserve"><value>Anthropic Messages 格式；通常以 /v1 結尾，Pane 會在後面接 /messages</value></data>
+  <data name="Settings_Ai_PresetEndpointDescription" xml:space="preserve"><value>內建服務商的位址不能改；要用別的位址，點「新增」建立一個自訂服務商</value></data>
+  <data name="Settings_Ai_DeleteEndpoint" xml:space="preserve"><value>刪除這個服務商</value></data>
+  <data name="Settings_Ai_DeleteEndpointDescription" xml:space="preserve"><value>連同它的 API Key 一起刪除</value></data>
+  <data name="Settings_Ai_ConfirmDeleteEndpoint" xml:space="preserve"><value>再點一次刪除</value></data>
   <data name="Settings_Ai_FetchModels" xml:space="preserve"><value>拉取模型列表</value></data>
   <data name="Settings_Ai_FirstModelDefault" xml:space="preserve"><value>預設（帳號的第一個模型）</value></data>
   <data name="Settings_Ai_FirstModelDescription" xml:space="preserve"><value>空著就用帳號模型列表裡的第一個</value></data>

@@ -9,6 +9,9 @@ public sealed partial class WrapPanel : Panel
 {
     public double HorizontalSpacing { get; set; } = 12;
     public double VerticalSpacing { get; set; } = 4;
+    // 换行判断的余量（issue 29）：125%、150% 缩放下宽度按物理像素取整，量出来的总宽和分到的宽度会差一点点浮点误差，
+    // 不留余量时最后一组会被误判成放不下、折到第二行（单行高的提示栏里就被切掉）。小于半个 DIP 的差别不换行。
+    const double Slack = 0.5;
 
     protected override Size MeasureOverride(Size available)
     {
@@ -17,7 +20,7 @@ public sealed partial class WrapPanel : Panel
         {
             child.Measure(new Size(available.Width, double.PositiveInfinity));
             var s = child.DesiredSize;
-            if (x > 0 && x + s.Width > available.Width) { y += row + VerticalSpacing; x = 0; row = 0; }
+            if (x > 0 && x + s.Width > available.Width + Slack) { y += row + VerticalSpacing; x = 0; row = 0; }
             x += s.Width + HorizontalSpacing;
             row = Math.Max(row, s.Height);
             width = Math.Max(width, x - HorizontalSpacing);
@@ -31,7 +34,7 @@ public sealed partial class WrapPanel : Panel
         foreach (var child in Children)
         {
             var s = child.DesiredSize;
-            if (x > 0 && x + s.Width > final.Width) { y += row + VerticalSpacing; x = 0; row = 0; }
+            if (x > 0 && x + s.Width > final.Width + Slack) { y += row + VerticalSpacing; x = 0; row = 0; }
             child.Arrange(new Rect(x, y, s.Width, s.Height));
             x += s.Width + HorizontalSpacing;
             row = Math.Max(row, s.Height);

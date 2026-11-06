@@ -63,10 +63,14 @@ public sealed record AiAccount(string Email, string? PlanName, bool CanUsePlan);
 /// </summary>
 public interface IAiSetup
 {
-    /// <summary>已保存的 API Key 的掩码（如「sk-ab…wxyz」）；没保存为 null。</summary>
+    /// <summary>
+    /// 当前服务商（<see cref="Pane.Settings.AiSettings.CurrentEndpoint"/>）已保存的 API Key 的掩码（如「sk-ab…wxyz」）；没保存为 null。
+    /// 065 起每个服务商各存一把 key（按服务商 Id），切换服务商后这里跟着变（会触发 <see cref="Changed"/>）。
+    /// 服务商从设置里删掉后，它的 key 由服务删除。
+    /// </summary>
     string? ApiKeyMask { get; }
 
-    /// <summary>保存 API Key（加密）；空字符串表示删除。</summary>
+    /// <summary>保存当前服务商的 API Key（加密）；空字符串表示删除。</summary>
     void SaveApiKey(string key);
 
     /// <summary>用当前设置发一个极小的请求，确认地址、Key / 登录、模型都能用。失败抛 AiException。</summary>
