@@ -1098,7 +1098,7 @@
   <data name="Settings_Launcher_HomeNone" xml:space="preserve"><value>呼出时只有一行搜索栏</value></data>
   <data name="Settings_Launcher_HomePinned" xml:space="preserve"><value>只显示固定</value></data>
   <data name="Settings_Launcher_HomeRecent" xml:space="preserve"><value>最近和固定</value></data>
-  <data name="Settings_Launcher_HomeRecentDescription" xml:space="preserve"><value>最近打开过的应用和固定的应用</value></data>
+  <data name="Settings_Launcher_HomeRecentDescription" xml:space="preserve"><value>最近打开过的应用和固定的应用。选中应用按 Ctrl+K 或右键可以固定</value></data>
   <data name="Settings_Launcher_Invalid" xml:space="preserve"><value>启动器设置无效</value></data>
   <data name="Settings_Launcher_KeepAlways" xml:space="preserve"><value>一直保留</value></data>
   <data name="Settings_Launcher_KeepInput" xml:space="preserve"><value>再次呼出时</value></data>
@@ -1366,6 +1366,11 @@
   <data name="Launcher_Properties" xml:space="preserve"><value>属性</value></data>
   <data name="Launcher_Uninstall" xml:space="preserve"><value>卸载</value></data>
   <data name="Launcher_ActionUnavailable" xml:space="preserve"><value>此项目已不支持该操作，请重新搜索后再试。</value></data>
+  <data name="Launcher_PinToHome" xml:space="preserve"><value>固定到首页</value></data>
+  <data name="Launcher_UnpinFromHome" xml:space="preserve"><value>取消固定</value></data>
+  <data name="Launcher_PinnedToHome" xml:space="preserve"><value>已固定到首页</value></data>
+  <data name="Launcher_UnpinnedFromHome" xml:space="preserve"><value>已取消固定</value></data>
+  <data name="Launcher_WebAppName" xml:space="preserve"><value>{0}（网页应用）</value></data>
   <data name="Settings_Modules" xml:space="preserve"><value>能力</value></data>
   <data name="Settings_Modules_Description" xml:space="preserve"><value>只开你要用的。停用的能力不占热键、不装钩子，设置也从左边收起。</value></data>
   <data name="Settings_Modules_Note" xml:space="preserve"><value>已有的记录和设置都会保留，再启用时原样回来。</value></data>

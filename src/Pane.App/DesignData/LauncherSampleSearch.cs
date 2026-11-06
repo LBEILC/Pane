@@ -90,6 +90,8 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
     static readonly string[] Programs = ["python", "pwsh", "ping", "git", "node"];
     static readonly string[] Recents = ["微信", "Visual Studio Code", "Microsoft Edge", "终端", "网易云音乐", "截图工具", "记事本", "设置"];
     static readonly string[] Pinned = ["文件资源管理器", "计算器", "腾讯会议", "Photoshop"];
+    /// <summary>演示模式读设置里的固定列表（issue 27 的「固定到首页」能看到效果）；没固定过时用上面四个，默认截图不变。</summary>
+    public Func<IReadOnlyList<string>>? PinnedApps { get; init; }
 
     public Task<LauncherResult> SearchAsync(string query, CancellationToken cancellationToken)
     {
@@ -100,7 +102,8 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
         if (q.Length == 0)
         {
             foreach (var n in Recents) items.Add(Tile(Apps.First(a => a.Name == n), LauncherGroups.Recent));
-            foreach (var n in Pinned) items.Add(Tile(Apps.First(a => a.Name == n), LauncherGroups.Pinned));
+            var pinned = PinnedApps?.Invoke() is { Count: > 0 } set ? set : Pinned;
+            foreach (var n in pinned) if (Apps.FirstOrDefault(a => a.Name == n) is { } app) items.Add(Tile(app, LauncherGroups.Pinned));
             return Task.FromResult(new LauncherResult(items, true));
         }
         if (t.StartsWith('>'))

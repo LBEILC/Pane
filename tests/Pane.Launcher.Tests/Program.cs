@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--063")){await Deduplication063Tests();return;}
         if(args.Contains("--058")){await PowerTimer058Tests();return;}
         if(args.Contains("--057")){await Portable057Tests();return;}
         if(args.Contains("--053-catalog")){Catalog053Probe();return;}
@@ -80,7 +81,7 @@ static partial class Program
         var timings=new List<double>();for(int i=0;i<100;i++){var timer=Stopwatch.StartNew();await perf.SearchAsync(queries[i%queries.Length],default);timings.Add(timer.Elapsed.TotalMilliseconds);}
         timings.Sort();Console.WriteLine($"search apps=1000 samples=100 medianMs={timings[50]:F4} maxMs={timings[^1]:F4}");Check(timings[^1]<=15,"1000 app latency");
         Console.WriteLine($"PASS original launcher assertions={checks}");
-        await SourceTests();await IndexTests();await IconTests();await ActionTests();await Deduplication053Tests();await Portable057Tests();
+        await SourceTests();await IndexTests();await IconTests();await ActionTests();await Deduplication053Tests();await Deduplication063Tests();await Portable057Tests();
         Console.WriteLine($"PASS launcher assertions={checks};realExecutions=0;clipboardWrites=0;browserLaunches=0");
     }
     static async Task Probe()

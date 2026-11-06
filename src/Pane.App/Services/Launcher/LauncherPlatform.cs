@@ -37,6 +37,17 @@ internal sealed record AppIndex(IndexedApp[] Apps,IndexMetrics Metrics);
 internal interface IAppCatalog { AppIndex Build(PinyinTable table,CancellationToken token); }
 internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProcessingStep>? steps=null,Pane.Settings.PortableEntry[]? portable=null):IAppCatalog
 {
+    internal static string DisplayName(string name,string id,bool packaged){
+        if(!packaged)return name;
+        int end=id.IndexOf('!');
+        string package=end<0?id:id[..end];
+        int publisher=package.LastIndexOf('_');
+        if(publisher>=0)package=package[..publisher];
+        int dash=package.LastIndexOf('-');
+        if(dash<1||package.Length-dash!=9||!package[..dash].Contains('.'))return name;
+        foreach(char digit in package.AsSpan(dash+1))if(!Uri.IsHexDigit(digit))return name;
+        return string.Format(Strings.Launcher_WebAppName,name);
+    }
     internal static bool IsAuxiliaryName(string name) { string lower=name.ToLowerInvariant(); return lower.Contains("uninstall")||lower.Contains("unins0")||lower.Contains("卸载")||lower.Contains("卸載")||lower.Contains("帮助")||lower.Contains("幫助")||lower.Contains("說明")||lower.Contains("readme")||lower.Contains(" help")||lower.StartsWith("help"); } // 不翻译：外部数据匹配
     public AppIndex Build(PinyinTable table,CancellationToken token)
     {
@@ -77,7 +88,7 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
             if(iconResult!=1)iconFailures[iconResult]=iconFailures.GetValueOrDefault(iconResult)+1;
             if(image!=null){foreach(var step in steps??[])image=step.Process(image,token);icons++;}
             var origin=app.Source==2?scan.Candidates.First(c=>c.Row==app):null;
-            apps.Add(new(group.StableId,table.Create(app.Name),packaged?app.Id:app.Parsing,packaged,image){Target=app.Target,Arguments=app.Args.Length==0?[]:WindowsLauncherActionPlatform.Split("placeholder.exe "+app.Args)[1..],PortablePath=origin?.Owner,PortableKind=origin?.Kind});
+            apps.Add(new(group.StableId,table.Create(DisplayName(app.Name,app.Id,packaged)),packaged?app.Id:app.Parsing,packaged,image){Target=app.Target,Arguments=app.Args.Length==0?[]:WindowsLauncherActionPlatform.Split("placeholder.exe "+app.Args)[1..],PortablePath=origin?.Owner,PortableKind=origin?.Kind});
             evidence.Add(new(app.Name,AppDeduplication.Key(app),group.Rows.Select(g=>g.Name).ToArray(),app.IconResource,app.IconIndex,width,height,direct));
         }
         File.WriteAllText(Path.Combine(directory,"catalog-evidence.json"),System.Text.Json.JsonSerializer.Serialize(evidence,CatalogEvidenceJson.Default.ListCatalogEvidence));

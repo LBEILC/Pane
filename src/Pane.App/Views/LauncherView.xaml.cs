@@ -77,9 +77,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     string shownQuery = "";
     AiRequest? cardRequest;
     string cardTitle = "";
-    // 附加操作（050，issue 10）：正在列谁的操作；每行对应的操作（第一行「打开」为 null）
+    // 附加操作（050，issue 10）：正在列谁的操作；每行对应的操作
     LauncherItem? menuItem;
-    List<LauncherItemAction?> menuActions = [];
+    List<MenuEntry> menuEntries = [];
+
+    /// <summary>操作列表的一行：Pin 是界面自己做的固定 / 取消固定（issue 27）；否则 Action 为服务给的操作，为空是「打开」。</summary>
+    readonly record struct MenuEntry(LauncherItemAction? Action = null, bool Pin = false);
 
     /// <summary>文件窗口：查询文字、要选中的文件路径（文件格按 Tab 时）。宿主负责创建或复用窗口。</summary>
     public event Action<string, string?>? OpenFiles;
@@ -1008,32 +1011,34 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 
     // ---------------- 附加操作（050，issue 10） ----------------
     // Ctrl+K / 右键：结果区就地换成这一项的操作列表（WinUI 版不弹独立菜单，同批量重命名的「就地展开」）。
-    // 第一行「打开」，后面是服务给的操作，右边数字键；卸载要按两次。Esc 回到结果并选回这一项
+    // 第一行「打开」，应用第二行「固定到首页 / 取消固定」（issue 27），后面是服务给的操作，右边数字键；卸载要按两次。Esc 回到结果并选回这一项
 
     async Task OpenMenu(int index)
     {
-        if (aiMode || menuItem is not null || index < 0 || index >= rows.Count || search is not ILauncherItemActions actions) return;
+        if (aiMode || menuItem is not null || index < 0 || index >= rows.Count) return;
         var row = rows[index];
         if (row.Cell is not (LauncherCell.App or LauncherCell.File)) return;
-        IReadOnlyList<LauncherItemAction> list;
-        using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300)))
+        bool pinnable = row.Item.Kind == LauncherItemKind.App;   // 首页图块也是应用；命令、文件不能固定
+        IReadOnlyList<LauncherItemAction> list = [];
+        if (search is ILauncherItemActions actions)
         {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
             try { list = await actions.GetActionsAsync(row.Item, cts.Token).WaitAsync(cts.Token); }
             catch (Exception) { list = []; }
         }
         if (aiMode || menuItem is not null || index >= rows.Count || !ReferenceEquals(rows[index], row)) return;   // 等的时候结果换了
-        if (list.Count == 0) { if (index == selected) FootWhat.Text = Strings.Launcher_NoMoreActions; return; }
+        if (list.Count == 0 && !pinnable) { if (index == selected) FootWhat.Text = Strings.Launcher_NoMoreActions; return; }
 
         Disarm();
         menuItem = row.Item;
-        menuActions = [null, .. list.Select(a => (LauncherItemAction?)a)];
+        menuEntries = [new(), .. pinnable ? [new MenuEntry(Pin: true)] : Array.Empty<MenuEntry>(), .. list.Select(a => new MenuEntry(a))];
         var s = new LauncherSection(row.Item.Title, LauncherSectionKind.List, []);
         sections = [s];
         rows = [];
-        foreach (var action in menuActions)
+        foreach (var entry in menuEntries)
         {
             var n = (rows.Count + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            var (title, glyph) = MenuLabel(action);
+            var (title, glyph) = MenuLabel(entry, row.Item);
             var r = new LauncherRow(new("menu:" + n, LauncherItemKind.Action, LauncherGroups.Actions, title, null, new(glyph), Hotkey: rows.Count < 9 ? n : null), rows.Count, LauncherCell.Menu);
             rows.Add(r);
             s.Rows.Add(r);
@@ -1047,7 +1052,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         RequestHeight();
     }
 
-    static (string Title, string Glyph) MenuLabel(LauncherItemAction? action) => action switch
+    static (string Title, string Glyph) MenuLabel(MenuEntry entry, LauncherItem item) => entry.Pin
+        ? IsPinned(item) ? (Strings.Launcher_UnpinFromHome, "pin-off") : (Strings.Launcher_PinToHome, "pin")
+        : entry.Action switch
     {
         null => (Strings.Common_Open, "external"),
         LauncherItemAction.RunAsAdmin => (Strings.Launcher_RunAsAdmin, "shield"),
@@ -1070,8 +1077,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 
     async Task RunMenu(LauncherRow row)
     {
-        if (menuItem is not { } item || row.Index >= menuActions.Count) return;
-        var action = menuActions[row.Index];
+        if (menuItem is not { } item || row.Index >= menuEntries.Count) return;
+        if (menuEntries[row.Index].Pin) { await TogglePin(row, item); return; }
+        var action = menuEntries[row.Index].Action;
         if (action == LauncherItemAction.Uninstall && !Confirmed(row)) return;
         try
         {
@@ -1082,6 +1090,27 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         // 从应用列表移除（057）：不收起启动器，回到结果重新搜，这一项就不在了
         if (action == LauncherItemAction.RemoveFromApps) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
         CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    // 固定到首页（issue 27）：界面直接改设置，搜索服务每次读最新设置。新固定的排最后。
+    // 不收起启动器：回到结果、选回这一项，提示栏说一声；在首页取消固定时图块就从「已固定」里消失
+    static bool IsPinned(LauncherItem item) => Options.PinnedApps.Contains(item.Id, StringComparer.Ordinal);
+
+    async Task TogglePin(LauncherRow row, LauncherItem item)
+    {
+        var store = ((App)Application.Current).Store;
+        var launcher = store.Current.Launcher;
+        bool pin = !IsPinned(item);
+        string[] pinned = pin ? [.. launcher.PinnedApps, item.Id] : [.. launcher.PinnedApps.Where(id => !string.Equals(id, item.Id, StringComparison.Ordinal))];
+        try { store.Save(store.Current with { Launcher = launcher with { PinnedApps = pinned } }); }
+        catch (Exception e) { ShowFailure(row, App.FailureReason(e) ?? Strings.Settings_SaveFailed); return; }
+        menuItem = null;
+        Disarm();
+        await Refresh(Input.Text);
+        if (menuItem is not null) return;   // 等的时候又打开了别的菜单
+        int back = rows.FindIndex(r => r.Item.Id == item.Id);
+        if (back >= 0) Select(back);
+        FootWhat.Text = pin ? Strings.Launcher_PinnedToHome : Strings.Launcher_UnpinnedFromHome;
     }
 
     // 失败原因写在这一行；服务给的 LauncherActionException 本身就是给用户看的一句话；UAC 点「否」服务已经静默

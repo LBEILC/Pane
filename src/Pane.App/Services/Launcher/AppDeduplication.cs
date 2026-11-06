@@ -41,21 +41,48 @@ internal static class AppDeduplication
         }).ToArray();
     }
     public static CatalogEntry[][] Groups(IEnumerable<CatalogEntry> rows)=>Group(Prepare(rows),Key);
-    static CatalogEntry[][] Group(IEnumerable<CatalogEntry> rows,Func<CatalogEntry,string> key,IEqualityComparer<string>? comparer=null)=>rows.GroupBy(key,comparer??Keys)
+    static CatalogEntry[][] OriginalGroups(IEnumerable<CatalogEntry> rows,Func<CatalogEntry,string> key,IEqualityComparer<string>? comparer=null)=>rows.GroupBy(key,comparer??Keys)
         // AppsFolder 和快捷方式名称均来自 Shell；优先 AppsFolder 的系统本地化名称。
         .Select(g=>g.OrderBy(r=>r.Source).ToArray()).ToArray();
+    static CatalogEntry[][] Group(IEnumerable<CatalogEntry> rows,Func<CatalogEntry,string> key){
+        var result=new List<List<CatalogEntry>>();
+        var targets=new Dictionary<string,Dictionary<string,List<CatalogEntry>>>(StringComparer.OrdinalIgnoreCase);
+        foreach(var original in OriginalGroups(rows,key)){
+            var first=original[0];List<CatalogEntry>? destination=null;
+            // 以原分组的显示入口为准；Shell 和没有完整 exe 目标的包仍按原规则分组。
+            if(Key(first).StartsWith("target:",StringComparison.Ordinal)){
+                string target=Environment.ExpandEnvironmentVariables(first.Target).Trim();
+                if(!targets.TryGetValue(target,out var names))targets[target]=names=new(StringComparer.OrdinalIgnoreCase);
+                if(!names.TryGetValue(first.Name,out destination)){
+                    destination=[];names.Add(first.Name,destination);result.Add(destination);
+                }
+            }
+            if(destination==null){destination=[];result.Add(destination);}
+            destination.AddRange(original);
+        }
+        // 稳定排序：同来源沿用原分组顺序，组内沿用枚举顺序，不改启动参数。
+        return result.Select(g=>g.OrderBy(r=>r.Source).ToArray()).ToArray();
+    }
     public static CatalogGroup[] Resolve(IEnumerable<CatalogEntry> entries){
         var rows=entries.ToArray();
         var prepared=Prepare(rows);
-        var groups=ResolveCore(prepared,Key);
-        // 同时覆盖上一版 Resolve 产生的 Id，包括旧参数冲突时的 Shell 身份回退。
+        // 先重现 053 的稳定 Id，再合并，避免新规则改变旧 Id 的所有权判定。
+        var current=ResolveCore(prepared,Key);
+        var membership=new Dictionary<CatalogEntry,CatalogGroup>();
+        foreach(var group in current)foreach(var row in group.Rows)membership[row]=group;
+        var groups=Group(prepared,Key).Select(rowsInGroup=>{
+            string id=membership[rowsInGroup[0]].StableId;
+            var oldGroups=rowsInGroup.Select(r=>membership[r]).Distinct();
+            return new CatalogGroup(rowsInGroup,id,oldGroups.SelectMany(g=>g.MergedIds.Prepend(g.StableId)).Where(old=>old!=id).Distinct().ToArray());
+        }).ToArray();
+        // 同时覆盖 053 以前的 Id，包括旧参数冲突时的 Shell 身份回退。
         var previous=ResolveCore(rows,PreviousKey,StringComparer.OrdinalIgnoreCase);
-        var retained=groups.Select(g=>g.StableId).ToHashSet();
+        var retained=groups.SelectMany(g=>g.MergedIds.Prepend(g.StableId)).ToHashSet();
         var positions=new Dictionary<CatalogEntry,int>();for(int i=0;i<rows.Length;i++)positions.TryAdd(rows[i],i);
         var destinations=new Dictionary<CatalogEntry,string>();foreach(var group in groups)foreach(var row in group.Rows)destinations[row]=group.StableId;
         var extra=new Dictionary<string,List<string>>();
         foreach(var old in previous){
-            if(retained.Contains(old.StableId))continue;
+            if(!retained.Add(old.StableId))continue;
             string id=destinations[prepared[positions[old.Rows[0]]]];
             if(!extra.TryGetValue(id,out var ids))extra[id]=ids=[];
             ids.Add(old.StableId);
@@ -67,7 +94,7 @@ internal static class AppDeduplication
         // 旧枚举丢失 AppsFolder 参数：同一个旧 Id 可能出现在多个新分组中。
         // 它只属于旧版最先保留的条目，不能把一个使用记录迁移到几个不同入口。
         var owners=rows.GroupBy(r=>r.LegacyId).ToDictionary(g=>g.Key,g=>keyOf(g.First()));
-        return Group(rows,keyOf,comparer).Select(group=>{
+        return OriginalGroups(rows,keyOf,comparer).Select(group=>{
             var app=group[0];string key=keyOf(app);
             var owned=group.Where(r=>comparer.Equals(owners[r.LegacyId],key)).Select(r=>r.LegacyId).Distinct().ToArray();
             string id=owned.FirstOrDefault()??StableId(Identity(app.Id,app.Target,app.Args,app.Parsing));

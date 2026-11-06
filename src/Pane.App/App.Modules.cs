@@ -163,7 +163,7 @@ public sealed partial class App
                 SettingsView.PortableApps = a.launcherSearch;
             }
             a.Files = a.demo ? new Pane.DesignData.FileSearchSample() : new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(), new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.launcherSearch!.OpenFileAsync);
-            var view = new LauncherView((ILauncherSearch?)a.launcherSearch ?? new Pane.DesignData.LauncherSampleSearch(), a.Ai, a.secondaryActions!,
+            var view = new LauncherView((ILauncherSearch?)a.launcherSearch ?? new Pane.DesignData.LauncherSampleSearch { PinnedApps = () => a.Store.Current.Launcher.PinnedApps }, a.Ai, a.secondaryActions!,
                 a.demo ? new Pane.DesignData.LauncherAttachmentActionsSample() : new Pane.Services.Clipboard.ClipboardAttachmentActions(a.launcherSearch!),
                 new Pane.Services.Clipboard.LauncherClipboardHistory(a.ClipboardHistory, a.Store));
             a.launcherView = view; a.AddModulePanel("launcher", Strings.Common_Launcher, view, view);

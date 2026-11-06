@@ -78,12 +78,12 @@ static partial class Program
         var a=new CatalogEntry("任务计划程序","",@"C:\Windows\system32\taskschd.msc","/s","shell:a",0,"old-a","",0);
         var b=a with{Name="Task Scheduler",Target=@"c:\WINDOWS\system32\taskschd.msc",Source=1,LegacyId="old-b"};
         var groups=AppDeduplication.Groups([b,a]);Check(groups.Length==1&&groups[0][0].Name=="任务计划程序","同目标不同名合并并优先 Shell 本地化名");
-        Check(AppDeduplication.Groups([a,b with{Name=a.Name,Args="/other"}]).Length==2,"同名不同参数保留");
-        var shared=a with{LegacyId="shared"};var variants=AppDeduplication.Resolve([shared,shared with{Args="/other"},b, b with{Args="/other",LegacyId="other-link"}]);
+        Check(AppDeduplication.Groups([a,b with{Name="其他任务入口",Args="/other"}]).Length==2,"不同名不同参数保留");
+        var shared=a with{LegacyId="shared"};var variants=AppDeduplication.Resolve([shared,shared with{Name="其他任务入口",Args="/other"},b, b with{Args="/other",LegacyId="other-link"}]);
         Check(variants.Select(g=>g.StableId).Distinct().Count()==2&&variants[0].StableId=="shared"&&variants[1].StableId=="other-link","旧 AppsFolder Id 冲突时保留各自原有 Id");
         Check(variants.SelectMany(g=>g.MergedIds).SequenceEqual(["old-b"]),"同一个旧 Id 只归属原先保留的入口");
         string oldEmpty=AppDeduplication.StableId(AppDeduplication.Identity("",a.Target,"",a.Parsing));
-        var restored=AppDeduplication.Resolve([a with{Id="Dev",LegacyId=oldEmpty},a with{Id="Plain",Args="",LegacyId=oldEmpty}]);
+        var restored=AppDeduplication.Resolve([a with{Id="Dev",LegacyId=oldEmpty},a with{Name="无参数入口",Id="Plain",Args="",LegacyId=oldEmpty}]);
         Check(restored[0].StableId==oldEmpty&&restored[1].StableId==AppDeduplication.StableId("Plain")&&restored[0].StableId!=restored[1].StableId,"恢复原先被漏掉的无参数入口时不抢占旧 Id");
         Check(AppDeduplication.Groups([a with{Id="Package!App",Target=""},b with{Id="package!app",Target="other"}]).Length==1,"商店应用按 AUMID 去重");
         Check(AppDeduplication.Groups([a with{Id="Package!App",Target=""},b with{Id="Package!Other",Target=""}]).Length==2,"不同商店应用保留");
