@@ -167,7 +167,7 @@
                     </Grid.ColumnDefinitions>
                     <c:PaneIcon Glyph="search" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText3Brush}"/>
                     <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0"
-                             PlaceholderText="{x:Bind loc:Strings.Clipboard_SearchPlaceholder}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
+                             PlaceholderText="{x:Bind loc:Strings.Clipboard_SearchPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                              SelectionHighlightColor="{StaticResource PaneAccentBrush}" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                              TextChanged="OnTextChanged" PreviewKeyDown="OnInputKeyDown"
                              GotFocus="OnInputFocus" LostFocus="OnInputFocus"/>

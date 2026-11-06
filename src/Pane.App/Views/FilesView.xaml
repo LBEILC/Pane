@@ -74,7 +74,7 @@
                     <TextBlock Text="{x:Bind loc:Strings.Common_Files}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
             </Border>
-            <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" PlaceholderText="{x:Bind loc:Strings.Files_SearchPlaceholder}"
+            <TextBox x:Name="Input" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" PlaceholderText="{x:Bind loc:Strings.Files_SearchPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
                      FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                      IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnTextChanged"/>
             <Button x:Name="PinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">

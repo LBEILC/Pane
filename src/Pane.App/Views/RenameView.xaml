@@ -217,7 +217,7 @@
                 </Button>
                 <StackPanel x:Name="SaveBox" Visibility="Collapsed" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                     <Border x:Name="SaveNameFrame" CornerRadius="{StaticResource PaneRadiusControl}" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
-                        <TextBox x:Name="SaveName" Width="160" Height="{StaticResource PaneControlSm}" MinHeight="0" Padding="10,5,10,0" PlaceholderText="{x:Bind loc:Strings.Rename_PresetNamePlaceholder}"
+                        <TextBox x:Name="SaveName" Width="160" Height="{StaticResource PaneControlSm}" MinHeight="0" Padding="10,5,10,0" PlaceholderText="{x:Bind loc:Strings.Rename_PresetNamePlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
                                  FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" IsSpellCheckEnabled="False" KeyDown="OnSaveNameKey"/>
                     </Border>
                     <Button Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Content="{x:Bind loc:Strings.Common_Save}" Click="OnSaveConfirm"/>

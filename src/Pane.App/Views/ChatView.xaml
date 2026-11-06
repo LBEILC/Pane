@@ -85,7 +85,7 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <TextBox x:Name="Input" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="0" MaxHeight="140" Padding="0,2,0,2" VerticalAlignment="Center"
-                         PlaceholderText="{x:Bind loc:Strings.Ai_Chat_QuestionPlaceholder}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
+                         PlaceholderText="{x:Bind loc:Strings.Ai_Chat_QuestionPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                          SelectionHighlightColor="{StaticResource PaneAccentBrush}" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                          ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnInputChanged"/>
                 <Button x:Name="SendButton" Grid.Column="1" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" CornerRadius="16" Padding="0" VerticalAlignment="Bottom" Click="OnSend"

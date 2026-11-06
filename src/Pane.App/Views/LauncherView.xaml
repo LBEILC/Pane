@@ -164,7 +164,7 @@
                 </Grid>
             </Border>
             <TextBox x:Name="Input" Grid.Column="2" VerticalAlignment="Center" MinHeight="0" Padding="0"
-                     PlaceholderText="{x:Bind loc:Strings.Launcher_SearchPlaceholder}"
+                     PlaceholderText="{x:Bind loc:Strings.Launcher_SearchPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
                      FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextSearch}"
                      SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                      IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
