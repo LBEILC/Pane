@@ -54,7 +54,7 @@ internal static partial class ClipboardClassifier
         !s.ExcludedPrograms.Contains(c.Program,StringComparer.OrdinalIgnoreCase);
 }
 
-internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
+internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
 {
     readonly object sync=new();
     readonly SettingsStore settings;
@@ -86,13 +86,15 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
         var ready=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);Ready=ready.Task;
         persistence=new Thread(()=>{
             try{
+                lock(settings.StorageSync){
                 Directory.CreateDirectory(directory);
-                var loaded=this.storage.Load(index);
-                lock(sync)entries.AddRange(loaded);
+                StoredClip[] loaded;
+                lock(sync){loaded=this.storage.Load(index);entries.AddRange(loaded);imageDirectory=StorageLocation.Resolve(settings).Path;Trim();if(entries.Count!=loaded.Length)Schedule();}
                 log.Write("loaded",count:loaded.Length);
                 try{Cleanup(loaded,true);}catch(Exception e){log.Write("cleanup-failed",e,"startup-cleanup");}
                 source.Captured+=Capture;settings.Changed+=SettingsChanged;SettingsChanged(this,EventArgs.Empty);
                 ready.SetResult();
+                }
             }catch(Exception e){log.Write("load-failed",e,"load");ready.SetException(e);return;}
             PersistLoop();
         }){IsBackground=true,Name="Pane clipboard storage"};
@@ -123,12 +125,12 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
             if(s.Dedupe&&latest?.Fingerprint==fingerprint){entries[entries.IndexOf(latest)]=latest with{Entry=latest.Entry with{CopiedAt=now}};}
             else {
                 string id=Guid.NewGuid().ToString("N");string? full=null,thumb=null;int? width=null,height=null;
-                if(kind==ClipKind.Image){full=Path.Combine(directory,id+".png");thumb=Path.Combine(directory,id+".thumb.png");var size=images.Save(content.Png!,full,thumb);width=size.Width;height=size.Height;}
+                if(kind==ClipKind.Image){Directory.CreateDirectory(imageDirectory);full=Path.Combine(imageDirectory,id+".png");thumb=Path.Combine(imageDirectory,id+".thumb.png");var size=images.Save(content.Png!,full,thumb);width=size.Width;height=size.Height;}
                 entries.Add(new(new(id,kind,kind==ClipKind.Image?null:content.Text,kind==ClipKind.Files?content.Files?.ToArray():null,
                     thumb==null?null:new(thumb),width,height,content.Source,content.Icon==null?null:new("app",content.Icon),now,false,full),fingerprint));
                 Trim();
                 if(kind==ClipKind.Files){
-                    string thumbnail=Path.Combine(directory,id+".thumb.png");
+                    string thumbnail=Path.Combine(imageDirectory,id+".thumb.png");
                     pendingThumbnails.Add(thumbnail);
                     thumbnailTasks.RemoveAll(t=>t.IsCompleted);
                     thumbnailTasks.Add(Task.Run(()=>CreateFileThumbnail(id,content.Files!.ToArray(),thumbnail)));
@@ -139,7 +141,7 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
         Changed?.Invoke(this,EventArgs.Empty);
     }
     static string Hash(byte[] bytes)=>Convert.ToHexString(SHA256.HashData(bytes));
-    void Trim(){var remove=entries.Where(e=>!e.Entry.Pinned).OrderByDescending(e=>e.Entry.CopiedAt).Skip(settings.Current.Clipboard.Limit).ToHashSet();entries.RemoveAll(remove.Contains);}
+    void Trim(){var remove=entries.Where(e=>!e.Entry.Pinned).OrderByDescending(e=>e.Entry.CopiedAt).Skip(settings.Current.Clipboard.Limit).ToHashSet();entries.RemoveAll(remove.Contains);TrimImages();}
     void Schedule(){dirty=true;signal.Set();}
     public void SetPinned(string id,bool pinned)=>Change(id,e=>e with{Pinned=pinned});
     void Change(string id,Func<ClipEntry,ClipEntry> update){lock(sync){int i=entries.FindIndex(e=>e.Entry.Id==id);if(i<0)return;entries[i]=entries[i] with{Entry=update(entries[i].Entry)};Trim();Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
@@ -154,6 +156,13 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
     void CreateFileThumbnail(string id,string[] files,string thumbnail)
     {
         try{
+            lock(settings.StorageSync){
+            lock(sync){
+            pendingThumbnails.Remove(thumbnail);
+            // 排队期间可能已搬移；解码只占用存储锁，快照和普通捕获仍可取得历史锁。
+            thumbnail=Path.Combine(imageDirectory,Path.GetFileName(thumbnail));pendingThumbnails.Add(thumbnail);
+            }
+            Directory.CreateDirectory(imageDirectory);
             foreach(string path in files){
                 var size=images.Thumbnail(path,thumbnail);if(size==null)continue;
                 lock(sync){
@@ -161,8 +170,10 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
                     if(i>=0&&!stopping){entries[i]=entries[i] with{Entry=entries[i].Entry with{Thumbnail=new(thumbnail),ImageWidth=size.Value.Width,ImageHeight=size.Value.Height}};Schedule();}
                     else File.Delete(thumbnail);
                 }
-                NotifyChanged();break;
+                break;
             }
+            }
+            NotifyChanged();
         }catch(Exception e){log.Write("thumbnail-failed",e,"thumbnail");}
         finally{lock(sync)pendingThumbnails.Remove(thumbnail);}
     }
@@ -172,8 +183,10 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
             var keep=entries.Concat(snapshot).SelectMany(e=>new[]{e.Entry.ContentPath,e.Entry.Thumbnail?.Path,e.Entry.SourceIcon?.ImagePath})
                 .Where(p=>p!=null).ToHashSet(StringComparer.OrdinalIgnoreCase);
             keep.UnionWith(pendingThumbnails);
-            foreach(var path in Directory.EnumerateFiles(directory)){
+            foreach(var path in new[]{directory,imageDirectory}.Distinct(StringComparer.OrdinalIgnoreCase).Where(Directory.Exists).SelectMany(Directory.EnumerateFiles)){
                 string extension=Path.GetExtension(path);
+                // 用户指定的 Pane 目录可能已放了其他文件，只清理本服务生成的名称。
+                if(!Path.GetDirectoryName(path)!.Equals(directory,StringComparison.OrdinalIgnoreCase)&&!StorageLocation.IsGeneratedImage(path))continue;
                 if(extension.Equals(".png",StringComparison.OrdinalIgnoreCase)&&!keep.Contains(path)||startup&&extension is ".input" or ".tmp")File.Delete(path);
             }
         }
@@ -194,6 +207,7 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
                 else shutdown.WaitOne(RetryDelay(failures));
                 step="snapshot";
                 StoredClip[]? snapshot;
+                lock(settings.StorageSync){
                 lock(sync){snapshot=dirty?entries.ToArray():null;dirty=false;}
                 if(snapshot!=null){
                     storage.Save(index,snapshot,value=>step=value);
@@ -202,7 +216,7 @@ internal sealed class ClipboardHistory:IClipboardHistory,IDisposable
                     failures=0;bool changed;
                     lock(sync){changed=storageProblem!=null;storageProblem=null;}
                     if(changed)NotifyChanged();
-                }
+                }}
             }catch(Exception e){
                 failures++;lock(sync){StorageFailures++;dirty=true;storageProblem=Problem(e,failures);}
                 log.Write("save-failed",e,step,failures);NotifyChanged();

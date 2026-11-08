@@ -73,6 +73,7 @@ public sealed partial class App : Application
             int startupLevel=MemoryStartupLevel();
             if(!demo&&startupLevel>=5){shell=new ShellHost(Command,ModuleShellSettings());shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
             await StartWinV();
+            if(!demo)SettingsView.DataStorage=new Pane.Services.Clipboard.DataStorage(Store,()=>clipboardService,()=>{launcherSearch?.RebuildStorageCache();(FileIcons as Pane.Services.Icons.FileIcons)?.RebuildStorageCache();},text=>queue.TryEnqueue(()=>{if(!closing)shell?.NotifyOnce(text);}),Pane.Services.Launcher.ProcessLauncherIndex.ClearCacheAsync);
             await StartModules();
             hotkeysReadyMs=(DateTime.UtcNow-System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
@@ -138,7 +139,7 @@ public sealed partial class App : Application
         if(controlsEnabled&&Take("exit",out _)){Shutdown();return;}
         DrainTrail();
         foreach(var panel in panels.Values)panel.Tick();settings?.Tick();TickSecondaries();gestures?.Tick();
-        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");_ = NotifyPreviousCrashAsync();if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics))+"\n"+ModuleDiagnostics());}
+        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");_ = NotifyPreviousCrashAsync();ShowImportResult();if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics))+"\n"+ModuleDiagnostics());}
         if(ready)DesignOpen();
         if(!ready||!controlsEnabled)return;
         if(pendingAck!=null){if(Settled){Ack(pendingAck);pendingAck=null;}return;}

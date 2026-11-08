@@ -1,4 +1,5 @@
 using Pane.Contracts;
+using Pane.Localization;
 using Pane.Services.Setup;
 using Pane.Settings;
 using System.Text.Json;
@@ -38,7 +39,7 @@ internal static class SetupTests
             Directory.CreateDirectory(paths.Root);
             string foreign = Path.Combine(paths.Root, "用户文件.txt");
             File.WriteAllText(foreign, "保留");
-            Check(Service().CheckInstallPath(paths.Root).Error == "这个文件夹里已经有别的文件", "占用目录拒绝");
+            Check(Service().CheckInstallPath(paths.Root).Error == Strings.Setup_DirectoryOccupied, "占用目录拒绝");
             File.Delete(foreign);
             Check(Service().CheckInstallPath(paths.Root).Error == null && !Directory.EnumerateFileSystemEntries(paths.Root).Any(), "空目录可用且探测文件已清理");
             Check(Service().Info.InstalledVersion == null && Service().Info.StartWithWindows, "新装默认自启");
@@ -103,7 +104,7 @@ internal static class SetupTests
                 move: (a, b) => { if (a == paths.App) { attempts++; throw new IOException("持续占用", unchecked((int)0x80070020)); } Directory.Move(a, b); },
                 delay: ms => wait += ms);
             try { await blocked.InstallAsync(new(false, false, paths.Root), progress); throw new Exception("应被占用阻止"); }
-            catch (SetupException error) { Check(error.Message == "有程序正在使用 Pane 的安装目录，关掉打开着这个目录的窗口或程序后再试。", "占用提示精确匹配"); }
+            catch (SetupException error) { Check(error.Message == Strings.Setup_DirectoryBusy, "占用提示精确匹配"); }
             Check(attempts == 6 && wait == 2500, "重试有界");
             Check(AppText() == "new" && !Directory.Exists(Path.Combine(paths.Root, "app.new")) && !Directory.Exists(Path.Combine(paths.Root, "app.previous")), "持续占用回滚干净");
             string logDirectory = Path.Combine(paths.Data, "logs");
@@ -116,7 +117,7 @@ internal static class SetupTests
                 var permanent = new SetupService(paths, source, "0.1.125", integration, process,
                     move: (a, b) => { if (a == paths.App) { attempts++; throw new IOException("非占用", unchecked((int)0x80070000) | code); } Directory.Move(a, b); }, delay: ms => wait += ms);
                 try { await permanent.InstallAsync(new(false, false, paths.Root), progress); throw new Exception("应失败"); }
-                catch (SetupException error) { Check(error.Message == (code == 112 ? "磁盘空间不够" : "操作未完成，请检查目录权限和文件是否被其他程序占用后重试。"), "非占用文案 " + code); }
+                catch (SetupException error) { Check(error.Message == (code == 112 ? Strings.Setup_DiskFull : Strings.Setup_OperationFailed), "非占用文案 " + code); }
                 Check(attempts == 1 && wait == 0, "非占用不重试 " + code);
             }
             Check(SetupDiagnostics.Busy(new UnauthorizedAccessException()), "拒绝访问可重试");

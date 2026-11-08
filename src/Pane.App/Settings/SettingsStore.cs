@@ -20,12 +20,15 @@ public sealed class SettingsStore
     }
     public string DirectoryPath { get; }
     public PaneSettings Current { get; private set; }
+    // 顺序固定为存储锁 → 设置写锁；历史保存和搬移共用此锁。
+    internal object StorageSync { get; }=new();
     readonly PaneSettings defaults;
     public event EventHandler? Changed;
     public event EventHandler<string>? CorruptFile;
     public SettingsStore(string directory, PaneSettings defaults) { DirectoryPath=directory; this.defaults=defaults; Current=defaults; }
     public void Load()
     {
+        StorageRecovery.RecoverAll(DirectoryPath);
         Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json");
         if(!File.Exists(path)) { Save(Current with{Update=Current.Update with{SeenVersion=CurrentVersion()}}); return; }
@@ -57,6 +60,20 @@ public sealed class SettingsStore
     {
         lock(writeLock){var value=change(Current);if(ReferenceEquals(value,Current))return;SaveCore(value);}
         Changed?.Invoke(this,EventArgs.Empty);
+    }
+    internal void CommitStorage(string? folder,Action<Action> transaction)
+    {
+        lock(writeLock){
+            var previous=Current;
+            try{transaction(()=>SaveCore(Current with{Storage=new(folder)}));}
+            catch{Current=previous;throw;}
+        }
+    }
+    internal void NotifyStorageChanged()
+    {
+        // 通知不属于磁盘事务，且必须在释放存储锁后调用，避免停止监听时互等。
+        foreach(EventHandler handler in Changed?.GetInvocationList()??[])
+            try{handler(this,EventArgs.Empty);}catch(Exception){ }
     }
     void SaveCore(PaneSettings value)
     {

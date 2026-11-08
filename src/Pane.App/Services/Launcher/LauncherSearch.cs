@@ -86,6 +86,11 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
             });
         }
     }
+    internal void RebuildStorageCache()
+    {
+        lock(sync){if(disposed)return;dirty=true;}
+        RefreshIndex();
+    }
     void Publish(PersistedIndex value){
         string? previousIcons=null;
         try{store.Update(current=>{

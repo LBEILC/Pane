@@ -219,6 +219,7 @@ public sealed partial class SettingsView
 
     /// <summary>扫描状态。工程在启动器能力装配时设（057）；没设时用演示数据。</summary>
     internal static IPortableAppsStatus? PortableApps { get; set; }
+    internal static IDataStorage? DataStorage { get; set; }
     internal static IAppAliases? AppAliases { get; set; }
 
     FrameworkElement PortableRow(PortableEntry p, IPortableAppsStatus scan)

@@ -31,7 +31,7 @@ public sealed partial class SettingsView
         var call = new List<FrameworkElement>
         {
             conflict != null ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
-                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? Strings.Settings_Clipboard_WinVActive : c.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null), hotkey),
+                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? (c.KeepHotkeyWithWinV ? Strings.Settings_Clipboard_WinVActive : Strings.Settings_Clipboard_WinVOnly) :c.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null), hotkey),
         };
         if (winv != null) call.AddRange(WinVRows(winv));
         Group(Strings.Settings_Clipboard_Activation, call.ToArray());
@@ -140,6 +140,11 @@ public sealed partial class SettingsView
         var history = Switch(w.SystemHistoryDisabled, v => Run(t => w.SetSystemHistoryDisabledAsync(v, t)));
         Enable(history, replaced);
         yield return Row(Strings.Settings_WinV_DisableSystemHistory, replaced ? Strings.Settings_WinV_DisableSystemHistoryDescription : Strings.Settings_WinV_EnableFirst, history);
+        // 084：替换后可以不再占用原来的呼出热键。只在 Win+V 真正注册成功时才停用原热键（宿主判断），没生效时说明里写清楚
+        var keep = Switch(app.Store.Current.Clipboard.KeepHotkeyWithWinV, v => { SaveClipboard(x => x with { KeepHotkeyWithWinV = v }); Render(); });   // 上面热键行的说明跟着变
+        Enable(keep, replaced);
+        yield return Row(Strings.Settings_WinV_KeepHotkey,
+            !replaced ? Strings.Settings_WinV_EnableFirst : state == WinVState.On ? Strings.Settings_WinV_KeepHotkeyDescription : Strings.Settings_WinV_KeepHotkeyPending, keep);
     }
 
     void OnWinVChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "clipboard" && !winvBusy) Later(0); });

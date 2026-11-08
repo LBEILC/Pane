@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -85,13 +86,13 @@ internal static partial class Program
         store.Save(store.Current with{Ai=store.Current.Ai with{Provider=AiProvider.Api,ProxyMode=AiProxyMode.Custom,ProxyUrl=server.Url,Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl="http://target.invalid/v1"}]}});
         await ai.TestProxyAsync(default);Check(server.LastHeaders[0].StartsWith("HEAD http://target.invalid/v1"),"probe uses local proxy");
         async Task ProbeFailure(string expected){try{await ai.TestProxyAsync(default);throw new Exception("expected probe failure");}catch(AiNetworkException e){Check(e.Message.Contains(expected),"probe reason "+expected);}}
-        server.Mode="407";await ProbeFailure("代理拒绝");
-        server.Mode="probe-timeout";var watch=System.Diagnostics.Stopwatch.StartNew();await ProbeFailure("超时");Check(watch.Elapsed.TotalSeconds is >=2.5 and <6,"three second timeout");
+        server.Mode="407";await ProbeFailure(Strings.Ai_ProxyAuthenticationFailed);
+        server.Mode="probe-timeout";var watch=System.Diagnostics.Stopwatch.StartNew();await ProbeFailure(Strings.Ai_ConnectionTimeout);Check(watch.Elapsed.TotalSeconds is >=2.5 and <6,"three second timeout");
         using(var cancel=new CancellationTokenSource()){cancel.Cancel();await Error<OperationCanceledException>(()=>ai.TestProxyAsync(cancel.Token),"caller cancellation preserved");}
         server.Mode="normal";
         var closed=new TcpListener(IPAddress.Loopback,0);closed.Start();string closedUrl="http://127.0.0.1:"+((IPEndPoint)closed.LocalEndpoint).Port;closed.Stop();
-        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyUrl=closedUrl}});await ProbeFailure("连不上代理");
-        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.None,Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl=closedUrl}]}});await ProbeFailure("目标连不上");
+        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyUrl=closedUrl}});await ProbeFailure(Strings.Ai_ProxyUnreachable);
+        store.Save(store.Current with{Ai=store.Current.Ai with{ProxyMode=AiProxyMode.None,Endpoints=[store.Current.Ai.CurrentEndpoint with{BaseUrl=closedUrl}]}});await ProbeFailure(Strings.Ai_EndpointNetworkFailed);
         foreach(var scheme in new[]{"socks5","socks5h"})await SocksProbe(store,ai,scheme);
     }
     static async Task SocksProbe(SettingsStore store,AiService ai,string scheme)

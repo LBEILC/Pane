@@ -84,7 +84,7 @@ internal sealed class PowerTimerSource(Func<IPowerTimer?> provider, TimeProvider
         if(parts.Length!=2 || !long.TryParse(parts[1],out var seconds))return Task.CompletedTask;
         PowerAction? action=parts[0] switch {"shutdown"=>PowerAction.Shutdown,"restart"=>PowerAction.Restart,"sleep"=>PowerAction.Sleep,_=>null}; // 不翻译
         // 设计定（2026-11-05）：结果行出现到按回车之间会过几秒，到点离现在不足 1 分钟时按 1 分钟定，不报错
-        var at=DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime();var earliest=DateTimeOffset.Now.AddMinutes(1);
+        var at=DateTimeOffset.FromUnixTimeSeconds(seconds).ToLocalTime();var earliest=clock.GetLocalNow().AddMinutes(1);
         if(action is {} a)service.Schedule(a,at<earliest?earliest:at);
         return Task.CompletedTask;
     }

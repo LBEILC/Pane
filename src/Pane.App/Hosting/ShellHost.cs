@@ -9,6 +9,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     internal event Action? PowerTimeChanged;
     internal int PowerTimeListeners => PowerTimeChanged?.GetInvocationList().Length ?? 0;
     bool winVRequested;
+    volatile bool winVActive;
+    public bool OriginalClipboardHotkeySuppressed {get;private set;}
     volatile bool stopping;
     readonly uint taskbarCreated=RegisterWindowMessageW("TaskbarCreated");
     readonly System.Collections.Concurrent.ConcurrentQueue<(bool Enabled,TaskCompletionSource<bool> Done)> winVRequests=new();
@@ -38,13 +40,13 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         }
         lock(conflicts)conflicts.RemoveAll(c=>c.Target=="winv");
         bool active=false;
-        if(winVRequested&&!suspended&&(currentSettings?.Clipboard.Enabled??false))
+        if(winVRequested&&!suspended&&(currentSettings is {} settings&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled)))
         {
             var key=new Hotkey(KeyModifiers.Win,86);
             active=clipboard==key&&registered.Contains(2);
             if(!active){Register(3,"winv",key);active=registered.Contains(3);}
         }
-        WinVRegistrationChanged?.Invoke(active);
+        winVActive=active;
         return active;
     }
     readonly Native.Proc proc;
@@ -104,15 +106,16 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;
         // 先停止旧线程；代数丢弃已经排队的旧配置通知。
         keyboardGeneration++;StopKeyboardHook();
-        ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
-        var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
+        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV);
+        OriginalClipboardHotkeySuppressed=active&&!settings.Clipboard.KeepHotkeyWithWinV;
+        var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,!OriginalClipboardHotkeySuppressed&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled),suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
         if(keys.Launcher!=0||keys.Clipboard!=0){
             int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard);
             keyboardStarted=code==0;
             if(code!=0){if(keys.Launcher!=0)RegistrationResult("launcher",a,false,code);if(keys.Clipboard!=0)RegistrationResult("clipboard",b,false,code);}
         }
         lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
-        ApplyWinV();
+        WinVRegistrationChanged?.Invoke(active);
         if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");} // 不翻译：日志异常
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
     }
@@ -137,7 +140,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         if(m==0x8006){while(barriers.TryDequeue(out var done))done.TrySetResult();return 0;}
         // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
         if(taskbarCreated!=0&&m==taskbarCreated){tray=false;if(currentSettings?.General.ShowTrayIcon==true)tray=Shell_NotifyIconW(0,ref data);return 0;}
-        if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;request.Done.TrySetResult(ApplyWinV());}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
+        if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;if(currentSettings is {} settings)ApplyCore(settings);request.Done.TrySetResult(winVActive);}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
         if(m==0x312){if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8005){if(!suspended&&w==keyboardGeneration&&ShellHotkeyBindings.Command((nuint)l) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8003){while(notifications.TryDequeue(out var text)){data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}

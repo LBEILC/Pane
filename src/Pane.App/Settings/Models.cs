@@ -2,6 +2,7 @@ namespace Pane.Settings;
 [Flags] public enum KeyModifiers { None=0, Ctrl=1, Alt=2, Shift=4, Win=8 }
 public enum ThemeMode { System, Light, Dark }
 public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); }
+    StorageSettings storage=new(); public StorageSettings Storage { get=>storage; init=>storage=value??new(); }
     // 能力模块的启用状态（设计加，2026-11-04，055）：键是 Pane.Contracts.ModuleIds，没写的用 ModuleInfo.DefaultEnabled。
     // 旧设置文件没有这项时，按旧的总开关迁移（Clipboard / SuperPanel / FolderJump 的 Enabled），见 docs/design.md「能力模块」
     Dictionary<string,bool>? modules; public Dictionary<string,bool>? Modules { get=>modules; init=>modules=value; } }
@@ -113,11 +114,13 @@ public enum PortableKind { Folder, Program, Learned }
 /// <param name="AddedAt">加入时间；记住的程序满 100 个时，按启动器使用记录去掉最久没用的，没用过的按这个时间。</param>
 public sealed record PortableEntry(string Path, PortableKind Kind, DateTimeOffset AddedAt);
 public sealed record LauncherPosition(string MonitorId, double X, double Y);
+// 本机专属位置；083 导出时跳过，不能随配置迁移到其他电脑。
+public sealed record StorageSettings(string? LargeFilesDirectory=null);
 public sealed record ClipboardSettings(Hotkey Hotkey,
     bool RecordText=true,bool RecordImages=true,bool RecordFiles=true,int Limit=500,
     bool Dedupe=true,bool MoveToTopAfterPaste=true,bool HonorExcludeMarker=true,
     // 设计加（2026-10-31，033）：整个剪贴板功能的开关。关掉 = 不监听、不记录、不注册呼出热键、面板打不开、Win+V 替换先恢复；已有记录保留
-    bool Enabled=true)
+    bool Enabled=true,long ImageLimitMegabytes=0,bool KeepHotkeyWithWinV=true)
 {
     string[] excludedPrograms=[];
     public string[] ExcludedPrograms {get=>excludedPrograms;init=>excludedPrograms=value??[];}

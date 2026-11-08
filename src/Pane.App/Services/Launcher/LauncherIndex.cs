@@ -72,6 +72,11 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
     }
     // 进程级串行，同时使用目录锁阻止同数据目录的其他实例并发写入。
     static readonly SemaphoreSlim gate=new(1);
+    internal static async Task ClearCacheAsync(Action clear,CancellationToken token)
+    {
+        await gate.WaitAsync(token).ConfigureAwait(false);
+        try{clear();}finally{gate.Release();}
+    }
     public double LastMilliseconds {get;private set;}
     public long PeakWorkingSet {get;private set;}
     public int LastProcessId {get;private set;}

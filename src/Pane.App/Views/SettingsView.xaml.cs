@@ -47,6 +47,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump),
             new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi, ModuleIds.Ai),
             new("icons", Strings.Settings_Icons, "app", Strings.Settings_Icons_Description, RenderIcons),
+            new("data", Strings.Settings_Data, "database", Strings.Settings_Data_Description, RenderData),
             new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout),
         ];
         current = sections[0];
@@ -126,6 +127,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (app.Updates is { } up) up.Changed += OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed += OnWinVChanged;
         if (PortableApps is { } pa) pa.Changed += OnFileSearchChanged;   // 扫描完成：同样只重建启动器分区
+        Data.Changed += OnDataChanged;   // 数据分区（082）
         if (AppAliases is { } aa) aa.Changed += OnFileSearchChanged;   // 别名改了（启动器里设的）：重建启动器分区
         app.Modules.Changed += OnModulesChanged;
         Unloaded += OnUnloaded;
@@ -146,6 +148,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (app.Updates is { } up) up.Changed -= OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed -= OnWinVChanged;
         if (PortableApps is { } pa) pa.Changed -= OnFileSearchChanged;
+        Data.Changed -= OnDataChanged;
         if (AppAliases is { } aa) aa.Changed -= OnFileSearchChanged;
         app.Modules.Changed -= OnModulesChanged;
         signIn?.Cancel();

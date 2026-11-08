@@ -15,7 +15,7 @@ internal sealed class ClipboardStorage:IClipboardStorage
         try{
             using var file=File.OpenRead(index);
             return JsonSerializer.Deserialize(file,ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException("历史索引为空"); // 不翻译：日志异常
-        }catch(FileNotFoundException){return [];}
+        }catch(FileNotFoundException){return [];}catch(DirectoryNotFoundException){return [];}
     }
     public void Save(string index,StoredClip[] entries,Action<string> step)
     {

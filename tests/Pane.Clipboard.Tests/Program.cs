@@ -15,6 +15,8 @@ static partial class Program
     static PaneSettings Defaults()=>new(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Ctrl,32)),new(new(KeyModifiers.Ctrl,86)));
     static async Task Main(string[] args)
     {
+        if(args is ["--083"]){await Transfer083Tests();TestResults.Pass();return;}
+        if(args is ["--082"]){await Storage082Tests();TestResults.Pass();return;}
         if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}
         string native=Path.GetFullPath(args[0]);
         NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(),(name,_,_)=>name=="Pane.Native.dll"?NativeLibrary.Load(native):0);

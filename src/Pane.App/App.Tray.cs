@@ -25,7 +25,7 @@ public sealed partial class App
         trayView!.Apply(new TrayMenuState(
             u is {State:UpdateState.Ready,Latest:{} r}?r.Version:null,
             HotkeyBox.Names(Store.Current.Launcher.Hotkey).ToList(),
-            HotkeyBox.Names(Store.Current.Clipboard.Hotkey).ToList(),
+            HotkeyBox.Names(shell?.OriginalClipboardHotkeySuppressed==true?new Settings.Hotkey(Settings.KeyModifiers.Win,86):Store.Current.Clipboard.Hotkey).ToList(),
             Modules.IsActive(ModuleIds.Gestures),gestureService?.IsPaused??false,
             pause is {} k?HotkeyBox.Names(new Settings.Hotkey((Settings.KeyModifiers)(int)k.Modifiers,k.VirtualKey)).ToList():[],
             Modules.IsActive(ModuleIds.Clipboard),Modules.IsActive(ModuleIds.Launcher),

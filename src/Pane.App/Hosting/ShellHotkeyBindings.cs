@@ -14,6 +14,8 @@ internal static class ShellHotkeyBindings
         uint b=enabled&&clipboard.IsValidDoubleTap?clipboard.VirtualKey:0u;
         return (a,b==a?0:b);
     }
+    internal static bool KeepClipboardHotkey(bool enabled,bool suspended,bool keepHotkeyWithWinV,bool winVRegistered)
+        =>enabled&&!suspended&&(keepHotkeyWithWinV||!winVRegistered);
     internal static Hotkey ParseOverride(string text)
     {
         if(text.StartsWith("2x",StringComparison.OrdinalIgnoreCase)){
@@ -24,13 +26,17 @@ internal static class ShellHotkeyBindings
         string last=keys[^1];ushort key=last.Equals("Space",StringComparison.OrdinalIgnoreCase)?(ushort)32:last.Length==1?(ushort)char.ToUpperInvariant(last[0]):throw new FormatException("开发热键格式无效"); // 不翻译：异常
         return new(mods,key);
     }
-    internal static void Rebind(List<int> registered,Action<int> unregister,Action<int,string,Hotkey> register,
-        Hotkey launcher,Hotkey clipboard,bool enabled,bool suspended,bool launcherEnabled=true)
+    internal static bool Rebind(List<int> registered,Action<int> unregister,Action<int,string,Hotkey> register,
+        Hotkey launcher,Hotkey clipboard,bool enabled,bool suspended,bool launcherEnabled=true,
+        bool keepHotkeyWithWinV=true,Func<bool>? registerWinV=null)
     {
         foreach(int id in registered)unregister(id);
         registered.Clear();
-        if(suspended)return;
+        bool active=registerWinV?.Invoke()??false;
+        if(suspended)return active;
         if(launcherEnabled&&!launcher.IsValidDoubleTap)register(1,"launcher",launcher);
-        if(enabled&&!clipboard.IsValidDoubleTap)register(2,"clipboard",clipboard);
+        if(KeepClipboardHotkey(enabled,suspended,keepHotkeyWithWinV,active)&&!clipboard.IsValidDoubleTap
+            &&!(active&&clipboard==new Hotkey(KeyModifiers.Win,86)))register(2,"clipboard",clipboard);
+        return active;
     }
 }

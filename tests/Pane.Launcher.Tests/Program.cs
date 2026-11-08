@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--082")){await StorageCache082Tests();return;}
         if(args.Contains("--080")){await Clipboard080Tests();return;}
         if(args.Contains("--078")){await Aliases078Tests();return;}
         if(args.Contains("--076")){await Remember076Tests();return;}
