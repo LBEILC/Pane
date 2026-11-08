@@ -45,6 +45,8 @@ internal static class SetupEntry
         if (args is ["--setup-preview" or "--uninstall-preview", var state])
         {
             Preview = state; Uninstall = args[0] == "--uninstall-preview"; Paths = SetupPaths.Production; Active = true;
+            try { var installed = SetupIntegration.ReadSettings(Paths.Data, GlassParameters.Defaults()); Strings.Initialize(App.ResolveUiLanguage(installed.General.UiLanguage)); }
+            catch { Strings.Initialize(App.ResolveUiLanguage(null)); }
             runApplication();
             return true;
         }
@@ -69,6 +71,8 @@ internal static class SetupEntry
             Paths = IsolatedRoot == null ? SetupPaths.Production : SetupPaths.Isolated(IsolatedRoot);
             IsolatedRoot = IsolatedRoot == null ? null : Paths.Root;
             Paths = Paths.ResolveInstalled(IsolatedRoot);
+            try { var installed = SetupIntegration.ReadSettings(Paths.Data, GlassParameters.Defaults()); Strings.Initialize(App.ResolveUiLanguage(installed.General.UiLanguage)); }
+            catch { Strings.Initialize(App.ResolveUiLanguage(null)); }
             Uninstall = args[0] != "--setup";
             if (args[0] == "--uninstall")
             {
