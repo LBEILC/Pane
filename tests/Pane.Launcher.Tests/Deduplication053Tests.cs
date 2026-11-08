@@ -88,7 +88,7 @@ static partial class Program
             Icons=new(){Overrides=new(){[oldId]=IconMode.Raw},CustomIcons=new(){[oldId]=custom}}
         });
         var app=new IndexedApp(id,new PinyinTable().Create(group.Rows[0].Name),group.Rows[0].Parsing,group.Rows[0].Id.Contains('!'),null);
-        var value=new PersistedIndex(1,new([app],[],[]),new(1,1,0,1,1,0,0){Aliases=aliases},DateTimeOffset.UtcNow);
+        var value=new PersistedIndex(IndexStorage.Version,new([app],[],[]),new(1,1,0,1,1,0,0){Aliases=aliases},DateTimeOffset.UtcNow);
         var measurements=new List<IconMeasurement>();value=IconProcessing.Apply(value,dir,store.Current.Icons,default,measurements.Add);
         Check(measurements.Single().Original==custom&&measurements.Single().Kind=="Raw","053 工作进程首次合并就使用旧图标设置");
         IndexStorage.Write(Path.Combine(dir,"launcher-index.json"),value);

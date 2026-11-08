@@ -130,6 +130,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
             var what=name=="launcher"?Strings.Common_Launcher:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
+        // 在广播线程直接清标记，不依赖 UI 调度在系统结束会话前执行。
+        if(NativeCrashRecovery.Current?.EndSession(m,w)==true)return 0;
         // 只处理 AUTOMATIC 恢复广播，避免随后 RESUMESUSPEND 重复延长倒数。
         if(m==0x1e || m==0x218 && w==0x12){PowerTimeChanged?.Invoke();return m==0x218?1:0;}
         if(m==0x8006){while(barriers.TryDequeue(out var done))done.TrySetResult();return 0;}

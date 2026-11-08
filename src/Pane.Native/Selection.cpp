@@ -134,5 +134,5 @@ API void* PaneClipboardSnapshot(){
 API int PaneClipboardRestore(void* data){auto saved=static_cast<SavedData*>(data);HRESULT hr=E_FAIL;for(int i=0;i<20;i++){hr=OleSetClipboard(saved);if(SUCCEEDED(hr))break;Sleep(5);}if(SUCCEEDED(hr))hr=OleFlushClipboard();diagnostic=L"restoreHr="+std::to_wstring(hr);saved->Release();return SUCCEEDED(hr);}
 API void PaneClipboardRelease(void* data){static_cast<SavedData*>(data)->Release();}
 API int PaneClipboardTextAlloc(wchar_t** output){*output=nullptr;if(!OpenClipboard(nullptr))return 0;auto h=GetClipboardData(CF_UNICODETEXT);auto p=h?static_cast<wchar_t*>(GlobalLock(h)):nullptr;bool ok=false;if(p){size_t n=0,max=GlobalSize(h)/sizeof(wchar_t);while(n<max&&p[n])n++;auto memory=static_cast<wchar_t*>(CoTaskMemAlloc((n+1)*sizeof(wchar_t)));if(memory){memcpy(memory,p,n*sizeof(wchar_t));memory[n]=0;*output=memory;ok=true;}GlobalUnlock(h);}CloseClipboard();return ok;}
-extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int);
-API int PaneClipboardWrite(const wchar_t* text){return PaneClipWrite(text,nullptr,nullptr,0); }
+extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int,int);
+API int PaneClipboardWrite(const wchar_t* text,int mode){return PaneClipWrite(text,nullptr,nullptr,0,mode); }

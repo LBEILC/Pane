@@ -7,6 +7,14 @@ using Pane.Settings;
 
 static partial class Program
 {
+    // 仅显式探针读取真实 PATH；不读注册表、不输出本机路径、不执行程序。
+    static async Task TerminalPath072Probe()
+    {
+        int directories=0;
+        using var programs=new TerminalPrograms(registered:[],enumerateFiles:(path,_)=>{Interlocked.Increment(ref directories);return Directory.EnumerateFiles(path);});
+        var timer=Stopwatch.StartNew();programs.Match("");await programs.Scanning;
+        Console.WriteLine($"072 PATH scanMs={timer.Elapsed.TotalMilliseconds:F3};directories={directories};registryReads=0;writes=0");
+    }
     sealed class Environment037:ILauncherEnvironment
     {
         public string Home=>@"D:\测试";public bool HibernateAvailable {get;set;}=true;
@@ -29,7 +37,7 @@ static partial class Program
         string directory=TestResults.NewDirectory("037-");Directory.CreateDirectory(directory);
         var store=new SettingsStore(directory,Defaults());var platform=new Environment037();var process=new Process037();var executor=new FakeExecutor();var files=new FakeFiles{ReturnRow=true};
         try{WindowsLauncherExecutor.CheckResult(-1223);Check(false,"系统组件 UAC 取消");}catch(System.ComponentModel.Win32Exception e){Check(e.NativeErrorCode==1223,"系统组件保留 UAC 取消码");}
-        var programs=new TerminalPrograms([], ["python","powershell","ping","pwsh","print","pip","pydoc","pytest"],false);
+        var programs=new TerminalPrograms([], ["python","powershell","ping","pwsh","print","pip","pydoc","pytest"]);
         using var service=new LauncherSearch(store,new FixtureIndex(new FakeCatalog()),files,executor,platform,process,programs);await service.Indexing;
         Check(SystemSettingsCatalog.All.Length is >=150 and <=250,"清单数量");
         Check(SystemSettingsCatalog.All.Select(e=>e.Key).Distinct().Count()==SystemSettingsCatalog.All.Length,"清单标识唯一");
@@ -67,10 +75,38 @@ static partial class Program
         store.Save(store.Current with{Launcher=store.Current.Launcher with{RememberCommands=false}});history.Record("private");Check(history.Match("").Length==0&&(await service.SearchAsync(">echo",default)).Items.Count==1,"关闭记录不补历史");Check((await service.SearchAsync(">py",default)).Items.Count>1,"关闭历史仍补程序");
         history.Clear();store.Save(store.Current with{Launcher=store.Current.Launcher with{RememberCommands=true}});Check(new TerminalHistory(store).Match("").Length==0,"Clear 持久化");
         process.Error=new System.ComponentModel.Win32Exception(1223);try{await service.ExecuteElevatedAsync(terminal,default);Check(false,"应保留 UAC 错误码");}catch(System.ComponentModel.Win32Exception e){Check(e.NativeErrorCode==1223&&history.Match("").Length==0,"取消UAC不记历史，宿主静默");}process.Error=null;
-        var path=Path.Combine(directory,"path");Directory.CreateDirectory(path);File.WriteAllText(Path.Combine(path,"python.exe"),"");File.WriteAllText(Path.Combine(path,"ignore.txt"),"");using(var discovered=new TerminalPrograms([path],["custom"],true)){
+        var parent=Path.Combine(directory,"App");var path=Path.Combine(parent,"bin");Directory.CreateDirectory(path);
+        File.WriteAllText(Path.Combine(path,"python.exe"),"");File.WriteAllText(Path.Combine(path,"ignore.txt"),"");
+        var scanClock=new Clock037();int enumerations=0;
+        using(var discovered=new TerminalPrograms([path],["custom"],scanClock,(p,_)=>{Interlocked.Increment(ref enumerations);return Directory.EnumerateFiles(p);}))
+        using(var lazy=new LauncherSearch(store,new FixtureIndex(new FakeCatalog()),files,executor,platform,process,discovered))
+        {
+            await lazy.Indexing;await lazy.SearchAsync("ordinary",default);
+            Check(enumerations==0,"构造 TerminalService 和 LauncherSearch 及普通查询不扫描 PATH");
+            await lazy.SearchAsync(">py",default);await discovered.Scanning;
             Check(discovered.Match("py").SequenceEqual(["python"]),"PATH 真实假目录扫描");Check(discovered.Match("ignore").Length==0&&discovered.Match("custom").Length==1,"过滤非程序并合并 App Paths");
-            File.WriteAllText(Path.Combine(path,"newtool.exe"),"");var deadline=Stopwatch.StartNew();while(discovered.Match("newtool").Length==0&&deadline.ElapsedMilliseconds<2000)await Task.Delay(10);Check(discovered.Match("newtool").Length==1,"目录通知增加程序");
-            File.Delete(Path.Combine(path,"newtool.exe"));deadline.Restart();while(discovered.Match("newtool").Length!=0&&deadline.ElapsedMilliseconds<2000)await Task.Delay(10);Check(discovered.Match("newtool").Length==0,"目录通知删除程序");
+            File.WriteAllText(Path.Combine(path,"newtool.exe"),"");await lazy.SearchAsync(">new",default);
+            Check(enumerations==1,"有效期内复用扫描结果");
+            scanClock.Now+=TimeSpan.FromSeconds(30);await lazy.SearchAsync(">new",default);await discovered.Scanning;
+            Check((await lazy.SearchAsync(">new",default)).Items.Any(i=>i.Id=="complete:newtool"),"过期查询增加程序");
+            File.Delete(Path.Combine(path,"newtool.exe"));scanClock.Now+=TimeSpan.FromSeconds(30);await lazy.SearchAsync(">new",default);await discovered.Scanning;
+            Check(!(await lazy.SearchAsync(">new",default)).Items.Any(i=>i.Id=="complete:newtool"),"过期查询删除程序");
+            Directory.Move(parent,parent+"-renamed");Check(Directory.Exists(parent+"-renamed"),"Dispose 之前可改名 PATH 上级目录");
+        }
+        using(var started=new ManualResetEventSlim())
+        {
+            int calls=0,finished=0;
+            using var slow=new TerminalPrograms([path,path+"-second"],["custom"],enumerateFiles:(_,token)=>
+            {
+                Interlocked.Increment(ref calls);started.Set();
+                try{token.WaitHandle.WaitOne();token.ThrowIfCancellationRequested();return [];}
+                finally{Interlocked.Increment(ref finished);}
+            });
+            var timer=Stopwatch.StartNew();Check(slow.Match("custom").SequenceEqual(["custom"])&&timer.ElapsedMilliseconds<500,"慢扫描首次查询不等待且可用 App Paths");
+            Check(started.Wait(5000),"后台扫描已开始");
+            for(int i=0;i<10;i++)slow.Match("custom");Check(calls==1,"扫描期间查询不重复排队");
+            slow.Dispose();Check(slow.Scanning.IsCompletedSuccessfully&&finished==1&&calls==1,"释放取消扫描且不留下后台任务");
+            Check(slow.Match("").Length==0,"释放后不启动扫描");
         }
         var bing=new SearchEngine("必应","bing","https://www.bing.com/search?q={query}");var baidu=new SearchEngine("百度","bd","https://www.baidu.com/s?wd={query}");var http=new Http037();var clock=new Clock037();bool enabled=true;
         using(var web=new WebSuggestions(()=>enabled,http,clock)){

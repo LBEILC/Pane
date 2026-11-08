@@ -1,4 +1,4 @@
-﻿#define NOMINMAX
+#define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
 #include <shlobj.h>
@@ -95,7 +95,7 @@ API int PaneClipSaveImage(const wchar_t* input,const wchar_t* full,const wchar_t
  if(SUCCEEDED(hr))hr=scale->Initialize(source.Get(),std::max(1u,static_cast<UINT>(w*k)),std::max(1u,static_cast<UINT>(h*k)),WICBitmapInterpolationModeFant);
  if(SUCCEEDED(hr))hr=Save(f.Get(),scale.Get(),thumb);return SUCCEEDED(hr);
 }
-API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars){
+API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars,int mode){
  Apartment apartment;HGLOBAL data=nullptr,png=nullptr;UINT format=CF_UNICODETEXT;
  if(image){
   auto f=Factory();if(!f)return 0;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> frame;ComPtr<IWICFormatConverter> convert;
@@ -109,7 +109,7 @@ API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* fi
  else if(text)data=Memory(text,(wcslen(text)+1)*2);if(!data){if(png)GlobalFree(png);return 0;}
  DWORD one=1;HGLOBAL marker=Memory(&one,sizeof(one));HWND owner=CreateWindowW(L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);
  bool opened=false;if(owner&&marker)for(int i=0;i<5&&!opened;i++){opened=OpenClipboard(owner)!=0;if(!opened)Sleep(15);}
- bool ok=opened&&EmptyClipboard()&&Put(RegisterClipboardFormatW(L"Pane.OwnClipboard"),marker)&&Put(format,data);
+ bool ok=opened&&EmptyClipboard()&&Put(RegisterClipboardFormatW(mode==1?L"Pane.OwnClipboard":L"Pane.SourceClipboard"),marker)&&Put(format,data);
  if(ok&&png)ok=Put(RegisterClipboardFormatW(L"PNG"),png);if(opened)CloseClipboard();if(owner)DestroyWindow(owner);if(marker)GlobalFree(marker);if(data)GlobalFree(data);if(png)GlobalFree(png);return ok;
 }
 API int PaneClipSaveDialog(const wchar_t* source,const wchar_t* name){

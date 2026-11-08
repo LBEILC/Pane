@@ -110,6 +110,8 @@
   <data name="Clipboard_SaveImageFailed" xml:space="preserve"><value>图片保存失败</value></data>
   <data name="Clipboard_SearchPlaceholder" xml:space="preserve"><value>搜索剪贴板</value></data>
   <data name="Clipboard_Select" xml:space="preserve"><value>选择</value></data>
+  <data name="Clipboard_FillLauncher" xml:space="preserve"><value>填进启动器</value></data>
+  <data name="Clipboard_BackToLauncher" xml:space="preserve"><value>回到启动器</value></data>
   <data name="Clipboard_SendToLauncher" xml:space="preserve"><value>交给启动器</value></data>
   <data name="Clipboard_SendToLauncherHint" xml:space="preserve"><value>交给启动器（Tab）</value></data>
   <data name="Clipboard_StorageFailed" xml:space="preserve"><value>保存失败：{0}，已失败 {1} 次</value></data>
@@ -329,6 +331,13 @@
 附件：
 {1}</value></data>
   <data name="Launcher_RemoveAttachmentHint" xml:space="preserve"><value>去掉附件（Esc）</value></data>
+  <data name="Launcher_EditAliases" xml:space="preserve"><value>设置搜索别名</value></data>
+  <data name="Launcher_AliasEditing" xml:space="preserve"><value>给「{0}」设搜索别名，多个用空格隔开；清空就是不用</value></data>
+  <data name="Launcher_AliasPlaceholder" xml:space="preserve"><value>输入别名，比如 ow</value></data>
+  <data name="Launcher_AliasSaved" xml:space="preserve"><value>已保存「{0}」的搜索别名</value></data>
+  <data name="Launcher_AliasCleared" xml:space="preserve"><value>已清除「{0}」的搜索别名</value></data>
+  <data name="Launcher_AliasTooMany" xml:space="preserve"><value>最多 8 个别名</value></data>
+  <data name="Launcher_AliasTooLong" xml:space="preserve"><value>每个别名最长 32 个字</value></data>
   <data name="Launcher_RemoveFromApps" xml:space="preserve"><value>从应用列表移除</value></data>
   <data name="Launcher_RestoreClipboard" xml:space="preserve"><value>重新放回剪贴板</value></data>
   <data name="Launcher_RunAsAdmin" xml:space="preserve"><value>以管理员身份运行</value></data>
@@ -1116,6 +1125,10 @@
   <data name="Settings_Launcher_KeepInput" xml:space="preserve"><value>再次呼出时</value></data>
   <data name="Settings_Launcher_KeepInputDescription" xml:space="preserve"><value>上次输入的文字怎么处理</value></data>
   <data name="Settings_Launcher_KeepOneMinute" xml:space="preserve"><value>1 分钟内保留</value></data>
+  <data name="Settings_Launcher_Aliases" xml:space="preserve"><value>搜索别名</value></data>
+  <data name="Settings_Launcher_AliasesDescription" xml:space="preserve"><value>给应用起个简称，搜简称就能找到它。在启动器里选中应用，按 Ctrl+K 选「设置搜索别名」来添加。</value></data>
+  <data name="Settings_Launcher_AliasesEmpty" xml:space="preserve"><value>还没有设过别名</value></data>
+  <data name="Settings_Launcher_AliasAppMissing" xml:space="preserve"><value>找不到这个应用 · {0}</value></data>
   <data name="Settings_Launcher_Portable" xml:space="preserve"><value>便携软件</value></data>
   <data name="Settings_Launcher_PortableDescription" xml:space="preserve"><value>文件夹里的程序会和安装的软件一样出现在搜索结果里；扫描文件夹本身和下一层子文件夹。可以把文件夹、程序或快捷方式拖到这里。</value></data>
   <data name="Settings_Launcher_PortableFolderMissing" xml:space="preserve"><value>找不到这个文件夹 · {0}</value></data>
@@ -1128,7 +1141,8 @@
   <data name="Settings_Launcher_RememberCommands" xml:space="preserve"><value>记住运行过的命令</value></data>
   <data name="Settings_Launcher_RememberOpened" xml:space="preserve"><value>记住用 Pane 打开过的程序</value></data>
   <data name="Settings_Launcher_RememberOpenedDescription" xml:space="preserve"><value>在 Pane 的文件结果里打开过、又不在应用列表里的程序，下次直接能搜到</value></data>
-  <data name="Settings_Launcher_RememberedCount" xml:space="preserve"><value>已记住 {0} 个；在启动器里选中按 Ctrl+K 可以单独移除</value></data>
+  <data name="Settings_Launcher_RememberedCount" xml:space="preserve"><value>已记住 {0} 个，展开可以逐个移除</value></data>
+  <data name="Settings_Launcher_ShowRemembered" xml:space="preserve"><value>查看</value></data>
   <data name="Settings_Launcher_ResetPosition" xml:space="preserve"><value>恢复默认位置</value></data>
   <data name="Settings_Launcher_SetDefault" xml:space="preserve"><value>设为默认</value></data>
   <data name="Settings_Launcher_SkippedNotPrograms" xml:space="preserve"><value>已跳过 {0} 个不是程序的文件</value></data>

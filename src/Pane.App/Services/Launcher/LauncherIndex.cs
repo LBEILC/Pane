@@ -20,10 +20,11 @@ internal interface ILauncherIndex
 }
 internal static class IndexStorage
 {
+    internal const int Version=2;
     public static PersistedIndex Read(string path){
         using var stream=File.OpenRead(path);
         var value=JsonSerializer.Deserialize(stream,IndexJson.Default.PersistedIndex);
-        if(value is not {Version:1,Snapshot:not null,Metrics:not null}||value.Snapshot.Apps==null||value.Snapshot.Favorites==null||value.Snapshot.Commands==null)throw new InvalidDataException("索引格式不兼容"); // 不翻译：日志异常
+        if(value is not {Version:Version,Snapshot:not null,Metrics:not null}||value.Snapshot.Apps==null||value.Snapshot.Favorites==null||value.Snapshot.Commands==null)throw new InvalidDataException("索引格式不兼容"); // 不翻译：日志异常
         return value;
     }
     public static void Write(string path,PersistedIndex value){
@@ -38,7 +39,7 @@ internal static class IndexBuilder
         var entries=favorites.Select(f=>new SearchEntry("favorite:"+f.Path,f.IsFolder?LauncherItemKind.Folder:LauncherItemKind.File,table.Create(FileTitle(f.Path)),Path.GetDirectoryName(f.Path)??f.Path,f.IsFolder?"folder":"doc")).ToArray();
         (string Id,string Name,string Glyph)[] commands=[("lock",Strings.Simplified(nameof(Strings.Launcher_CommandLock)),"lock"),("sleep",Strings.Simplified(nameof(Strings.Launcher_CommandSleep)),"moon"),("restart",Strings.Simplified(nameof(Strings.Launcher_CommandRestart)),"restart"),("shutdown",Strings.Simplified(nameof(Strings.Launcher_CommandShutdown)),"power"),("recycle",Strings.Simplified(nameof(Strings.Launcher_CommandEmptyRecycleBin)),"trash"),("clipboard",Strings.Simplified(nameof(Strings.Launcher_CommandClipboard)),"clipboard"),("settings",Strings.Simplified(nameof(Strings.Launcher_CommandSettings)),"gear")];
         var commandEntries=commands.Select(c=>new SearchEntry("command:"+c.Id,LauncherItemKind.Command,table.Create(c.Name),c.Id is "clipboard" or "settings"?"Pane":Strings.Simplified(nameof(Strings.Launcher_CommandSubtitle)),c.Glyph)).ToArray();
-        token.ThrowIfCancellationRequested();return new(1,new(index.Apps,entries,commandEntries),index.Metrics,DateTimeOffset.UtcNow);
+        token.ThrowIfCancellationRequested();return new(IndexStorage.Version,new(index.Apps,entries,commandEntries),index.Metrics,DateTimeOffset.UtcNow);
     }
     static string FileTitle(string path){var name=Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar));return name.Length>0?name:path;}
 }
@@ -80,7 +81,13 @@ internal sealed class ProcessLauncherIndex(string directory,string? executable=n
     public Func<IconSettings> IconSettingsProvider {get;set;}=()=>new();
     public event Action<PersistedIndex>? OriginalsReady;
     string ResultPath=>Path.Combine(directory,"launcher-index.json");
-    public PersistedIndex? Load()=>File.Exists(ResultPath)?IndexStorage.Read(ResultPath):null;
+    public PersistedIndex? Load(){
+        if(!File.Exists(ResultPath))return null;
+        // 旧版快照正常失效，由宿主安排重建，不作为索引错误报告。
+        using(var document=JsonDocument.Parse(File.ReadAllText(ResultPath)))
+            if(document.RootElement.TryGetProperty("Version",out var version)&&version.TryGetInt32(out int number)&&number!=IndexStorage.Version)return null;
+        return IndexStorage.Read(ResultPath);
+    }
     public async Task<PersistedIndex> BuildAsync(FavoriteEntry[] favorites,CancellationToken token){
         await gate.WaitAsync(token).ConfigureAwait(false);
         try{

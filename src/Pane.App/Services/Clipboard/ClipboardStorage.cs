@@ -32,17 +32,19 @@ internal sealed class ClipboardLog(string directory)
 {
     static readonly object gate=new();
     internal const int Limit=256*1024;
-    public void Write(string name,Exception? error=null,string? step=null,int? count=null)
+    public void Skip(string reason,string program)=>Write("capture-skipped",step:reason,program:program);
+    public void Write(string name,Exception? error=null,string? step=null,int? count=null,string? program=null)
     {
         try{lock(gate){
             string path=Path.Combine(directory,"logs","clipboard.log");
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             // 不写 Message、StackTrace、路径或输入；事件和步骤仅由内部常量传入。
             string line=$"{DateTimeOffset.UtcNow:O} event={name}"+
-                (step==null?"":$" step={step}")+(count==null?"":$" count={count}")+
+                (program==null?"":$" program={CleanProgram(program)}")+(step==null?"":$" step={step}")+(count==null?"":$" count={count}")+
                 (error==null?"":$" type={error.GetType().Name}"+(name=="capture-failed"?"":$" hresult=0x{error.HResult:X8}"))+Environment.NewLine;
             if(File.Exists(path)&&new FileInfo(path).Length+System.Text.Encoding.UTF8.GetByteCount(line)>Limit)File.Move(path,path+".1",true);
             File.AppendAllText(path,line);
         }}catch(Exception){/* 日志介质失败不能中止监听或保存。 */}
     }
+    static string CleanProgram(string value)=>new string(value.Take(260).Select(c=>char.IsControl(c)||c==' '?'_':c).ToArray());
 }

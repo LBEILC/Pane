@@ -99,10 +99,42 @@ void unit(){
   check(!s.expired(519)&&s.expired(520),"timeout exact boundary");s.replayed();check(!s.active&&!s.pending()&&!s.typing,"replay clears state");}
  {pane::DoubleTap d;d.feed(0xA2,true,0,false,0);d.feed(0xA2,false,10,false,1);d.feed(0xA2,true,20,false,1);check(!d.feed(0xA2,false,30,false,1),"swallowed chord invalidates doubletap");}
 }
+void superUnit(){
+ using namespace pane;
+ std::array<bool,256> held{};
+ // 覆盖接管键、指定透传键和字符类别，并穷举修饰键组合。
+ for(unsigned vk:{0x25u,0x27u,13u,9u,27u,0x30u,0x31u,0x32u,0x33u,0x34u,0x35u,0x36u,0x37u,0x38u,0x39u,
+                  0x41u,0x43u,0x50u,0x52u,0x5Au,8u,0x26u,0x28u,0x20u,0x61u,0x66u,0x6Fu,0xBAu,0xDBu,0xE2u})
+  for(unsigned bits=0;bits<16;bits++){
+   PanelModifiers m{(bits&1)!=0,(bits&2)!=0,(bits&4)!=0,(bits&8)!=0};
+   PanelAction expected=PanelNone;unsigned number=0;
+   if(bits==0){
+    switch(vk){case 0x25:expected=PanelLeft;break;case 0x27:expected=PanelRight;break;
+     case 13:expected=PanelEnter;break;case 9:expected=PanelSend;break;case 27:expected=PanelEscape;break;}
+    if(vk>=0x31&&vk<=0x36){expected=PanelDigit;number=vk-0x30;}
+   }else if(bits==1){if(vk==0x43)expected=PanelCopy;else if(vk==0x52)expected=PanelRetry;}
+   PanelKeys s;s.begin(PanelMode::Super,held);
+   for(int repeat=0;repeat<3;repeat++){
+    auto r=s.feed({vk,0,true},m,0);
+    check(r.action==expected&&r.number==number&&r.swallow==(expected!=PanelNone),"super routing and repeat");
+   }
+   check(!s.typing&&s.count==0,"super never enters Type queue");
+   s.end();
+   check(s.feed({vk,0,true},m,0).swallow==(expected!=PanelNone),"super repeat after end");
+   check(s.feed({vk,0,false},m,0).swallow==(expected!=PanelNone)&&!s.pending(),"super release after end");
+  }
+ for(unsigned vk:{0xA4u,0xA5u,0x5Bu,0x5Cu}){
+  PanelKeys s;held[vk]=true;s.begin(PanelMode::Super,held);held[vk]=false;s.end();
+  check(s.feed({vk,0,false},{},0).mask&&!s.pending(),"super opening modifier mask");
+ }
+ {PanelKeys s;s.begin(PanelMode::Super,held);s.feed({0xA4,0,true},{},0);
+  check(!s.feed({0xA4,0,false},{},0).mask,"super plain Alt unchanged");}
+}
 int main(int argc,char** argv){
  if(argc<2)return 2;std::ofstream log(argv[1]);HWND window=nullptr;
  try{
   unit();log<<"unit assertions="<<checks<<std::endl;
+  auto beforeSuper=checks;superUnit();log<<"super unit assertions="<<checks-beforeSuper<<std::endl;
   wchar_t desktop[128]{};DWORD size=0;check(GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,desktop,sizeof(desktop),&size)&&wcsncmp(desktop,L"Pane027-",8)==0,"hidden desktop required");
   physical=&keys;
   WNDCLASSW wc{};wc.lpfnWndProc=receiver;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"Pane059Fixture";RegisterClassW(&wc);
@@ -110,6 +142,19 @@ int main(int argc,char** argv){
   failInstall=true;check(!PanePanelKeysBegin(window,WM_APP+59,1,1)&&!PanePanelKeysInstalled(),"hook installation failure");failInstall=false;
   auto begin=[&]{check(PanePanelKeysBegin(window,WM_APP+59,1,1)&&PanePanelKeysActive()&&PanePanelKeysInstalled(),"begin real hook");};
   begin();PanePanelKeysEnd();check(!PanePanelKeysActive()&&!PanePanelKeysInstalled(),"end uninstalls immediately");
+  check(PanePanelKeysBegin(window,WM_APP+59,1,2)&&PanePanelKeysActive(),"super native begin");
+  for(unsigned vk:{0x25u,0x27u,0x31u,0x32u,0x33u,0x34u,0x35u,0x36u,13u,9u,27u,0x43u,0x52u}){
+   keys[VK_LCONTROL]=vk==0x43||vk==0x52;notices=0;
+   check(key(vk,true)==1&&key(vk,false)==1,"super callback swallows pair");pump(5);
+   auto action=vk==0x25?pane::PanelLeft:vk==0x27?pane::PanelRight:vk==13?pane::PanelEnter:vk==9?pane::PanelSend:
+    vk==27?pane::PanelEscape:vk==0x43?pane::PanelCopy:vk==0x52?pane::PanelRetry:pane::PanelDigit;
+   auto number=action==pane::PanelDigit?vk-0x30:0;
+   check(notices==1&&lastNotice==static_cast<LPARAM>(action|(number<<8)),"super notification payload");
+  }
+  keys[VK_LCONTROL]=false;notices=0;
+  for(unsigned vk:{0x37u,0x38u,0x39u,0x41u,8u})check(key(vk,true)==0&&key(vk,false)==0,"super callback passes typing");
+  pump(5);check(notices==0&&!panelkeys::state.typing,"super callback never posts Type");
+  PanePanelKeysEnd();check(!PanePanelKeysInstalled(),"super end unhooks");notices=0;
   begin();check(key(VK_DOWN,true)==1,"callback swallows down");pump(5);check(notices==1&&lastNotice==pane::PanelDown,"post notification");
   PanePanelKeysEnd();check(PanePanelKeysInstalled(),"end retains swallowed release");check(key(VK_DOWN,false)==1,"release swallowed after end");SendMessageW(panelkeys::commandWindow,WM_NULL,0,0);pump(5);check(!PanePanelKeysInstalled(),"last release unhooks");
   keys[VK_LMENU]=true;begin();PanePanelKeysEnd();keys[VK_LMENU]=false;sent.clear();check(key(VK_LMENU,false)==1,"alt release held for mask");SendMessageW(panelkeys::commandWindow,WM_NULL,0,0);pump(5);

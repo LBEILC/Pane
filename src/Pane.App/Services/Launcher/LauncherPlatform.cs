@@ -19,10 +19,10 @@ internal static class LauncherNative
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneEverythingQuery(string query,int limit,FileRow callback);
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherOpen(string target,int packaged);
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherReveal(string path);
-    [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherCopy(string text);
+    [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherCopy(string text,int mode);
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] internal static extern int PaneLauncherCommand(int command);
 }
-internal sealed record IndexedApp(string Id,SearchName Name,string Launch,bool Packaged,string? Icon) { public string? DarkIcon {get;init;} public string? LightIcon {get;init;} public string? Target {get;init;} public string[] Arguments {get;init;}=[]; public string? PortablePath {get;init;} public Pane.Settings.PortableKind? PortableKind {get;init;} }
+internal sealed record IndexedApp(string Id,SearchName Name,string Launch,bool Packaged,string? Icon) { public SearchName[] SecondaryNames {get;init;}=[]; public string? DarkIcon {get;init;} public string? LightIcon {get;init;} public string? Target {get;init;} public string[] Arguments {get;init;}=[]; public string? PortablePath {get;init;} public Pane.Settings.PortableKind? PortableKind {get;init;} }
 internal sealed record IndexMetrics(int AppsFolder,int Shortcuts,int Filtered,int Duplicates,int Total,int Icons,double Milliseconds)
 {
     public Dictionary<string,string> Aliases {get;init;}=[];
@@ -48,7 +48,7 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
         foreach(char digit in package.AsSpan(dash+1))if(!Uri.IsHexDigit(digit))return name;
         return string.Format(Strings.Launcher_WebAppName,name);
     }
-    internal static bool IsAuxiliaryName(string name) { string lower=name.ToLowerInvariant(); return lower.Contains("uninstall")||lower.Contains("unins0")||lower.Contains("卸载")||lower.Contains("卸載")||lower.Contains("帮助")||lower.Contains("幫助")||lower.Contains("說明")||lower.Contains("readme")||lower.Contains(" help")||lower.StartsWith("help"); } // 不翻译：外部数据匹配
+    internal static bool IsAuxiliaryName(string name)=>SecondaryAppNames.Auxiliary(name);
     public AppIndex Build(PinyinTable table,CancellationToken token)
     {
         var watch=Stopwatch.StartNew();var apps=new List<IndexedApp>();var candidates=new List<CatalogEntry>();
@@ -88,7 +88,7 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
             if(iconResult!=1)iconFailures[iconResult]=iconFailures.GetValueOrDefault(iconResult)+1;
             if(image!=null){foreach(var step in steps??[])image=step.Process(image,token);icons++;}
             var origin=app.Source==2?scan.Candidates.First(c=>c.Row==app):null;
-            apps.Add(new(group.StableId,table.Create(DisplayName(app.Name,app.Id,packaged)),packaged?app.Id:app.Parsing,packaged,image){Target=app.Target,Arguments=app.Args.Length==0?[]:WindowsLauncherActionPlatform.Split("placeholder.exe "+app.Args)[1..],PortablePath=origin?.Owner,PortableKind=origin?.Kind});
+            apps.Add(new(group.StableId,table.Create(DisplayName(app.Name,app.Id,packaged)),packaged?app.Id:app.Parsing,packaged,image){SecondaryNames=SecondaryAppNames.Collect(table,DisplayName(app.Name,app.Id,packaged),app.Target,packaged),Target=app.Target,Arguments=app.Args.Length==0?[]:WindowsLauncherActionPlatform.Split("placeholder.exe "+app.Args)[1..],PortablePath=origin?.Owner,PortableKind=origin?.Kind});
             evidence.Add(new(app.Name,AppDeduplication.Key(app),group.Rows.Select(g=>g.Name).ToArray(),app.IconResource,app.IconIndex,width,height,direct));
         }
         File.WriteAllText(Path.Combine(directory,"catalog-evidence.json"),System.Text.Json.JsonSerializer.Serialize(evidence,CatalogEvidenceJson.Default.ListCatalogEvidence));
@@ -103,7 +103,7 @@ internal interface ILauncherExecutor
     Task CopyAsync(string value,CancellationToken token);
     Task CommandAsync(string id,CancellationToken token);
 }
-internal sealed class WindowsLauncherExecutor(Action<string> showPanel):ILauncherExecutor
+internal sealed class WindowsLauncherExecutor(Action<string> showPanel,Func<string,int,int>? copy=null):ILauncherExecutor
 {
     internal static void CheckResult(int result){if(result==-1223)throw new System.ComponentModel.Win32Exception(1223);if(result==0)throw new InvalidOperationException(Strings.Common_SystemOperationFailed);}
     static Task Run(Func<int> action,CancellationToken token)=>Task.Run(()=>{token.ThrowIfCancellationRequested();CheckResult(action());},token);
@@ -111,7 +111,7 @@ internal sealed class WindowsLauncherExecutor(Action<string> showPanel):ILaunche
     // 内置系统组件可能等待用户回应 UAC；保留普通文件打开的超时，组件不按该超时判失败。
     public Task OpenComponentAsync(string target,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherOpen(target,2),token);
     public Task RevealAsync(string path,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherReveal(path),token);
-    public Task CopyAsync(string value,CancellationToken token)=>Run(()=>LauncherNative.PaneLauncherCopy(value),token);
+    public Task CopyAsync(string value,CancellationToken token)=>Run(()=>(copy??LauncherNative.PaneLauncherCopy)(value,0),token);
     public Task CommandAsync(string id,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();

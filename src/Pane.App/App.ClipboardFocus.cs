@@ -53,6 +53,7 @@ public sealed partial class App
 
     void OnPanelKey(object? sender,PanelKeyPress press)
     {
+        if(SuperPanelKey(press))return;   // 超级面板不激活打开时（079）
         if(!panels.TryGetValue("clipboard",out var panel)||!panel.Shown||!panel.Passive||panel.View is not ClipboardView view){panelKeys?.End();return;}
         if(press.Key==PanelKey.Type)
         {

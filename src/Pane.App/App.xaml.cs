@@ -114,7 +114,12 @@ public sealed partial class App : Application
         if(command=="hide"){foreach(var p in panels.Values)p.Hide();settings?.Hide();HideSecondaries();gestures?.HideAll();return;}
         if(command=="show-settings"){
             if(settings==null){var view=new SettingsView();if(controlsEnabled)TrackSettings(view);settings=new(Strings.Common_Settings,view,view,Glass,true);WatchFrames(settings);settings.Hidden+=(_,_)=>{var old=settings;if(controlsEnabled&&old!=null){retiredSettings.Add(new WeakReference(old.View));retiredHosts.Add(new WeakReference(old));}settings=null;if(current==old)current=null;old?.Dispose();(Fonts as Pane.Services.FontCatalog)?.ClearCache();ReclaimAfterSettings();};settings.Prepare();}current=settings;
-        }else if(command.StartsWith("show-")&&panels.TryGetValue(command[5..],out var panel)){foreach(var other in panels.Values)if(other!=panel)other.Hide();current=panel;}
+        }else if(command.StartsWith("show-")&&panels.TryGetValue(command[5..],out var panel)){
+            // 启动器开着时呼出剪贴板：启动器不收起，剪贴板叠在上面，选的条目交给启动器（2026-11-08）
+            var keep=command=="show-clipboard"?ClipboardOverLauncher(panel):null;
+            foreach(var other in panels.Values)if(other!=panel&&other!=keep)other.Hide();current=panel;
+            if(keep!=null){panel.Show(activate:!demo);return;}
+        }
         else return;
         // 剪贴板默认不激活打开（059）；接管不了时照原来激活
         if(command=="show-clipboard"&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&ShowClipboardPassive(current))return;
@@ -133,7 +138,7 @@ public sealed partial class App : Application
         if(controlsEnabled&&Take("exit",out _)){Shutdown();return;}
         DrainTrail();
         foreach(var panel in panels.Values)panel.Tick();settings?.Tick();TickSecondaries();gestures?.Tick();
-        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");if(IsProduction&&shell!=null){var log=new CrashLog(Store.DirectoryPath);if(log.Pending() is {} crash){shell.NotifyOnce(string.Format(Strings.Common_CrashLog, crash));log.MarkNotified(crash);}}if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics))+"\n"+ModuleDiagnostics());}
+        if(!ready&&panels.Values.All(p=>p.Prepared)&&(gestures?.Panel.Prepared??true)&&wallpaperReady&&(clipboardService?.Ready.IsCompletedSuccessfully??true)){ready=true;if(!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1"&&Environment.GetEnvironmentVariable("PANE_OBSERVE")!="1"&&LaunchArguments.Parse(Environment.GetCommandLineArgs().Skip(1).ToArray())==LaunchCommand.Show)Command("show-launcher");_ = NotifyPreviousCrashAsync();if(controlsEnabled)File.WriteAllText(output+".ready",$"pid={Environment.ProcessId};panels={panels.Count};prepared=1;demo={(demo?1:0)};hotkeys={shell?.RegisteredCount??0};tray={(shell?.TrayCreated==true?1:0)};theme={(Glass.Dark?"Dark":"Light")}\n"+(shell==null?"":string.Join("\n",shell.Diagnostics))+"\n"+ModuleDiagnostics());}
         if(ready)DesignOpen();
         if(!ready||!controlsEnabled)return;
         if(pendingAck!=null){if(Settled){Ack(pendingAck);pendingAck=null;}return;}
@@ -168,9 +173,17 @@ public sealed partial class App : Application
         if(Take("save-settings",out _)){Store.Save(Store.Current);Ack("settings-saved");}
     }
     static Size Pair(string text){var parts=text.Trim().Split(',');return new(double.Parse(parts[0],System.Globalization.CultureInfo.InvariantCulture),double.Parse(parts[1],System.Globalization.CultureInfo.InvariantCulture));}
+    async Task NotifyPreviousCrashAsync(){
+        if(!IsProduction||shell==null)return;
+        await (NativeCrashRecovery.Current?.Completion??Task.CompletedTask);
+        if(closing)return;
+        var log=new CrashLog(Store.DirectoryPath);
+        if(log.Pending() is {} crash){shell.NotifyOnce(string.Format(Strings.Common_CrashLog, crash));log.MarkNotified(crash);}
+    }
     void ReportCrash(Exception exception){Environment.ExitCode=1;if(IsProduction)new CrashLog(RuntimeMode.Current.DataDirectory).Write(exception);else if(controlsEnabled)File.WriteAllText(output+".error",exception.ToString());}
     void Shutdown(){
         if(closing)return;closing=true;
+        NativeCrashRecovery.Current?.Stop();
         // 某个服务清理失败也继续释放其余钩子、热键与窗口。
         void Clean(Action action){try{action();}catch(Exception error){Environment.ExitCode=1;ReportCrash(error);}}
         Clean(()=>(Updates as IDisposable)?.Dispose());

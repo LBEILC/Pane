@@ -51,7 +51,12 @@ public sealed partial class PaneSwitch : UserControl
     public bool IsOn { get => isOn; set { if (isOn != value) { isOn = value; Animate(); } } }
     public event EventHandler<bool>? Toggled;
 
-    void Toggle() { isOn = !isOn; Animate(); Toggled?.Invoke(this, isOn); }
+    void Toggle()
+    {
+        isOn = !isOn; Animate();
+        MotionHold.Hold(GlassParameters.Token("PaneDurNormal") * ((App)Application.Current).Glass.Current.MotionSpeed);
+        Toggled?.Invoke(this, isOn);
+    }
 
     void Animate()
     {

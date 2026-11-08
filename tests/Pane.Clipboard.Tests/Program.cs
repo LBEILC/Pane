@@ -84,6 +84,7 @@ static partial class Program
         await PersistenceTests();
         await FileThumbnailTests();
         PasteTests();
+        await Capture080Tests();
         Console.WriteLine($"PASS clipboard assertions={checks};systemClipboardRead=0;systemClipboardWrite=0;listenerStopped=1");
         TestResults.Pass();
     }

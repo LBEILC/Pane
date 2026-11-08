@@ -14,8 +14,7 @@ internal static class PortableCatalog
     internal static string Id(string path)=>"app:portable:"+(Normalize(path)??path).ToUpperInvariant();
     internal static bool Auxiliary(string name)
     {
-        string lower=name.ToLowerInvariant();
-        return WindowsAppCatalog.IsAuxiliaryName(name)||new[]{"setup","install","update","updater","crash","crashpad","helper","reporter"}.Any(lower.Contains);
+        return SecondaryAppNames.PortableAuxiliary(name);
     }
     internal static string DisplayName(string path,string? description)
     {

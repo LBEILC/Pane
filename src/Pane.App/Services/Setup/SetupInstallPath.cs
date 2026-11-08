@@ -1,5 +1,8 @@
 using Pane.Localization;
 using Pane.Contracts;
+using Microsoft.Win32.SafeHandles;
+using System.Runtime.InteropServices;
+using System.Text;
 namespace Pane.Services.Setup;
 
 internal static class SetupInstallPath
@@ -9,7 +12,7 @@ internal static class SetupInstallPath
     static string FixedDisk => Strings.Setup_FixedDiskRequired;
     static string Occupied => Strings.Setup_DirectoryOccupied;
     static string TooLong => Strings.Setup_PathTooLong;
-    public static InstallPathCheck Check(string folder, bool appendPane = true, bool allowExisting = false)
+    public static InstallPathCheck Check(string folder, bool appendPane = true, bool allowExisting = false, IReadOnlyList<string>? systemDirectories = null)
     {
         string target = folder;
         try
@@ -21,13 +24,10 @@ internal static class SetupInstallPath
                 target = Path.Combine(target, "Pane");
             if (target.Length > MaxLength) return new(target, TooLong);
             if (new DriveInfo(Path.GetPathRoot(target)!).DriveType != DriveType.Fixed) return new(target, FixedDisk);
-            foreach (var special in new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86,
-                Environment.SpecialFolder.Windows, Environment.SpecialFolder.CommonApplicationData })
-            {
-                string system = Environment.GetFolderPath(special);
-                if (system.Length > 0 && (target.Equals(system, StringComparison.OrdinalIgnoreCase) ||
-                    target.StartsWith(system.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase))) return new(target, Permission);
-            }
+            systemDirectories ??= new[] { Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86,
+                Environment.SpecialFolder.Windows, Environment.SpecialFolder.CommonApplicationData }.Select(Environment.GetFolderPath).Where(p => p.Length > 0).ToArray();
+            bool Protected(string path) => systemDirectories.Any(system => Within(path, system));
+            if (Protected(target)) return new(target, Permission);
             SetupFiles.Check(target);
             if (File.Exists(target)) return new(target, Occupied);
             if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any() &&
@@ -35,6 +35,12 @@ internal static class SetupInstallPath
             // 不创建候选目录；在最近的已存在祖先中验证创建和写入权限。
             var ancestor = new DirectoryInfo(target);
             while (!ancestor.Exists) ancestor = ancestor.Parent ?? throw new IOException();
+            // 在任何写入探测之前解析真实祖先，并接回尚未创建的路径部分。
+            string resolved = Path.GetFullPath(Path.Combine(FinalPath(ancestor.FullName), Path.GetRelativePath(ancestor.FullName, target)));
+            if (resolved.StartsWith(@"\\") || new DriveInfo(Path.GetPathRoot(resolved)!).DriveType != DriveType.Fixed)
+                return new(target, FixedDisk);
+            if (Protected(resolved) || systemDirectories.Where(Directory.Exists).Any(system => Within(resolved, FinalPath(system))))
+                return new(target, Permission);
             string probe = Path.Combine(ancestor.FullName, ".pane-write-" + Guid.NewGuid().ToString("N"));
             using (var stream = new FileStream(probe, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.DeleteOnClose))
                 stream.WriteByte(0);
@@ -44,4 +50,23 @@ internal static class SetupInstallPath
         catch (Exception error) when (error is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         { return new(target, Permission); }
     }
+    static bool Within(string path, string root) => path.Equals(root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(root.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+    static string FinalPath(string path)
+    {
+        using var handle = CreateFileW(path, 0, FileShare.ReadWrite | FileShare.Delete, 0, FileMode.Open, 0x02000000, 0);
+        if (handle.IsInvalid) throw new IOException($"无法解析真实路径：{path}", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
+        var buffer = new StringBuilder(512);
+        uint length = GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Capacity, 0);
+        if (length >= buffer.Capacity)
+        { buffer.EnsureCapacity(checked((int)length + 1)); length = GetFinalPathNameByHandleW(handle, buffer, (uint)buffer.Capacity, 0); }
+        if (length == 0 || length >= buffer.Capacity) throw new IOException($"无法解析真实路径：{path}", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
+        string result = buffer.ToString();
+        return result.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase) ? @"\\" + result[8..]
+            : result.StartsWith(@"\\?\") ? result[4..] : result;
+    }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    static extern SafeFileHandle CreateFileW(string path, uint access, FileShare share, nint security, FileMode mode, uint flags, nint template);
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    static extern uint GetFinalPathNameByHandleW(SafeFileHandle handle, StringBuilder path, uint length, uint flags);
 }

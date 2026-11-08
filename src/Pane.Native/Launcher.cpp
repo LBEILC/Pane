@@ -193,8 +193,8 @@ API int PaneLauncherOpen(const wchar_t* target,int packaged){
  catch(...) {return 0;}
 }
 API int PaneLauncherReveal(const wchar_t* path){Apartment apartment;PIDLIST_ABSOLUTE item=nullptr;if(FAILED(SHParseDisplayName(path,nullptr,&item,0,nullptr)))return 0;auto hr=SHOpenFolderAndSelectItems(item,0,nullptr,0);CoTaskMemFree(item);return SUCCEEDED(hr);}
-extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int);
-API int PaneLauncherCopy(const wchar_t* value){return PaneClipWrite(value,nullptr,nullptr,0); }
+extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int,int);
+API int PaneLauncherCopy(const wchar_t* value,int mode){return PaneClipWrite(value,nullptr,nullptr,0,mode); }
 API int PaneLauncherCommand(int command){
  if(command==0)return LockWorkStation();if(command==1)return SetSuspendState(FALSE,FALSE,FALSE);
  if(command==5)return ExitWindowsEx(EWX_LOGOFF,SHTDN_REASON_MAJOR_APPLICATION|SHTDN_REASON_FLAG_PLANNED);

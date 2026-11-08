@@ -3,6 +3,8 @@ using System.Runtime.InteropServices;
 using System.Text;
 namespace Pane.Services.Clipboard;
 
+internal enum ClipboardWriteMode { UserCopy, HistoryPaste }
+
 public sealed class ClipboardTargetClosedException():InvalidOperationException("目标窗口已关闭"); // 不翻译：类型化异常
 public sealed class ClipboardPermissionException():UnauthorizedAccessException("系统拒绝向更高完整性级别的窗口输入"); // 不翻译：类型化异常
 public sealed class ClipboardFocusException():InvalidOperationException("没能切回原来的窗口，内容已经复制好了，按 Ctrl+V 就能贴"); // 不翻译：类型化异常

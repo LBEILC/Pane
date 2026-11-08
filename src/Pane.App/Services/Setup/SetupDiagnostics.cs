@@ -22,13 +22,13 @@ internal static class SetupDiagnostics
         try
         {
             string logs = Path.Combine(data, "logs");
-            SetupFiles.Check(logs);
             Directory.CreateDirectory(logs);
             string name = $"setup-{DateTime.UtcNow:yyyyMMdd-HHmmss-fffffff}-{Guid.NewGuid():N}.txt";
+            SetupFiles.Check(Path.Combine(logs, name));
             File.WriteAllText(Path.Combine(logs, name),
                 $"UTC: {DateTime.UtcNow:O}\nStep: {step}\nSource: {source}\nTarget: {target}\nType: {error.GetType().FullName}\nHResult: 0x{error.HResult:X8}\n{error}\n");
             foreach (string file in Directory.GetFiles(logs, "setup-*.txt").OrderByDescending(Path.GetFileName).Skip(10))
-                File.Delete(file);
+            { SetupFiles.Check(file); File.Delete(file); }
         }
         catch (Exception logError) when (logError is IOException or UnauthorizedAccessException)
         { /* 记录失败不能遮盖原始安装错误，也不能阻止回滚。 */ }

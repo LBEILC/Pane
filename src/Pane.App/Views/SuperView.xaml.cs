@@ -331,22 +331,43 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
     void OnKeyDown(object sender, KeyRoutedEventArgs e)
     {
         bool Down(VirtualKey k) => InputKeyboardSource.GetKeyStateForCurrentThread(k).HasFlag(CoreVirtualKeyStates.Down);
-        var ctrl = Down(VirtualKey.Control);
+        if (HandleKey(e.Key, Down(VirtualKey.Control))) e.Handled = true;
+    }
+
+    /// <summary>不激活打开时（079），全局键盘钩子拦下的键由宿主转到这里，和面板激活时按键效果一样。</summary>
+    public void HandleKey(PanelKeyPress press)
+    {
+        _ = press.Key switch
+        {
+            PanelKey.Left => HandleKey(VirtualKey.Left, false),
+            PanelKey.Right => HandleKey(VirtualKey.Right, false),
+            PanelKey.Digit when press.Number is >= 1 and <= 6 => HandleKey(VirtualKey.Number1 + (press.Number - 1), false),
+            PanelKey.Enter => HandleKey(VirtualKey.Enter, false),
+            PanelKey.Copy => HandleKey(VirtualKey.C, true),
+            PanelKey.Retry => HandleKey(VirtualKey.R, true),
+            PanelKey.Send => HandleKey(VirtualKey.Tab, false),
+            PanelKey.Escape => HandleKey(VirtualKey.Escape, false),
+            _ => false,
+        };
+    }
+
+    bool HandleKey(VirtualKey key, bool ctrl)
+    {
         var hasResult = ResultArea.Visibility == Visibility.Visible && Card.Result.Length > 0;
-        switch (e.Key)
+        switch (key)
         {
             case VirtualKey.Left when current.Text is not null || files is not null: Select(selected - 1); break;
             case VirtualKey.Right when current.Text is not null || files is not null: Select(selected + 1); break;
-            case >= VirtualKey.Number1 and <= VirtualKey.Number6 when !ctrl: _ = Execute(e.Key - VirtualKey.Number1); break;
+            case >= VirtualKey.Number1 and <= VirtualKey.Number6 when !ctrl: _ = Execute(key - VirtualKey.Number1); break;
             case VirtualKey.Enter when hasResult: _ = Replace(); break;
             case VirtualKey.Enter: _ = Execute(selected); break;
             case VirtualKey.C when ctrl && hasResult: _ = actions.CopyAsync(Card.Result, CancellationToken.None); break;
             case VirtualKey.R when ctrl && ResultArea.Visibility == Visibility.Visible: Card.Retry(); break;
             case VirtualKey.Tab when current.Text is { } t && (autoMode || ResultArea.Visibility == Visibility.Visible && cardAction == "translate"): OpenTranslate?.Invoke(t); break;
             case VirtualKey.Escape: CloseRequested?.Invoke(this, EventArgs.Empty); break;
-            default: return;
+            default: return false;
         }
-        e.Handled = true;
+        return true;
     }
 
     async Task Replace()

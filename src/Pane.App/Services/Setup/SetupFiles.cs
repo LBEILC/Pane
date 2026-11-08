@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Pane.Services.Setup;
 
 // 安装器内部文件边界；拒绝链接，避免递归操作越过目标目录。
@@ -6,20 +8,51 @@ internal static class SetupFiles
     public static string Full(string path) => Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
     public static void Check(string path)
     {
-        for (var part = new DirectoryInfo(Full(path)); part != null; part = part.Parent)
-            if (part.Exists && (part.Attributes & FileAttributes.ReparsePoint) != 0)
-                throw new IOException("安装目录不能经过链接"); // 不翻译：内部异常
-        if (File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
-            throw new IOException("安装文件不能是链接"); // 不翻译：内部异常
+        if (IsLink(path)) throw new IOException($"对象本身是链接：{path}"); // 不翻译：内部异常
     }
+    static bool IsLink(string path)
+    {
+        try { if ((File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0) return false; }
+        catch (FileNotFoundException) { return false; }
+        catch (DirectoryNotFoundException) { return false; }
+        // 查对象自身的 tag，不打开目标或读取云文件内容；云占位符不属于名称代理。
+        nint handle = FindFirstFileW(Path.TrimEndingDirectorySeparator(Path.GetFullPath(path)), out var data);
+        if (handle == -1)
+        {
+            int error = Marshal.GetLastWin32Error();
+            if (error is 2 or 3) return false;
+            throw new IOException($"无法读取重解析标记：{path}", new System.ComponentModel.Win32Exception(error));
+        }
+        try { return (data.Attributes & FileAttributes.ReparsePoint) != 0 && IsNameSurrogate(data.ReparseTag); }
+        finally { FindClose(handle); }
+    }
+    internal static bool IsNameSurrogate(uint tag) => (tag & 0x20000000u) != 0;
+
+    // WIN32_FIND_DATAW 共 592 字节；只读取属性和 dwReserved0，保留其余字段空间。
+    [StructLayout(LayoutKind.Explicit, Size = 592)]
+    struct FindData
+    {
+        [FieldOffset(0)] public FileAttributes Attributes;
+        [FieldOffset(36)] public uint ReparseTag;
+    }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, ExactSpelling = true, SetLastError = true)]
+    static extern nint FindFirstFileW(string path, out FindData data);
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    static extern bool FindClose(nint handle);
     public static void Copy(string source, string destination)
     {
-        Check(source); Check(destination);
+        ValidateTree(source); Check(destination);
+        if (Directory.Exists(destination)) ValidateTree(destination);
+        CopyTree(source, destination);
+    }
+    static void CopyTree(string source, string destination)
+    {
         Directory.CreateDirectory(destination);
         foreach (string file in Directory.GetFiles(source))
         { Check(file); File.Copy(file, Path.Combine(destination, Path.GetFileName(file))); }
         foreach (string directory in Directory.GetDirectories(source))
-            Copy(directory, Path.Combine(destination, Path.GetFileName(directory)));
+            CopyTree(directory, Path.Combine(destination, Path.GetFileName(directory)));
     }
     public static void Delete(string path)
     {
@@ -33,13 +66,21 @@ internal static class SetupFiles
     {
         Check(path);
         foreach (string item in Directory.EnumerateFileSystemEntries(path))
-        { Check(item); if (Directory.Exists(item)) ValidateTree(item); }
+        {
+            if (IsLink(item)) throw new IOException($"树里有链接：{item}（目录：{path}）"); // 不翻译：内部异常
+            if (Directory.Exists(item)) ValidateTree(item);
+        }
     }
     public static long Size(string path)
     {
         if (!Directory.Exists(path)) return 0;
-        ValidateTree(path);
-        return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length);
+        long size = 0;
+        foreach (string item in Directory.EnumerateFileSystemEntries(path))
+        {
+            if (IsLink(item)) continue;
+            size += Directory.Exists(item) ? Size(item) : new FileInfo(item).Length;
+        }
+        return size;
     }
     public static string? VersionOf(string exe)
     {

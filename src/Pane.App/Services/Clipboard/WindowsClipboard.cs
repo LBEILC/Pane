@@ -12,6 +12,9 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
     NativeClip.Callback? callback;
     nint listener;
     uint lastSequence;
+    readonly object gate=new();
+    CancellationTokenSource? pending;
+    Task work=Task.CompletedTask;
     public bool Registered {get;private set;}
     public bool Removed {get;private set;}=true;
     public int Notifications {get;private set;}
@@ -21,45 +24,83 @@ internal sealed class WindowsClipboardSource(SettingsStore settings,bool observe
     void OnChange(uint sequence)
     {
         Notifications++;
-        // 观察模式在任何内容/来源 API 前返回，自测只统计系统通知。
-        if(observe||!settings.Current.Clipboard.Enabled||sequence==lastSequence)return;
+        // 观察模式不读取内容或来源。
+        if(observe||sequence==lastSequence)return;
         lastSequence=sequence;
-        if(ClipboardHistorySuppression.TryConsume(sequence))return;
-        bool opened=false;
-        try {
-            for(int i=0;i<5&&!opened;i++){opened=NativeClip.OpenClipboard(0);if(!opened)Thread.Sleep(15);}
-            if(!opened||SelectionNative.GetClipboardSequenceNumber()!=sequence)return;
-            bool own=Has("Pane.OwnClipboard"),exclude=Has("ExcludeClipboardContentFromMonitorProcessing");
-            int? history=Flag("CanIncludeInClipboardHistory"),cloud=Flag("CanUploadToCloudClipboard");
-            var s=settings.Current.Clipboard;
-            if(own||s.HonorExcludeMarker&&(exclude||history==0||cloud==0))return;
-            string program="",display="",path="";
+        lock(gate){
+            pending?.Cancel();
+            var cancellation=new CancellationTokenSource();pending=cancellation;
+            bool suppressed=ClipboardHistorySuppression.TryConsume(sequence);
+            Task previous=work;
+            work=Task.Run(async()=>{
+                try{
+                    await previous.ConfigureAwait(false);
+                    var capture=new ClipboardCapture(new WindowsClipboardCapture(settings),()=>settings.Current.Clipboard,
+                        new ClipboardLog(settings.DirectoryPath),c=>Captured?.Invoke(c),
+                        action=>Sta.Run(()=>{action();return true;}),failed:()=>Failures++);
+                    await capture.Capture(sequence,cancellation.Token,suppressed).ConfigureAwait(false);
+                }finally{lock(gate){if(pending==cancellation)pending=null;cancellation.Dispose();}}
+            });
+        }
+    }
+    public void Dispose()=>Stop();
+    public void Stop(){
+        if(listener==0)return;
+        Removed=NativeClip.PaneClipStop(listener,out int count)==1;Notifications=count;listener=0;Registered=false;
+        Task remaining;lock(gate){pending?.Cancel();remaining=work;}
+        remaining.GetAwaiter().GetResult();GC.KeepAlive(callback);
+    }
+}
+internal sealed class WindowsClipboardCapture(SettingsStore settings):IClipboardCapturePlatform
+{
+    string path="",display="";
+    public uint Sequence=>SelectionNative.GetClipboardSequenceNumber();
+    public bool Open()=>NativeClip.OpenClipboard(0);
+    public void Close()=>NativeClip.CloseClipboard();
+    public string Program {
+        get{
+            path="";display="";
             NativeClip.GetWindowThreadProcessId(NativeClip.GetClipboardOwner(),out uint pid);
-            if(pid!=0){try{using var process=Process.GetProcessById((int)pid);path=process.MainModule?.FileName??"";program=Path.GetFileName(path);display=FileVersionInfo.GetVersionInfo(path).FileDescription??program;}catch(Exception e) when(e is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException){}}
-            if(s.ExcludedPrograms.Contains(program,StringComparer.OrdinalIgnoreCase)||s.ExcludedPrograms.Length>0&&program.Length==0)return;
-            string? text=null;string[]? files=null;byte[]? png=null;
-            if(NativeClip.IsClipboardFormatAvailable(15)){
-                if(!s.RecordFiles)return;var handle=NativeClip.GetClipboardData(15);uint count=NativeClip.DragQueryFileW(handle,uint.MaxValue,null,0);files=new string[count];
-                for(uint i=0;i<count;i++){var name=new StringBuilder((int)NativeClip.DragQueryFileW(handle,i,null,0)+1);NativeClip.DragQueryFileW(handle,i,name,(uint)name.Capacity);files[i]=name.ToString();}
-            }else if(Has("PNG")||NativeClip.IsClipboardFormatAvailable(17)||NativeClip.IsClipboardFormatAvailable(8)){
-                if(!s.RecordImages)return;if(NativeClip.PaneClipImageAlloc(out var bytes,out int length)!=1)return;
-                try{png=new byte[length];Marshal.Copy(bytes,png,0,length);}finally{Marshal.FreeCoTaskMem(bytes);}
-            }else if(s.RecordText&&NativeClip.IsClipboardFormatAvailable(13)){
-                var handle=NativeClip.GetClipboardData(13);var p=NativeClip.GlobalLock(handle);if(p!=0){try{int chars=checked((int)(NativeClip.GlobalSize(handle)/2));text=Marshal.PtrToStringUni(p,chars)?.TrimEnd('\0');}finally{NativeClip.GlobalUnlock(handle);}}
-            }
-            NativeClip.CloseClipboard();opened=false;
-            if(!settings.Current.Clipboard.Enabled)return;
-            string? icon=null;
-            if(path.Length>0){string cache=Path.Combine(settings.DirectoryPath,"clipboard","icons");Directory.CreateDirectory(cache);string target=Path.Combine(cache,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path)))+".png");
-                if(File.Exists(target)||NativeClip.PaneClipSourceIcon(path,target)==1)icon=target;
-            }
-            Captured?.Invoke(new(text,files,png,program,string.IsNullOrWhiteSpace(display)?program:display,icon,exclude,history,cloud,own));
-        }catch(Exception e){Failures++;new ClipboardLog(settings.DirectoryPath).Write("capture-failed",e);}finally{if(opened)NativeClip.CloseClipboard();}
+            if(pid!=0)try{using var process=Process.GetProcessById((int)pid);path=process.MainModule?.FileName??"";display=FileVersionInfo.GetVersionInfo(path).FileDescription??"";}
+            catch(Exception e) when(e is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException){}
+            return Path.GetFileName(path);
+        }
+    }
+    public ClipboardContent Metadata(){
+        string program=Program;
+        // 写入方的临时 owner 窗口会销毁，单独的来源格式只负责归属，不抑制历史。
+        if(Has("Pane.SourceClipboard")||Has("Pane.OwnClipboard")){program="Pane.exe";display="Pane";path=Environment.ProcessPath??"";}
+        return new(Program:program,Source:string.IsNullOrWhiteSpace(display)?program:display,
+            Own:Has("Pane.OwnClipboard"),Exclude:Has("ExcludeClipboardContentFromMonitorProcessing"),
+            History:Flag("CanIncludeInClipboardHistory"),Cloud:Flag("CanUploadToCloudClipboard"));
+    }
+    public string Kind=>NativeClip.IsClipboardFormatAvailable(15)?"files":
+        Has("PNG")||NativeClip.IsClipboardFormatAvailable(17)||NativeClip.IsClipboardFormatAvailable(8)?"image":
+        NativeClip.IsClipboardFormatAvailable(13)?"text":"";
+    public ClipboardContent Read(ClipboardContent metadata){
+        string? text=null;string[]? files=null;byte[]? png=null;
+        if(Kind=="files"){
+            var handle=NativeClip.GetClipboardData(15);uint count=NativeClip.DragQueryFileW(handle,uint.MaxValue,null,0);files=new string[count];
+            for(uint i=0;i<count;i++){var name=new StringBuilder((int)NativeClip.DragQueryFileW(handle,i,null,0)+1);NativeClip.DragQueryFileW(handle,i,name,(uint)name.Capacity);files[i]=name.ToString();}
+        }else if(Kind=="image"){
+            if(NativeClip.PaneClipImageAlloc(out var bytes,out int length)!=1)throw new InvalidDataException();
+            try{png=new byte[length];Marshal.Copy(bytes,png,0,length);}finally{Marshal.FreeCoTaskMem(bytes);}
+        }else if(Kind=="text"){
+            var handle=NativeClip.GetClipboardData(13);var p=NativeClip.GlobalLock(handle);
+            if(p==0)throw new InvalidDataException();
+            try{int chars=checked((int)(NativeClip.GlobalSize(handle)/2));text=Marshal.PtrToStringUni(p,chars)?.TrimEnd('\0');}finally{NativeClip.GlobalUnlock(handle);}
+        }
+        return metadata with{Text=text,Files=files,Png=png};
+    }
+    public ClipboardContent Complete(ClipboardContent content){
+        string? icon=null;
+        if(path.Length>0){string cache=Path.Combine(settings.DirectoryPath,"clipboard","icons");Directory.CreateDirectory(cache);string target=Path.Combine(cache,Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path)))+".png");
+            if(File.Exists(target)||NativeClip.PaneClipSourceIcon(path,target)==1)icon=target;
+        }
+        return content with{Icon=icon};
     }
     static bool Has(string name)=>NativeClip.IsClipboardFormatAvailable(NativeClip.RegisterClipboardFormatW(name));
     static int? Flag(string name){uint format=NativeClip.RegisterClipboardFormatW(name);if(!NativeClip.IsClipboardFormatAvailable(format))return null;var handle=NativeClip.GetClipboardData(format);if(NativeClip.GlobalSize(handle)<4)return 0;var p=NativeClip.GlobalLock(handle);if(p==0)return 0;try{return Marshal.ReadInt32(p);}finally{NativeClip.GlobalUnlock(handle);}}
-    public void Dispose()=>Stop();
-    public void Stop(){if(listener==0)return;Removed=NativeClip.PaneClipStop(listener,out int count)==1;Notifications=count;listener=0;Registered=false;GC.KeepAlive(callback);}
 }
 internal sealed class WindowsClipboardImages:IClipboardImages
 {
@@ -94,31 +135,31 @@ internal sealed class WindowsClipboardImages:IClipboardImages
         }finally{File.Delete(input);File.Delete(temporary);File.Delete(small);}
     }
 }
-internal sealed class WindowsClipboardWriter:IClipboardWriter
+internal sealed class WindowsClipboardWriter(Action<ClipEntry,ClipboardWriteMode,bool>? write=null,Func<IPastePlatform>? paste=null):IClipboardWriter
 {
     public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)
     {
-        long started=Environment.TickCount64; var platform=new Pane.Services.Clipboard.WindowsPastePlatform();
-        return Sta.Run(()=>{new PasteTransfer(platform,PasteTransfer.WriteLog).Run(target,()=>Write(entry,plainText),token,started);return true;});
+        long started=Environment.TickCount64; var platform=paste?.Invoke()??new WindowsPastePlatform();
+        return Sta.Run(()=>{new PasteTransfer(platform,PasteTransfer.WriteLog).Run(target,()=>(write??Write)(entry,ClipboardWriteMode.HistoryPaste,plainText),token,started);return true;});
     }
-    internal static void Write(ClipEntry entry,bool plainText=false)
+    internal static void Write(ClipEntry entry,ClipboardWriteMode mode,bool plainText=false)
     {
         string? files=null,image=null,text=entry.Text;
         // TODO(design): 图片没有文本时，纯文本粘贴保守地报告不支持；由设计决定是否禁用该入口。
         if(plainText){text=entry.Kind==ClipKind.Files?string.Join(Environment.NewLine,entry.Files??[]):entry.Text;if(text==null)throw new NotSupportedException(Strings.Clipboard_NoPlainText);}
         else if(entry.Kind==ClipKind.Image){image=entry.ContentPath??throw new InvalidDataException(Strings.Clipboard_ImageMissing);text=null;}
         else if(entry.Kind==ClipKind.Files){files=string.Join('\0',entry.Files??[])+"\0\0";text=null;}
-        if(NativeClip.PaneClipWrite(text,image,files,files?.Length??0)!=1)throw new TimeoutException(Strings.Clipboard_WriteFailed);
+        if(NativeClip.PaneClipWrite(text,image,files,files?.Length??0,mode)!=1)throw new TimeoutException(Strings.Clipboard_WriteFailed);
     }
 }
-internal sealed class ClipboardAttachmentActions(ILauncherAttachmentActions other):ILauncherAttachmentActions
+internal sealed class ClipboardAttachmentActions(ILauncherAttachmentActions other,Action<ClipEntry,ClipboardWriteMode,bool>? write=null):ILauncherAttachmentActions
 {
     public Task RunAsync(string actionId,ClipEntry attachment,CancellationToken token)
     {
         if(attachment.Kind!=ClipKind.Image)return other.RunAsync(actionId,attachment,token);
         return Sta.Run(()=>{token.ThrowIfCancellationRequested();
             switch(actionId){
-                case "copy-image":WindowsClipboardWriter.Write(attachment);break;
+                case "copy-image":(write??WindowsClipboardWriter.Write)(attachment,ClipboardWriteMode.UserCopy,false);break;
                 case "save-image":if(attachment.ContentPath==null)throw new InvalidDataException(Strings.Clipboard_ImageMissing);if(NativeClip.PaneClipSaveDialog(attachment.ContentPath,string.Format(Strings.Clipboard_ImageFileName, (object?)(attachment.CopiedAt.LocalDateTime)))==0)throw new IOException(Strings.Clipboard_SaveImageFailed);break;
                 default:throw new NotSupportedException(actionId);
             }return true;
@@ -134,7 +175,7 @@ internal static class NativeClip
     [DllImport(Dll)] internal static extern int PaneClipStop(nint listener,out int count);
     [DllImport(Dll)] internal static extern int PaneClipImageAlloc(out nint output,out int length);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveImage(string input,string? full,string thumb,out int width,out int height);
-    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars);
+    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars,ClipboardWriteMode mode);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveDialog(string source,string name);
     [DllImport("user32.dll")] internal static extern bool OpenClipboard(nint owner);
     [DllImport("user32.dll")] internal static extern bool CloseClipboard();

@@ -181,26 +181,43 @@ public sealed partial class SettingsView
         // 更新日志：随安装包带着的历代说明，版本列表，点一行展开那一版（默认展开当前运行的版本）
         if (app.ReleaseHistory is { All.Count: > 0 } history)
         {
-            if (PendingChangelog is { } wanted) { PendingChangelog = null; changelogOpen = true; changelogVersion = history.Find(wanted)?.Version ?? history.All[0].Version; }
+            if (PendingChangelog is { } wanted) { PendingChangelog = null; changelogOpen = true; revealKey = "changelog"; changelogVersion = history.Find(wanted)?.Version ?? history.All[0].Version; }
+            // 展开 / 收起走组件库的 Reveal / Collapse（2026-11-08 用户反馈没有动画）
+            void ToggleChangelog()
+            {
+                if (changelogOpen) { Collapse("changelog", () => { changelogOpen = false; Render(); }); return; }
+                changelogOpen = true; revealKey = "changelog";
+                changelogVersion ??= history.Find(u.CurrentVersion)?.Version ?? history.All[0].Version;
+                Render();
+            }
+            designToggles["changelog"] = ToggleChangelog;
             rows.Add(Row(Strings.Update_Changelog, string.Format(Strings.Update_ChangelogDescription, (object?)history.All[^1].Version),
-                Button(changelogOpen ? Strings.Common_Collapse : Strings.Update_ChangelogOpen, null, () =>
-                {
-                    changelogOpen = !changelogOpen;
-                    changelogVersion ??= history.Find(u.CurrentVersion)?.Version ?? history.All[0].Version;
-                    Render();
-                })));
-            if (changelogOpen)
-                foreach (var n in history.All)
-                {
-                    bool current = SameVersion(n.Version, u.CurrentVersion), open = changelogVersion == n.Version;
-                    var label = current ? string.Format(Strings.Update_CurrentTag, (object?)n.Version) : n.Version;
-                    var desc = n.Date is { } date ? $"{date:yyyy-MM-dd} · {Summary(n)}" : Summary(n);
-                    var toggle = IconButton("chev-d", open ? Strings.Common_Collapse : Strings.Update_ChangelogOpen, () => { changelogVersion = open ? "" : n.Version; Render(); });
-                    if (open) toggle.Content = new PaneIcon { Glyph = "chev-d", Width = 16, Height = 16, Foreground = IconProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = 180 } };
-                    rows.Add(Row(label, desc, toggle));
-                    if (open) rows.Add(new Border { Padding = new Thickness(14, 0, 14, 12), Child = NotesBlock(n, int.MaxValue, null) });
-                }
+                Button(changelogOpen ? Strings.Common_Collapse : Strings.Update_ChangelogOpen, null, ToggleChangelog)));
+            if (changelogOpen) rows.Add(Reveal("changelog", history.All.Select(ChangelogVersion)));
         }
         Group(Strings.Update_Title, rows.ToArray());
+
+        // 一版：版本行 + 展开的说明在同一行里（中间不画分隔线），箭头转 180°
+        FrameworkElement ChangelogVersion(ReleaseNotes n)
+        {
+            bool current = SameVersion(n.Version, u.CurrentVersion), open = changelogVersion == n.Version;
+            string key = "changelog:" + n.Version;
+            bool opening = open && revealKey == key;
+            var label = current ? string.Format(Strings.Update_CurrentTag, (object?)n.Version) : n.Version;
+            var desc = n.Date is { } date ? $"{date:yyyy-MM-dd} · {Summary(n)}" : Summary(n);
+            var chevron = new PaneIcon { Glyph = "chev-d", Width = 16, Height = 16, Foreground = IconProto.Foreground, RenderTransformOrigin = new Point(0.5, 0.5), RenderTransform = new RotateTransform { Angle = open && !opening ? 180 : 0 } };
+            if (opening) chevron.Loaded += (_, _) => SpinChevron(chevron, 180);
+            void Toggle()
+            {
+                if (open) { SpinChevron(chevron, 0); Collapse(key, () => { changelogVersion = ""; Render(); }); return; }
+                changelogVersion = n.Version; revealKey = key; Render();
+            }
+            var toggle = IconButton("chev-d", open ? Strings.Common_Collapse : Strings.Update_ChangelogOpen, Toggle);
+            toggle.Content = chevron;
+            var item = new StackPanel();
+            item.Children.Add(Row(label, desc, toggle));
+            if (open) item.Children.Add(Reveal(key, [new Border { Padding = new Thickness(14, 2, 14, 14), Child = NotesBlock(n, int.MaxValue, null) }]));
+            return item;
+        }
     }
 }

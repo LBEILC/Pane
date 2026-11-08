@@ -84,7 +84,7 @@ LRESULT CALLBACK keyboard(int code,WPARAM kind,LPARAM data){
  if(r.swallow&&down)pane::panelKeySerial++;
  return r.swallow?1:CallNextHookEx(nullptr,code,kind,data);
 }
-struct Request {HWND recipient;UINT message;WPARAM generation;bool send;};
+struct Request {HWND recipient;UINT message;WPARAM generation;pane::PanelMode mode;};
 LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){
  if(m==Begin){
   if(state.count)drain(true);state.end();
@@ -98,7 +98,7 @@ LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){
    installed=true;
   }
   std::array<bool,256> pressed{};for(unsigned k:{VK_LMENU,VK_RMENU,VK_LWIN,VK_RWIN})pressed[k]=held(k);
-  state.begin(r.send,pressed);taking=true;return 1;
+  state.begin(r.mode,pressed);taking=true;return 1;
  }
  if(m==End){state.end();if(state.count)drain(true);retire();return 0;}
  if(m==Replay){if(state.active&&state.typing)drain(true);return 0;}
@@ -137,8 +137,8 @@ bool ensure(){
 }
 }
 // 宿主 UI 线程串行调用；同步等待仅在控制路径，回调不获取锁。
-API int PanePanelKeysBegin(HWND recipient,UINT message,WPARAM generation,int send){
- using namespace panelkeys;if(!ensure())return 0;Request r{recipient,message,generation,send!=0};return static_cast<int>(SendMessageW(commandWindow,Begin,0,reinterpret_cast<LPARAM>(&r)));
+API int PanePanelKeysBegin(HWND recipient,UINT message,WPARAM generation,int mode){
+ using namespace panelkeys;if(!ensure())return 0;Request r{recipient,message,generation,static_cast<pane::PanelMode>(mode)};return static_cast<int>(SendMessageW(commandWindow,Begin,0,reinterpret_cast<LPARAM>(&r)));
 }
 API void PanePanelKeysEnd(){using namespace panelkeys;if(commandWindow)SendMessageW(commandWindow,End,0,0);}
 API void PanePanelKeysReplay(){using namespace panelkeys;if(commandWindow)SendMessageW(commandWindow,Replay,0,0);}

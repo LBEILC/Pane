@@ -104,13 +104,22 @@ public sealed partial class SettingsView
             paths => { foreach (var p in paths) AddFavorite(new FavoriteEntry(p, Directory.Exists(p)), render: false); Render(); });
 
         // 便携软件（057，issue 19）：文件夹（扫描本身和下一层）/ 单个程序，能拖进来；最后一行「记住用 Pane 打开过的程序」。
-        // 记住的程序不逐条列出（最多 100 个），只显示个数；单独移除在启动器里 Ctrl+K
+        // 记住的程序（最多 100 个）默认收起，点「查看」展开逐条列出、单独移除（2026-11-08 用户要）
         var scan = PortableApps ?? PortableAppsSample.Instance;
         var portable = l.Portable.Where(p => p.Kind != PortableKind.Learned).Select(p => PortableRow(p, scan)).ToList<FrameworkElement>();
         portable.Add(AddRow(
             Button(Strings.Settings_Launcher_AddFolder, "folder-plus", async () => { if (await PickFavorite(true) is { } e) AddPortable([e.Path]); }),
             Button(Strings.Settings_Launcher_AddProgram, "plus", async () => { if (await PickPortableProgram() is { } path) AddPortable([path]); })));
-        var learned = l.Portable.Count(p => p.Kind == PortableKind.Learned);
+        var learnedEntries = l.Portable.Where(p => p.Kind == PortableKind.Learned).OrderByDescending(p => p.AddedAt).ToList();
+        var learned = learnedEntries.Count;
+        if (learned == 0) learnedOpen = false;
+        void ToggleLearned()
+        {
+            if (learnedOpen) Collapse("learned", () => { learnedOpen = false; Render(); });
+            else { learnedOpen = true; revealKey = "learned"; Render(); }
+        }
+        designToggles["learned"] = ToggleLearned;
+        var showLearned = Button(learnedOpen ? Strings.Common_Collapse : Strings.Settings_Launcher_ShowRemembered, learnedOpen ? "chev-d" : "chev-r", ToggleLearned);
         // 清空要点两次（同剪贴板「清空历史」）
         var clearLearned = Button(learnedArmed ? Strings.Settings_Clipboard_ConfirmClear : Strings.Common_Clear, null, () =>
         {
@@ -123,8 +132,18 @@ public sealed partial class SettingsView
         portable.Add(Row(Strings.Settings_Launcher_RememberOpened,
             learnedArmed ? Strings.Settings_Launcher_ClearRememberedWarning
                 : learned > 0 ? string.Format(Strings.Settings_Launcher_RememberedCount, (object?)learned) : Strings.Settings_Launcher_RememberOpenedDescription,
-            learned > 0 ? new FrameworkElement[] { clearLearned, remember } : [remember]));
+            learned > 0 ? new FrameworkElement[] { showLearned, clearLearned, remember } : [remember]));
+        if (learnedOpen)
+            portable.Add(Reveal("learned", learnedEntries.Select(p => ListRow("app", Path.GetFileNameWithoutExtension(p.Path), p.Path, false,
+                IconButton("close", Strings.Common_Remove, () => { SaveLauncher(x => x with { Portable = x.Portable.Where(e => e != p).ToArray() }); Render(); }))).ToArray()));
         Group(Strings.Settings_Launcher_Portable, portable.ToArray(), portableNote ?? Strings.Settings_Launcher_PortableDescription, AddPortable);
+
+        // 搜索别名（078，issue 33）：在启动器里设（Ctrl+K →「设置搜索别名」），这里集中看、单个删；找不到的应用也列出来
+        var aliasList = (AppAliases?.All() ?? []).Select(a => ListRow(AppIcon(a.IconPath), Text(a.Name, LabelProto),
+            a.Missing ? string.Format(Strings.Settings_Launcher_AliasAppMissing, (object?)string.Join(" · ", a.Aliases)) : string.Join(" · ", a.Aliases), false,
+            IconButton("close", Strings.Common_Remove, () => { AppAliases?.Set(a.AppId, []); Render(); }))).ToList<FrameworkElement>();
+        if (aliasList.Count == 0) aliasList.Add(Row(Strings.Settings_Launcher_AliasesEmpty, null));
+        Group(Strings.Settings_Launcher_Aliases, aliasList.ToArray(), Strings.Settings_Launcher_AliasesDescription);
 
         var engines = l.SearchEngines.Select(e =>
         {
@@ -200,6 +219,7 @@ public sealed partial class SettingsView
 
     /// <summary>扫描状态。工程在启动器能力装配时设（057）；没设时用演示数据。</summary>
     internal static IPortableAppsStatus? PortableApps { get; set; }
+    internal static IAppAliases? AppAliases { get; set; }
 
     FrameworkElement PortableRow(PortableEntry p, IPortableAppsStatus scan)
     {
@@ -239,7 +259,7 @@ public sealed partial class SettingsView
     }
 
     string? portableNote;
-    bool learnedArmed;
+    bool learnedArmed, learnedOpen;
 
     async Task ClearPortableNote()
     {

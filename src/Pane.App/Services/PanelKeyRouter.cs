@@ -34,12 +34,14 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
         return window != 0;
     }
     public bool Begin(nint target, bool sendEnabled)
+        => Begin(target, sendEnabled ? PanelKeyMode.ClipboardWithSend : PanelKeyMode.Clipboard);
+    public bool Begin(nint target, PanelKeyMode mode)
     {
         if (disposed) return false;
         End();
         if (target == 0 || !platform.Exists(target) || platform.Higher(target) == true || !EnsureWindow()) return false;
         started = true;
-        return PanePanelKeysBegin(window, Notification, generation, sendEnabled ? 1 : 0) != 0;
+        return PanePanelKeysBegin(window, Notification, generation, (int)mode) != 0;
     }
     public void End() { generation++; if (started && !disposed) PanePanelKeysEnd(); }
     public void ReplayAndEnd() { if (Active) { PanePanelKeysReplay(); generation++; } }
@@ -50,7 +52,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
             if (!disposed && w == generation && Active)
             {
                 int value = (int)l, key = (value & 255) - 1;
-                if (key >= 0 && key <= (int)PanelKey.Type) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
+                if (key >= 0 && key <= (int)PanelKey.Retry) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
             }
             return 0;
         }
@@ -66,7 +68,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
     }
     // 现有退出路径没有逐个 StopAsync；退出事件仅释放原生资源，不跨线程销毁 UI 窗口。
     void ProcessExit(object? sender, EventArgs args) { if (started) { PanePanelKeysDispose(); started = false; } }
-    [DllImport("Pane.Native.dll")] static extern int PanePanelKeysBegin(nint recipient, uint message, nuint generation, int send);
+    [DllImport("Pane.Native.dll")] static extern int PanePanelKeysBegin(nint recipient, uint message, nuint generation, int mode);
     [DllImport("Pane.Native.dll")] static extern void PanePanelKeysEnd();
     [DllImport("Pane.Native.dll")] static extern void PanePanelKeysReplay();
     [DllImport("Pane.Native.dll")] static extern int PanePanelKeysActive();

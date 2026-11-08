@@ -41,7 +41,7 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
             files[path] = Read("capture-file", path, () => ReadBytes(path));
         return new Snapshot(run, registration, files);
     }
-    static byte[]? ReadBytes(string path) { SetupFiles.Check(path); return File.Exists(path) ? File.ReadAllBytes(path) : null; }
+    static byte[]? ReadBytes(string path) => File.Exists(path) ? File.ReadAllBytes(path) : null;
     public void Restore(object snapshot)
     {
         var value = (Snapshot)snapshot;
@@ -58,15 +58,17 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
     {
         // 不调用 Load：读取设置时不得重命名损坏文件或创建用户数据目录。
         PaneSettings settings = ReadSettings(paths.Data, defaults);
+        SetupFiles.Check(SettingsFile); SetupFiles.Check(SettingsFile + ".tmp");
         var store = new SettingsStore(paths.Data, settings);
         new AutostartService(true, paths.Exe, store, startup).Set(options.StartWithWindows);
         WriteRegistration(Registration(paths, version, bytes));
         Shortcut(Menu);
-        if (options.DesktopShortcut) Shortcut(Desktop); else File.Delete(Desktop);
+        if (options.DesktopShortcut) Shortcut(Desktop); else { SetupFiles.Check(Desktop); File.Delete(Desktop); }
     }
     public void Remove()
     {
         if (AutostartService.PointsTo(startup.Read(), paths.Exe)) startup.Delete();
+        SetupFiles.Check(Menu); SetupFiles.Check(Desktop);
         File.Delete(Menu); File.Delete(Desktop); WriteRegistration(null);
     }
     public static PaneSettings ReadSettings(string data, PaneSettings fallback)
@@ -89,6 +91,7 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
     {
         if (isolatedRoot != null)
         {
+            SetupFiles.Check(FakeRegistration);
             if (fields == null) { File.Delete(FakeRegistration); return; }
             Directory.CreateDirectory(isolatedRoot);
             using var stream = File.Create(FakeRegistration);
@@ -116,7 +119,7 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
         string PathName => Path.Combine(root, "run.txt");
         public string? Read() => File.Exists(PathName) ? File.ReadAllText(PathName) : null;
         public bool Disabled => false;
-        public void Write(string command) { Directory.CreateDirectory(root); File.WriteAllText(PathName, command); }
-        public void Delete() => File.Delete(PathName);
+        public void Write(string command) { SetupFiles.Check(PathName); Directory.CreateDirectory(root); File.WriteAllText(PathName, command); }
+        public void Delete() { SetupFiles.Check(PathName); File.Delete(PathName); }
     }
 }

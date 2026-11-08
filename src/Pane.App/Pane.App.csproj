@@ -11,6 +11,8 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <WindowsAppSdkBootstrapInitialize>false</WindowsAppSdkBootstrapInitialize>
     <SelfContained>true</SelfContained>
+    <!-- issue #31 / 调研 073：关闭 CET，兼容进程内 .NET Framework Shell 扩展的异常恢复。 -->
+    <CETCompat>false</CETCompat>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>

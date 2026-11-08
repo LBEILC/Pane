@@ -95,16 +95,16 @@ internal sealed class WindowsSelectionPlatform : ISelectionPlatform
     public void Release(object snapshot)=>SelectionNative.PaneClipboardRelease((nint)snapshot);
     public void Restore(object snapshot){if(SelectionNative.PaneClipboardRestore((nint)snapshot)==0)throw new InvalidOperationException("剪贴板恢复失败");} // 不翻译：内部异常
 }
-internal sealed class SelectionActions : ISelectionActions
+internal sealed class SelectionActions(Action<string,Clipboard.ClipboardWriteMode>? write=null,Func<Clipboard.IPastePlatform>? paste=null) : ISelectionActions
 {
     public Task SearchWebAsync(string text,CancellationToken token){token.ThrowIfCancellationRequested();Process.Start(new ProcessStartInfo("https://www.bing.com/search?q="+Uri.EscapeDataString(text)){UseShellExecute=true})?.Dispose();return Task.CompletedTask;}
     public Task CopyAsync(string text,CancellationToken token)=>Sta.Run(()=>{token.ThrowIfCancellationRequested();Write(text);return true;});
     public Task ReplaceSelectionAsync(string text,nint window,CancellationToken token)
     {
-        long started=Environment.TickCount64; var platform=new Pane.Services.Clipboard.WindowsPastePlatform();
+        long started=Environment.TickCount64; var platform=paste?.Invoke()??new Pane.Services.Clipboard.WindowsPastePlatform();
         return Sta.Run(()=>{new Clipboard.PasteTransfer(platform,Clipboard.PasteTransfer.WriteLog).Run(window,()=>Write(text),token,started);return true;});
     }
-    static void Write(string text){if(SelectionNative.PaneClipboardWrite(text)==0)throw new InvalidOperationException(Strings.Common_ClipboardWriteFailed);}
+    void Write(string text){if(write!=null){write(text,Clipboard.ClipboardWriteMode.UserCopy);return;}if(SelectionNative.PaneClipboardWrite(text,Clipboard.ClipboardWriteMode.UserCopy)==0)throw new InvalidOperationException(Strings.Common_ClipboardWriteFailed);}
 }
 internal static class SelectionNative
 {
@@ -117,7 +117,7 @@ internal static class SelectionNative
     [DllImport(Dll)] internal static extern void PaneClipboardRelease(nint data);
     [DllImport(Dll)] internal static extern int PaneClipboardRestore(nint data);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipboardTextAlloc(out nint text);
-    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipboardWrite(string text);
+    [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipboardWrite(string text,Clipboard.ClipboardWriteMode mode);
     [DllImport(Dll,SetLastError=true)] internal static extern int PaneKey(ushort key,int down,int unicode);
     [DllImport("ole32.dll")] internal static extern int OleInitialize(nint reserved);
     [DllImport("ole32.dll")] internal static extern void OleUninitialize();

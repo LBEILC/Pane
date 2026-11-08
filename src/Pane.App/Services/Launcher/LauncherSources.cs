@@ -37,9 +37,24 @@ internal sealed class ApplicationSource(ILauncherExecutor executor,Action<string
             var byId=c.Snapshot.Apps.ToDictionary(a=>a.Id);var pinned=new HashSet<string>();foreach(var id in c.Settings.PinnedApps)if(byId.TryGetValue(c.Snapshot.Aliases.GetValueOrDefault(id,id),out var app)&&pinned.Add(app.Id))home.Add(Item(app,LauncherGroups.Pinned));
             return Rows(home);
         }
-        var hits=new List<(IndexedApp App,NameMatch Match)>();
-        foreach(var app in c.Snapshot.Apps){token.ThrowIfCancellationRequested();if(app.Name.Match(c.Query) is {} match)hits.Add((app,match));}
-        return Rows(hits.OrderByDescending(x=>x.Match.Score).ThenByDescending(x=>c.Usage.GetValueOrDefault(x.App.Id)?.Count??0).ThenByDescending(x=>c.Usage.GetValueOrDefault(x.App.Id)?.LastUsed??DateTimeOffset.MinValue).ThenBy(x=>x.App.Name.Name,StringComparer.OrdinalIgnoreCase).Take(Limit(c)).Select(x=>Item(x.App,Group) with{Highlights=x.Match.Spans}));
+        var hits=new List<(IndexedApp App,int Tier,NameMatch Match)>();
+        var aliases=c.Settings.AppAliases.ToDictionary(a=>a.AppId,a=>a.Aliases);
+        foreach(var app in c.Snapshot.Apps){
+            token.ThrowIfCancellationRequested();
+            int tier=4;
+            if(aliases.TryGetValue(app.Id,out var names))foreach(var name in names){
+                if(name.Equals(c.Query,StringComparison.OrdinalIgnoreCase)){tier=0;break;}
+                if(name.StartsWith(c.Query,StringComparison.OrdinalIgnoreCase))tier=1;
+            }
+            var display=app.Name.Match(c.Query);
+            if(tier<2){hits.Add((app,tier,new(0,display?.Spans??[])));continue;}
+            if(display!=null){hits.Add((app,2,display));continue;}
+            NameMatch? best=null;
+            foreach(var name in app.SecondaryNames)if(name.Match(c.Query) is {} match&&(best==null||match.Score>best.Score))best=match;
+            // 次要名字的偏移不属于显示名，不能作为标题高亮。
+            if(best!=null)hits.Add((app,3,best with{Spans=[]}));
+        }
+        return Rows(hits.OrderBy(x=>x.Tier).ThenByDescending(x=>x.Match.Score).ThenByDescending(x=>c.Usage.GetValueOrDefault(x.App.Id)?.Count??0).ThenByDescending(x=>c.Usage.GetValueOrDefault(x.App.Id)?.LastUsed??DateTimeOffset.MinValue).ThenBy(x=>x.App.Name.Name,StringComparer.OrdinalIgnoreCase).Take(Limit(c)).Select(x=>Item(x.App,Group) with{Highlights=x.Match.Spans}));
     }
     public override async Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token){
         var app=c.Snapshot.Apps.FirstOrDefault(a=>a.Id==item.Id)??throw new InvalidOperationException(Strings.Launcher_AppMissing);

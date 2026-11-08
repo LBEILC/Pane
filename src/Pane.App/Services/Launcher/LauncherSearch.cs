@@ -57,7 +57,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     }
     string IconsStamp()=>Pane.Services.Icons.IconProcessing.SettingsKey(store.Current.Icons);
     void PublishOriginals(PersistedIndex value){if(Volatile.Read(ref snapshot).Apps.Length==0)Publish(value);}
-    void SettingsChanged(object? sender,EventArgs args){lock(sync){var current=store.Current.Launcher.Favorites;var icons=IconsStamp();var portable=store.Current.Launcher.Portable;if(lastFavorites.SequenceEqual(current)&&lastIcons==icons&&lastPortable.SequenceEqual(portable))return;lastPortable=portable.ToArray();
+    void SettingsChanged(object? sender,EventArgs args){NotifyAliasSettings();lock(sync){var current=store.Current.Launcher.Favorites;var icons=IconsStamp();var portable=store.Current.Launcher.Portable;if(lastFavorites.SequenceEqual(current)&&lastIcons==icons&&lastPortable.SequenceEqual(portable))return;lastPortable=portable.ToArray();
             // 列表删除立即生效，旧构建不能把已删除的入口重新发布。
             PrunePortable();lastIcons=icons;lastFavorites=current.ToArray();dirty=true;}RefreshIndex();}
     public void RefreshIndex()
@@ -87,22 +87,20 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         }
     }
     void Publish(PersistedIndex value){
+        string? previousIcons=null;
+        try{store.Update(current=>{
+            var settings=AppSettingsMigration.Apply(current,value.Metrics.Aliases);
+            // 保存迁移结果时不持有启动器锁，等价图标设置不触发重建。
+            if(!ReferenceEquals(settings,current))lock(sync){previousIcons=lastIcons;lastIcons=Pane.Services.Icons.IconProcessing.SettingsKey(settings.Icons);}
+            return settings;
+        });}catch{if(previousIcons!=null)lock(sync)lastIcons=previousIcons;throw;}
+        bool changed;
         lock(sync){
-            // 与后台记忆、设置页保存串行合并，迁移不能覆盖刚添加的便携条目。
-            var previousIcons=lastIcons;
-            try{store.Update(current=>{
-                var settings=AppSettingsMigration.Apply(current,value.Metrics.Aliases);
-                // 子进程已用相同别名处理图标；保存迁移结果不再触发一次等价重建。
-                if(!ReferenceEquals(settings,current))lastIcons=Pane.Services.Icons.IconProcessing.SettingsKey(settings.Icons);
-                return settings;
-            });}catch{lastIcons=previousIcons;throw;}
-            var migrated=new Dictionary<string,AppUse>(uses);
-            if(AppDeduplication.MergeUsage(migrated,value.Metrics.Aliases)){
-                Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
-                File.WriteAllText(path+".tmp",JsonSerializer.Serialize(migrated,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);uses=migrated;
-            }
+            changed=AppDeduplication.MergeUsage(uses,value.Metrics.Aliases);
             Volatile.Write(ref snapshot,value.Snapshot with{Aliases=value.Metrics.Aliases});Metrics=value.Metrics;PrunePortable();portableStatus=new(value.Metrics.PortableStatus??[],StringComparer.OrdinalIgnoreCase);lastBuilt=value.BuiltAt;IndexError=null;
         }
+        if(changed)SaveUsage();
+        AliasesChanged?.Invoke(this,EventArgs.Empty);
     }
     // ---- 设置页「应用图标」（设计加，IAppIconCatalog）----
     volatile bool building;
@@ -117,11 +115,10 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     }
     // 分类写在遮罩结果旁的 .kind 文件里（IconProcessing）；按路径缓存，路径随设置和图标指纹变化
     AppIconKind Kind(string dark){
-        lock(kinds){
-            if(kinds.TryGetValue(dark,out var k))return k;
-            try{k=File.Exists(dark+".kind")&&Enum.TryParse<AppIconKind>(File.ReadAllText(dark+".kind").Trim(),out var v)?v:AppIconKind.Unknown;}catch(IOException){k=AppIconKind.Unknown;}
-            if(kinds.Count>2000)kinds.Clear();kinds[dark]=k;return k;
-        }
+        lock(kinds)if(kinds.TryGetValue(dark,out var cached))return cached;
+        AppIconKind k;
+        try{k=File.Exists(dark+".kind")&&Enum.TryParse<AppIconKind>(File.ReadAllText(dark+".kind").Trim(),out var v)?v:AppIconKind.Unknown;}catch(IOException){k=AppIconKind.Unknown;}
+        lock(kinds){if(kinds.Count>2000)kinds.Clear();kinds[dark]=k;}return k;
     }
     SourceContext Context(string query){Dictionary<string,AppUse> usage;lock(sync)usage=new(uses);return new(query.Trim(),Volatile.Read(ref snapshot),store.Current.Launcher,usage);}
     public async Task<LauncherResult> SearchAsync(string query,CancellationToken cancellationToken)
@@ -151,8 +148,17 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         if(item.Kind==LauncherItemKind.File&&item.Id.StartsWith("file:",StringComparison.Ordinal))await RememberOpenedAsync(item.Id[5..]).ConfigureAwait(false);
     }
     public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,token):ExecuteAsync(item,token);
-    void RecordUse(string id){
-        lock(sync){var use=uses.GetValueOrDefault(id);uses[id]=new(Math.Min((use?.Count??0),int.MaxValue-1)+1,DateTimeOffset.UtcNow);Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");File.WriteAllText(path+".tmp",JsonSerializer.Serialize(uses,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);}
+    readonly SemaphoreSlim usageWriter=new(1,1);
+    void RecordUseCore(string id){var use=uses.GetValueOrDefault(id);uses[id]=new(Math.Min((use?.Count??0),int.MaxValue-1)+1,DateTimeOffset.UtcNow);}
+    void RecordUse(string id){lock(sync)RecordUseCore(id);SaveUsage();}
+    void SaveUsage(){
+        // 仅串行化落盘；等待和文件操作均在 sync 外，搜索不等待此信号量。
+        usageWriter.Wait();
+        try{
+            Dictionary<string,AppUse> current;lock(sync)current=new(uses);
+            Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
+            File.WriteAllText(path+".tmp",JsonSerializer.Serialize(current,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);
+        }finally{usageWriter.Release();}
     }
     public async Task RunAsync(string actionId,ClipEntry attachment,CancellationToken cancellationToken)
     {
@@ -168,5 +174,5 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         if(actionId=="web-search"&&attachment.Text!=null){await executor.OpenAsync(BuildUrl(DefaultEngine(store.Current.Launcher),attachment.Text),false,cancellationToken);return;}
         throw new NotSupportedException(actionId);
     }
-    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;lifetime.Cancel();}indexing.GetAwaiter().GetResult();terminal.Dispose();lifetime.Dispose();}
+    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();lifetime.Dispose();}
 }

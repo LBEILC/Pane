@@ -131,7 +131,27 @@ public static class LauncherGroups
 /// RemoveFromApps（057，issue 19）：只给单独添加的便携程序和记住的程序，从 LauncherSettings.Portable 里去掉（不删文件），之后重建索引；
 /// 文件夹扫描出来的、安装的软件都不给。
 /// </summary>
-public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps }
+public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps, EditAliases }
+// EditAliases 由界面打开编辑，不传给 RunAsync；仅对已索引应用提供。
+
+/// <summary>应用的搜索别名（078）。appId 就是应用行的 LauncherItem.Id。</summary>
+public interface IAppAliases
+{
+    /// <summary>某个应用的别名，没有就返回空列表。</summary>
+    IReadOnlyList<string> Get(string appId);
+    /// <summary>
+    /// 设置别名，传空列表就是清除。去掉首尾空白、空项，不区分大小写去重并保留首次写法。
+    /// 去重后超过 8 个、单个超过 32 个字符或含空白字符时抛 ArgumentException。
+    /// 保存后下一次搜索立即生效。
+    /// </summary>
+    void Set(string appId, IReadOnlyList<string> aliases);
+    /// <summary>按应用名排序；失去索引的应用使用保存时的名字，Missing=true。</summary>
+    IReadOnlyList<AppAliasInfo> All();
+    /// <summary>别名或索引重建后的名字、图标、存在状态变化；可能在后台线程触发。</summary>
+    event EventHandler? Changed;
+}
+/// <param name="IconPath">和 IAppIconCatalog 给的图标相同；没有则为 null。</param>
+public sealed record AppAliasInfo(string AppId, string Name, string? IconPath, IReadOnlyList<string> Aliases, bool Missing);
 
 /// <summary>便携软件某一项的扫描状态（057）。</summary>
 public enum PortableScanState { Scanning, Ready, Missing }

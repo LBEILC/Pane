@@ -67,6 +67,7 @@ public sealed partial class PaneSegmented : UserControl
         selected = index;
         highlight.MoveTo(items[selected]);
         UpdateText();
+        if (notify) MotionHold.Hold(Pane.Hosting.GlassParameters.Token("PaneDurNormal"));   // 高亮滑动时长不乘动效速度，和 SlidingHighlight 一致
         if (notify) Changed?.Invoke(this, Value);
     }
 

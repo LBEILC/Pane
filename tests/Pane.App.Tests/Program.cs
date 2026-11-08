@@ -15,7 +15,7 @@ static class Program
   if(args is ["--update-e2e",var oldPackage,var newPackage,var evidence]){await UpdateEndToEnd.Run(oldPackage,newPackage,evidence);return;}
   if(args is ["--setup-only"]){
    var fixture=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Alt,32)),new(new(KeyModifiers.Ctrl,86)));
-   try {int total=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await SetupFailureTests.Run(fixture);
+   try {int total=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await SetupFailureTests.Run(fixture);total+=await SetupLinkTests.Run(fixture);
    Console.WriteLine($"PASS setup suites assertions={total}");}catch(Exception error){Console.WriteLine(error);Environment.ExitCode=1;}return;
   }
   foreach(var failure in new[]{SelectionFailure.None,SelectionFailure.Empty,SelectionFailure.Unsupported,SelectionFailure.Elevated,SelectionFailure.Timeout}){
@@ -33,6 +33,7 @@ static class Program
   ClipboardHistorySuppression.IgnoreSequence(42);ClipboardHistorySuppression.CancelPending();Check(ClipboardHistorySuppression.TryConsume(42)&&!ClipboardHistorySuppression.TryConsume(43),"delayed notification sequence");
   var hotkey=new Hotkey(KeyModifiers.Alt,32);
   checks+=DoubleTapBindingsTests.Run();
+  checks+=await Crash077Tests.Run();
   var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(hotkey),new(new(KeyModifiers.Ctrl,86)));
   string json=JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings);using var document=JsonDocument.Parse(json);var old=string.Join(",",document.RootElement.EnumerateObject().Where(p=>p.Name!="SuperPanel").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()));
   var loaded=JsonSerializer.Deserialize("{"+old+"}",SettingsJson.Default.PaneSettings)!;Check(loaded.SuperPanel.TriggerButton==SuperPanelButton.X1&&loaded.SuperPanel.HoldMilliseconds==400&&loaded.SuperPanel.ClipboardFallback,"old settings defaults");

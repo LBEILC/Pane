@@ -66,36 +66,72 @@ internal sealed class TerminalHistory:ITerminalHistory
 
 internal sealed class TerminalPrograms:IDisposable
 {
-    readonly object sync=new();readonly List<FileSystemWatcher> watchers=[];readonly Dictionary<string,string[]> directories=new(StringComparer.OrdinalIgnoreCase);
-    readonly string[] appPaths;string[] names=[];bool disposed;
-    public TerminalPrograms(IEnumerable<string>? paths=null,IEnumerable<string>? registered=null,bool watch=true)
+    readonly object sync=new();readonly CancellationTokenSource lifetime=new();
+    readonly string[]? paths,appPaths;readonly TimeProvider clock;
+    readonly Func<string,CancellationToken,IEnumerable<string>> enumerateFiles;
+    string[] names;Task scanning=Task.CompletedTask;DateTimeOffset? refreshed;bool disposed,released;
+    static readonly TimeSpan CacheLifetime=TimeSpan.FromSeconds(30);
+    public TerminalPrograms(IEnumerable<string>? paths=null,IEnumerable<string>? registered=null,TimeProvider? clock=null,Func<string,CancellationToken,IEnumerable<string>>? enumerateFiles=null)
     {
-        appPaths=(registered??ReadAppPaths()).ToArray();
-        foreach(var directory in (paths??(Environment.GetEnvironmentVariable("PATH")??"").Split(Path.PathSeparator)).Select(p=>Environment.ExpandEnvironmentVariables(p.Trim().Trim('"'))).Where(Path.IsPathFullyQualified).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            if(!Directory.Exists(directory))continue;
-            Refresh(directory);
-            if(!watch)continue;
-            try{var watcher=new FileSystemWatcher(directory){NotifyFilter=NotifyFilters.FileName};watcher.Created+=(_,_)=>Refresh(directory);watcher.Deleted+=(_,_)=>Refresh(directory);watcher.Renamed+=(_,_)=>Refresh(directory);watcher.Error+=(_,_)=>Refresh(directory);watcher.EnableRaisingEvents=true;watchers.Add(watcher);}catch(Exception e) when(e is IOException or UnauthorizedAccessException or ArgumentException){}
-        }
-        lock(sync)Rebuild();
+        this.paths=paths?.ToArray();appPaths=registered?.ToArray();this.clock=clock??TimeProvider.System;
+        this.enumerateFiles=enumerateFiles??((directory,_)=>Directory.EnumerateFiles(directory));
+        names=Merge(appPaths??[]);
     }
-    static IEnumerable<string> ReadAppPaths()
+    static string[] Merge(IEnumerable<string> values)=>values.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+    internal Task Scanning {get{lock(sync)return scanning;}}
+    static IEnumerable<string> ReadAppPaths(CancellationToken token)
     {
         var result=new List<string>();
         foreach(var hive in new[]{RegistryHive.CurrentUser,RegistryHive.LocalMachine})foreach(var view in new[]{RegistryView.Registry64,RegistryView.Registry32})
-        {try{using var root=RegistryKey.OpenBaseKey(hive,view);using var key=root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths");if(key!=null)foreach(var name in key.GetSubKeyNames()){using var app=key.OpenSubKey(name);if(app?.GetValue("") is string path&&File.Exists(Environment.ExpandEnvironmentVariables(path.Trim('"'))))result.Add(Path.GetFileNameWithoutExtension(name));}}catch(Exception e) when(e is System.Security.SecurityException or UnauthorizedAccessException or IOException){}}
+        {try{token.ThrowIfCancellationRequested();using var root=RegistryKey.OpenBaseKey(hive,view);using var key=root.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\App Paths");if(key!=null)foreach(var name in key.GetSubKeyNames()){token.ThrowIfCancellationRequested();using var app=key.OpenSubKey(name);if(app?.GetValue("") is string path&&File.Exists(Environment.ExpandEnvironmentVariables(path.Trim('"'))))result.Add(Path.GetFileNameWithoutExtension(name));}}catch(Exception e) when(e is System.Security.SecurityException or UnauthorizedAccessException or IOException){}}
         return result;
     }
-    void Refresh(string directory)
+    void Refresh(CancellationToken token)
     {
-        string[] found;
-        try{found=Directory.EnumerateFiles(directory).Where(p=>new[]{".exe",".com",".cmd",".bat"}.Contains(Path.GetExtension(p),StringComparer.OrdinalIgnoreCase)).Select(Path.GetFileNameWithoutExtension).OfType<string>().ToArray();}catch(Exception e) when(e is IOException or UnauthorizedAccessException){found=[];}
-        lock(sync){if(disposed)return;directories[directory]=found;Rebuild();}
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            var found=new List<string>(appPaths??ReadAppPaths(token));
+            lock(sync){if(!disposed)names=Merge(names.Concat(found));}
+            foreach(var directory in (paths??(Environment.GetEnvironmentVariable("PATH")??"").Split(Path.PathSeparator)).Select(p=>Environment.ExpandEnvironmentVariables(p.Trim().Trim('"'))).Where(Path.IsPathFullyQualified).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                token.ThrowIfCancellationRequested();
+                try
+                {
+                    // 枚举器只在扫描内持有，取消和异常退出也会释放目录句柄。
+                    foreach(var file in enumerateFiles(directory,token))
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if(new[]{".exe",".com",".cmd",".bat"}.Contains(Path.GetExtension(file),StringComparer.OrdinalIgnoreCase))found.Add(Path.GetFileNameWithoutExtension(file));
+                    }
+                }
+                catch(Exception e) when(e is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException){}
+            }
+            var result=Merge(found);
+            lock(sync){if(!disposed){names=result;refreshed=clock.GetUtcNow();}}
+        }
+        catch(OperationCanceledException) when(token.IsCancellationRequested){}
     }
-    void Rebuild()=>names=directories.Values.SelectMany(x=>x).Concat(appPaths).Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToArray();
-    public string[] Match(string prefix){if(prefix.Any(char.IsWhiteSpace))return [];lock(sync)return names.Where(n=>n.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)).Take(6).ToArray();}
-    public void Dispose(){lock(sync){disposed=true;}foreach(var watcher in watchers)watcher.Dispose();}
+    public string[] Match(string prefix)
+    {
+        lock(sync)
+        {
+            if(disposed)return [];
+            // 查询只启动扫描并读取快照，不等待磁盘，不建立计时器或常驻监视。
+            if(scanning.IsCompleted&&(!refreshed.HasValue||clock.GetUtcNow()-refreshed.Value>=CacheLifetime))
+                scanning=Task.Run(()=>Refresh(lifetime.Token));
+            if(prefix.Any(char.IsWhiteSpace))return [];
+            return names.Where(n=>n.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)).Take(6).ToArray();
+        }
+    }
+    public void Dispose()
+    {
+        Task pending;
+        lock(sync){if(!disposed){disposed=true;lifetime.Cancel();}pending=scanning;}
+        // 不持有 sync 等待，确保返回时枚举器和后台任务均已结束。
+        pending.GetAwaiter().GetResult();
+        lock(sync){if(!released){released=true;lifetime.Dispose();}}
+    }
 }
 
 internal sealed class TerminalService:IDisposable

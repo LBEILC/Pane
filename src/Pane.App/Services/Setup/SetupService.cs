@@ -106,7 +106,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
             try
             {
                 if (uninstallerChanged)
-                { if (previousUninstaller == null) File.Delete(paths.Uninstaller); else File.WriteAllBytes(paths.Uninstaller, previousUninstaller); }
+                { SetupFiles.Check(paths.Uninstaller); if (previousUninstaller == null) File.Delete(paths.Uninstaller); else File.WriteAllBytes(paths.Uninstaller, previousUninstaller); }
                 if (activated) Move(paths.App, stage);
                 if (movedCurrent) Move(old, paths.App);
                 if (movedOld) Move(previous, old);
@@ -148,7 +148,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
             if (removeData) { progress.Report(new(.85, Strings.Setup_DeletingData)); Track("删除数据", paths.Data); SetupFiles.Delete(paths.Data); } // 不翻译：日志
             operation.Dispose();
             if (Directory.Exists(paths.Root) && !Directory.EnumerateFileSystemEntries(paths.Root).Any())
-                { Track("删除空安装目录", paths.Root); Directory.Delete(paths.Root); } // 不翻译：日志
+                { Track("删除空安装目录", paths.Root); SetupFiles.Check(paths.Root); Directory.Delete(paths.Root); } // 不翻译：日志
             progress.Report(new(1, Strings.Setup_UninstallComplete));
         }
         catch (Exception error) { Log(error); throw Failure(error); }
@@ -158,6 +158,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
         try
         {
             Track("获取安装锁", paths.Root); SetupFiles.Check(paths.Root); Directory.CreateDirectory(paths.Root); // 不翻译：日志
+            SetupFiles.Check(Path.Combine(paths.Root, ".setup.lock"));
             return new FileStream(Path.Combine(paths.Root, ".setup.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose);
         }
         catch (Exception error) { Log(error); throw Failure(new SetupException(Strings.Setup_CannotStart, error)); }

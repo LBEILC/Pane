@@ -171,6 +171,13 @@ public sealed partial class GlassPanel : IDisposable
         if(next!=style)SetWindowLongPtrW(Input,-20,next);
     }
     /// <summary>从不激活方式切到激活方式（打字搜索、点搜索框）：激活面板并聚焦。之后失去焦点照常收起。</summary>
+    // 已显示的面板重新拿回前台和键盘焦点（剪贴板叠在启动器上用完收起后，焦点回到启动器）
+    public void Refocus()
+    {
+        if(!Shown||Passive||disposing||demo)return;
+        Activate();
+        if(root.IsLoaded)Focus();else pendingFocus=true;
+    }
     public void Engage()
     {
         if(!Passive||!Shown||disposing)return;

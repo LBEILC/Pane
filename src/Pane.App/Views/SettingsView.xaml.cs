@@ -64,9 +64,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
             SaveIcons(x => x with { Overrides = new() { ["app:photoshop"] = IconMode.ForceMask, ["app:obs"] = IconMode.Auto, ["app:steam"] = IconMode.Raw }, CustomIcons = new() { ["app:obs"] = "obs.png" } });
             if (iconPreview.StartsWith("search:", StringComparison.Ordinal)) iconQuery = iconPreview[7..];
         }
-        // 设计预览（只在演示模式）：PANE_DESIGN_PORTABLE=1 预置几条便携软件（扫到的、找不到的、单个程序）和 5 个记住的程序
-        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_PORTABLE") == "1")
+        // 设计预览（只在演示模式）：PANE_DESIGN_PORTABLE=1 预置几条便携软件（扫到的、找不到的、单个程序）和 5 个记住的程序；=open 同时展开记住的程序
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_PORTABLE") is "1" or "open")
         {
+            learnedOpen = Environment.GetEnvironmentVariable("PANE_DESIGN_PORTABLE") == "open";
             var now = DateTimeOffset.Now;
             PortableEntry[] seed =
             [
@@ -125,6 +126,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (app.Updates is { } up) up.Changed += OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed += OnWinVChanged;
         if (PortableApps is { } pa) pa.Changed += OnFileSearchChanged;   // 扫描完成：同样只重建启动器分区
+        if (AppAliases is { } aa) aa.Changed += OnFileSearchChanged;   // 别名改了（启动器里设的）：重建启动器分区
         app.Modules.Changed += OnModulesChanged;
         Unloaded += OnUnloaded;
         Show(current);
@@ -144,6 +146,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (app.Updates is { } up) up.Changed -= OnUpdateChanged;
         if (app.WinV is { } wv) wv.Changed -= OnWinVChanged;
         if (PortableApps is { } pa) pa.Changed -= OnFileSearchChanged;
+        if (AppAliases is { } aa) aa.Changed -= OnFileSearchChanged;
         app.Modules.Changed -= OnModulesChanged;
         signIn?.Cancel();
         app.SetHotkeysSuspended(false);
@@ -210,6 +213,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void Render(bool resetScroll)
     {
         rerender.Stop();
+        // 刚拨的开关 / 分段还在播动画：推迟到播完再重建（换分区 resetScroll 不等，旧控件本来就不要了）
+        if (!resetScroll && Pane.Views.Controls.MotionHold.Remaining is > 0 and var wait)
+        {
+            rerender.Interval = TimeSpan.FromMilliseconds(wait + 16);
+            rerender.Start();
+            return;
+        }
         double offset = Scroller.VerticalOffset;
         foreach (var item in navItems)
         {

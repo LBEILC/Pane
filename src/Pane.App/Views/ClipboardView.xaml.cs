@@ -431,16 +431,28 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         var entry = row.Entry;
         // 图片没有文字可贴，Shift+Enter 按普通粘贴处理（不让按键落空）
         if (entry.Kind == ClipKind.Image) plainText = false;
+        // 叠在启动器上打开的：不粘贴，交给启动器（宿主收起剪贴板、焦点回启动器）
+        if (ForLauncher) { UseInLauncher?.Invoke(this, entry); return; }
         var id = entry.Id;
         CloseRequested?.Invoke(this, EventArgs.Empty);
         try { await history.PasteAsync(id, plainText, previousWindow, CancellationToken.None); }
         catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.Common_Paste, e); } // 面板已收起：屏幕中间提示
     }
 
+    /// <summary>启动器开着时按剪贴板热键，剪贴板叠在启动器上打开（2026-11-08 用户定）：选中条目交给启动器，不粘贴。宿主在显示前设。</summary>
+    public bool ForLauncher { get; set; }
+
+    /// <summary>ForLauncher 时选了一条（Enter、点一下、Alt+数字）。</summary>
+    public event EventHandler<ClipEntry>? UseInLauncher;
+
     /// <summary>「交给启动器」：宿主收到后把条目交给启动器（LauncherView.AttachNext）并切到启动器。</summary>
     public event EventHandler<ClipEntry>? SendToLauncher;
 
-    public void Send(ClipRow row) => SendToLauncher?.Invoke(this, row.Entry);
+    public void Send(ClipRow row)
+    {
+        if (ForLauncher) { UseInLauncher?.Invoke(this, row.Entry); return; }   // 启动器本来就开着，不重新呼出（会重置输入）
+        SendToLauncher?.Invoke(this, row.Entry);
+    }
 
     public void TogglePin(ClipRow row) => history.SetPinned(row.Entry.Id, !row.Entry.Pinned);
 
@@ -470,13 +482,19 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     // ---------------- 底部快捷键提示 ----------------
 
     // 启动器停用时不列「Tab 交给启动器」（055）；启动器状态变了下次呼出时重建
-    bool footSend;
+    bool footSend, footLauncher;
     void BuildFoot()
     {
         bool send = ModuleGate.On(Contracts.ModuleIds.Launcher);
-        if (Foot.Children.Count > 0 && send == footSend) return;
+        if (Foot.Children.Count > 0 && send == footSend && ForLauncher == footLauncher) return;
         footSend = send;
+        footLauncher = ForLauncher;
         Foot.Children.Clear();
+        if (ForLauncher)
+        {
+            KeyHints.Fill(Foot, [(["↑", "↓"], Strings.Clipboard_Select), (["Enter"], Strings.Clipboard_FillLauncher), (["Esc"], Strings.Clipboard_BackToLauncher)], HintLabelProto, KbdProto);
+            return;
+        }
         KeyHints.Fill(Foot,
         [
             (["↑", "↓"], Strings.Clipboard_Select), (["Enter"], Strings.Common_Paste), (["Shift", "+", "Enter"], Strings.Clipboard_PlainText),

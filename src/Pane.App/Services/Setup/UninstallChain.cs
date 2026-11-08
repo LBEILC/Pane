@@ -48,6 +48,7 @@ internal static class UninstallChain
                 string text = (File.Exists(LogPath) ? File.ReadAllText(LogPath) : "") + line;
                 while (Encoding.UTF8.GetByteCount(text) > 65536)
                 { int end = text.IndexOf('\n'); text = end < 0 ? "" : text[(end + 1)..]; }
+                SetupFiles.Check(LogPath);
                 File.WriteAllText(LogPath, text, new UTF8Encoding(false));
             }
             finally { mutex.ReleaseMutex(); }
@@ -145,7 +146,7 @@ internal static class UninstallChain
         {
             Cleanup(isolated);
             helper = Path.Combine(Path.GetTempPath(), "Pane-Cleanup-" + Guid.NewGuid().ToString("N") + ".exe");
-            SetupFiles.Check(executable); (copy ?? ((a, b) => File.Copy(a, b)))(executable, helper);
+            SetupFiles.Check(helper); (copy ?? ((a, b) => File.Copy(a, b)))(executable, helper);
             Log(step, path: helper);
             string name = @"Local\Pane-Uninstall-" + Guid.NewGuid().ToString("N");
             using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, name);
@@ -155,7 +156,7 @@ internal static class UninstallChain
             step = "start-helper";
             using var child = (start ?? Start)(info);
             launched = true;
-            if (isolated != null) File.WriteAllLines(Path.Combine(isolated, "helper.txt"), [helper, child.Id.ToString()]);
+            if (isolated != null) { SetupFiles.Check(Path.Combine(isolated, "helper.txt")); File.WriteAllLines(Path.Combine(isolated, "helper.txt"), [helper, child.Id.ToString()]); }
             step = "wait-window";
             // 默认一分钟覆盖残留清理 10 秒、可读等待 15 秒及一次启动重试，避免过早误报。
             if (!ready.WaitOne(timeout)) throw new TimeoutException();
@@ -166,7 +167,7 @@ internal static class UninstallChain
             Log(step, "failed", e);
             if (!launched && helper != null)
             {
-                try { File.Delete(helper); }
+                try { SetupFiles.Check(helper); File.Delete(helper); }
                 catch (Exception cleanup) when (cleanup is IOException or UnauthorizedAccessException) { Log("cleanup-unstarted-helper", "retained", cleanup, helper); }
             }
             failure(step, e);
@@ -223,11 +224,12 @@ internal static class UninstallChain
     }
     static bool LeaseMatches(string path, string isolated)
     {
-        try { SetupFiles.Check(path); return File.ReadAllText(path) == isolated; }
+        try { return File.ReadAllText(path) == isolated; }
         catch (Exception error) { Log("cleanup-stale", "retained", error, path); return false; }
     }
     public static FileStream Lease(string path, string? isolated = null)
     {
+        SetupFiles.Check(path + ".lease");
         var stream = new FileStream(path + ".lease", FileMode.Create, FileAccess.ReadWrite, FileShare.None);
         stream.Write(Encoding.UTF8.GetBytes(isolated ?? "")); stream.Flush(); return stream;
     }

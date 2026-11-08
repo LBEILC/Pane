@@ -23,6 +23,30 @@ public enum PanelKey
     Escape,
     /// <summary>打字：会产生字符的键（不带 Ctrl / Alt / Win，可带 Shift）。收到后界面切到激活方式、聚焦搜索框，再调 ReplayAndEnd</summary>
     Type,
+    /// <summary>←（不带修饰键）</summary>
+    Left,
+    /// <summary>→（不带修饰键）</summary>
+    Right,
+    /// <summary>1～9（主键盘，不带修饰键）；Number 为 1～9</summary>
+    Digit,
+    /// <summary>Ctrl+C</summary>
+    Copy,
+    /// <summary>Ctrl+R</summary>
+    Retry,
+}
+
+/// <summary>接管哪一组键。</summary>
+public enum PanelKeyMode
+{
+    /// <summary>剪贴板（059 的规则，Tab 不拦）</summary>
+    Clipboard,
+    /// <summary>剪贴板，并且拦 Tab（启动器启用时）</summary>
+    ClipboardWithSend,
+    /// <summary>
+    /// 超级面板：拦 ← → Digit(1～6) Enter Copy Retry Tab(报 Send) Escape。
+    /// 不报 Type：打字照常落到原窗口。其余键照常落到原窗口。
+    /// </summary>
+    Super,
 }
 
 /// <summary>Number 只在 Quick 时有值（1～9），其余为 0。</summary>
@@ -35,6 +59,9 @@ public interface IPanelKeyRouter
     /// 宿主改用原来的激活方式打开面板。已在接管中再调用：先 End 再重新开始。
     /// </summary>
     bool Begin(nint target, bool sendEnabled);
+
+    /// <summary>按指定模式开始接管；布尔重载对应 Clipboard / ClipboardWithSend。</summary>
+    bool Begin(nint target, PanelKeyMode mode);
 
     /// <summary>停止接管，之后不再拦新按下的键。面板收起、切到激活方式、粘贴前都会调。重复调用无害。</summary>
     void End();

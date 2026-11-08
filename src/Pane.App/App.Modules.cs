@@ -161,19 +161,21 @@ public sealed partial class App
                 a.launcherSearch.PowerTimerProvider = () => a.PowerTimer; a.WebSuggestions = new Pane.Services.Launcher.WebSuggestions(() => a.Store.Current.Launcher.WebSuggestions);
                 a.TerminalHistory = a.launcherSearch.TerminalHistory;
                 SettingsView.PortableApps = a.launcherSearch;
+                SettingsView.AppAliases = a.launcherSearch;
             }
             a.Files = a.demo ? new Pane.DesignData.FileSearchSample() : new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(), new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.launcherSearch!.OpenFileAsync);
             var view = new LauncherView((ILauncherSearch?)a.launcherSearch ?? new Pane.DesignData.LauncherSampleSearch { PinnedApps = () => a.Store.Current.Launcher.PinnedApps }, a.Ai, a.secondaryActions!,
                 a.demo ? new Pane.DesignData.LauncherAttachmentActionsSample() : new Pane.Services.Clipboard.ClipboardAttachmentActions(a.launcherSearch!),
                 new Pane.Services.Clipboard.LauncherClipboardHistory(a.ClipboardHistory, a.Store));
             a.launcherView = view; a.AddModulePanel("launcher", Strings.Common_Launcher, view, view);
-            a.panels["launcher"].PositionStore = a.Store; a.panels["launcher"].HideOnBlur = () => a.Store.Current.Launcher.HideOnBlur;
+            a.panels["launcher"].PositionStore = a.Store; a.panels["launcher"].HideOnBlur = () => a.Store.Current.Launcher.HideOnBlur && !a.clipboardOverLauncher;   // 剪贴板叠在上面时不算失焦
             a.WireSecondary(view, a.secondaryActions!);
             return Task.CompletedTask;
         }
         public override async Task StopAsync(CancellationToken token)
         {
             var a = App; a.RemoveSecondary(SecondaryId.Files); a.RemoveModulePanel("launcher"); a.launcherView = null;
+            SettingsView.AppAliases = null;
             SettingsView.PortableApps = null; a.launcherSearch?.Dispose(); a.launcherSearch = null; (a.WebSuggestions as IDisposable)?.Dispose(); a.WebSuggestions = null;
             a.TerminalHistory = null; a.Files = null; a.FileSearchStatus=null!;
             var icons=a.FileIcons;a.FileIcons=new Pane.Services.Icons.EmptyFileIcons();(icons as IDisposable)?.Dispose();
@@ -192,11 +194,12 @@ public sealed partial class App
                 a.clipboardSource = new(a.Store, Environment.GetEnvironmentVariable("PANE_OBSERVE") == "1" || Environment.GetEnvironmentVariable("PANE_VERIFY") == "1");
                 a.clipboardService = new(a.Store, a.clipboardSource, new Pane.Services.Clipboard.WindowsClipboardWriter(), new Pane.Services.Clipboard.WindowsClipboardImages());
                 await a.clipboardService.Ready; history = a.clipboardService; a.clipboardBridge.Attach(history);
-                a.PanelKeys = new Pane.Services.PanelKeyRouter();
+                a.EnsurePanelKeys();   // 和超级面板共用（079）
             }
             var view = new ClipboardView(history);
             view.SendToLauncher += (_, entry) => { if (a.AllowModule(ModuleIds.Launcher)) { a.launcherView?.AttachNext(entry); a.Command("show-launcher"); } };
             a.AddModulePanel("clipboard", Strings.Common_Clipboard, view, view, PanelPlacement.Pointer);
+            a.WireClipboardLauncher(a.panels["clipboard"], view);
         }
         public override async Task StopAsync(CancellationToken token)
         {
@@ -207,7 +210,7 @@ public sealed partial class App
                 if (winv.Error != null) throw new InvalidOperationException(winv.Error);
             }
             a.RemoveModulePanel("clipboard"); a.clipboardBridge.Attach(null);
-            a.PanelKeys?.End(); (a.PanelKeys as IDisposable)?.Dispose(); a.PanelKeys = null;
+            a.ReleasePanelKeys(false, a.superModule);
             try { a.clipboardService?.Dispose(); }
             finally { a.clipboardService = null; a.clipboardSource = null; }
         }
@@ -230,12 +233,12 @@ public sealed partial class App
     {
         public override async Task StartAsync(CancellationToken token)
         {
-            var a = App; var view = new SuperView(a.Ai, a.secondaryActions!); a.superView = view; a.WireSuper(view);
+            var a = App; var view = new SuperView(a.Ai, a.secondaryActions!); a.superView = view; a.WireSuper(view); a.EnsurePanelKeys();
             a.AddModulePanel("super", Strings.Common_SuperPanel, view, view, PanelPlacement.Pointer); a.superModule = true; await a.UpdateMouse();
         }
         public override async Task StopAsync(CancellationToken token)
         {
-            var a = App; a.superModule = false; a.selectionCancellation?.Cancel(); a.RemoveModulePanel("super"); a.superView = null; await a.UpdateMouse();
+            var a = App; a.superModule = false; a.selectionCancellation?.Cancel(); a.RemoveModulePanel("super"); a.superView = null; a.ReleasePanelKeys(a.panels.ContainsKey("clipboard"), false); await a.UpdateMouse();
         }
     }
     sealed class AiModule(App app) : Capability(app, ModuleIds.Ai, ModuleCategory.Ai, "sparkles")

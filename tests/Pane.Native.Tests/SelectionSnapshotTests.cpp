@@ -1,7 +1,7 @@
 // 直接包含实现以替换 IDataObject；不打开或读取系统剪贴板。
 #include "../../src/Pane.Native/Selection.cpp"
 #include <iostream>
-extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int){return 0;}
+extern "C" int PaneClipWrite(const wchar_t*,const wchar_t*,const wchar_t*,int,int){return 0;}
 struct FixtureData:SavedData {
  CLIPFORMAT bad{};
  HRESULT STDMETHODCALLTYPE GetData(FORMATETC* f,STGMEDIUM* m) override {

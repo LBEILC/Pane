@@ -3,9 +3,21 @@
 #include <windows.h>
 static UINT fixtureFormat;
 static HGLOBAL fixtureMemory;
-static UINT WINAPI FixtureRegister(LPCWSTR){return 0xc001;}
+static UINT WINAPI FixtureRegister(LPCWSTR name){return wcscmp(name,L"Pane.OwnClipboard")==0?0xc002:wcscmp(name,L"Pane.SourceClipboard")==0?0xc003:0xc001;}
 static BOOL WINAPI FixtureAvailable(UINT format){return format==fixtureFormat;}
 static HANDLE WINAPI FixtureGet(UINT format){return format==fixtureFormat?fixtureMemory:nullptr;}
+static bool fixtureOwn=false,fixtureSource=false,fixtureText=false;
+static BOOL WINAPI FixtureOpen(HWND){return TRUE;}
+static BOOL WINAPI FixtureClose(){return TRUE;}
+static BOOL WINAPI FixtureEmpty(){fixtureOwn=false;fixtureSource=false;fixtureText=false;return TRUE;}
+static HANDLE WINAPI FixtureSet(UINT format,HANDLE memory){
+ if(format==0xc002)fixtureOwn=true;if(format==0xc003)fixtureSource=true;if(format==CF_UNICODETEXT)fixtureText=true;
+ GlobalFree(memory);return reinterpret_cast<HANDLE>(1);
+}
+#define OpenClipboard FixtureOpen
+#define CloseClipboard FixtureClose
+#define EmptyClipboard FixtureEmpty
+#define SetClipboardData FixtureSet
 #define RegisterClipboardFormatW FixtureRegister
 #define IsClipboardFormatAvailable FixtureAvailable
 #define GetClipboardData FixtureGet
@@ -87,6 +99,10 @@ int main(int argc,char** argv){
  SaveFixture(f.Get(),Dib(true,false,mixed),true,mixed);
  SaveFixture(f.Get(),Png(f.Get(),zero),false,opaque);
  SaveFixture(f.Get(),Png(f.Get(),mixed),false,mixed);
+ for(int mode:{0,1}){
+  Check(PaneClipWrite(L"synthetic copy",nullptr,nullptr,0,mode)==1,"write synthetic text");
+  Check(fixtureText&&fixtureOwn==(mode==1)&&fixtureSource==(mode==0),"native write mode formats");
+ }
  Benchmark();
  std::cout<<"PASS image assertions="<<checks<<";systemClipboard=0\n";
 }

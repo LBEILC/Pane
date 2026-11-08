@@ -52,7 +52,8 @@ public sealed partial class App
         selectionCancellation?.Cancel();var pending=new CancellationTokenSource();selectionCancellation=pending;
         try{var result=await selectionReader!.ReadAsync(pending.Token);if(pending.IsCancellationRequested||closing||!superModule||superView==null)return;
             superView!.SetSelection(result);if(controlsEnabled)File.AppendAllText(output+".selection-order","SetSelection\n");
-            foreach(var panel in panels.Values)panel.Hide();current=panels["super"];current.Show(true,request.PhysicalX,request.PhysicalY,Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");
+            foreach(var panel in panels.Values)panel.Hide();current=panels["super"];
+            if(!ShowSuperPassive(current,request.PhysicalX,request.PhysicalY))current.Show(true,request.PhysicalX,request.PhysicalY,Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");   // 079：先试不激活
             if(controlsEnabled)File.AppendAllText(output+".selection-order","Show\n");
         }catch(OperationCanceledException){}catch(Exception e){if(!closing&&superModule&&superView!=null){superView!.SetSelection(new(null,0,SelectionFailure.Unsupported));current=panels["super"];current.Show(true,request.PhysicalX,request.PhysicalY,Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");if(controlsEnabled)File.AppendAllText(output+".selection-errors",e.GetType().Name+"\n");}}finally{if(selectionCancellation==pending)selectionCancellation=null;pending.Dispose();}
     }

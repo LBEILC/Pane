@@ -54,6 +54,7 @@ public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey)
 }
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
+public sealed record AppAliasEntry(string AppId, string Name, string[] Aliases);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
 // 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
 public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing }
@@ -69,6 +70,8 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
 {
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
+    AppAliasEntry[] appAliases=[];
+    public AppAliasEntry[] AppAliases { get=>appAliases; init=>appAliases=value??[]; }
     SearchEngine[] searchEngines=DefaultSearchEngines();
     // 设计改（2026-11-01，issue 8）：默认加上 Google。存过的列表如果和旧默认完全一样（没改过），读进来时换成新默认；改过的不动
     public SearchEngine[] SearchEngines { get=>searchEngines; init=>searchEngines=value==null||IsOldDefault(value)?DefaultSearchEngines():value; }

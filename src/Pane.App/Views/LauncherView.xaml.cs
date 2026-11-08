@@ -126,7 +126,25 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     }
 
     /// <summary>剪贴板「交给启动器」：宿主先调用这个，再显示启动器。</summary>
-    public void AttachNext(ClipEntry entry) => pendingAttachment = entry;
+    public void AttachNext(ClipEntry entry)
+    {
+        // 单行短文字当搜索词填进输入框，别的当附件（2026-11-08 用户定）
+        if (QueryText(entry) is { } text) pendingQuery = text; else pendingAttachment = entry;
+    }
+
+    /// <summary>剪贴板叠在启动器上时选了一条：单行短文字替换输入框内容，别的当附件。启动器已显示。</summary>
+    public void Use(ClipEntry entry)
+    {
+        if (QueryText(entry) is { } text) { SetAttachment(null); Fill(text); return; }   // Fill 改了文字会触发搜索
+        SetAttachment(entry);
+        _ = Refresh(Input.Text);
+    }
+
+    /// <summary>能直接当搜索词的剪贴板文字：不是图片 / 文件、单行、去掉首尾空白后 1～100 字。</summary>
+    public static string? QueryText(ClipEntry e) =>
+        e.Kind is not (ClipKind.Image or ClipKind.Files) && e.Text?.Trim() is { Length: > 0 and <= 100 } t && t.IndexOfAny(['\r', '\n']) < 0 ? t : null;
+
+    string? pendingQuery;
 
     // ---------------- IPanelView ----------------
 
@@ -144,12 +162,15 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         noticeHeight = Notice.Show(notice);
         if (notice != null) ((App)Application.Current).NoticeShown(notice);
         ExitAi();
+        if (aliasItem is not null) { aliasItem = null; SetAttachment(attachment, animate: false); }   // 上次没保存的别名编辑作废
         menuItem = null;   // 每次呼出都从结果列表开始
         // 附件：交过来的优先；否则复制后几秒内呼出（设置里定，0 = 关），带入刚复制的内容（不清空系统剪贴板）
         var attach = pendingAttachment;
         pendingAttachment = null;
+        var query = pendingQuery;   // 剪贴板交过来的短文字：直接当搜索词，不再自动带附件
+        pendingQuery = null;
         int seconds = Options.AutoAttachSeconds;
-        if (attach is null && seconds > 0 && clipboard.Snapshot().OrderByDescending(e => e.CopiedAt).FirstOrDefault() is { } newest
+        if (attach is null && query is null && seconds > 0 && clipboard.Snapshot().OrderByDescending(e => e.CopiedAt).FirstOrDefault() is { } newest
             && DateTimeOffset.Now - newest.CopiedAt < TimeSpan.FromSeconds(seconds))
             attach = newest;
         // 设计预览：PANE_DESIGN_ATTACH=text|image|files 带一个对应类型的附件
@@ -168,10 +189,11 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
             Settings.KeepInputMode.OneMinute => DateTimeOffset.Now - hiddenAt < TimeSpan.FromMinutes(1),
             _ => false,
         };
-        var text = Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY") ?? (keep ? Input.Text : string.Empty);
+        var text = Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY") ?? query ?? (keep ? Input.Text : string.Empty);
         if (Input.Text != text) Input.Text = text;
         else _ = Refresh(text);
-        if (text.Length > 0) Input.SelectAll();
+        if (query is not null) Input.SelectionStart = text.Length;   // 交过来的搜索词光标放末尾，接着打
+        else if (text.Length > 0) Input.SelectAll();
     }
 
     public void OnShown()
@@ -256,6 +278,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
 
     void OnRemoveAttachment(object sender, RoutedEventArgs e)
     {
+        if (aliasItem is not null) { ExitAlias(); return; }
         SetAttachment(null);
         _ = Refresh(Input.Text);
         Input.Focus(FocusState.Programmatic);
@@ -325,6 +348,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     void OnTextChanged(object sender, TextChangedEventArgs e)
     {
         HideClearButton();
+        if (aliasItem is not null) { AliasFoot(); return; }   // 编辑别名时输入框装的是别名，不搜索
         if (aiMode) ExitAi(); // 卡片打开时继续打字 = 回到列表重新搜
         menuItem = null;      // 操作列表里打字 = 回到列表接着搜
         // 设计改（2026-10-30）：不再防抖，每次按键直接搜（026 补测：防抖 60 ms 加等慢来源，结果比 uTools 晚 110～170 ms）
@@ -578,9 +602,18 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
             LauncherCell.Action => ActionFoot(ActionId(item), item.Title, q),
             _ => (item.Title, [(["Enter"], Strings.Common_Execute)]),
         };
+        // Tab 兜底的行，提示放得下（不到三个）时加「Tab 搜文件」；应用行已有三个，不加
+        if (TabFallback && keys.Length < 3 && !keys.Any(k => k.Item1 is ["Tab"]) && row.Cell is LauncherCell.Calc or LauncherCell.Command or LauncherCell.Action
+            && item.Id != "terminal:hint" && !item.Id.StartsWith("direct:", StringComparison.Ordinal) && item.Group is not (LauncherGroups.Terminal or LauncherGroups.Completion or LauncherGroups.Timer)
+            && !(row.Cell == LauncherCell.Action && ActionId(item) == "files"))
+            keys = [.. keys, (["Tab"], Strings.Launcher_SearchFiles)];
         FootWhat.Text = what;
         KeyHints.Fill(FootKeys, keys, HintLabelProto, KbdProto);
     }
+
+    // Tab 兜底进文件窗口：终端模式、带附件时不兜底（issue 35）
+    bool TabFallback => attachment is null && !shownQuery.StartsWith('>');
+    void TabToFiles(string q) { if (TabFallback) OpenFiles?.Invoke(q, null); }
 
     static (string, (string[], string)[]) ActionFoot(string id, string name, string q) => id switch
     {
@@ -731,6 +764,19 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     void OnInputKeyDown(object sender, KeyRoutedEventArgs e)
     {
         var ctrl = Down(VirtualKey.Control);
+
+        if (aliasItem is not null)
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Enter: SaveAlias(); break;
+                case VirtualKey.Escape: ExitAlias(); break;
+                case VirtualKey.Up or VirtualKey.Down or VirtualKey.Tab: break;
+                default: return;   // 其他键照常打字
+            }
+            e.Handled = true;
+            return;
+        }
 
         if (aiMode)
         {
@@ -956,7 +1002,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
                 if (id == "files") { OpenFiles?.Invoke(q, null); return; }
                 if (id == "ai:translate" && tab) { OpenTranslate?.Invoke(q); return; }
                 if (id == "ai:ask" && tab) { OpenChat?.Invoke(q, null); return; }
-                if (tab) return;
+                if (tab) { TabToFiles(q); return; }
                 if (id.StartsWith("ai:", StringComparison.Ordinal)) { RunAi(id[3..]); return; }
                 if (id.StartsWith("web:", StringComparison.Ordinal) && Engine(id) is { } engine)
                 {
@@ -966,7 +1012,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
                 }
                 return;
             default:
-                if (tab) return;   // Tab 只展开二级窗口，别的项不响应（不误触发关机这类命令）
+                // Tab 只展开二级窗口，不执行这一项（不误触发关机这类命令）；没有自己二级窗口的项，Tab 带着输入进文件窗口（issue 35）
+                if (tab) { TabToFiles(q); return; }
                 break;
         }
 
@@ -1062,7 +1109,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         LauncherItemAction.CopyPath => (Strings.Common_CopyPath, "copy"),
         LauncherItemAction.Properties => (Strings.Launcher_Properties, "info"),
         LauncherItemAction.RemoveFromApps => (Strings.Launcher_RemoveFromApps, "eye-off"),   // 057：不删文件，只是不再列出
-        _ => (Strings.Launcher_Uninstall, "trash"),
+        LauncherItemAction.EditAliases => (Strings.Launcher_EditAliases, "hash"),           // 078 / issue 33
+        LauncherItemAction.Uninstall => (Strings.Launcher_Uninstall, "trash"),
+        _ => (Strings.Launcher_MoreActions, "info"),
     };
 
     void CloseMenu()
@@ -1080,6 +1129,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         if (menuItem is not { } item || row.Index >= menuEntries.Count) return;
         if (menuEntries[row.Index].Pin) { await TogglePin(row, item); return; }
         var action = menuEntries[row.Index].Action;
+        if (action == LauncherItemAction.EditAliases) { EnterAlias(item); return; }
         if (action == LauncherItemAction.Uninstall && !Confirmed(row)) return;
         try
         {
@@ -1111,6 +1161,64 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         int back = rows.FindIndex(r => r.Item.Id == item.Id);
         if (back >= 0) Select(back);
         FootWhat.Text = pin ? Strings.Launcher_PinnedToHome : Strings.Launcher_UnpinnedFromHome;
+    }
+
+    // ---------------- 搜索别名（078 / issue 33） ----------------
+    // 菜单选「设置搜索别名」：输入框换成这个应用现有的别名（空格隔开），输入框左边的标签显示应用名；
+    // 列表只留这一个应用；Enter 保存、Esc 取消，都回到原来的搜索、选回这一项。
+    LauncherItem? aliasItem;
+    string aliasReturnQuery = "";
+
+    void EnterAlias(LauncherItem item)
+    {
+        if (search is not IAppAliases aliases) return;
+        menuItem = null;
+        Disarm();
+        aliasReturnQuery = Input.Text;
+        aliasItem = item;
+        AttachIcon.Glyph = "hash";
+        AttachText.Text = item.Title;
+        AttachChip.Visibility = Visibility.Visible;
+        PlayAttachIn();
+        Input.PlaceholderText = Strings.Launcher_AliasPlaceholder;
+        Render(new LauncherResult([item], false), aliasReturnQuery, attachmentMode: false);
+        Input.Text = string.Join(" ", aliases.Get(item.Id));
+        Input.SelectAll();
+        Input.Focus(FocusState.Programmatic);
+        AliasFoot();
+    }
+
+    void AliasFoot(string? message = null)
+    {
+        if (aliasItem is not { } item) return;
+        FootWhat.Text = message ?? string.Format(Strings.Launcher_AliasEditing, (object?)item.Title);
+        KeyHints.Fill(FootKeys, [(["Enter"], Strings.Common_Save), (["Esc"], Strings.Common_Cancel)], HintLabelProto, KbdProto);
+    }
+
+    void SaveAlias()
+    {
+        if (aliasItem is not { } item || search is not IAppAliases aliases) return;
+        var names = Input.Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (names.Length > 8) { AliasFoot(Strings.Launcher_AliasTooMany); return; }
+        if (names.Any(n => n.Length > 32)) { AliasFoot(Strings.Launcher_AliasTooLong); return; }
+        try { aliases.Set(item.Id, names); }
+        catch (Exception e) when (e is ArgumentException or IOException or UnauthorizedAccessException) { AliasFoot(App.FailureReason(e) ?? Strings.Settings_SaveFailed); return; }
+        _ = ExitAlias(string.Format(names.Length > 0 ? Strings.Launcher_AliasSaved : Strings.Launcher_AliasCleared, (object?)item.Title));
+    }
+
+    void ExitAlias() => _ = ExitAlias(null);
+
+    async Task ExitAlias(string? done)
+    {
+        if (aliasItem is not { } item) return;
+        aliasItem = null;
+        SetAttachment(attachment, animate: false);
+        Input.Text = aliasReturnQuery;   // 触发重新搜索
+        Input.SelectionStart = Input.Text.Length;
+        await Refresh(Input.Text);
+        int back = rows.FindIndex(r => r.Item.Id == item.Id);
+        if (back >= 0) Select(back);
+        if (done is not null) FootWhat.Text = done;
     }
 
     // 失败原因写在这一行；服务给的 LauncherActionException 本身就是给用户看的一句话；UAC 点「否」服务已经静默
