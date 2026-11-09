@@ -14,9 +14,9 @@ public sealed partial class App
         ? UiLanguageResolver.Resolve(configured, UiLanguageResolver.SystemLanguage())
         : "zh-Hans";
 
-    void ApplyUiLanguage()
+    public void ApplyUiLanguage(string? configured = null)
     {
-        UiLanguage = ResolveUiLanguage(Store.Current.General.UiLanguage);
+        UiLanguage = ResolveUiLanguage(configured ?? Store?.Current.General.UiLanguage);
         Strings.Initialize(UiLanguage);
     }
 }

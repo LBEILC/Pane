@@ -25,7 +25,10 @@ internal sealed class SetupHost : IDisposable
         // 只继承主题、强调色；玻璃材质参数仍采用默认令牌。
         try { glass = new(defaults.General with { Theme = installed.General.Theme, AccentColor = installed.General.AccentColor }); }
         catch (Exception e) when (e is ArgumentException or FormatException or NullReferenceException) { glass = new(defaults.General); }
-        ((App)app).Glass = glass;   // 控件（焦点环等）从 App.Glass 读主题色
+        var paneApp = (App)app;
+        paneApp.Glass = glass;   // 控件（焦点环等）从 App.Glass 读主题色
+        paneApp.ApplyUiLanguage(installed.General.UiLanguage);
+        paneApp.ApplyUiFont(installed.General.UiFont);
         IPanelView view;
         Task Operation() => Task.CompletedTask;
         Func<Task> operation = Operation;

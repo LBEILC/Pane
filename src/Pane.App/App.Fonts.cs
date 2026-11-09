@@ -15,11 +15,12 @@ public sealed partial class App
     // 繁体界面（048）：MiSans VF 和微软雅黑的繁体是简体字形，默认字体和缺字回落都换成微软正黑。要在 ApplyUiLanguage 之后用
     public string DefaultFont=>UiLanguage=="zh-Hant"?CjkFallbackFont:DefaultUiFont;
     public string CjkFallbackFont=>UiLanguage=="zh-Hant"?"Microsoft JhengHei UI":"Microsoft YaHei UI";
-    void ApplyUiFont()
+    public void ApplyUiFont(string? configuredFont = null)
     {
         if(demo)Fonts??=new Pane.DesignData.FontCatalogSample();
-        var name=Store.Current.General.UiFont is {Length:>0} f?f:DefaultFont;
-        AppliedUiFont=Store.Current.General.UiFont;
+        var configured = configuredFont ?? Store?.Current.General.UiFont;
+        var name=configured is {Length:>0} f?f:DefaultFont;
+        AppliedUiFont=configured;
         GlassParameters.SetFonts(new FontFamily($"{name}, {CjkFallbackFont}, Segoe UI Variable Text"),new FontFamily($"{name}, {CjkFallbackFont}, Segoe UI Variable Display"));
     }
 }

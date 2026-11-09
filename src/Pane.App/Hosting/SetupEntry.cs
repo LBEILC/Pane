@@ -1,5 +1,6 @@
 using Pane.Localization;
 using System.Diagnostics;
+using System.Text.Json;
 using System.Runtime.InteropServices;
 using Pane.Services.Setup;
 namespace Pane.Hosting;
@@ -45,6 +46,7 @@ internal static class SetupEntry
         if (args is ["--setup-preview" or "--uninstall-preview", var state])
         {
             Preview = state; Uninstall = args[0] == "--uninstall-preview"; Paths = SetupPaths.Production; Active = true;
+            InitializeLanguage(Paths.Data);
             runApplication();
             return true;
         }
@@ -69,6 +71,7 @@ internal static class SetupEntry
             Paths = IsolatedRoot == null ? SetupPaths.Production : SetupPaths.Isolated(IsolatedRoot);
             IsolatedRoot = IsolatedRoot == null ? null : Paths.Root;
             Paths = Paths.ResolveInstalled(IsolatedRoot);
+            InitializeLanguage(Paths.Data);
             Uninstall = args[0] != "--setup";
             if (args[0] == "--uninstall")
             {
@@ -105,6 +108,21 @@ internal static class SetupEntry
             else MessageBoxW(0, error is Pane.Contracts.SetupException ? error.Message : string.Format(Strings.Setup_UninstallChainFailed, "application-entry", UninstallChain.LogPath), "Pane", 0x10);
         }
         return true;
+    }
+    private static void InitializeLanguage(string data)
+    {
+        // WinUI 尚未初始化，不能调用会创建 FontFamily 的 GlassParameters.Defaults()。
+        string? configured = null;
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(data, "settings.json")));
+            if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("General", out var general) && general.ValueKind == JsonValueKind.Object &&
+                general.TryGetProperty("UiLanguage", out var language) && language.ValueKind == JsonValueKind.String)
+                configured = language.GetString();
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or JsonException) { }
+        Strings.Initialize(App.ResolveUiLanguage(configured));
     }
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int MessageBoxW(nint window, string text, string caption, uint flags);
 }
