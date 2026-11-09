@@ -10,12 +10,14 @@
   <img src="https://img.shields.io/badge/Windows%2011-x64-5874c9?style=flat-square" alt="Windows 11 x64">
   <img src="https://img.shields.io/badge/%E7%95%8C%E9%9D%A2-%E7%AE%80%E4%BD%93%20%C2%B7%20%E7%B9%81%E9%AB%94-5874c9?style=flat-square" alt="界面：简体 · 繁體">
   <a href="LICENSE"><img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-GPL--3.0-5874c9?style=flat-square" alt="许可证 GPL-3.0"></a>
+  <a href="https://qm.qq.com/q/x1BlWfEO2e"><img src="https://img.shields.io/badge/QQ%20%E7%BE%A4-1131911368-5874c9?style=flat-square" alt="QQ 群 1131911368"></a>
 </p>
 
 <p align="center">
   <a href="https://github.com/LBEILC/Pane/releases/latest"><b>下载最新版</b></a> ·
   <a href="#安装">安装说明</a> ·
   <a href="#隐私">隐私</a> ·
+  <a href="#反馈与交流">交流群</a> ·
   <a href="#从源码构建">从源码构建</a>
 </p>
 
@@ -170,6 +172,11 @@
 - 联网只有三种情况：你用 AI 功能时访问你配置的服务；检查更新时访问 GitHub；你用网页搜索时打开浏览器。
 
 截图里的文件、剪贴板内容都是演示数据。
+
+## 反馈与交流
+
+- **QQ 群「Pane官方交流群」：[1131911368](https://qm.qq.com/q/x1BlWfEO2e)**（点链接直接加群）。用的时候遇到问题、有想法，或者对 Pane 感兴趣，都欢迎加群交流。
+- 需要跟进的问题和功能建议，也可以提到 [Issues](https://github.com/LBEILC/Pane/issues)，方便记录和回复。
 
 ## 从源码构建
 
