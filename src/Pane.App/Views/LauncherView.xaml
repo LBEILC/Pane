@@ -39,6 +39,12 @@
                                    Foreground="{ThemeResource PaneText3Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                     </StackPanel>
                     <StackPanel Grid.Column="2" VerticalAlignment="Center" Visibility="{x:Bind HotkeyVisibility}" c:KeyCombo.Text="{x:Bind Hotkey}"/>
+                    <!-- 网页搜索历史行：选中时行尾出 ×（issue 39） -->
+                    <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="24" Height="24" CornerRadius="12" VerticalAlignment="Center"
+                            Visibility="{x:Bind RemoveVisibility, Mode=OneWay}" Click="{x:Bind OnRemoveClick}"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Launcher_RemoveHistory}">
+                        <c:PaneIcon Glyph="close" Width="13" Height="13" Foreground="{ThemeResource PaneText3Brush}"/>
+                    </Button>
                 </Grid>
             </DataTemplate>
 
@@ -144,7 +150,20 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <c:PaneIcon Glyph="search" Width="22" Height="22" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+            <!-- 放大镜；用关键字搜网页时换成引擎徽章（issue 43，原型 prototype/engine-badge.html 的 B 玻璃）。
+                 徽章 28，用负边距伸出 22 的位置，输入框不跟着挪 -->
+            <Grid Width="22" Height="22" VerticalAlignment="Center" IsHitTestVisible="False">
+                <c:PaneIcon x:Name="SearchGlyph" Glyph="search" Width="22" Height="22" Foreground="{ThemeResource PaneText2Brush}"/>
+                <Border x:Name="EngineBadge" Width="28" Height="28" Margin="-3" CornerRadius="8" Opacity="0"
+                        Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <Grid>
+                        <Image x:Name="EngineGlyph" Width="15" Height="15" Stretch="Uniform"/>
+                        <Image x:Name="EngineFull" Stretch="UniformToFill" Visibility="Collapsed"/>
+                        <TextBlock x:Name="EngineMono" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"
+                                   FontFamily="{StaticResource PaneFontDisplay}" FontSize="13" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+                    </Grid>
+                </Border>
+            </Grid>
             <!-- 附件：刚复制的内容，或从剪贴板交过来的条目（原型 .attach） -->
             <Border x:Name="AttachChip" Grid.Column="1" Height="30" MaxWidth="220" Padding="9,0,4,0" VerticalAlignment="Center" Visibility="Collapsed"
                     CornerRadius="15" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">

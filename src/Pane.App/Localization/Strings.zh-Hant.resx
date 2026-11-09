@@ -412,6 +412,7 @@
   <data name="Launcher_AliasTooMany" xml:space="preserve"><value>最多 8 個別名</value></data>
   <data name="Launcher_AliasTooLong" xml:space="preserve"><value>每個別名最多 32 個字元</value></data>
   <data name="Launcher_RemoveFromApps" xml:space="preserve"><value>從應用程式清單移除</value></data>
+  <data name="Launcher_RemoveFromRecent" xml:space="preserve"><value>從最近使用中移除</value></data>
   <data name="Launcher_RestoreClipboard" xml:space="preserve"><value>重新複製到剪貼簿</value></data>
   <data name="Launcher_RunAsAdmin" xml:space="preserve"><value>以管理員身份執行</value></data>
   <data name="Launcher_RunFailed" xml:space="preserve"><value>執行失敗：{0}</value></data>
@@ -1195,6 +1196,11 @@
   <data name="Settings_Launcher_HomeRecentDescription" xml:space="preserve"><value>最近開啟過的應用程式和固定的應用程式。選取應用程式後按 Ctrl+K 或右鍵即可固定</value></data>
   <data name="Settings_Launcher_ExpandOnOpen" xml:space="preserve"><value>從搜尋欄展開</value></data>
   <data name="Settings_Launcher_ExpandOnOpenDescription" xml:space="preserve"><value>叫出時先顯示搜尋欄，再向下展開</value></data>
+  <data name="Launcher_WebHint" xml:space="preserve"><value>輸入要用 {0} 搜尋的內容</value></data>
+  <data name="Launcher_SearchUsing" xml:space="preserve"><value>使用 {0} 搜尋</value></data>
+  <data name="Launcher_RemoveHistory" xml:space="preserve"><value>刪除此記錄（Shift+Delete）</value></data>
+  <data name="Settings_Launcher_RememberWebSearches" xml:space="preserve"><value>記住網頁搜尋</value></data>
+  <data name="Settings_Launcher_RememberWebSearchesDescription" xml:space="preserve"><value>用關鍵字搜尋網頁時記下搜尋過的詞，按網站分開，只存本機；以空格開頭的不記錄</value></data>
   <data name="Settings_Launcher_Invalid" xml:space="preserve"><value>啟動器設定無效</value></data>
   <data name="Settings_Launcher_KeepAlways" xml:space="preserve"><value>一直保留</value></data>
   <data name="Settings_Launcher_KeepInput" xml:space="preserve"><value>再次叫出時</value></data>

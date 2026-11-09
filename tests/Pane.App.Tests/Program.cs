@@ -8,6 +8,7 @@ static class Program
  static int checks;
  static void Check(bool condition,string name){checks++;if(!condition)throw new Exception(name);}
  static async Task Main(string[] args){
+  if(args is ["--desktop-shell-probe",var probe]){SetupLaunchTests.Probe(probe);return;}
   if(args.Length==4 && args[0]=="--uninstall-child-fixture"){File.WriteAllText(args[1],JsonSerializer.Serialize(args.Skip(2).ToArray()));Environment.ExitCode=7;return;}
   if(args.Length is 3 or 4 && args[0]=="--verify-release") { await ReleaseVerification.Run(args[1],args[2],args.Length==4 && args[3]=="--fake-server");return; }
   if(args is ["--fonts"]){try{await FontTests.Run();}catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}return;}
@@ -15,7 +16,7 @@ static class Program
   if(args is ["--update-e2e",var oldPackage,var newPackage,var evidence]){await UpdateEndToEnd.Run(oldPackage,newPackage,evidence);return;}
   if(args is ["--setup-only"]){
    var fixture=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Alt,32)),new(new(KeyModifiers.Ctrl,86)));
-   try {int total=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await SetupFailureTests.Run(fixture);total+=await SetupLinkTests.Run(fixture);
+   try {int total=SetupLaunchTests.Run();total+=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await SetupFailureTests.Run(fixture);total+=await SetupLinkTests.Run(fixture);
    Console.WriteLine($"PASS setup suites assertions={total}");}catch(Exception error){Console.WriteLine(error);Environment.ExitCode=1;}return;
   }
   foreach(var failure in new[]{SelectionFailure.None,SelectionFailure.Empty,SelectionFailure.Unsupported,SelectionFailure.Elevated,SelectionFailure.Timeout}){
@@ -47,6 +48,7 @@ static class Program
   checks+=await WinVTests.Run();
   checks+=await SelectionTests.Run();
   checks+=ReleaseTests.Run(settings);
+  checks+=SetupLaunchTests.Run();
   checks+=await SetupTests.Run(settings);
   checks+=UninstallTests.Run();
   checks+=await UpdateTests.Run();

@@ -24,6 +24,7 @@ internal static class ReleaseVerification
             }
             Uri source = server?.Url ?? UpdateService.ProductionSource;
             using var http = new HttpClient(new HttpClientHandler { UseCookies = false, UseDefaultCredentials = false, AllowAutoRedirect = false });
+            http.Timeout = TimeSpan.FromMinutes(15);
             http.DefaultRequestHeaders.UserAgent.ParseAdd("Pane/" + version);
             using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(15));
             var token = timeout.Token;

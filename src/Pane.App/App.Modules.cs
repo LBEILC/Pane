@@ -160,9 +160,12 @@ public sealed partial class App
                 a.launcherSearch = new(a.Store, new Pane.Services.Launcher.WindowsAppCatalog(a.Store.DirectoryPath), everything, new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))));
                 a.launcherSearch.PowerTimerProvider = () => a.PowerTimer; a.WebSuggestions = new Pane.Services.Launcher.WebSuggestions(() => a.Store.Current.Launcher.WebSuggestions);
                 a.TerminalHistory = a.launcherSearch.TerminalHistory;
+                a.WebSearchHistory = a.launcherSearch.WebSearchHistory;
                 SettingsView.PortableApps = a.launcherSearch;
                 SettingsView.AppAliases = a.launcherSearch;
             }
+            if(a.demo)a.WebSearchHistory=new Pane.DesignData.WebSearchHistorySample(()=>a.Store.Current.Launcher.RememberWebSearches);
+            a.EngineIcons=new Pane.Services.Launcher.EngineIcons(a.Store.DirectoryPath,!a.demo);
             a.Files = a.demo ? new Pane.DesignData.FileSearchSample() : new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(), new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.launcherSearch!.OpenFileAsync);
             var view = new LauncherView((ILauncherSearch?)a.launcherSearch ?? new Pane.DesignData.LauncherSampleSearch { PinnedApps = () => a.Store.Current.Launcher.PinnedApps }, a.Ai, a.secondaryActions!,
                 a.demo ? new Pane.DesignData.LauncherAttachmentActionsSample() : new Pane.Services.Clipboard.ClipboardAttachmentActions(a.launcherSearch!),
@@ -178,6 +181,9 @@ public sealed partial class App
             SettingsView.AppAliases = null;
             SettingsView.PortableApps = null; a.launcherSearch?.Dispose(); a.launcherSearch = null; (a.WebSuggestions as IDisposable)?.Dispose(); a.WebSuggestions = null;
             a.TerminalHistory = null; a.Files = null; a.FileSearchStatus=null!;
+            a.WebSearchHistory=null;
+            if(a.EngineIcons is Pane.Services.Launcher.EngineIcons engines){engines.Dispose();await engines.Completion;}
+            a.EngineIcons=null;
             var icons=a.FileIcons;a.FileIcons=new Pane.Services.Icons.EmptyFileIcons();(icons as IDisposable)?.Dispose();
             if(icons is Pane.Services.Icons.FileIcons real)await real.Completion;
         }

@@ -8,6 +8,7 @@ using Pane.Localization;
 // AI：选 AI 项后结果卡片代替列表；Enter 粘贴回原窗口、Ctrl+C 复制、Ctrl+R 重新生成、Tab 继续对话（翻译是翻译窗口）。
 // Esc 分步：AI 卡片 → 回到列表；有输入 → 清空；有附件 → 去掉；最后收起（docs/design.md「Esc 分步」）。
 using System.Numerics;
+using Microsoft.UI.Composition;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -123,6 +124,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         Card.ContentGrew += (_, _) => RequestHeight();
         Card.SizeChanged += (_, _) => RequestHeight();
         Icons.Ready += OnIconReady;
+        // 引擎徽章的单色图标按主题上色，换主题时重画
+        ActualThemeChanged += (_, _) => { if (badgeEngine is { } e) _ = FillBadge(e); };
     }
 
     /// <summary>剪贴板「交给启动器」：宿主先调用这个，再显示启动器。</summary>
@@ -216,6 +219,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     public void Dispose()
     {
         Icons.Ready -= OnIconReady;
+        if (hookedIcons is not null) { hookedIcons.Ready -= OnEngineIconReady; hookedIcons = null; }
         pending?.Cancel();
         if (armTimer is not null) { armTimer.Stop(); armTimer.Tick -= OnArmExpired; }
         Card.Release();
@@ -417,8 +421,119 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         return null;
     }
 
-    static LauncherItem WebItem(Settings.SearchEngine engine, string text, string title, string? hotkey) =>
-        new("web:" + engine.UrlTemplate.Replace("{query}", Uri.EscapeDataString(text), StringComparison.Ordinal), LauncherItemKind.Web, LauncherGroups.Web, title, null, new("search"), Hotkey: hotkey);
+    static LauncherItem WebItem(Settings.SearchEngine engine, string text, string title, string? hotkey, string glyph = "search") =>
+        new("web:" + engine.UrlTemplate.Replace("{query}", Uri.EscapeDataString(text), StringComparison.Ordinal), LauncherItemKind.Web, LauncherGroups.Web, title, null, new(glyph), Hotkey: hotkey);
+
+    /// <summary>输入以「站点关键字 空格」开头（后面可以还没打字）：徽章和「只输入了关键字时列历史」用。</summary>
+    static Settings.SearchEngine? KeywordEngine(string raw)
+    {
+        var s = raw.TrimStart();
+        int space = s.IndexOf(' ');
+        if (space <= 0) return null;
+        return Options.SearchEngines.FirstOrDefault(e => string.Equals(e.Keyword, s[..space], StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ---------------- 引擎徽章（issue 43）：关键字搜网页时搜索框左边的放大镜换成站点徽章 ----------------
+
+    Settings.SearchEngine? badgeEngine;
+    IEngineIcons? hookedIcons;   // 订阅了 Ready 的那个服务（能力重启后服务会换，退订要对上同一个）
+    int badgeVersion;
+
+    void UpdateBadge(Settings.SearchEngine? engine)
+    {
+        if (engine == badgeEngine) return;
+        bool wasWeb = badgeEngine is not null;
+        badgeEngine = engine;
+        if (engine is null) { PlayBadge(false, wasWeb); return; }
+        _ = FillBadge(engine);
+        PlayBadge(true, wasWeb);
+    }
+
+    async Task FillBadge(Settings.SearchEngine engine)
+    {
+        int version = ++badgeVersion;
+        var app = (App)Application.Current;
+        if (app.EngineIcons is { } icons && !ReferenceEquals(icons, hookedIcons))
+        {
+            if (hookedIcons is not null) hookedIcons.Ready -= OnEngineIconReady;
+            icons.Ready += OnEngineIconReady; hookedIcons = icons;
+        }
+        EngineBadgeImages.Glyph? glyph = null;
+        if (app.EngineIcons?.TryGet(engine) is { } icon) glyph = await EngineBadgeImages.LoadAsync(icon, ActualTheme == ElementTheme.Dark);
+        if (version != badgeVersion) return;   // 等图标的时候已经换了站点
+        EngineGlyph.Source = glyph is { FullBleed: false } ? glyph.Source : null;
+        EngineFull.Source = glyph is { FullBleed: true } ? glyph.Source : null;
+        EngineGlyph.Visibility = glyph is { FullBleed: false } ? Visibility.Visible : Visibility.Collapsed;
+        EngineFull.Visibility = glyph is { FullBleed: true } ? Visibility.Visible : Visibility.Collapsed;
+        // 取不到图标：玻璃底上放站点名的首字
+        EngineMono.Text = EngineBadgeImages.Monogram(engine.Name);
+        EngineMono.Visibility = glyph is null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // 用户自加站点的图标在后台取好了；可能在后台线程触发
+    void OnEngineIconReady(object? sender, string url) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (badgeEngine is { } e && e.UrlTemplate == url) _ = FillBadge(e);
+    });
+
+    // 放大镜和徽章交替：进入时放大镜缩小淡出，徽章回弹放大淡入；换站点时徽章轻轻弹一下；退出反过来（原型 .slot.web）
+    void PlayBadge(bool web, bool wasWeb)
+    {
+        var glyph = ElementCompositionPreview.GetElementVisual(SearchGlyph);
+        var badge = ElementCompositionPreview.GetElementVisual(EngineBadge);
+        var c = glyph.Compositor;
+        glyph.CenterPoint = new Vector3(11, 11, 0);
+        badge.CenterPoint = new Vector3(14, 14, 0);
+        var spring = c.CreateCubicBezierEasingFunction(new Vector2(0.34f, 1.36f), new Vector2(0.64f, 1f));
+        var smooth = c.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0f), new Vector2(0f, 1f));
+        double speed = ((App)Application.Current).Glass.Current.MotionSpeed;
+        TimeSpan Ms(string token) => TimeSpan.FromMilliseconds(Math.Max(1, GlassParameters.Token(token) * speed));
+        void Scale(Visual v, float from, float to, CompositionEasingFunction ease, TimeSpan d)
+        {
+            var a = c.CreateVector3KeyFrameAnimation();
+            a.InsertKeyFrame(0, new Vector3(from, from, 1)); a.InsertKeyFrame(1, new Vector3(to, to, 1), ease); a.Duration = d;
+            v.StartAnimation("Scale", a);
+        }
+        void Fade(Visual v, float to, TimeSpan d)
+        {
+            var a = c.CreateScalarKeyFrameAnimation();
+            a.InsertKeyFrame(1, to, smooth); a.Duration = d;
+            v.StartAnimation("Opacity", a);
+        }
+        if (web && wasWeb) { Scale(badge, 0.85f, 1, spring, Ms("PaneDurSlow")); return; }
+        if (web)
+        {
+            EngineBadge.Opacity = 1;
+            Fade(glyph, 0, Ms("PaneDurFast")); Scale(glyph, 1, 0.6f, smooth, Ms("PaneDurNormal"));
+            badge.Opacity = 0; Fade(badge, 1, Ms("PaneDurNormal")); Scale(badge, 0.6f, 1, spring, Ms("PaneDurSlow"));
+        }
+        else
+        {
+            Fade(badge, 0, Ms("PaneDurFast")); Scale(badge, 1, 0.6f, smooth, Ms("PaneDurFast"));
+            Fade(glyph, 1, Ms("PaneDurNormal")); Scale(glyph, 0.6f, 1, spring, Ms("PaneDurSlow"));
+        }
+    }
+
+    // ---------------- 网页搜索历史（issue 39）：只输入关键字时列最近的词；打字后历史里匹配的在上（最多 3 条），联想词在下 ----------------
+
+    static IWebSearchHistory? History => Options.RememberWebSearches ? ((App)Application.Current).WebSearchHistory : null;
+    Settings.SearchEngine? webEngine;   // 这次渲染是哪个站点的网页搜索（历史行删除、底栏文字用）
+
+    void AddHistory(LauncherSection s, Settings.SearchEngine engine, string text)
+    {
+        var row = new LauncherRow(WebItem(engine, text, text, null, "history"), rows.Count, LauncherCell.Command) { HistoryText = text, Remove = RemoveHistory };
+        rows.Add(row);
+        s.Rows.Add(row);
+    }
+
+    void RemoveHistory(LauncherRow row)
+    {
+        if (row.HistoryText is not { } text || webEngine is not { } engine || ((App)Application.Current).WebSearchHistory is not { } history) return;
+        history.Remove(engine, text);
+        int keep = row.Index;
+        if (lastResult is { } r) Render(r, Input.Text, attachmentMode: false);
+        Select(Math.Min(keep, rows.Count - 1), scroll: false);
+    }
 
     // 只在用关键字搜网页时才向那个站点要建议（平时打字不联网）；停手 150 ms 再要，回来时输入没变才补上
     async Task Suggest(string q, CancellationTokenSource cts)
@@ -449,6 +564,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         shownQuery = q;
         rows = [];
         sections = [];
+        webEngine = null;
         LauncherSection Section(string label, LauncherSectionKind kind) { var s = new LauncherSection(label, kind, []); sections.Add(s); return s; }
         void Add(LauncherSection s, LauncherItem item, LauncherCell cell, string? number = null) { var r = new LauncherRow(item, rows.Count, cell, number); rows.Add(r); s.Rows.Add(r); }
 
@@ -487,10 +603,21 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         else if (KeywordQuery(q) is { } web)
         {
             // 用搜索关键字搜网页（「bd 天气」）：只出网页一组，第一项就是用这个站点搜，下面跟站点给的搜索建议（037）
+            webEngine = web.Engine;
             var s = Section(web.Engine.Name, LauncherSectionKind.List);
             Add(s, WebItem(web.Engine, web.Text, string.Format(Strings.Launcher_SearchWithQuery, (object?)(web.Engine.Name), (object?)(web.Text)), "Enter"), LauncherCell.Command);
+            var recent = History?.Recent(web.Engine, web.Text, 3) ?? [];
+            foreach (var text in recent) AddHistory(s, web.Engine, text);
             if (suggested.Query == web.Engine.Keyword + " " + web.Text)
-                foreach (var text in suggested.Items.Where(t => t != web.Text)) Add(s, WebItem(web.Engine, text, text, null), LauncherCell.Command);
+                foreach (var text in suggested.Items.Where(t => t != web.Text && !recent.Contains(t, StringComparer.OrdinalIgnoreCase))) Add(s, WebItem(web.Engine, text, text, null), LauncherCell.Command);
+        }
+        else if (KeywordEngine(query) is { } only)
+        {
+            // 只输入了「关键字 空格」：列这个站点最近搜过的词；没有记录时一条提示（不执行）
+            webEngine = only;
+            var s = Section(only.Name, LauncherSectionKind.List);
+            foreach (var text in History?.Recent(only, "", 6) ?? []) AddHistory(s, only, text);
+            if (s.Rows.Count == 0) Add(s, new("web:hint", LauncherItemKind.Command, LauncherGroups.Web, string.Format(Strings.Launcher_WebHint, (object?)only.Name), null, new("search")), LauncherCell.Command);
         }
         else if (DirectQuery(q) is { } direct)
         {
@@ -559,6 +686,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         UpdateLayout();
         int kept = keep is null ? -1 : rows.FindIndex(r => r.Item.Id == keep);
         Select(kept >= 0 ? kept : DefaultSelection(), scroll: false);
+        UpdateBadge(attachmentMode ? null : KeywordEngine(query));
         RequestHeight();
     }
 
@@ -599,6 +727,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             LauncherCell.Command when item.Id.StartsWith("direct:", StringComparison.Ordinal) && DirectQuery(q) is { } d => ActionFoot(d.ActionId, item.Title, d.Text),
             LauncherCell.Command when item.Group == LauncherGroups.Terminal => (string.Format(Strings.Launcher_RunInTerminal, (object?)(item.Subtitle)), [(["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_RunAsAdmin)]),
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
+            LauncherCell.Command when item.Id == "web:hint" => (item.Title, []),
+            // 关键字搜网页（issue 43）：底栏写用哪个站点，不重复结果行；历史行多一个 Shift+Delete 删除
+            LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (string.Format(Strings.Launcher_SearchUsing, (object?)we.Name),
+                row.HistoryText is null ? [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)] : [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput), (["Shift", "+", "Delete"], Strings.Common_Delete)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
             LauncherCell.Command when item.Group == LauncherGroups.Timer => (item.Title.TrimEnd('…'), [(["Enter"], item.Id == "power:panel" ? Strings.Common_Open : item.Id == "power:cancel" ? Strings.Common_Execute : Strings.Timer_Go)]),
             LauncherCell.Command when item.Group == LauncherGroups.Settings => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
@@ -703,7 +835,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (rows.Count == 0) { selected = -1; highlight.Hide(); UpdateFoot(); return; }
         index = Math.Clamp(index, 0, rows.Count - 1);
         if ((armed ?? failed) is { } marked && !ReferenceEquals(marked, rows[index])) Disarm();   // 换了选中项就取消待确认
+        if (selected >= 0 && selected < rows.Count) rows[selected].ShowRemove = false;
         selected = index;
+        rows[selected].ShowRemove = true;   // 历史行选中（含鼠标悬停）时出 ×
         UpdateFoot();
         if (ContainerOf(rows[selected]) is not { } el) return;
         highlight.MoveTo(el);
@@ -839,6 +973,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             case VirtualKey.Left when SelectedIsTile: MoveInLine(-1); break;
             case VirtualKey.Enter: _ = Execute(selected, false, ctrl, Down(VirtualKey.Shift)); break;
             case VirtualKey.Tab: _ = Execute(selected, true, false); break;
+            case VirtualKey.Delete when Down(VirtualKey.Shift) && selected >= 0 && selected < rows.Count && rows[selected].HistoryText is not null:
+                RemoveHistory(rows[selected]); break;   // 网页搜索历史行：Shift+Delete 删掉这条
             case VirtualKey.Back when Input.Text.Length == 0 && attachment is not null:
                 SetAttachment(null); _ = Refresh(string.Empty); break; // 空输入时退格去掉附件
             case VirtualKey.Escape:
@@ -973,7 +1109,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         // Tab：补全项填进输入框（037）；网页建议填成「关键字 建议」接着改
         if (tab && item.Id.StartsWith("complete:", StringComparison.Ordinal)) { Fill(">" + item.Id["complete:".Length..]); return; }
         if (tab && item.Kind == LauncherItemKind.Web && KeywordQuery(q) is { } kw) { Fill($"{kw.Engine.Keyword} {(item.Hotkey is null ? item.Title : kw.Text)}"); return; }
-        if (item.Id == "terminal:hint") return;   // 只有 > 时的提示项
+        if (tab && row.HistoryText is { } past && webEngine is { } we) { Fill($"{we.Keyword} {past}"); return; }   // 只输入了关键字时的历史行
+        if (item.Id is "terminal:hint" or "web:hint") return;   // 只有 > 时的提示项
         // 终端项 Ctrl+Shift+Enter：以管理员身份运行（走系统 UAC）
         if (ctrl && shift && item.Group is LauncherGroups.Terminal or LauncherGroups.Completion)
         {
@@ -1116,6 +1253,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         LauncherItemAction.Properties => (Strings.Launcher_Properties, "info"),
         LauncherItemAction.RemoveFromApps => (Strings.Launcher_RemoveFromApps, "eye-off"),   // 057：不删文件，只是不再列出
         LauncherItemAction.EditAliases => (Strings.Launcher_EditAliases, "hash"),           // 078 / issue 33
+        LauncherItemAction.RemoveFromRecent => (Strings.Launcher_RemoveFromRecent, "eraser"), // 只删使用记录，应用照常能搜到
         LauncherItemAction.Uninstall => (Strings.Launcher_Uninstall, "trash"),
         _ => (Strings.Launcher_MoreActions, "info"),
     };
@@ -1144,7 +1282,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         catch (Exception e) { MenuFailed(row, e); return; }
         // 从应用列表移除（057）：不收起启动器，回到结果重新搜，这一项就不在了
-        if (action == LauncherItemAction.RemoveFromApps) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
+        if (action is LauncherItemAction.RemoveFromApps or LauncherItemAction.RemoveFromRecent) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

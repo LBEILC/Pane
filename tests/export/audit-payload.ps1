@@ -1,6 +1,18 @@
-﻿param([string]$PackageMetadata,[string]$Report)
+﻿param([string]$PackageMetadata,[string]$Report,[string]$EngineAssetDirectory)
 $ErrorActionPreference='Stop'
 $repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+$engineAssets=@('google','bing','bilibili','github','baidu') | ForEach-Object {"Assets/Engines/$_.png"}
+# 固定设计确认的 favicon.ico 最大帧，防止源文件和发布文件一起退回旧放大镜。
+$bingHash='688789CF2A94D0238659CC1CA40A4EF6AEF8B6585769AD397EEED52102B879C0'
+if((Get-FileHash -LiteralPath (Join-Path $repo 'src/Pane.App/Assets/Engines/bing.png')).Hash -ne $bingHash){throw '必应图标不是已核对的 b 标志'}
+# 仅构建验收时核对发布目录；完整安装包审计仍执行下方全部检查。
+if($EngineAssetDirectory){
+    foreach($path in $engineAssets){
+        if((Get-FileHash -LiteralPath (Join-Path $repo "src/Pane.App/$path")).Hash -ne (Get-FileHash -LiteralPath (Join-Path $EngineAssetDirectory $path)).Hash){throw "引擎图标不一致：$path"}
+    }
+    Write-Host "engineAssets=5; hashesVerified=True"
+    return
+}
 if(!$PackageMetadata){$PackageMetadata=Join-Path $repo 'dist/package.json'}
 if(!$Report){$Report=Join-Path $repo 'out/payload-audit.json'}
 $metadata=Get-Content -LiteralPath $PackageMetadata -Encoding UTF8 -Raw | ConvertFrom-Json
@@ -27,6 +39,7 @@ foreach($library in $assets.libraries.PSObject.Properties){
 }
 $own=@('Pane.App.exe','Pane.Maintenance.exe','Uninstall Pane.exe','zh-Hant/Pane.App.resources.dll','Pane.Native.dll','Pane.Effect.dll','resources.pri','Assets/pane.ico','Assets/pane-app.svg','LauncherData/pinyin.tsv','LauncherData/Unicode-LICENSE.txt')
 $notices=@{'LICENSE'='LICENSE';'LICENSE-EXCEPTION.md'='LICENSE-EXCEPTION.md';'THIRD_PARTY_NOTICES.md'='THIRD_PARTY_NOTICES.md'}
+
 foreach($file in Get-ChildItem -LiteralPath (Join-Path $repo 'src/Pane.App/ThirdParty') -File){$notices['ThirdParty/'+$file.Name]='src/Pane.App/ThirdParty/'+$file.Name}
 $rows=@(foreach($file in Get-ChildItem -LiteralPath $metadata.stage -Recurse -File){
     $path=$file.FullName.Substring($metadata.stage.TrimEnd('\','/').Length+1).Replace('\','/')
@@ -38,10 +51,14 @@ $rows=@(foreach($file in Get-ChildItem -LiteralPath $metadata.stage -Recurse -Fi
     if($notices.ContainsKey($path)){
         if((Get-FileHash -LiteralPath (Join-Path $repo $notices[$path]) -Algorithm SHA256).Hash -ne $hash){throw "许可文件不一致：$path"}
         $kind='notice'
+    } elseif($engineAssets -contains $path){
+        if((Get-FileHash -LiteralPath (Join-Path $repo "src/Pane.App/$path") -Algorithm SHA256).Hash -ne $hash){throw "引擎图标不一致：$path"}
+        $kind='search-engine-mark'
     } elseif($matches.Count){$kind='package'} elseif($own -contains $path){$kind='application-or-data'}else{throw "未归属的 payload 文件：$path"}
     [pscustomobject]@{path=$path;sha256=$hash;kind=$kind;packages=$matches}
 })
 foreach($path in $notices.Keys){if($rows.path -notcontains $path){throw "payload 缺少许可证：$path"}}
+foreach($path in $engineAssets){if($rows.path -notcontains $path){throw "payload 缺少引擎图标：$path"}}
 # 核对真正传给安装外壳的 ZIP，并确认其字节完整嵌入最终安装程序。
 $zipPath=Join-Path (Split-Path $metadata.stage -Parent) 'payload.zip'
 Add-Type -AssemblyName System.IO.Compression.FileSystem

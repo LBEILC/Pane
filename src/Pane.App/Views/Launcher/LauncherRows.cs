@@ -64,6 +64,14 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
         Changed(nameof(Picture)); Changed(nameof(PictureVisibility)); Changed(nameof(ColoredVisibility)); Changed(nameof(PlainVisibility));
     }
 
+    /// <summary>网页搜索历史行（issue 39）：搜过的词。选中（含鼠标悬停）时行尾出 ×，Shift+Delete 也能删。</summary>
+    public string? HistoryText { get; init; }
+    public Action<LauncherRow>? Remove { get; init; }
+    bool showRemove;
+    public bool ShowRemove { get => showRemove; set { value &= HistoryText is not null; if (showRemove == value) return; showRemove = value; Changed(nameof(RemoveVisibility)); } }
+    public Visibility RemoveVisibility => showRemove ? Visibility.Visible : Visibility.Collapsed;
+    public void OnRemoveClick(object sender, RoutedEventArgs e) => Remove?.Invoke(this);
+
     public Visibility PictureVisibility => Picture is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ColoredVisibility => Picture is null && Gradient is not null ? Visibility.Visible : Visibility.Collapsed;
     public Visibility PlainVisibility => Picture is null && Gradient is null ? Visibility.Visible : Visibility.Collapsed;

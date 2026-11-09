@@ -69,8 +69,8 @@ static partial class Program
         try{await service.GetActionsAsync(app,cancel.Token);Check(false,"cancel get");}catch(OperationCanceledException){Check(true,"cancel get");}
         try{await service.RunAsync(app,LauncherItemAction.CopyPath,cancel.Token);Check(false,"cancel run");}catch(OperationCanceledException){Check(true,"cancel run");}
         var sample=new Pane.DesignData.LauncherSampleSearch();
-        // 设计定（057）：演示微信是安装的软件，五项含卸载，不给「从应用列表移除」
-        Check((await sample.GetActionsAsync(app with{Title="微信"},default)).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.Uninstall]),"sample full actions");
+        // 设计定（090）：演示微信增加最近使用移除，仍不给「从应用列表移除」。
+        Check((await sample.GetActionsAsync(app with{Title="微信"},default)).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.Uninstall,LauncherItemAction.RemoveFromRecent]),"sample full actions");
         Check((await sample.GetActionsAsync(app with{Title="Visual Studio Code"},default)).Count==4,"sample no uninstall");
         Check((await sample.GetActionsAsync(app with{Title="终端"},default)).Count==0,"sample packaged");
         Console.WriteLine($"PASS actions assertions={checks-start};realExecutions=0;clipboardWrites=0");

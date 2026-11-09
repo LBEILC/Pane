@@ -31,16 +31,17 @@ static partial class Program
         var store=new SettingsStore(data,Defaults() with{Storage=new(external)});
         Put(Path.Combine(data,"settings.json"),11);Put(Path.Combine(data,"gestures.json"),12);
         Put(Path.Combine(data,"launcher-usage.json"),13);Put(Path.Combine(data,"terminal-history.json"),14);
+        Put(Path.Combine(data,"web-search-history.json"),24);Put(Path.Combine(data,"engine-icons","site.png"),25);Put(Path.Combine(data,"engine-icons","site.png.failed"),26);
         Put(Path.Combine(data,"clipboard","history.json"),15);Put(Path.Combine(data,"clipboard","icons","app.png"),16);Put(Path.Combine(external,"image.png"),17);
         Put(Path.Combine(data,"launcher-index.json"),18);Put(Path.Combine(data,"launcher-icons","one.png"),19);
         Put(Path.Combine(data,"masked-icons","one.png"),20);Put(Path.Combine(data,"file-icons","one.png"),21);Put(Path.Combine(data,"updates","setup.exe"),22);
         Put(Path.Combine(data,"logs","old.log"),23);Put(Path.Combine(data,"ai-secrets.json"),500);Put(Path.Combine(data,"winv-original.json"),500);
         int rebuilt=0,changed=0;var service=StorageService(store,rebuild:()=>rebuilt++);service.Changed+=(_,_)=>changed++;
         var report=await service.MeasureAsync(default);
-        foreach(var expected in new[]{(StorageCategory.Settings,23L,2),(StorageCategory.Usage,27L,2),(StorageCategory.Clipboard,48L,3),(StorageCategory.Cache,100L,5),(StorageCategory.Logs,23L,1)}){
+        foreach(var expected in new[]{(StorageCategory.Settings,23L,2),(StorageCategory.Usage,51L,3),(StorageCategory.Clipboard,48L,3),(StorageCategory.Cache,151L,7),(StorageCategory.Logs,23L,1)}){
             var actual=report.Items.Single(i=>i.Category==expected.Item1);Check(actual.Bytes==expected.Item2&&actual.Files==expected.Item3,"分类统计 "+expected.Item1);
         }
-        Check(report.Total==221&&report.Items.Single(i=>i.Category==StorageCategory.Clipboard).Folder==Path.Combine(data,"clipboard"),"总量和打开文件夹");
+        Check(report.Total==296&&report.Items.Single(i=>i.Category==StorageCategory.Clipboard).Folder==Path.Combine(data,"clipboard"),"总量和打开文件夹");
         string busy=Path.Combine(data,"logs","busy.log");Put(busy,30);
         using(var held=new FileStream(busy,FileMode.Open,FileAccess.ReadWrite,FileShare.None)){
             Check((await service.MeasureAsync(default)).Items.Single(i=>i.Category==StorageCategory.Logs).Bytes==23,"读不了的文件跳过");
@@ -48,7 +49,7 @@ static partial class Program
         }
         Check(await service.ClearAsync(StorageCategory.Logs,default)==30,"释放后的日志能清理");
         new ClipboardLog(data).Write("fixture");Check(File.Exists(Path.Combine(data,"logs","clipboard.log")),"清空后日志继续写");
-        Check(await service.ClearAsync(StorageCategory.Cache,default)==100&&rebuilt==1,"清缓存并触发假索引重建");
+        Check(await service.ClearAsync(StorageCategory.Cache,default)==151&&rebuilt==1,"清缓存并触发假索引重建");
         Check((await service.MeasureAsync(default)).Items.Single(i=>i.Category==StorageCategory.Cache).Files==0,"缓存清空");
         foreach(var category in new[]{StorageCategory.Settings,StorageCategory.Usage,StorageCategory.Clipboard}){
             try{await service.ClearAsync(category,default);throw new Exception("非法清理类别");}catch(ArgumentException){Check(true,"拒绝 "+category);}

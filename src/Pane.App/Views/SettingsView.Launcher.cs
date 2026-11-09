@@ -171,6 +171,11 @@ public sealed partial class SettingsView
         engines.Add(addingEngine ? Reveal("engine", [EngineForm()]) : AddRow(Button(Strings.Settings_Launcher_AddEngine, "plus", () => { addingEngine = true; revealKey = "engine"; Render(); })));
         engines.Insert(0, Row(Strings.Settings_Launcher_WebSuggestions, Strings.Settings_Launcher_WebSuggestionsDescription,
             Switch(l.WebSuggestions, v => SaveLauncher(x => x with { WebSuggestions = v }))));
+        // 记住网页搜索（issue 39）：关键字搜网页时记下搜过的词；「清空」删掉全部站点的记录，没有记录时变灰
+        var clearWeb = Button(Strings.Common_Clear, "trash", () => { app.WebSearchHistory?.Clear(); webHistoryCleared = true; Render(); });
+        Enable(clearWeb, !webHistoryCleared && (app.WebSearchHistory?.Count ?? 0) > 0);
+        engines.Insert(1, Row(Strings.Settings_Launcher_RememberWebSearches, webHistoryCleared ? Strings.Settings_Launcher_CommandsCleared : Strings.Settings_Launcher_RememberWebSearchesDescription,
+            Switch(l.RememberWebSearches, v => SaveLauncher(x => x with { RememberWebSearches = v })), clearWeb));
         Group(Strings.Settings_Launcher_WebSearch, engines.ToArray(), Strings.Settings_Launcher_WebSearchDescription);
 
         // 终端命令（037）：> 开头在终端里运行；记住最近 20 条用来补全
@@ -180,7 +185,7 @@ public sealed partial class SettingsView
                 Switch(l.RememberCommands, v => SaveLauncher(x => x with { RememberCommands = v })), clearHistory)],
             Strings.Settings_Launcher_TerminalDescription);
     }
-    bool terminalCleared;
+    bool terminalCleared, webHistoryCleared;
 
     // 关键字直达的一行：多个关键字用空格隔开，留空 = 不用。CommitField 的错误本来写给 AI 分区，这里自己记
     string? keywordError;

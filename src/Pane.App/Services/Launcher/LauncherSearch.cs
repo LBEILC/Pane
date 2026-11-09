@@ -19,6 +19,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     internal Func<IPowerTimer?> PowerTimerProvider { get; set; } = () => null;
     readonly TerminalService terminal;
     public ITerminalHistory TerminalHistory=>terminal.History;
+    public WebSearchHistory WebSearchHistory {get;}
     readonly SettingsStore store;readonly ILauncherIndex index;readonly ILauncherSource[] sources;readonly ILauncherExecutor executor;
     readonly object sync=new();readonly CancellationTokenSource lifetime=new();
     LauncherSnapshot snapshot=LauncherSnapshot.Empty;
@@ -44,6 +45,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();lastPortable=store.Current.Launcher.Portable.ToArray();
         environment??=new LauncherEnvironment();process??=new LaunchProcess();
         terminal=new(store,environment,process,programs);
+        WebSearchHistory=new(store);
         portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
         actions=new(portablePlatform,executor,process);
         sources=[new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
@@ -150,6 +152,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     {
         cancellationToken.ThrowIfCancellationRequested();if(item.Id is "rename" or "power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         await source.ExecuteAsync(item,Context(""),cancellationToken).ConfigureAwait(false);
+        if(item.Kind==LauncherItemKind.Web&&item.Id.StartsWith("web:",StringComparison.Ordinal))WebSearchHistory.RecordUrl(store.Current.Launcher.SearchEngines,item.Id[4..]);
         if(item.Kind==LauncherItemKind.File&&item.Id.StartsWith("file:",StringComparison.Ordinal))await RememberOpenedAsync(item.Id[5..]).ConfigureAwait(false);
     }
     public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,token):ExecuteAsync(item,token);
@@ -176,8 +179,8 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
                 case "reveal":foreach(var path in paths)await executor.RevealAsync(path,cancellationToken);return;
             }
         }
-        if(actionId=="web-search"&&attachment.Text!=null){await executor.OpenAsync(BuildUrl(DefaultEngine(store.Current.Launcher),attachment.Text),false,cancellationToken);return;}
+        if(actionId=="web-search"&&attachment.Text!=null){var engine=DefaultEngine(store.Current.Launcher);await executor.OpenAsync(BuildUrl(engine,attachment.Text),false,cancellationToken);WebSearchHistory.Record(engine,attachment.Text);return;}
         throw new NotSupportedException(actionId);
     }
-    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();lifetime.Dispose();}
+    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();WebSearchHistory.Dispose();lifetime.Dispose();}
 }

@@ -72,3 +72,20 @@ API int PaneIconEncode(const wchar_t* path,const BYTE* pixels,int size){
  if(SUCCEEDED(hr))hr=frame->WriteSource(bitmap.Get(),nullptr);
  if(SUCCEEDED(hr))hr=frame->Commit();if(SUCCEEDED(hr))hr=encoder->Commit();return SUCCEEDED(hr)?1:0;
 }
+// 网站图标：仅解码图片，取最大帧，保留 alpha 和宽高比，不套用应用图标遮罩。
+API int PaneEngineIconConvert(const wchar_t* path,const wchar_t* output){
+ Apartment apartment;ComPtr<IWICImagingFactory> factory;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> best;
+ HRESULT hr=CoCreateInstance(CLSID_WICImagingFactory,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&factory));
+ if(SUCCEEDED(hr))hr=factory->CreateDecoderFromFilename(path,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder);
+ if(FAILED(hr))return 0;UINT count=0;decoder->GetFrameCount(&count);UINT w=0,h=0;
+ for(UINT i=0;i<count;i++){ComPtr<IWICBitmapFrameDecode> frame;UINT x=0,y=0;if(SUCCEEDED(decoder->GetFrame(i,&frame))&&SUCCEEDED(frame->GetSize(&x,&y))&&x&&y&&x<=8192&&y<=8192&&static_cast<UINT64>(x)*y>static_cast<UINT64>(w)*h){best=frame;w=x;h=y;}}
+ if(!best)return 0;double scale=std::min(1.0,128.0/std::max(w,h));UINT width=std::max(1u,static_cast<UINT>(w*scale+.5)),height=std::max(1u,static_cast<UINT>(h*scale+.5));
+ ComPtr<IWICFormatConverter> convert;ComPtr<IWICBitmapScaler> scaler;ComPtr<IWICStream> stream;ComPtr<IWICBitmapEncoder> encoder;ComPtr<IWICBitmapFrameEncode> frame;
+ hr=factory->CreateFormatConverter(&convert);if(SUCCEEDED(hr))hr=convert->Initialize(best.Get(),GUID_WICPixelFormat32bppPBGRA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom);
+ if(SUCCEEDED(hr))hr=factory->CreateBitmapScaler(&scaler);if(SUCCEEDED(hr))hr=scaler->Initialize(convert.Get(),width,height,WICBitmapInterpolationModeFant);
+ if(SUCCEEDED(hr))hr=factory->CreateStream(&stream);if(SUCCEEDED(hr))hr=stream->InitializeFromFilename(output,GENERIC_WRITE);
+ if(SUCCEEDED(hr))hr=factory->CreateEncoder(GUID_ContainerFormatPng,nullptr,&encoder);if(SUCCEEDED(hr))hr=encoder->Initialize(stream.Get(),WICBitmapEncoderNoCache);
+ if(SUCCEEDED(hr))hr=encoder->CreateNewFrame(&frame,nullptr);if(SUCCEEDED(hr))hr=frame->Initialize(nullptr);
+ WICPixelFormatGUID format=GUID_WICPixelFormat32bppBGRA;if(SUCCEEDED(hr))hr=frame->SetPixelFormat(&format);
+ if(SUCCEEDED(hr))hr=frame->WriteSource(scaler.Get(),nullptr);if(SUCCEEDED(hr))hr=frame->Commit();if(SUCCEEDED(hr))hr=encoder->Commit();return SUCCEEDED(hr)?1:0;
+}

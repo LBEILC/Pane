@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--089")){await Web089Tests(args.Contains("--live"));return;}
         if(args.Contains("--082")){await StorageCache082Tests();return;}
         if(args.Contains("--080")){await Clipboard080Tests();return;}
         if(args.Contains("--078")){await Aliases078Tests();return;}
@@ -88,6 +89,7 @@ static partial class Program
         Console.WriteLine($"PASS original launcher assertions={checks}");
         await SourceTests();await IndexTests();await IconTests();await ActionTests();await Deduplication053Tests();await Deduplication063Tests();await Portable057Tests();await Remember076Tests();
         await Aliases078Tests();
+        await Recent090Tests();
         Console.WriteLine($"PASS launcher assertions={checks};realExecutions=0;clipboardWrites=0;browserLaunches=0");
     }
     static async Task Probe()

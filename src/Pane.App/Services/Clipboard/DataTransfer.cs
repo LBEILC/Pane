@@ -16,7 +16,7 @@ internal sealed partial class DataStorage
     internal const long ImportJsonLimit=64L*1024*1024;
     static string Pending(string data)=>Path.Combine(data,".import-pending");
     static string Outcome(string data)=>Path.Combine(data,".import-result.json");
-    static readonly string[] TransferFiles=["settings/settings.json","settings/gestures.json","usage/launcher-usage.json","usage/terminal-history.json","clipboard/history.json"];
+    static readonly string[] TransferFiles=["settings/settings.json","settings/gestures.json","usage/launcher-usage.json","usage/terminal-history.json","usage/web-search-history.json","clipboard/history.json"];
     static string LocalFile(string data,string name)=>Path.Combine(data,name.StartsWith("clipboard/",StringComparison.Ordinal)?name.Replace('/',Path.DirectorySeparatorChar):name[(name.IndexOf('/')+1)..]);
     static JsonObject Object(string text)=>JsonNode.Parse(text) as JsonObject??throw new InvalidDataException();
     static JsonObject ReadObject(string path)=>Object(File.ReadAllText(path));
@@ -43,6 +43,7 @@ internal sealed partial class DataStorage
     public Task<DataExportResult> ExportAsync(string path,DataExportOptions options,IProgress<double>? progress,CancellationToken cancellationToken)=>Task.Run(async()=>{
         await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
         try{
+            if(options.Usage)await flushUsage().WaitAsync(cancellationToken).ConfigureAwait(false);
             if(history() is {} loading)await loading.Ready.ConfigureAwait(false);
             lock(settings.StorageSync){
                 var active=history();if(active?.Ready.IsCompletedSuccessfully!=true)active=null;
@@ -116,7 +117,7 @@ internal sealed partial class DataStorage
         if(string.IsNullOrWhiteSpace(obj["app"]!.GetValue<string>())||!DateTimeOffset.TryParse(obj["exportedAt"]!.GetValue<string>(),out _))throw Invalid();
         bool s=obj["settings"]!.GetValue<bool>(),u=obj["usage"]!.GetValue<bool>(),c=obj["clipboard"]!.GetValue<bool>();
         int count=obj["clipboardEntries"]!.GetValue<int>(),pictures=obj["clipboardImages"]!.GetValue<int>();
-        if(count<0||pictures<0||pictures>count||!c&&count!=0||s!=(zip.GetEntry("settings/settings.json")!=null)||u!=zip.Entries.Any(e=>e.FullName is "usage/launcher-usage.json" or "usage/terminal-history.json")||c!=(zip.GetEntry("clipboard/history.json")!=null))throw Invalid();
+        if(count<0||pictures<0||pictures>count||!c&&count!=0||s!=(zip.GetEntry("settings/settings.json")!=null)||u!=zip.Entries.Any(e=>e.FullName is "usage/launcher-usage.json" or "usage/terminal-history.json" or "usage/web-search-history.json")||c!=(zip.GetEntry("clipboard/history.json")!=null))throw Invalid();
         return obj;
     }
     public Task<DataImportPreview> InspectAsync(string path,CancellationToken cancellationToken)=>Task.Run(()=>{
@@ -156,6 +157,8 @@ internal sealed partial class DataStorage
         if(File.Exists(usage))foreach(var pair in ReadObject(usage)){
             if(string.IsNullOrEmpty(pair.Key)||pair.Value?["Count"]?.GetValue<int>() is not >=0||pair.Value?["LastUsed"]?.GetValue<DateTimeOffset>()==null)throw Invalid();
         }
+        string web=Path.Combine(root,"usage/web-search-history.json");
+        if(File.Exists(web)){var records=JsonSerializer.Deserialize(File.ReadAllText(web),Pane.Services.Launcher.WebHistoryJson.Default.DictionaryStringListWebSearchRecord)??throw Invalid();foreach(var pair in records)if(string.IsNullOrEmpty(pair.Key)||pair.Value==null||pair.Value.Any(r=>r==null||!Pane.Services.Launcher.WebSearchHistory.Valid(r.Text)))throw Invalid();}
         string terminal=Path.Combine(root,"usage/terminal-history.json");
         if(File.Exists(terminal))foreach(var value in JsonNode.Parse(File.ReadAllText(terminal))!.AsArray())if(value?.GetValue<string>()==null)throw Invalid();
         string index=Path.Combine(root,"clipboard/history.json");if(!File.Exists(index))return;

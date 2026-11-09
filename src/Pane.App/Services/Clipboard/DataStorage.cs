@@ -12,6 +12,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
     readonly Action rebuild;
     readonly Action<string>? notify;
     readonly Func<Action,CancellationToken,Task> clearCache;
+    readonly Func<Task> flushUsage;
     readonly HashSet<string> notified=new(StringComparer.OrdinalIgnoreCase);
     readonly SemaphoreSlim operation=new(1);
     LargeFilesLocation location;
@@ -27,10 +28,11 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
     internal Action<string,string> Copy {get;init;}=(source,target)=>File.Copy(source,target);
     public event EventHandler? Changed;
     public LargeFilesLocation LargeFiles=>Volatile.Read(ref location);
-    public DataStorage(SettingsStore settings,Func<ClipboardHistory?> history,Action rebuild,Action<string>? notify=null,Func<Action,CancellationToken,Task>? clearCache=null)
+    public DataStorage(SettingsStore settings,Func<ClipboardHistory?> history,Action rebuild,Action<string>? notify=null,Func<Action,CancellationToken,Task>? clearCache=null,Func<Task>? flushUsage=null)
     {
         this.settings=settings;this.history=history;this.rebuild=rebuild;this.notify=notify;
         this.clearCache=clearCache??((clear,token)=>{token.ThrowIfCancellationRequested();clear();return Task.CompletedTask;});
+        this.flushUsage=flushUsage??(()=>Task.CompletedTask);
         location=StorageLocation.Resolve(settings);NotifyUnavailable();
     }
     internal void NotifyUnavailable()
@@ -44,9 +46,9 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
         string data=settings.DirectoryPath;
         IEnumerable<string> roots=category switch{
             StorageCategory.Settings=>new[]{"settings.json","gestures.json"}.Select(p=>Path.Combine(data,p)),
-            StorageCategory.Usage=>new[]{"launcher-usage.json","terminal-history.json"}.Select(p=>Path.Combine(data,p)),
+            StorageCategory.Usage=>new[]{"launcher-usage.json","terminal-history.json","web-search-history.json"}.Select(p=>Path.Combine(data,p)),
             StorageCategory.Clipboard=>new[]{Path.Combine(data,"clipboard")},
-            StorageCategory.Cache=>CacheFiles.Concat(["launcher-icons","masked-icons","file-icons","updates"]).Select(p=>Path.Combine(data,p)),
+            StorageCategory.Cache=>CacheFiles.Concat(["launcher-icons","masked-icons","file-icons","engine-icons","updates"]).Select(p=>Path.Combine(data,p)),
             StorageCategory.Logs=>new[]{Path.Combine(data,"logs")},_=>[]};
         var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach(string root in roots)foreach(string path in Walk(root,token))if(seen.Add(path))yield return path;

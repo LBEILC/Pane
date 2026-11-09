@@ -147,18 +147,24 @@ internal sealed partial class LauncherSearch
     IndexedApp? ActionApp(LauncherItem item)=>Volatile.Read(ref snapshot).Apps.FirstOrDefault(a=>a.Id==item.Id);
     public async Task<IReadOnlyList<LauncherItemAction>> GetActionsAsync(LauncherItem item,CancellationToken cancellationToken)
     {
-        try{return await Task.Run(()=>{cancellationToken.ThrowIfCancellationRequested();var app=ActionApp(item);var result=actions.Get(item,actions.Target(item,app),app?.PortablePath!=null).ToList();if(app?.PortableKind is Pane.Settings.PortableKind.Program or Pane.Settings.PortableKind.Learned)result.Add(LauncherItemAction.RemoveFromApps);if(app!=null&&item.Kind==LauncherItemKind.App)result.Add(LauncherItemAction.EditAliases);cancellationToken.ThrowIfCancellationRequested();return result;},cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);}
+        try{return await Task.Run(()=>{cancellationToken.ThrowIfCancellationRequested();var app=ActionApp(item);var result=actions.Get(item,actions.Target(item,app),app?.PortablePath!=null).ToList();if(app?.PortableKind is Pane.Settings.PortableKind.Program or Pane.Settings.PortableKind.Learned)result.Add(LauncherItemAction.RemoveFromApps);if(app!=null&&item.Kind==LauncherItemKind.App)result.Add(LauncherItemAction.EditAliases);if(item.Kind==LauncherItemKind.App)lock(sync){if(uses.ContainsKey(item.Id))result.Add(LauncherItemAction.RemoveFromRecent);}cancellationToken.ThrowIfCancellationRequested();return result;},cancellationToken).WaitAsync(cancellationToken).ConfigureAwait(false);}
         catch(OperationCanceledException){throw;}
         catch(Exception){throw new LauncherActionException(Strings.Launcher_ActionFailed);}
     }
     public async Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken)
     {
         if(action==LauncherItemAction.EditAliases)throw new NotSupportedException(nameof(LauncherItemAction.EditAliases));
-        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);},cancellationToken).ConfigureAwait(false);}
+        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.RemoveFromRecent){RemoveRecent(item);return;}if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);},cancellationToken).ConfigureAwait(false);}
         catch(Win32Exception e) when(e.NativeErrorCode==1223){}
         catch(OperationCanceledException){throw;}
         catch(LauncherActionException){throw;}
         catch(Exception){throw new LauncherActionException(Strings.Launcher_ActionFailed);}
+    }
+    void RemoveRecent(LauncherItem item)
+    {
+        if(item.Kind!=LauncherItemKind.App)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);
+        lock(sync)uses.Remove(item.Id);
+        SaveUsage();
     }
     async Task ExecuteAppElevatedAsync(LauncherItem item,CancellationToken token)
     {

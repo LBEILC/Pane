@@ -15,7 +15,8 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
         {
             LauncherItemKind.App when item.Title == "终端" => [],
             // 安装的软件：全部附加操作（含卸载）；「从应用列表移除」只给便携程序（057），这里不给
-            LauncherItemKind.App when item.Title == "微信" => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties, LauncherItemAction.Uninstall],
+            // 微信在演示的「最近使用」里，多一项「从最近使用中移除」
+            LauncherItemKind.App when item.Title == "微信" => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties, LauncherItemAction.Uninstall, LauncherItemAction.RemoveFromRecent],
             LauncherItemKind.App => [LauncherItemAction.RunAsAdmin, LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
             LauncherItemKind.File or LauncherItemKind.Folder => [LauncherItemAction.OpenLocation, LauncherItemAction.CopyPath, LauncherItemAction.Properties],
             _ => []

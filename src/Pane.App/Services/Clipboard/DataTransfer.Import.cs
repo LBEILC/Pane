@@ -94,6 +94,11 @@ internal sealed partial class DataStorage
                     current[pair.Key]=new JsonObject{["Count"]=count,["LastUsed"]=last};
                 }
                 value=current;
+            }else if(name=="usage/web-search-history.json"){
+                var incoming=JsonSerializer.Deserialize(value.ToJsonString(),Pane.Services.Launcher.WebHistoryJson.Default.DictionaryStringListWebSearchRecord)??[];
+                var current=options["merge"]!.GetValue<bool>()&&File.Exists(target)?JsonSerializer.Deserialize(File.ReadAllText(target),Pane.Services.Launcher.WebHistoryJson.Default.DictionaryStringListWebSearchRecord)??[]:[];
+                foreach(var pair in incoming){if(!current.TryGetValue(pair.Key,out var list))current[pair.Key]=pair.Value;else list.AddRange(pair.Value);}
+                value=JsonNode.Parse(JsonSerializer.Serialize(Pane.Services.Launcher.WebSearchHistory.Normalize(current),Pane.Services.Launcher.WebHistoryJson.Default.DictionaryStringListWebSearchRecord))!;
             }else if(name=="usage/terminal-history.json"){
                 // TODO(design): 现有历史没有时间戳，跨文件无法按真实时间排序；暂保留本机顺序优先。
                 var current=options["merge"]!.GetValue<bool>()&&File.Exists(target)?JsonNode.Parse(File.ReadAllText(target))!.AsArray():new JsonArray();

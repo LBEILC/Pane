@@ -28,6 +28,9 @@ static partial class Program
         Clips(source,text,Text("code"),originalImage,new(new("file",ClipKind.Files,null,["D:\\fixture.txt"],null,null,null,"fixture",null,DateTimeOffset.UtcNow,false),"file"));
         Put(Path.Combine(source.DirectoryPath,"gestures.json"),"{}");Put(Path.Combine(source.DirectoryPath,"launcher-usage.json"),"{\"app\":{\"Count\":3,\"LastUsed\":\"2026-11-01T00:00:00Z\"}}");
         Put(Path.Combine(source.DirectoryPath,"terminal-history.json"),"[\"new\",\"shared\"]");
+        const string webSite="https://example.test/?q={query}";
+        string WebJson(params (string Text,int Day)[] entries)=>new JsonObject{[webSite]=new JsonArray(entries.Select(e=>(JsonNode?)new JsonObject{["Text"]=e.Text,["Time"]=$"2026-11-{e.Day:D2}T00:00:00+00:00"}).ToArray())}.ToJsonString();
+        Put(Path.Combine(source.DirectoryPath,"web-search-history.json"),WebJson(("shared",3),("imported",2)));
         foreach(string name in new[]{"ai-key","chatgpt-token","winv-original.json","launcher-index.json","logs/test.log"})Put(Path.Combine(source.DirectoryPath,name),"secret");
         string full="";
         foreach(var option in Enum.GetValues<ClipboardExport>()){
@@ -82,6 +85,12 @@ static partial class Program
         var usage=JsonNode.Parse(File.ReadAllText(Path.Combine(target.DirectoryPath,"launcher-usage.json")))!;
         Check(usage["app"]!["Count"]!.GetValue<int>()==8&&usage["app"]!["LastUsed"]!.GetValue<DateTimeOffset>().Day==2,"usage merge");
         Check(JsonNode.Parse(File.ReadAllText(Path.Combine(target.DirectoryPath,"terminal-history.json")))!.AsArray().Select(n=>n!.GetValue<string>()).SequenceEqual(["local","shared","new"]),"terminal merge");
+        Put(Path.Combine(target.DirectoryPath,"web-search-history.json"),WebJson(("SHARED",1),("local",4)));
+        await Apply(target,new(false,true,false,DataImportMode.Merge));
+        var webHistory=JsonNode.Parse(File.ReadAllText(Path.Combine(target.DirectoryPath,"web-search-history.json")))![webSite]!.AsArray();
+        Check(webHistory.Select(n=>n!["Text"]!.GetValue<string>()).SequenceEqual(["local","shared","imported"]),"089 按站点大小写去重按时间合并");
+        Put(Path.Combine(target.DirectoryPath,"web-search-history.json"),WebJson(Enumerable.Range(0,60).Select(i=>("item"+i,4)).ToArray()));
+        await Apply(target,new(false,true,false,DataImportMode.Merge));Check(JsonNode.Parse(File.ReadAllText(Path.Combine(target.DirectoryPath,"web-search-history.json")))![webSite]!.AsArray().Count==50,"089 合并每站上限50");
         await Apply(target,new(false,true,false,DataImportMode.Replace));Check(JsonNode.Parse(File.ReadAllText(Path.Combine(target.DirectoryPath,"launcher-usage.json")))!["app"]!["Count"]!.GetValue<int>()==3,"usage replace");
         await Apply(target,new(false,false,true,DataImportMode.Replace));
         var imported=ReadClips(target);Check(imported.Length==3&&!File.Exists(oldImage.Entry.ContentPath)&&imported.Single(c=>c.Entry.Kind==ClipKind.Image).Entry.ContentPath!.StartsWith(large)&&File.Exists(imported.Single(c=>c.Entry.Kind==ClipKind.Image).Entry.ContentPath),"clipboard replace images");
@@ -115,10 +124,15 @@ static partial class Program
         StorageRecovery.Begin(both.DirectoryPath,[new(bothImage.Entry.ContentPath!,movedImage)]);File.Copy(bothImage.Entry.ContentPath!,movedImage);File.Delete(bothImage.Entry.ContentPath!);both.Save(both.Current with{Storage=new(moved)});
         both.Load();Check(Transfer(both).LastImport?.Error==null&&both.Current.Storage.LargeFilesDirectory==null&&File.Exists(bothImage.Entry.ContentPath)&&!File.Exists(movedImage),"082 before 083");
         var empty=new SettingsStore(Path.Combine(root,"roundtrip"),Defaults());await Apply(empty,new(true,true,true,DataImportMode.Replace));string again=Path.Combine(root,"again.zip");await Transfer(empty).ExportAsync(again,new(true,true,ClipboardExport.WithImages),null,default);
-        foreach(string name in new[]{"settings/settings.json","usage/launcher-usage.json","usage/terminal-history.json"})Check(JsonNode.DeepEquals(JsonNode.Parse(ZipText(full,name)),JsonNode.Parse(ZipText(again,name))),"roundtrip "+name);
+        foreach(string name in new[]{"settings/settings.json","usage/launcher-usage.json","usage/terminal-history.json","usage/web-search-history.json"})Check(JsonNode.DeepEquals(JsonNode.Parse(ZipText(full,name)),JsonNode.Parse(ZipText(again,name))),"roundtrip "+name);
         var round=JsonSerializer.Deserialize(ZipText(again,"clipboard/history.json"),ClipboardJson.Default.StoredClipArray)!;
         Check(round.Length==3&&round.Where(c=>c.Entry.Kind!=ClipKind.Image).Select(c=>c.Entry.Text).ToHashSet().SetEquals(["hello","code"]),"roundtrip clips");
         // 活跃服务尚未落盘的条目也必须出现在导出快照中。
+        var webLive=Store("web-live");using(var web=new Pane.Services.Launcher.WebSearchHistory(webLive)){
+            var e=new SearchEngine("fixture","x",webSite);web.Record(e,"just searched");string webZip=Path.Combine(root,"web-live.zip");
+            await new DataStorage(webLive,()=>null,()=>{},flushUsage:()=>web.Completion).ExportAsync(webZip,new(false,true,ClipboardExport.None),null,default);
+            Check(JsonNode.Parse(ZipText(webZip,"usage/web-search-history.json"))![webSite]![0]!["Text"]!.GetValue<string>()=="just searched","089 导出等待历史后台落盘");
+        }
         var live=Store("snapshot");var fake=new FakeSource();using(var active=new ClipboardHistory(live,fake,new FakeWriter(),new WindowsClipboardImages())){await active.Ready;fake.Emit(new(Text:"live"));string liveZip=Path.Combine(root,"live.zip");await new DataStorage(live,()=>active,()=>{}).ExportAsync(liveZip,new(false,false,ClipboardExport.TextOnly),null,default);Check((await Transfer(live).InspectAsync(liveZip,default)).ClipboardEntries==1,"live snapshot");}
         Console.WriteLine($"PASS transfer083 assertions={checks-begin};systemClipboard=0");
     }

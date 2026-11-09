@@ -3,7 +3,10 @@ using System.Diagnostics;
 using Pane.Contracts;
 namespace Pane.Services.Setup;
 
-internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupProcesses
+internal sealed class SetupProcesses(SetupPaths paths, bool isolated,
+    Func<string, string[], bool, int>? shellLaunch = null,
+    Action<ProcessStartInfo, bool>? directLaunch = null,
+    Action<int>? logFallback = null) : ISetupProcesses
 {
     public void SetPaths(SetupPaths value) => paths = value;
     public bool Running
@@ -29,8 +32,18 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupPr
     }
     public void Launch(bool background = false)
     {
+        string[] arguments = isolated ? ["--setup-launch-probe", IsolatedRoot()] : background ? ["--autostart"] : [];
+        if (!isolated)
+        {
+            int result = (shellLaunch ?? DesktopShellLaunch.Launch)(paths.Exe, arguments, !background);
+            if (result >= 0) return;
+            if (logFallback != null) logFallback(result);
+            else UninstallChain.Log("desktop-shell-launch", "fallback", new System.Runtime.InteropServices.COMException("桌面外壳启动失败，改用直接启动", result), paths.Exe);
+        }
         // 安装自测只启动验证入口，避免实际注册全局服务。
-        using var process = Start(paths.Exe, isolated ? ["--setup-launch-probe", IsolatedRoot()] : background ? ["--autostart"] : []);
+        var info = StartInfo(paths.Exe, arguments);
+        if (directLaunch != null) { directLaunch(info, isolated); return; }
+        using var process = Process.Start(info) ?? throw new IOException(Strings.Setup_LaunchFailed);
         if (isolated && (!process.WaitForExit(15000) || process.ExitCode != 0)) throw new IOException("隔离新版启动失败"); // 不翻译：诊断异常
     }
     string IsolatedRoot()
@@ -39,6 +52,8 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupPr
         return SetupPaths.Isolated(Path.GetDirectoryName(paths.Data)!).Root;
     }
     Process Start(string executable, string[] arguments)
+        => Process.Start(StartInfo(executable, arguments)) ?? throw new IOException(Strings.Setup_LaunchFailed);
+    ProcessStartInfo StartInfo(string executable, string[] arguments)
     {
         var info = new ProcessStartInfo(executable) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(executable)! };
         foreach (string argument in arguments) info.ArgumentList.Add(argument);
@@ -48,6 +63,6 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated) : ISetupPr
             info.Environment["PANE_DATA_DIR"] = paths.Data; info.Environment["PANE_INSTANCE"] = paths.Root;
             info.Environment["PANE_OBSERVE"] = "1"; info.Environment["PANE_DEV_HOTKEYS"] = "launcher=Ctrl+Alt+Shift+L;clipboard=Ctrl+Alt+Shift+C";
         }
-        return Process.Start(info) ?? throw new IOException(Strings.Setup_LaunchFailed);
+        return info;
     }
 }

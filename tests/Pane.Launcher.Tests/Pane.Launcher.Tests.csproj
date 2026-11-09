@@ -11,6 +11,6 @@
     <Compile Include="../../src/Pane.App/Contracts/AppIcons.cs" Link="Contracts/AppIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Clipboard.cs" Link="Contracts/Clipboard.cs" />
     <Content Include="../../src/Pane.App/Services/Launcher/Data/*" Link="LauncherData/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="../../src/Pane.App/bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../src/Pane.App/Assets/Engines/*.png" Link="Assets/Engines/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"/><Content Include="../../src/Pane.App/bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 <ItemGroup><Compile Include="../TestResults.cs" Link="TestResults.cs"/></ItemGroup><Import Project="../Localization.targets" /></Project>

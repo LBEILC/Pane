@@ -82,6 +82,59 @@ public interface IWebSuggestions
 }
 
 /// <summary>
+/// 网页搜索历史（issue 39，2026-11-09 设计定）：用关键字搜网页时记下搜过的词，按站点分开（以 <c>UrlTemplate</c> 区分，改关键字不丢历史），只存本机。
+/// 界面在关键字模式下混排：只输入了关键字时列最近的词；打字后历史里匹配的词在上（最多 3 条），站点的联想词在下。
+/// 设置 → 启动器 →「记住网页搜索」关掉后不再记录，<see cref="Recent"/> 也返回空（已有记录保留，「清空」才删）。
+/// 所有方法都在界面线程调用，不得阻塞（内存里查，写盘放后台）。
+/// </summary>
+public interface IWebSearchHistory
+{
+    /// <summary>
+    /// 记一次搜索：去掉首尾空白；空白、以空白开头（照终端命令的规矩，前面加空格就不记）、超过 200 字的不记。
+    /// 同一站点里不分大小写去重，重复的移到最前；每个站点最多 50 条，超出删最旧的。
+    /// </summary>
+    void Record(Pane.Settings.SearchEngine engine, string text);
+
+    /// <summary>
+    /// 最近的记录，新的在前。<paramref name="prefix"/> 为空时返回最近 <paramref name="max"/> 条；
+    /// 否则返回包含它的（不分大小写），以它开头的排在前面，同类按时间新的在前；和 <paramref name="prefix"/> 完全相同的不返回。
+    /// </summary>
+    IReadOnlyList<string> Recent(Pane.Settings.SearchEngine engine, string prefix, int max);
+
+    /// <summary>删掉一条（界面上按 Shift+Delete 或点行尾的 ×）。</summary>
+    void Remove(Pane.Settings.SearchEngine engine, string text);
+
+    /// <summary>清空全部站点的记录（设置里的「清空」）。</summary>
+    void Clear();
+
+    /// <summary>全部站点的记录总数，设置里显示用。</summary>
+    int Count { get; }
+}
+
+/// <summary>引擎图标的种类：彩色原样显示；单色由界面按主题上色（有 <see cref="EngineIcon.Tint"/> 时用这个品牌色，深色主题下界面再提亮）。</summary>
+public enum EngineIconKind { Color, Monochrome }
+
+/// <summary>引擎图标：透明底 PNG（长边 128 px 以内，界面按实际笔画范围缩放）。</summary>
+public sealed record EngineIcon(string Path, EngineIconKind Kind, string? Tint = null);
+
+/// <summary>
+/// 关键字搜网页时搜索框左边的「引擎徽章」用的图标（issue 43，2026-11-09 设计定，见 docs/design.md「网页搜索的引擎徽章」）。
+/// 默认的五个站点按地址的域名对上内置图标（随程序发布，总是有）；用户自己加的站点运行时从网站取一次、缓存到本机。
+/// 界面线程调用，不得阻塞。
+/// </summary>
+public interface IEngineIcons
+{
+    /// <summary>
+    /// 有就立刻返回（内置的、已缓存的）；没有就返回 null，并在后台去取，取好了发 <see cref="Ready"/>。
+    /// 取不到（网站没有图标、断网、格式不支持）返回 null，界面用首字兜底；失败结果也缓存一段时间，不反复联网。
+    /// </summary>
+    EngineIcon? TryGet(Pane.Settings.SearchEngine engine);
+
+    /// <summary>某个站点的图标取好了，参数是它的 <c>UrlTemplate</c>。可能在后台线程触发。</summary>
+    event EventHandler<string>? Ready;
+}
+
+/// <summary>
 /// 启动器的附件（复制后 3 秒内呼出自动带入，或从剪贴板「交给启动器」）上的非 AI 动作。
 /// 动作 Id：文件 open / reveal / copy-path；图片 save-image / copy-image；文字 web-search。
 /// 附件就是剪贴板条目（<see cref="ClipEntry"/>）；带入附件不清空系统剪贴板。
@@ -131,8 +184,11 @@ public static class LauncherGroups
 /// RemoveFromApps（057，issue 19）：只给单独添加的便携程序和记住的程序，从 LauncherSettings.Portable 里去掉（不删文件），之后重建索引；
 /// 文件夹扫描出来的、安装的软件都不给。
 /// </summary>
-public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps, EditAliases }
+public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps, EditAliases, RemoveFromRecent }
 // EditAliases 由界面打开编辑，不传给 RunAsync；仅对已索引应用提供。
+// RemoveFromRecent（设计加，2026-11-09，用户要求）：「从最近使用中移除」。只对有使用记录的应用提供（首页「最近使用」里的、搜索里用过的都算）；
+// RunAsync 删掉这个应用的使用记录（次数和最近使用时间），它就不再出现在「最近使用」里，搜索排序也不再因用过而靠前。
+// 不动「已固定」，不动应用本身和索引；记录是 launcher-usage.json 里的那一条，删除后照常写盘。
 
 /// <summary>应用的搜索别名（078）。appId 就是应用行的 LauncherItem.Id。</summary>
 public interface IAppAliases

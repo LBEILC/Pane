@@ -130,7 +130,7 @@ static partial class Program
             Check(store.Current.Launcher.Portable.Length==2,"057 辅助程序不记忆");
             index.Hold=new(TaskCreationOptions.RunContinuationsAsynchronously);
             var item=(await search.SearchAsync("Alpha",default)).Items.Single(i=>i.Id==PortableCatalog.Id(first));
-            Check((await search.GetActionsAsync(item,default)).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.RemoveFromApps,LauncherItemAction.EditAliases]),"057 Learned动作无卸载且可移除及编辑别名");
+            Check((await search.GetActionsAsync(item,default)).SequenceEqual([LauncherItemAction.RunAsAdmin,LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties,LauncherItemAction.RemoveFromApps,LauncherItemAction.EditAliases,LauncherItemAction.RemoveFromRecent]),"057 Learned动作无卸载且可移除、编辑别名及移除最近使用");
             await search.RunAsync(item,LauncherItemAction.RemoveFromApps,default);
             Check(store.Current.Launcher.Portable.All(e=>e.Path!=first)&&!(await search.SearchAsync("Alpha",default)).Items.Any(i=>i.Id==item.Id)&&!search.Indexing.IsCompleted,"057 移除返回前设置与快照消失无需等待重建");
             Check(search.Get(another).State==PortableScanState.Scanning,"057 重建中状态为Scanning");

@@ -73,7 +73,7 @@ public sealed partial class App : Application
             int startupLevel=MemoryStartupLevel();
             if(!demo&&startupLevel>=5){shell=new ShellHost(Command,ModuleShellSettings());shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
             await StartWinV();
-            if(!demo)SettingsView.DataStorage=new Pane.Services.Clipboard.DataStorage(Store,()=>clipboardService,()=>{launcherSearch?.RebuildStorageCache();(FileIcons as Pane.Services.Icons.FileIcons)?.RebuildStorageCache();},text=>queue.TryEnqueue(()=>{if(!closing)shell?.NotifyOnce(text);}),Pane.Services.Launcher.ProcessLauncherIndex.ClearCacheAsync);
+            if(!demo)SettingsView.DataStorage=new Pane.Services.Clipboard.DataStorage(Store,()=>clipboardService,()=>{launcherSearch?.RebuildStorageCache();(FileIcons as Pane.Services.Icons.FileIcons)?.RebuildStorageCache();},text=>queue.TryEnqueue(()=>{if(!closing)shell?.NotifyOnce(text);}),ClearWebStorageCache,()=>launcherSearch?.WebSearchHistory.Completion??Task.CompletedTask);
             await StartModules();
             hotkeysReadyMs=(DateTime.UtcNow-System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime()).TotalMilliseconds;
             listener=SingleInstance.Listen(command=>queue.TryEnqueue(()=>{Command(command);Ack("forwarded");}),cancellation.Token);
@@ -199,6 +199,7 @@ public sealed partial class App : Application
         Clean(()=>clipboardService?.Dispose());if(clipboardSource?.Removed==false||clipboardService?.StorageFailures>0)Environment.ExitCode=1;
         if(controlsEnabled&&clipboardSource!=null)Clean(()=>File.WriteAllText(output+".clipboard-stopped",$"registered={clipboardSource.Registered};removed={clipboardSource.Removed};notifications={clipboardSource.Notifications};failures={clipboardSource.Failures};storageFailures={clipboardService?.StorageFailures}"));
         Clean(()=>(FileIcons as IDisposable)?.Dispose());
+        Clean(()=>(EngineIcons as IDisposable)?.Dispose());
         Clean(()=>(WebSuggestions as IDisposable)?.Dispose());Clean(()=>aiService?.Dispose());Clean(()=>launcherSearch?.Dispose());Clean(CloseEmptyIsland);Clean(()=>settings?.Dispose());foreach(var w in secondaries.Values.ToArray())Clean(w.Dispose);
         foreach(var panel in panels.Values)Clean(panel.Dispose);
         Clean(()=>gestures?.Dispose());Clean(()=>background?.Close());Clean(()=>Glass?.Dispose());Clean(()=>manager?.Dispose());

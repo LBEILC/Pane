@@ -35,6 +35,23 @@ the public protocol; no copied third-party client implementation was identified.
 
 ## License compatibility status
 
+### Search engine marks
+
+The transparent PNG files in `src/Pane.App/Assets/Engines/` identify search
+providers. Trademarks belong to their respective owners; inclusion does not
+imply endorsement or grant trademark rights.
+
+| File | Source | Processing / notice |
+| --- | --- | --- |
+| `google.png` | [Google branding asset](https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png) | 128 px PNG, transparent background; Google mark |
+| `bing.png` | [Bing favicon](https://www.bing.com/favicon.ico) | Largest ICO frame converted to transparent 32 px PNG; Microsoft mark |
+| `bilibili.png` | [Bilibili favicon](https://www.bilibili.com/favicon.ico) | Largest ICO frame converted to transparent 32 px PNG; Bilibili mark |
+| `github.png` | [GitHub favicon](https://github.com/favicon.ico) | Largest ICO frame converted to transparent 32 px PNG; GitHub mark |
+| `baidu.png` | [Simple Icons 13.21.0 baidu.svg](https://github.com/simple-icons/simple-icons/blob/13.21.0/icons/baidu.svg) | CC0-1.0; rendered once as black on transparent 128 px PNG; Baidu mark |
+
+Simple Icons uses [CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/).
+No SVG renderer is included at runtime for these assets.
+
 MIT, ISC and BSD-3-Clause permit use with GPL-3.0; Unicode License V3 likewise
 permits modification and redistribution with its notice retained. These notices
 do not relicense Microsoft's distributed binaries.
