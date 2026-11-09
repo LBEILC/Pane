@@ -69,6 +69,8 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     // 设计加（2026-11-05，issue 24、062）：宽度三档（510 / 592 / 756，一行 6 / 7 / 9 个应用）、应用最多几行（1～4）、文件最多几个（3 / 5 / 8 / 10）
     LauncherWidth Width=LauncherWidth.Standard, int AppRows=2, int FileRows=3)
 {
+    // 设计加（2026-11-09，issue 38）：呼出时先只出搜索栏，再向下展开首页内容；默认关。「未输入时显示」为「都不显示」时不起作用
+    public bool ExpandOnOpen { get; init; }
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
     AppAliasEntry[] appAliases=[];

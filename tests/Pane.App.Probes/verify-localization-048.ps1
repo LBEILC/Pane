@@ -24,7 +24,7 @@ try {
             $rows+=$row
             if(!$Baseline){Send-Control $process $prefix 'localization-probe' 'localization-result'
             $text=[IO.File]::ReadAllLines($prefix+'.localization-result')
-            $expected=@('zh-Hant','新版本 1.2.3 已下載好','重新啟動並更新','開啟啟動器','開啟剪貼簿','設定','暫停手勢','結束 Pane')
+            $expected=@('zh-Hant','新版本 1.2.3 已下載完成','重新啟動並更新','開啟啟動器','開啟剪貼簿','設定','暫停手勢','結束 Pane')
             if(($text -join '|') -cne ($expected -join '|')){throw "菜单文字不符：$($text -join '|')"}
             Write-Output ($row|ConvertTo-Json -Compress)
             Write-Output ($text -join '|')}

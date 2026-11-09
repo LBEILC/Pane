@@ -25,7 +25,7 @@ using Windows.UI.Core;
 
 namespace Pane.Views;
 
-public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
+public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpeningSize, IDisposable
 {
     const double SearchRowHeight = 60, FootHeight = 34;
     // 宽度、应用行数、文件个数跟设置走（issue 24，docs/design.md「启动器尺寸与显示数量」）：格子 82 宽，左右内边距各 8 + 1，
@@ -149,6 +149,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     // ---------------- IPanelView ----------------
 
     public Size PreferredSize => new(Width_, SearchRowHeight);
+    // 设置 → 启动器 →「从搜索栏展开」（issue 38）：打开时先只有搜索栏（和提示条），宿主再用弹簧长到结果的高度
+    public Size? OpeningSize => Options.ExpandOnOpen && Options.Home != Settings.LauncherHome.Nothing && rows.Count > 0 && !aiMode
+        ? new Size(Width_, noticeHeight + SearchRowHeight) : null;
     public event EventHandler<Size>? SizeRequested;
     public event EventHandler? CloseRequested;
     public UIElement? DragRegion => SearchRow; // 宿主只在没有可交互控件（输入框、附件的叉）的位置开始拖动
@@ -190,6 +193,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
             _ => false,
         };
         var text = Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY") ?? query ?? (keep ? Input.Text : string.Empty);
+        // issue 40：空输入先用上次的首页结果同步画一遍，宿主打开时就是首页的高度（「都不显示」= 只有搜索栏）；异步搜到新的再补上
+        if (text.Length == 0 && attach is null && homeResult is { } home) Render(home, string.Empty, attachmentMode: false);
         if (Input.Text != text) Input.Text = text;
         else _ = Refresh(text);
         if (query is not null) Input.SelectionStart = text.Length;   // 交过来的搜索词光标放末尾，接着打
@@ -380,7 +385,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
     // ---------------- 网页搜索建议（037） ----------------
 
     const int MaxSettings = 4;
-    LauncherResult? lastResult;
+    LauncherResult? lastResult, homeResult;
     (string Query, IReadOnlyList<string> Items) suggested = ("", []);
 
     /// <summary>「关键字 空格 内容」，关键字是设置里的某个搜索站点；内容不能是空的。</summary>
@@ -544,6 +549,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IDisposable
         }
 
         lastResult = result;
+        if (result.IsHome && !attachmentMode) homeResult = result;
         Sections.ItemsSource = sections;
         ResultsArea.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Foot.Visibility = rows.Count > 0 ? Visibility.Visible : Visibility.Collapsed;

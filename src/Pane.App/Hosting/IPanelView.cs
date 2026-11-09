@@ -12,6 +12,11 @@ public interface IPanelView
     UIElement? DragRegion { get; }
 }
 public sealed record PanelShowContext(nint PreviousForegroundWindow, Point? AnchorPhysical, bool Activate);
+/// <summary>
+/// 从收起状态打开时窗口先用的尺寸（设计加，2026-11-09，issue 38）。宿主在 OnShowing 之后读：
+/// null = 直接用视图最后要的尺寸；给出较小的尺寸（启动器「从搜索栏展开」给搜索栏）= 从它开始，用改尺寸的弹簧长到视图要的尺寸。
+/// </summary>
+public interface IPanelOpeningSize { Size? OpeningSize { get; } }
 // Center：工作区正中，改尺寸时保持居中（手势提示框，设计加）
 // Tray：托盘菜单，贴着右键那一刻的鼠标点、往任务栏的反方向展开（设计加，2026-10-30，做法照 NovelAIPromptStudio）
 public enum PanelPlacement { UpperCenter, Pointer, BottomCenter, Center, Tray }

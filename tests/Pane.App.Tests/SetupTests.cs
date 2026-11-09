@@ -33,9 +33,9 @@ internal static class SetupTests
             Check(Service().CheckInstallPath(paths.Root + "\\").Path == paths.Root, "Pane 不重复添加");
             Check(Service().CheckInstallPath(paths.Root.ToUpperInvariant()).Path == paths.Root.ToUpperInvariant(), "Pane 大小写不敏感");
             Check(!Directory.Exists(parent), "检查不创建目录");
-            Check(Service().CheckInstallPath(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)).Error == "这里要管理员权限，换一个位置", "系统目录拒绝");
-            Check(Service().CheckInstallPath(@"\\server\share").Error == "请选本机的固定磁盘", "网络路径拒绝");
-            Check(Service().CheckInstallPath(Path.Combine(root, new string('a', 181))).Error == "路径太长，换一个短一点的位置", "过长路径拒绝");
+            Check(Service().CheckInstallPath(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)).Error == Strings.Setup_PermissionRequired, "系统目录拒绝");
+            Check(Service().CheckInstallPath(@"\\server\share").Error == Strings.Setup_FixedDiskRequired, "网络路径拒绝");
+            Check(Service().CheckInstallPath(Path.Combine(root, new string('a', 181))).Error == Strings.Setup_PathTooLong, "过长路径拒绝");
             Directory.CreateDirectory(paths.Root);
             string foreign = Path.Combine(paths.Root, "用户文件.txt");
             File.WriteAllText(foreign, "保留");

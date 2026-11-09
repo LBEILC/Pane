@@ -33,6 +33,9 @@ public sealed partial class SettingsView
         var l = s.Launcher;
         var reset = Button(Strings.Settings_Launcher_ResetPosition, "refresh", () => { SaveLauncher(x => x with { Position = null }); Render(); });
         Enable(reset, moved);
+        // 从搜索栏展开（issue 38）：「都不显示」时没有内容可展开，变灰
+        var expand = Switch(l.ExpandOnOpen, v => SaveLauncher(x => x with { ExpandOnOpen = v }));
+        Enable(expand, l.Home != LauncherHome.Nothing);
         Group(Strings.Settings_Launcher_Activation,
             hotkeyRow,
             Row(Strings.Settings_Launcher_Position, moved ? Strings.Settings_Launcher_PositionSaved : Strings.Settings_Launcher_PositionDefault, reset),
@@ -43,6 +46,7 @@ public sealed partial class SettingsView
             Row(Strings.Settings_Launcher_Home, l.Home == LauncherHome.Nothing ? Strings.Settings_Launcher_HomeNone : Strings.Settings_Launcher_HomeRecentDescription,
                 Seg([("RecentAndPinned", Strings.Settings_Launcher_HomeRecent), ("PinnedOnly", Strings.Settings_Launcher_HomePinned), ("Nothing", Strings.Settings_Launcher_HomeHidden)], l.Home.ToString(),
                     v => { SaveLauncher(x => x with { Home = Enum.Parse<LauncherHome>(v) }); Later(); })),
+            Row(Strings.Settings_Launcher_ExpandOnOpen, Strings.Settings_Launcher_ExpandOnOpenDescription, expand),
             Row(Strings.Settings_Launcher_AutoAttach, Strings.Settings_Launcher_AutoAttachDescription,
                 Seg([("0", Strings.Common_Off), ("1", Strings.Settings_Launcher_AttachOneSecond), ("3", Strings.Settings_Launcher_AttachThreeSeconds), ("5", Strings.Settings_Launcher_AttachFiveSeconds)], l.AutoAttachSeconds.ToString(),
                     v => SaveLauncher(x => x with { AutoAttachSeconds = int.Parse(v) }))));

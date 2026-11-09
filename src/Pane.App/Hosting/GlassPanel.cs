@@ -137,6 +137,18 @@ public sealed partial class GlassPanel : IDisposable
         if(!near){Native.GetCursorPos(out var cursor);px=cursor.X;py=cursor.Y;}
         near=near||Placement is PanelPlacement.Pointer or PanelPlacement.Tray;
         view.OnShowing(new PanelShowContext(Previous,new Windows.Foundation.Point(px,py),activate&&!demo));
+        // 设计改（2026-11-09，issue 40）：从收起状态打开时不沿用上次的尺寸。原来启动器上次搜过东西、结果区很高，
+        // 下次呼出先按那个高度出现，异步搜完首页才用弹簧缩回搜索栏，看着是一块空面板再收回去。
+        // 视图在 OnShowing 里要的尺寸直接定下；视图给了开场尺寸（IPanelOpeningSize）就从它开始，弹簧长到要的尺寸
+        if(!Shown&&!animating)
+        {
+            if(resizing){Width=targetWidth;Height=targetHeight;resizing=false;}
+            if(view is IPanelOpeningSize{OpeningSize:{} start})
+            {
+                double w=Math.Max(minWidth,start.Width),h=Math.Max(minHeight,start.Height);
+                if(Math.Abs(w-Width)>0.5||Math.Abs(h-Height)>0.5){targetWidth=Width;targetHeight=Height;Width=w;Height=h;velocityWidth=velocityHeight=0;resizeClock.Restart();resizing=true;}
+            }
+        }
         // 托盘菜单要按最终尺寸算位置，弹出前直接定尺寸，不走改尺寸的弹簧
         if(Placement==PanelPlacement.Tray&&!Shown){var s=view.PreferredSize;Width=targetWidth=Math.Max(minWidth,s.Width);Height=targetHeight=Math.Max(minHeight,s.Height);resizing=false;}
         var point=PlaceForShow(px,py,near);int x=point.X,y=point.Y;

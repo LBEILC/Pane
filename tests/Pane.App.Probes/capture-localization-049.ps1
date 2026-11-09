@@ -26,7 +26,7 @@ $cases+=@(
     @{Name='translate';Open='translate';Title='翻译'},
     @{Name='files';Open='files';Title='文件'},
     @{Name='rename';Open='rename';Title='批量重命名'},
-    @{Name='folder-jump';Open='folder-jump';Title='跳到文件夹'},
+    @{Name='folder-jump';Open='folder-jump';Title='跳转到文件夹'},
     @{Name='tray';Open='tray';Title='托盘菜单'},
     @{Name='chat';Open='chat';Title='AI 对话'}
 )
