@@ -67,7 +67,7 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="28"/>
                 </Grid.RowDefinitions>
-                <TextBox x:Name="Source" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="{x:Bind loc:Strings.Translate_InputPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}" Padding="0" MinHeight="0"
+                <TextBox x:Name="Source" AcceptsReturn="True" TextWrapping="Wrap" PlaceholderText="{x:Bind loc:Strings.Translate_InputPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}" Padding="0" MinHeight="0" c:TextBleed.Bleed="4"
                          FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                          IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnSourceChanged"/>
                 <Grid Grid.Row="1">

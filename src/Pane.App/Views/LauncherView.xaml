@@ -185,7 +185,8 @@
                     </Button>
                 </Grid>
             </Border>
-            <TextBox x:Name="Input" Grid.Column="2" VerticalAlignment="Center" MinHeight="0" Padding="0"
+            <!-- TextBleed：j 这类伸到起点左边的笔画不被输入框裁掉，字的位置不变（issue 44） -->
+            <TextBox x:Name="Input" Grid.Column="2" VerticalAlignment="Center" MinHeight="0" Padding="0" c:TextBleed.Bleed="4"
                      PlaceholderText="{x:Bind loc:Strings.Launcher_SearchPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
                      FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextSearch}"
                      SelectionHighlightColor="{StaticResource PaneAccentBrush}"

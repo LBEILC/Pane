@@ -84,7 +84,7 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="Input" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="0" MaxHeight="140" Padding="0,2,0,2" VerticalAlignment="Center"
+                <TextBox x:Name="Input" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="0" MaxHeight="140" Padding="0,2,0,2" c:TextBleed.Bleed="4" VerticalAlignment="Center"
                          PlaceholderText="{x:Bind loc:Strings.Ai_Chat_QuestionPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
                          SelectionHighlightColor="{StaticResource PaneAccentBrush}" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                          ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnInputChanged"/>
