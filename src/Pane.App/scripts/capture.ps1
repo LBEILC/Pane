@@ -1,4 +1,4 @@
-﻿param([ValidateSet('jit','aot')][string]$Mode='aot',[ValidateSet('Light','Dark','System')][string]$Theme='Dark',[ValidateSet('launcher','clipboard','super','settings','glass','resize','cycle','positions','drag','pointer','gesture','all')][string]$Shot='all',[switch]$NoShot,[ValidateSet('gdi','dxgi','both')][string]$CaptureBackend='gdi')
+﻿param([ValidateSet('jit','aot')][string]$Mode='aot',[ValidateSet('Light','Dark','System')][string]$Theme='Dark',[ValidateSet('launcher','clipboard','super','settings','glass','resize','cycle','positions','drag','pointer','gesture','window','all')][string]$Shot='all',[string]$Title='',[switch]$NoShot,[ValidateSet('gdi','dxgi','both')][string]$CaptureBackend='gdi')
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/capture-native.ps1"
 . "$PSScriptRoot/capture-functions.ps1"
@@ -106,6 +106,8 @@ try {
         }
         Send-Demo 'hide' 'hidden'
     }
+    # 二级窗口（设计加，2026-11-09）：PANE_DESIGN_OPEN 打开的窗口，按标题拍，如 -Shot window -Title 分词
+    if($Shot-eq 'window'){Start-Sleep -Milliseconds 1500;Capture-Panel $Title 'window'}
     foreach($panel in @('launcher','clipboard','super','settings')){
         if($Shot-in @('all',$panel)){$point=if($panel-eq 'super'){"$($bounds.Right-40),$($bounds.Bottom-40)"}else{''};Send-Demo "show-$panel" "shown-$panel" $point;Capture-Panel $titles[$panel] $panel;Send-Demo 'hide' 'hidden'}
     }

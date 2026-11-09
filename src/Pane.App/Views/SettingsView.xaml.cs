@@ -42,6 +42,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("modules", Strings.Settings_Modules, "blocks", Strings.Settings_Modules_Description, RenderModules),
             new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher, ModuleIds.Launcher),
             new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard, ModuleIds.Clipboard),
+            new("words", Strings.Module_Words_Name, "words", Strings.Settings_Words_Description, RenderWords, ModuleIds.Words),
             new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures),
             new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel),
             new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump),

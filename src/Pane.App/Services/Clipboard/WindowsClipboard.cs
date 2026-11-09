@@ -60,9 +60,7 @@ internal sealed class WindowsClipboardCapture(SettingsStore settings):IClipboard
     public string Program {
         get{
             path="";display="";
-            NativeClip.GetWindowThreadProcessId(NativeClip.GetClipboardOwner(),out uint pid);
-            if(pid!=0)try{using var process=Process.GetProcessById((int)pid);path=process.MainModule?.FileName??"";display=FileVersionInfo.GetVersionInfo(path).FileDescription??"";}
-            catch(Exception e) when(e is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException){}
+            (path,display)=SourceProgram.Read(NativeClip.GetClipboardOwner());
             return Path.GetFileName(path);
         }
     }

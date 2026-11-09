@@ -40,6 +40,9 @@ static class Program
   var loaded=JsonSerializer.Deserialize("{"+old+"}",SettingsJson.Default.PaneSettings)!;Check(loaded.SuperPanel.TriggerButton==SuperPanelButton.X1&&loaded.SuperPanel.HoldMilliseconds==400&&loaded.SuperPanel.ClipboardFallback,"old settings defaults");
   var dir=Path.Combine(AppContext.BaseDirectory,"results","settings");var store=new SettingsStore(dir,settings);store.Save(settings with{SuperPanel=new(true,SuperPanelButton.Middle,650,false,false){DisabledPrograms=["test.exe"]}});store.Load();Check(store.Current.SuperPanel.HoldMilliseconds==650&&store.Current.SuperPanel.TriggerButton==SuperPanelButton.Middle,"super settings roundtrip");
   checks+=WinVHotkey084Tests.Run(settings);
+  var legacyWords=System.Text.Json.Nodes.JsonNode.Parse(json)!.AsObject();legacyWords.Remove("Words");legacyWords.Remove("Modules");
+  var wordsDefaults=JsonSerializer.Deserialize(legacyWords.ToJsonString(),SettingsJson.Default.PaneSettings)!;
+  Check(wordsDefaults.Words==new WordsSettings()&&wordsDefaults.Modules==null,"093 old settings defaults");
   checks+=await ModuleTests.Run(settings);
   checks+=FolderJumpSettingsTests.Run(settings);
   if(args is ["--settings"]){Console.WriteLine($"PASS settings assertions={checks}; realRegistry=0; systemClipboard=0");TestResults.Pass();return;}

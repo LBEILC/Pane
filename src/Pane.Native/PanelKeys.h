@@ -4,7 +4,7 @@
 #include <list>
 namespace pane {
 // 数值对应设计契约 PanelKey；0 留给「没有通知」。不依赖 Windows，便于序列测试。
-enum PanelAction { PanelNone, PanelUp, PanelDown, PanelEnter, PanelShiftEnter, PanelQuick, PanelPin, PanelSend, PanelEscape, PanelType, PanelLeft, PanelRight, PanelDigit, PanelCopy, PanelRetry };
+enum PanelAction { PanelNone, PanelUp, PanelDown, PanelEnter, PanelShiftEnter, PanelQuick, PanelPin, PanelSend, PanelEscape, PanelType, PanelLeft, PanelRight, PanelDigit, PanelCopy, PanelRetry, PanelWords };
 // 数值对应设计契约 PanelKeyMode；0/1 兼容原来的 send 参数。
 enum class PanelMode { Clipboard, ClipboardWithSend, Super };
 struct PanelModifiers { bool ctrl=false,alt=false,win=false,shift=false; unsigned altSides=0; };
@@ -13,7 +13,7 @@ struct PanelDecision { bool swallow=false,mask=false; PanelAction action=PanelNo
 struct PanelQueued { PanelEvent event; bool mask=false; };
 struct PanelKeys {
  static constexpr unsigned ReplayTimeoutMs=500;
- bool active=false,typing=false;
+ bool active=false,typing=false,wordsEnabled=false;
  PanelMode mode=PanelMode::Clipboard;
  uint64_t typingAt=0;
  std::array<bool,256> swallowed{},maskRelease{};
@@ -69,6 +69,7 @@ struct PanelKeys {
    else if(character(e.vk))r.action=PanelType;
   }else if(m.alt&&!m.ctrl&&!m.win&&e.vk>=0x31&&e.vk<=0x39){r.action=PanelQuick;r.number=e.vk-0x30;}
   else if(m.ctrl&&!m.alt&&!m.win&&!m.shift&&e.vk==0x50)r.action=PanelPin;
+  else if(wordsEnabled&&m.ctrl&&!m.alt&&!m.win&&!m.shift&&e.vk==0x42)r.action=PanelWords;
   if(r.action!=PanelNone){
    r.swallow=true;
    if(r.action==PanelType){enqueue({e,false});typing=true;typingAt=now;}

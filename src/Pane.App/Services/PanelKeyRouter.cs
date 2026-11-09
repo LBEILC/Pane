@@ -17,6 +17,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
     public event EventHandler<PanelKeyPress>? Pressed;
     public bool Active => !disposed && started && PanePanelKeysActive() != 0;
     internal static bool HookInstalled => current is { started: true, disposed: false } && PanePanelKeysInstalled() != 0;
+    internal static void SetWordsEnabled(bool enabled) => PanePanelKeysWords(enabled ? 1 : 0);
     internal PanelKeyRouter(IPastePlatform? platform = null)
     {
         this.platform = platform ?? new WindowsPastePlatform();
@@ -52,7 +53,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
             if (!disposed && w == generation && Active)
             {
                 int value = (int)l, key = (value & 255) - 1;
-                if (key >= 0 && key <= (int)PanelKey.Retry) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
+                if (key >= 0 && key <= (int)PanelKey.Words) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
             }
             return 0;
         }
@@ -72,6 +73,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
     [DllImport("Pane.Native.dll")] static extern void PanePanelKeysEnd();
     [DllImport("Pane.Native.dll")] static extern void PanePanelKeysReplay();
     [DllImport("Pane.Native.dll")] static extern int PanePanelKeysActive();
+    [DllImport("Pane.Native.dll")] static extern void PanePanelKeysWords(int enabled);
     [DllImport("Pane.Native.dll")] static extern int PanePanelKeysInstalled();
     [DllImport("Pane.Native.dll")] static extern void PanePanelKeysDispose();
 }

@@ -4,7 +4,7 @@ namespace Pane.Hosting;
 internal static class ShellHotkeyBindings
 {
     internal const uint NoRepeat=0x4000;
-    internal static string? Command(nuint id)=>id switch{1=>"hotkey-launcher",2 or 3=>"hotkey-clipboard",_=>null};
+    internal static string? Command(nuint id)=>id switch{1=>"hotkey-launcher",2 or 3=>"hotkey-clipboard",4=>"hotkey-words",_=>null};
     // Shown 表示动画的目标状态；收起过程中再次按下应重新显示。
     internal static bool ShouldHide(bool shown,bool foreground)=>shown&&foreground;
     internal static (uint Launcher,uint Clipboard) DoubleTapKeys(Hotkey launcher,Hotkey clipboard,bool enabled,bool suspended,bool launcherEnabled=true)
@@ -28,7 +28,7 @@ internal static class ShellHotkeyBindings
     }
     internal static bool Rebind(List<int> registered,Action<int> unregister,Action<int,string,Hotkey> register,
         Hotkey launcher,Hotkey clipboard,bool enabled,bool suspended,bool launcherEnabled=true,
-        bool keepHotkeyWithWinV=true,Func<bool>? registerWinV=null)
+        bool keepHotkeyWithWinV=true,Func<bool>? registerWinV=null,Hotkey? words=null,bool wordsEnabled=false)
     {
         foreach(int id in registered)unregister(id);
         registered.Clear();
@@ -37,6 +37,7 @@ internal static class ShellHotkeyBindings
         if(launcherEnabled&&!launcher.IsValidDoubleTap)register(1,"launcher",launcher);
         if(KeepClipboardHotkey(enabled,suspended,keepHotkeyWithWinV,active)&&!clipboard.IsValidDoubleTap
             &&!(active&&clipboard==new Hotkey(KeyModifiers.Win,86)))register(2,"clipboard",clipboard);
+        if(wordsEnabled&&words is {} key&&!key.IsValidDoubleTap)register(4,"words",key);
         return active;
     }
 }

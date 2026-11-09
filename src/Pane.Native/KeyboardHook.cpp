@@ -13,7 +13,7 @@ std::atomic<DWORD> threadId=0;
 std::atomic<bool> active=false;
 DWORD startError=0;
 HWND target=nullptr;UINT message=0;WPARAM generation=0;
-unsigned launcher=0,clipboard=0;
+unsigned launcher=0,clipboard=0,words=0;
 pane::DoubleTap recognizer;
 bool keyPressed(unsigned vk){return (GetAsyncKeyState(static_cast<int>(vk))&0x8000)!=0;}
 bool foregroundFull(){
@@ -31,8 +31,8 @@ LRESULT CALLBACK keyboard(int code,WPARAM kind,LPARAM data){
   bool up=kind==WM_KEYUP||kind==WM_SYSKEYUP;
   if(down||up){
    auto key=recognizer.feed(event.vkCode,down,event.time,pane::ownInput(event.dwExtraInfo)||pane::simulatingInput.load()!=0,pane::mouseDownSerial.load()+pane::panelKeySerial.load(),keyPressed);
-   unsigned id=key&&key==launcher?1:key&&key==clipboard?2:0;
-   if(id&&!foregroundFull())PostMessageW(target,message,generation,static_cast<LPARAM>(id));
+   unsigned id=key&&key==launcher?1:key&&key==clipboard?2:key&&key==words?4:0;
+   if(id&&(id==4||!foregroundFull()))PostMessageW(target,message,generation,static_cast<LPARAM>(id));
   }
  }
  return CallNextHookEx(nullptr,code,kind,data);
@@ -43,12 +43,12 @@ API void PaneKeyboardStop(){
  if(worker.joinable()){PostThreadMessageW(threadId.load(),WM_QUIT,0,0);worker.join();}
  threadId=0;
 }
-API int PaneKeyboardStart(HWND window,UINT msg,WPARAM epoch,unsigned first,unsigned second){
+API int PaneKeyboardStart(HWND window,UINT msg,WPARAM epoch,unsigned first,unsigned second,unsigned third=0){
  PaneKeyboardStop();
- if(!first&&!second)return 0;
+ if(!first&&!second&&!third)return 0;
  HANDLE ready=CreateEventW(nullptr,TRUE,FALSE,nullptr);
  if(!ready)return static_cast<int>(GetLastError());
- target=window;message=msg;generation=epoch;launcher=first;clipboard=second;recognizer={};startError=0;
+ target=window;message=msg;generation=epoch;launcher=first;clipboard=second;words=third;recognizer={};startError=0;
  try {worker=std::thread([ready]{
   SetThreadDescription(GetCurrentThread(),L"Pane 双击修饰键");
   MSG event{};PeekMessageW(&event,nullptr,0,0,PM_NOREMOVE);threadId=GetCurrentThreadId();

@@ -87,6 +87,10 @@
                                     <c:PaneIcon Glyph="R" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>
                                 <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
+                                        Click="{x:Bind Words}" Visibility="{x:Bind WordsVisibility}" ToolTipService.ToolTip="{x:Bind loc:Strings.Words_OpenHint}">
+                                    <c:PaneIcon Glyph="words" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
+                                </Button>
+                                <Button Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlXs}" Height="{StaticResource PaneControlXs}" CornerRadius="7"
                                         Click="{x:Bind TogglePin}" ToolTipService.ToolTip="{x:Bind PinTip}">
                                     <c:PaneIcon Glyph="pin" IsFilled="{x:Bind Pinned}" Width="14" Height="14" Foreground="{ThemeResource PaneText2Brush}"/>
                                 </Button>

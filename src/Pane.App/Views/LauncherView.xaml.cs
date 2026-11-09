@@ -501,6 +501,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             v.StartAnimation("Opacity", a);
         }
         if (web && wasWeb) { Scale(badge, 0.85f, 1, spring, Ms("PaneDurSlow")); return; }
+        var divider = ElementCompositionPreview.GetElementVisual(EngineDivider);
+        EngineDivider.Opacity = 1;
+        if (web) { divider.Opacity = 0; Fade(divider, 1, Ms("PaneDurNormal")); }
+        else Fade(divider, 0, Ms("PaneDurFast"));
         if (web)
         {
             EngineBadge.Opacity = 1;
@@ -605,7 +609,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             // 用搜索关键字搜网页（「bd 天气」）：只出网页一组，第一项就是用这个站点搜，下面跟站点给的搜索建议（037）
             webEngine = web.Engine;
             var s = Section(web.Engine.Name, LauncherSectionKind.List);
-            Add(s, WebItem(web.Engine, web.Text, string.Format(Strings.Launcher_SearchWithQuery, (object?)(web.Engine.Name), (object?)(web.Text)), "Enter"), LauncherCell.Command);
+            Add(s, WebItem(web.Engine, web.Text, Strings.FormatName(Strings.Launcher_SearchWithQuery, web.Engine.Name, web.Text), "Enter"), LauncherCell.Command);
             var recent = History?.Recent(web.Engine, web.Text, 3) ?? [];
             foreach (var text in recent) AddHistory(s, web.Engine, text);
             if (suggested.Query == web.Engine.Keyword + " " + web.Text)
@@ -617,7 +621,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             webEngine = only;
             var s = Section(only.Name, LauncherSectionKind.List);
             foreach (var text in History?.Recent(only, "", 6) ?? []) AddHistory(s, only, text);
-            if (s.Rows.Count == 0) Add(s, new("web:hint", LauncherItemKind.Command, LauncherGroups.Web, string.Format(Strings.Launcher_WebHint, (object?)only.Name), null, new("search")), LauncherCell.Command);
+            if (s.Rows.Count == 0) Add(s, new("web:hint", LauncherItemKind.Command, LauncherGroups.Web, Strings.FormatName(Strings.Launcher_WebHint, only.Name), null, new("search")), LauncherCell.Command);
         }
         else if (DirectQuery(q) is { } direct)
         {
@@ -729,7 +733,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
             LauncherCell.Command when item.Id == "web:hint" => (item.Title, []),
             // 关键字搜网页（issue 43）：底栏写用哪个站点，不重复结果行；历史行多一个 Shift+Delete 删除
-            LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (string.Format(Strings.Launcher_SearchUsing, (object?)we.Name),
+            LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (Strings.FormatName(Strings.Launcher_SearchUsing, we.Name),
                 row.HistoryText is null ? [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)] : [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput), (["Shift", "+", "Delete"], Strings.Common_Delete)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
             LauncherCell.Command when item.Group == LauncherGroups.Timer => (item.Title.TrimEnd('…'), [(["Enter"], item.Id == "power:panel" ? Strings.Common_Open : item.Id == "power:cancel" ? Strings.Common_Execute : Strings.Timer_Go)]),
@@ -758,7 +762,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         "ai:translate" => (string.Format(Strings.Launcher_TranslateTarget, (object?)(q)), [(["Enter"], Strings.Common_Translate), (["Tab"], Strings.Launcher_OpenTranslate)]),
         "ai:ask" => (string.Format(Strings.Launcher_AskTarget, (object?)(q)), [(["Enter"], Strings.Launcher_AskAi), (["Tab"], Strings.Launcher_OpenChat)]),
         "files" => (string.Format(Strings.Launcher_SearchFilesTarget, (object?)(q)), [(["Enter"], Strings.Launcher_OpenFiles)]),
-        _ when id.StartsWith("web:", StringComparison.Ordinal) => (string.Format(Strings.Launcher_SearchWithQuery, (object?)(name), (object?)(q)), [(["Enter"], Strings.Common_Search)]),
+        _ when id.StartsWith("web:", StringComparison.Ordinal) => (Strings.FormatName(Strings.Launcher_SearchWithQuery, name, q), [(["Enter"], Strings.Common_Search)]),
         _ => ($"{name}「{q}」", [(["Enter"], name)]),
     };
 

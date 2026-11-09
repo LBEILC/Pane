@@ -13,6 +13,7 @@ HWND commandWindow=nullptr,recipient=nullptr;
 UINT notification=0;WPARAM generation=0;
 HHOOK hook=nullptr;
 std::atomic<bool> installed=false,taking=false;
+std::atomic<bool> wordsEnabled=false;
 pane::PanelKeys state;
 DWORD startError=0;
 bool drainPosted=false;
@@ -66,6 +67,7 @@ LRESULT CALLBACK keyboard(int code,WPARAM kind,LPARAM data){
  mods.altSides=(held(VK_LMENU)?1u:0u)|(held(VK_RMENU)?2u:0u);
  auto e=pane::PanelEvent{k.vkCode,k.scanCode,down,(k.flags&LLKHF_EXTENDED)!=0,false};
  const bool wasTyping=state.typing;
+ state.wordsEnabled=wordsEnabled.load();
  auto r=state.feed(e,mods,GetTickCount64());
  if(r.mask)releasedMask[k.vkCode]=true;
  if(r.action!=pane::PanelNone)PostMessageW(recipient,notification,generation,static_cast<LPARAM>(r.action|(r.number<<8)));
@@ -143,6 +145,7 @@ API int PanePanelKeysBegin(HWND recipient,UINT message,WPARAM generation,int mod
 API void PanePanelKeysEnd(){using namespace panelkeys;if(commandWindow)SendMessageW(commandWindow,End,0,0);}
 API void PanePanelKeysReplay(){using namespace panelkeys;if(commandWindow)SendMessageW(commandWindow,Replay,0,0);}
 API int PanePanelKeysActive(){return panelkeys::taking?1:0;}
+API void PanePanelKeysWords(int enabled){panelkeys::wordsEnabled=enabled!=0;}
 API int PanePanelKeysInstalled(){return panelkeys::installed?1:0;}
 API void PanePanelKeysDispose(){
  using namespace panelkeys;if(worker.joinable()){if(commandWindow)SendMessageW(commandWindow,Stop,0,0);worker.join();}state={};

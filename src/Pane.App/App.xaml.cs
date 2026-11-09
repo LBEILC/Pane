@@ -98,6 +98,7 @@ public sealed partial class App : Application
             command.StartsWith("hotkey-",StringComparison.Ordinal)?command[7..]:command=="pause-gestures"?Pane.Contracts.ModuleIds.Gestures:null;
         if(moduleId=="super")moduleId=Pane.Contracts.ModuleIds.SuperPanel;
         if(moduleId!=null&&Modules!=null&&Modules.Modules.Any(m=>m.Id==moduleId)&&!AllowModule(moduleId))return;
+        if(command=="hotkey-words"){_ = ReadWordsSelection();return;}
         if(command.StartsWith("hotkey-",StringComparison.Ordinal)){
             string name=command[7..];command="show-"+name;
             nint foreground=foregroundOverride??Native.GetForegroundWindow();

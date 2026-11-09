@@ -17,7 +17,7 @@ public sealed partial class App
     public IWebSuggestions? WebSuggestions {get;set;}
     /// <summary>终端命令历史（037）：设置页「清空」用。工程赋真实实现。</summary>
     public ITerminalHistory? TerminalHistory {get;set;}
-    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
+    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder, Words }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
     readonly Dictionary<SecondaryId,GlassPanel> secondaries=[];
     readonly Dictionary<SecondaryId,(int X,int Y,double W,double H)> secondaryBounds=[];
     // 销毁窗口前要做的退订（关窗口、能力停用两条路径都调用）
@@ -62,16 +62,18 @@ public sealed partial class App
     // 超级面板：自动翻译 / 翻译结果按 Tab 到翻译窗口；「问 AI」打开对话窗口并带上选中文字；选中文件时「批量重命名」
     void WireSuper(SuperView super){super.OpenTranslate+=text=>ShowTranslate(text);super.OpenChat+=text=>ShowChatDraft(text);super.OpenRename+=files=>ShowRename(files,0);}
 
-    void Present(SecondaryId id,string name,Func<Microsoft.UI.Xaml.Controls.UserControl> make,Action<IPanelView> open)
+    /// <param name="at">新建窗口时放到这里（物理像素，玻璃左上角），代替上次记下的位置（分词：剪贴板原来的位置、鼠标附近）。</param>
+    void Present(SecondaryId id,string name,Func<Microsoft.UI.Xaml.Controls.UserControl> make,Action<IPanelView> open,(int X,int Y)? at=null)
     {
         if(closing)return;
-        var owner=id switch { SecondaryId.Files=>ModuleIds.Launcher, SecondaryId.Rename=>ModuleIds.Rename, SecondaryId.Timer=>ModuleIds.PowerTimer, _=>ModuleIds.Ai };
+        var owner=id switch { SecondaryId.Files=>ModuleIds.Launcher, SecondaryId.Rename=>ModuleIds.Rename, SecondaryId.Timer=>ModuleIds.PowerTimer, SecondaryId.Words=>ModuleIds.Words, _=>ModuleIds.Ai };
         if(!AllowModule(owner))return;
         if(!secondaries.TryGetValue(id,out var panel)){
             var view=make();var sv=(ISecondaryView)view;
             panel=new GlassPanel(name,view,sv,Glass,true,true,sv.MinimumSize){EscapeHides=false};
             WatchFrames(panel);
             if(secondaryBounds.TryGetValue(id,out var b)){panel.Width=b.W;panel.Height=b.H;panel.RememberedOrigin=(b.X,b.Y);}
+            if(at!=null)panel.RememberedOrigin=at;
             // 关窗口时要退订：原生 XAML 在内容岛释放后仍会抓着视图外壳，视图再经这个处理函数抓着宿主，宿主连同整套玻璃材质都回收不了（每开关一次 1～2 MiB）
             EventHandler<bool> topmost=(_,on)=>panel.SetTopmost(on);sv.TopmostChanged+=topmost;secondaryRelease[id]=()=>sv.TopmostChanged-=topmost;
             var host=panel;
@@ -114,6 +116,10 @@ public sealed partial class App
                 break;
             }
             case "timer":ShowTimer();break;   /* 058：PANE_DESIGN_TIMER=分钟数 先定一个 */
+            case "words":   /* 093：带上 PANE_DESIGN_QUERY（默认一段地址）；PANE_DESIGN_WORDS=clipboard 时按从剪贴板进入写来源 */
+                Words??=new Pane.DesignData.TextSegmenterSample();
+                ShowWords(q??"收货地址：上海市浦东新区张江路 123 号 4 栋 501 室，电话 138 0013 8000，邮编 201203。\n收件人：王小明（工作日 9:00-18:00 在）","微信",Environment.GetEnvironmentVariable("PANE_DESIGN_WORDS")=="clipboard"); // 不翻译：演示数据
+                break;
             case "rename":
                 ShowRename(q=="empty"?[]:Pane.DesignData.RenameSample.Photos,0);
                 if(q!="empty"&&secondaries.TryGetValue(SecondaryId.Rename,out var rw))((RenameView)rw.View).UseRules(Pane.DesignData.RenameSample.SampleRules);

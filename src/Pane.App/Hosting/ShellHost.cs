@@ -106,13 +106,19 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         lock(conflicts)conflicts.Clear();launcher=a;clipboard=b;
         // 先停止旧线程；代数丢弃已经排队的旧配置通知。
         keyboardGeneration++;StopKeyboardHook();
-        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV);
+        var words=settings.Words.Hotkey;
+        if(words!=null)words=Override("words",words);
+        bool wordsEnabled=settings.Modules?.GetValueOrDefault("words",true)??true;
+        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV,words,wordsEnabled);
         OriginalClipboardHotkeySuppressed=active&&!settings.Clipboard.KeepHotkeyWithWinV;
         var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,!OriginalClipboardHotkeySuppressed&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled),suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
-        if(keys.Launcher!=0||keys.Clipboard!=0){
-            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard);
+        uint wordsKey=wordsEnabled&&!suspended&&words?.IsValidDoubleTap==true?words.VirtualKey:0u;
+        if(wordsKey!=0&&(wordsKey==keys.Launcher||wordsKey==keys.Clipboard)){RegistrationResult("words",words!,false,1409);wordsKey=0;}
+        if(keys.Launcher!=0||keys.Clipboard!=0||wordsKey!=0){
+            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard,wordsKey);
             keyboardStarted=code==0;
             if(code!=0){if(keys.Launcher!=0)RegistrationResult("launcher",a,false,code);if(keys.Clipboard!=0)RegistrationResult("clipboard",b,false,code);}
+            if(wordsKey!=0)RegistrationResult("words",words!,code==0,code);
         }
         lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
         WinVRegistrationChanged?.Invoke(active);
@@ -130,7 +136,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         lock(diagnostics)diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
         if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
             // 设计加（2026-10-30）：注册失败时提示一次，否则按了没反应也不知道为什么
-            var what=name=="launcher"?Strings.Common_Launcher:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
+            var what=name=="launcher"?Strings.Common_Launcher:name=="words"?Strings.Module_Words_Name:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
         // 在广播线程直接清标记，不依赖 UI 调度在系统结束会话前执行。
@@ -185,7 +191,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     [DllImport("user32.dll")] static extern bool PostMessageW(nint h,uint m,nuint w,nint l);
     [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessageW(string name);
-    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard);
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard,uint words);
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern void PaneKeyboardStop();
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardActive();
 }

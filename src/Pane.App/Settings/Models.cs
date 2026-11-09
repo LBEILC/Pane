@@ -2,6 +2,7 @@ namespace Pane.Settings;
 [Flags] public enum KeyModifiers { None=0, Ctrl=1, Alt=2, Shift=4, Win=8 }
 public enum ThemeMode { System, Light, Dark }
 public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); }
+    WordsSettings words=new(); public WordsSettings Words { get=>words; init=>words=value??new(); }
     StorageSettings storage=new(); public StorageSettings Storage { get=>storage; init=>storage=value??new(); }
     // 能力模块的启用状态（设计加，2026-11-04，055）：键是 Pane.Contracts.ModuleIds，没写的用 ModuleInfo.DefaultEnabled。
     // 旧设置文件没有这项时，按旧的总开关迁移（Clipboard / SuperPanel / FolderJump 的 Enabled），见 docs/design.md「能力模块」
@@ -14,6 +15,10 @@ public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=nu
     [System.Text.Json.Serialization.JsonIgnore] public Hotkey Jump=>JumpHotkey??DefaultJump;
     [System.Text.Json.Serialization.JsonIgnore] public Hotkey Menu=>MenuHotkey??DefaultMenu;
 }
+// 分词（设计加，2026-11-09，093）：Hotkey = 在任意程序里选中文字后呼出分词窗口（null = 不设，默认）；可以是组合键或双击修饰键，规则同剪贴板热键；
+// CloseAfterCopy = 复制后关闭窗口；DragPunctuation = 拖选时带上中间的标点；Join = 选中的几段不挨着时怎么接（记住上次选的）
+public enum WordsJoin { Smart, Space, Line }
+public sealed record WordsSettings(Hotkey? Hotkey=null, bool CloseAfterCopy=true, bool DragPunctuation=false, WordsJoin Join=WordsJoin.Smart);
 // 软件内更新（设计加，2026-10-30，023）：AutoUpdate 开着就自动检查并在后台下载，下载好后提示重启更新
 // 设计加（2026-11-05，issue 25、062）：InstallOnStartup = 下次启动时自动安装已下载好的更新（默认关）；
 // IgnoredVersion = 提示条上点了「忽略」的版本；SeenVersion = 看过「更新后」提示的版本，NewsShown = 这一版的提示已经出现过几次（最多 3 次）；

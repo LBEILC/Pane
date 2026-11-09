@@ -422,7 +422,7 @@
   <data name="Launcher_SearchFilesTarget" xml:space="preserve"><value>搜尋檔案「{0}」</value></data>
   <data name="Launcher_SearchInFiles" xml:space="preserve"><value>在檔案視窗中搜尋「{0}」</value></data>
   <data name="Launcher_SearchPlaceholder" xml:space="preserve"><value>搜尋應用程式、檔案，或輸入任何文字</value></data>
-  <data name="Launcher_SearchQuery" xml:space="preserve"><value>在{0}中搜尋「{1}」</value></data>
+  <data name="Launcher_SearchQuery" xml:space="preserve"><value>在 {0} 中搜尋「{1}」</value></data>
   <data name="Launcher_SearchTarget" xml:space="preserve"><value>搜尋「{0}」</value></data>
   <data name="Launcher_SearchWith" xml:space="preserve"><value>用 {0} 搜尋</value></data>
   <data name="Launcher_SearchWithQuery" xml:space="preserve"><value>用 {0} 搜尋「{1}」</value></data>
@@ -1535,6 +1535,39 @@
   <data name="Module_PowerTimer_Name" xml:space="preserve"><value>定時關機</value></data>
   <data name="Module_PowerTimer_Description" xml:space="preserve"><value>在指定時間關機、重新啟動或睡眠；執行前 1 分鐘提醒，可取消或延後</value></data>
   <data name="Module_PowerTimer_WithLauncher" xml:space="preserve"><value>與啟動器搭配使用：輸入「30 分鐘後關機」直接設定</value></data>
+  <data name="Module_Words_Name" xml:space="preserve"><value>分詞</value></data>
+  <data name="Module_Words_Description" xml:space="preserve"><value>把一段文字拆成詞塊，點選或拖選其中幾塊後複製</value></data>
+  <data name="Module_Words_WithClipboard" xml:space="preserve"><value>與剪貼簿搭配使用：文字項目上按 Ctrl+B 拆開</value></data>
+  <data name="Module_Words_WithLauncher" xml:space="preserve"><value>與啟動器搭配使用：選好的文字可以交給啟動器繼續處理</value></data>
+  <data name="Words_NoSelection" xml:space="preserve"><value>沒有讀到選取的文字</value></data>
+  <data name="Words_FromClipboard" xml:space="preserve"><value>來自剪貼簿</value></data>
+  <data name="Words_FromClipboardApp" xml:space="preserve"><value>來自剪貼簿 · {0}</value></data>
+  <data name="Words_FromSelection" xml:space="preserve"><value>選取的文字</value></data>
+  <data name="Words_FromSelectionApp" xml:space="preserve"><value>來自 {0} · 選取的文字</value></data>
+  <data name="Words_Hint" xml:space="preserve"><value>點一下選詞，按住拖曳連選，按住 Shift 再點選一段</value></data>
+  <data name="Words_JoinSmart" xml:space="preserve"><value>連起來</value></data>
+  <data name="Words_JoinSpace" xml:space="preserve"><value>空格</value></data>
+  <data name="Words_JoinLine" xml:space="preserve"><value>換行</value></data>
+  <data name="Words_JoinHint" xml:space="preserve"><value>選取的幾段不相鄰時，中間怎麼接</value></data>
+  <data name="Words_SelectAllHint" xml:space="preserve"><value>全選（Ctrl+A）</value></data>
+  <data name="Words_CloseHint" xml:space="preserve"><value>關閉（Esc）</value></data>
+  <data name="Words_Select" xml:space="preserve"><value>選擇</value></data>
+  <data name="Words_Extend" xml:space="preserve"><value>連選</value></data>
+  <data name="Words_SelectAll" xml:space="preserve"><value>全選</value></data>
+  <data name="Words_Count" xml:space="preserve"><value>已選 {0} 塊 · {1} 字</value></data>
+  <data name="Words_Truncated" xml:space="preserve"><value>文字太長，只拆了前 2 萬字</value></data>
+  <data name="Words_Empty" xml:space="preserve"><value>沒有可以拆的文字</value></data>
+  <data name="Words_Open" xml:space="preserve"><value>分詞</value></data>
+  <data name="Words_OpenHint" xml:space="preserve"><value>分詞（Ctrl+B）</value></data>
+  <data name="Settings_Words_Description" xml:space="preserve"><value>拆開文字的呼出方式與視窗行為</value></data>
+  <data name="Settings_Words_HotkeyDescription" xml:space="preserve"><value>在任何程式中選取文字後按下，拆開選取的文字</value></data>
+  <data name="Settings_Words_FromClipboard" xml:space="preserve"><value>從剪貼簿開啟</value></data>
+  <data name="Settings_Words_FromClipboardDescription" xml:space="preserve"><value>在文字項目上按 Ctrl+B，或點擊項目右側的分詞按鈕</value></data>
+  <data name="Settings_Words_Window" xml:space="preserve"><value>視窗</value></data>
+  <data name="Settings_Words_CloseAfterCopy" xml:space="preserve"><value>複製後關閉視窗</value></data>
+  <data name="Settings_Words_CloseAfterCopyDescription" xml:space="preserve"><value>複製的內容會照常記入剪貼簿歷史</value></data>
+  <data name="Settings_Words_DragPunctuation" xml:space="preserve"><value>拖選時包含標點</value></data>
+  <data name="Settings_Words_DragPunctuationDescription" xml:space="preserve"><value>關閉時，拖選會略過中間的標點；單獨點擊標點仍可選取</value></data>
   <data name="Launcher_Group_Timer" xml:space="preserve"><value>定時</value></data>
   <data name="Timer_Action" xml:space="preserve"><value>動作</value></data>
   <data name="Timer_Time" xml:space="preserve"><value>時間</value></data>

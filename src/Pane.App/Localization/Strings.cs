@@ -21,6 +21,20 @@ public static partial class Strings
     // 搜索拼音始终从简体原文生成；调用方用 nameof(强类型属性) 指定键。
     internal static string Simplified(string key) => source.GetString(key, CultureInfo.InvariantCulture)!;
 
+    // 资源里名字两边按「中英文之间加空格」写好空格（「用 {0} 搜索」）；名字本身以中文开头或结尾时，去掉那一侧的空格（「用百度搜索」）。
+    // 只处理 {0} 紧挨着的空格，其余占位符（用户输入的搜索词等）原样。
+    public static string FormatName(string template, string name, params object?[] rest)
+    {
+        if (name.Length > 0)
+        {
+            if (IsWide(name[0])) template = template.Replace(" {0}", "{0}");
+            if (IsWide(name[^1])) template = template.Replace("{0} ", "{0}");
+        }
+        return string.Format(template, [name, .. rest]);
+    }
+
+    static bool IsWide(char c) => c is >= '⺀' and <= '鿿' or >= '豈' and <= '﫿' or >= '＀' and <= '￯';
+
     public static string PseudoLocalize(string text) => "［" + text + new string('～', (int)Math.Ceiling(text.Length * .4)) + "］";
 
     sealed class PseudoResourceManager() : ResourceManager("Pane.Localization.Strings", typeof(Strings).Assembly)

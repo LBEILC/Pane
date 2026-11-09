@@ -36,6 +36,8 @@ public sealed partial class SettingsView
             [(ModuleIds.Launcher, Strings.Module_Rename_FromLauncher), (ModuleIds.SuperPanel, Strings.Module_Rename_FromSuper)]),
         ModuleIds.PowerTimer => (Strings.Module_PowerTimer_Name, "timer", Strings.Module_PowerTimer_Description,
             [(ModuleIds.Launcher, Strings.Module_PowerTimer_WithLauncher)]),
+        ModuleIds.Words => (Strings.Module_Words_Name, "words", Strings.Module_Words_Description,
+            [(ModuleIds.Clipboard, Strings.Module_Words_WithClipboard), (ModuleIds.Launcher, Strings.Module_Words_WithLauncher)]),
         _ => (id, "app", "", []),   // 以后加的能力还没配文案时：至少能开关
     };
 

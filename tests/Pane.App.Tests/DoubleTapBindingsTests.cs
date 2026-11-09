@@ -23,6 +23,13 @@ static class DoubleTapBindingsTests
             Check(removed.SequenceEqual([1,2,3])&&requested.SequenceEqual([1]),"invalid dispatched to conflict path; valid double tap not registered");
         }
         Check(ShellHotkeyBindings.Command(1)=="hotkey-launcher"&&ShellHotkeyBindings.Command(2)=="hotkey-clipboard"&&ShellHotkeyBindings.Command(3)=="hotkey-clipboard","commands preserved");
+        Check(ShellHotkeyBindings.Command(4)=="hotkey-words","words command");
+        foreach(bool enabled in new[]{false,true})foreach(bool suspended in new[]{false,true})foreach(var key in new Hotkey?[]{null,chord,left})
+        {
+            List<int> registered=[4],removed=[],requested=[];
+            ShellHotkeyBindings.Rebind(registered,removed.Add,(id,_,_)=>requested.Add(id),chord,chord,false,suspended,false,words:key,wordsEnabled:enabled);
+            Check(removed.SequenceEqual([4])&&requested.Contains(4)==(enabled&&!suspended&&key==chord),"words registration lifetime");
+        }
         return checks;
     }
 }

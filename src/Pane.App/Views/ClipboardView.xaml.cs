@@ -319,6 +319,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
                 VirtualKey.Up => new(PanelKey.Up),
                 VirtualKey.Enter => new(shift ? PanelKey.ShiftEnter : PanelKey.Enter),
                 VirtualKey.P when ctrl => new(PanelKey.Pin),
+                VirtualKey.B when ctrl => new(PanelKey.Words),
                 VirtualKey.Tab => new(PanelKey.Send),
                 VirtualKey.Escape => new(PanelKey.Escape),
                 _ => null,
@@ -352,6 +353,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
                 break;
             case PanelKey.Pin: if (SelectedRow is { } p) TogglePin(p); break;
             case PanelKey.Send: if (SelectedRow is { } t && ModuleGate.On(Contracts.ModuleIds.Launcher)) Send(t); break;
+            case PanelKey.Words: if (SelectedRow is { CanSplit: true } w) Words(w); break;
             case PanelKey.Escape:
                 if (Input.Text.Length > 0) Input.Text = string.Empty;
                 else CloseRequested?.Invoke(this, EventArgs.Empty);
@@ -454,6 +456,10 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         SendToLauncher?.Invoke(this, row.Entry);
     }
 
+    /// <summary>「分词」（093）：宿主收到后打开分词窗口拆这条文字（剪贴板收起）。</summary>
+    public event EventHandler<ClipEntry>? OpenWords;
+    public void Words(ClipRow row) => OpenWords?.Invoke(this, row.Entry);
+
     public void TogglePin(ClipRow row) => history.SetPinned(row.Entry.Id, !row.Entry.Pinned);
 
     public void Delete(ClipRow row)
@@ -482,12 +488,12 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     // ---------------- 底部快捷键提示 ----------------
 
     // 启动器停用时不列「Tab 交给启动器」（055）；启动器状态变了下次呼出时重建
-    bool footSend, footLauncher;
+    bool footSend, footLauncher, footWords;
     void BuildFoot()
     {
-        bool send = ModuleGate.On(Contracts.ModuleIds.Launcher);
-        if (Foot.Children.Count > 0 && send == footSend && ForLauncher == footLauncher) return;
-        footSend = send;
+        bool send = ModuleGate.On(Contracts.ModuleIds.Launcher), words = ModuleGate.On(Contracts.ModuleIds.Words);
+        if (Foot.Children.Count > 0 && send == footSend && words == footWords && ForLauncher == footLauncher) return;
+        footSend = send; footWords = words;
         footLauncher = ForLauncher;
         Foot.Children.Clear();
         if (ForLauncher)
@@ -498,7 +504,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         KeyHints.Fill(Foot,
         [
             (["↑", "↓"], Strings.Clipboard_Select), (["Enter"], Strings.Common_Paste), (["Shift", "+", "Enter"], Strings.Clipboard_PlainText),
-            (["Alt", "+", "1~9"], Strings.Clipboard_QuickPaste), .. send ? new[] { (new[] { "Tab" }, Strings.Clipboard_SendToLauncher) } : [], (["Ctrl", "+", "P"], Strings.Clipboard_Pin),
+            (["Alt", "+", "1~9"], Strings.Clipboard_QuickPaste), .. send ? new[] { (new[] { "Tab" }, Strings.Clipboard_SendToLauncher) } : [],
+            .. words ? new[] { (new[] { "Ctrl", "+", "B" }, Strings.Words_Open) } : [], (["Ctrl", "+", "P"], Strings.Clipboard_Pin),
         ], HintLabelProto, KbdProto);
     }
 

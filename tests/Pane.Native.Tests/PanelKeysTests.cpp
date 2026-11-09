@@ -84,6 +84,10 @@ void unit(){
   }
   PanelKeys pin;pin.begin(true,held);auto expected=bits==1?PanelPin:bits==0||bits==8?PanelType:PanelNone;
   check(pin.feed({'P',0,true},m,0).action==expected,"all pin modifiers");
+  PanelKeys wordsKeys;wordsKeys.begin(true,held);wordsKeys.wordsEnabled=true;
+  check(wordsKeys.feed({'B',0,true},m,0).action==(bits==1?PanelWords:bits==0||bits==8?PanelType:PanelNone),"all words modifiers");
+  PanelKeys disabledWords;disabledWords.begin(true,held);
+  check(disabledWords.feed({'B',0,true},m,0).action==(bits==0||bits==8?PanelType:PanelNone),"disabled words passes ctrl B");
   PanelKeys text;text.begin(true,held);check(text.feed({'A',0,true},m,0).action==(bits==0||bits==8?PanelType:PanelNone),"all typing modifiers including AltGr");
   PanelKeys tab;tab.begin(false,held);check(!tab.feed({9,0,true},m,0).swallow,"disabled tab all modifiers");
  }

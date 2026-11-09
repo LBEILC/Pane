@@ -23,6 +23,7 @@ public sealed partial class App
     /// <summary>剪贴板模块装配时接上（App.Modules）。</summary>
     void WireClipboardLauncher(GlassPanel panel, ClipboardView view)
     {
+        view.OpenWords += (_, entry) => { if (entry.Text is { } text) ShowWords(text, entry.Source, fromClipboard: true); };   // 分词（093）
         view.UseInLauncher += (_, entry) =>
         {
             launcherView?.Use(entry);

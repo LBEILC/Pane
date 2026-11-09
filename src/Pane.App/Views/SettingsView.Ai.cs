@@ -345,7 +345,7 @@ public sealed partial class SettingsView
         var ai = app.Store.Current.Ai;
         var all = new List<(string Id, string Name, string Glyph)> { ("ai:translate", Strings.Common_Translate, "translate"), ("ai:ask", Strings.Launcher_AskAi, "ai"), ("files", Strings.Launcher_SearchFiles, "folder") };
         all.AddRange(ai.Actions.Where(a => a.Id != "translate").Select(a => ("ai:" + a.Id, a.Name, a.Glyph)));
-        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, string.Format(Strings.Launcher_SearchWith, (object?)(e.Name)), "globe")));
+        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, Strings.FormatName(Strings.Launcher_SearchWith, e.Name), "globe")));
         var shown = l.ActionRow.Where(id => all.Any(a => a.Id == id)).ToList();
         var ordered = shown.Select(id => all.First(a => a.Id == id)).Concat(all.Where(a => !shown.Contains(a.Id))).ToList();
         var rows = new List<FrameworkElement>();

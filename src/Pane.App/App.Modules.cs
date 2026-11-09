@@ -67,7 +67,7 @@ public sealed partial class App
             () => Store.Current.SuperPanel.ClipboardFallback, files: FileSelection as Pane.Services.FileSelection);
         // 新能力只需新增一个类，在此登记；显示顺序由这个列表决定。
         var host = new ModuleHost([new LauncherModule(this), new ClipboardModule(this), new GesturesModule(this),
-            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this)], Store,
+            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this), new WordsModule(this)], Store,
             () => WinVService?.State is WinVState.On or WinVState.Pending, OnUi);
         Modules = host;
         host.Changed += (_, _) => { shell?.Apply(ModuleShellSettings()); WakeFrames(); };
@@ -76,9 +76,9 @@ public sealed partial class App
     Pane.Settings.PaneSettings ModuleShellSettings()
     {
         var s = Store.Current;
-        if (Modules == null) return s with { Modules = new() { [ModuleIds.Launcher] = false, [ModuleIds.Clipboard] = false } };
+        if (Modules == null) return s with { Modules = new() { [ModuleIds.Launcher] = false, [ModuleIds.Clipboard] = false, [ModuleIds.Words] = false } };
         return s with { Modules = new(s.Modules ?? []) { [ModuleIds.Launcher] = Modules.IsActive(ModuleIds.Launcher),
-            [ModuleIds.Clipboard] = Modules.IsActive(ModuleIds.Clipboard) },
+            [ModuleIds.Clipboard] = Modules.IsActive(ModuleIds.Clipboard), [ModuleIds.Words] = Modules.IsActive(ModuleIds.Words) },
             Clipboard = s.Clipboard with { Enabled = Modules.IsActive(ModuleIds.Clipboard) } };
     }
     bool AllowModule(string id)
@@ -87,7 +87,7 @@ public sealed partial class App
         LastModuleCommandResult = "disabled:" + id;
         string name = id switch { ModuleIds.Launcher => Strings.Common_Launcher, ModuleIds.Clipboard => Strings.Common_Clipboard,
             ModuleIds.SuperPanel => Strings.Common_SuperPanel, ModuleIds.Ai => "AI", ModuleIds.Rename => Strings.Common_Rename,
-            ModuleIds.Gestures => Strings.Module_Gestures_Name, _ => Strings.Module_FolderJump_Name };
+            ModuleIds.Gestures => Strings.Module_Gestures_Name, ModuleIds.Words => Strings.Module_Words_Name, _ => Strings.Module_FolderJump_Name };
         var text = string.Format(Strings.Module_NotEnabled, (object?)name);
         gestures?.Hint(new(GestureHintKind.Notice, [], CommandName: text));
         shell?.NotifyOnce(text);
@@ -289,6 +289,16 @@ public sealed partial class App
             if (service != null) service.Finished -= Finished;
             if (service is Pane.Services.PowerTimerService real && App.shell != null) App.shell.PowerTimeChanged -= real.SystemTimeChanged;
             service?.Cancel(); (service as IDisposable)?.Dispose(); App.PowerTimer = null;
+            return Task.CompletedTask;
+        }
+    }
+    sealed class WordsModule(App app) : Capability(app, ModuleIds.Words, ModuleCategory.Clipboard, "words", ModuleIds.Clipboard, ModuleIds.Launcher)
+    {
+        public override Task StartAsync(CancellationToken token) { App.Words = App.demo ? new Pane.DesignData.TextSegmenterSample() : new Pane.Services.Words.TextSegmenter(); if(!App.demo)Pane.Services.PanelKeyRouter.SetWordsEnabled(true); return Task.CompletedTask; }
+        public override Task StopAsync(CancellationToken token)
+        {
+            App.wordsSelectionCancellation?.Cancel(); App.RemoveSecondary(SecondaryId.Words); App.Words = null;
+            if(!App.demo)Pane.Services.PanelKeyRouter.SetWordsEnabled(false);
             return Task.CompletedTask;
         }
     }

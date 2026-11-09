@@ -13,6 +13,7 @@ public static class ModuleIds
     public const string FolderJump = "folder-jump";
     public const string Rename = "rename";
     public const string PowerTimer = "power-timer";   // 定时关机（2026-11-05，058）
+    public const string Words = "words";   // 分词（2026-11-09，093）
 }
 
 /// <summary>「能力」页的分组。</summary>

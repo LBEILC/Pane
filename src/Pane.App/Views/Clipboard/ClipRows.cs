@@ -89,6 +89,8 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public Visibility SourcePictureVisibility => V(SourcePicture is not null);
     public Visibility HotkeyVisibility => V(Number > 0);
     public Visibility SendVisibility => V(ModuleGate.On(Contracts.ModuleIds.Launcher));   // 启动器停用时没有「交给启动器」（055）
+    public Visibility WordsVisibility => V(CanSplit);   // 分词（093）：只给普通文字条目，分词能力开着时
+    public bool CanSplit => Entry.Kind == ClipKind.Text && !string.IsNullOrWhiteSpace(Entry.Text) && ModuleGate.On(Contracts.ModuleIds.Words);
     public bool Pinned => Entry.Pinned;
     public string PinTip => Entry.Pinned ? Strings.Clipboard_UnpinHint : Strings.Clipboard_PinHint;
 
@@ -109,6 +111,7 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public bool ActionsHitTest => selected;
 
     public void Send() => actions.Send(this);
+    public void Words() => actions.Words(this);
     public void TogglePin() => actions.TogglePin(this);
     public void Delete() => actions.Delete(this);
 
@@ -202,6 +205,7 @@ public sealed partial class ClipRow : INotifyPropertyChanged
 public interface IClipRowActions
 {
     void Send(ClipRow row);
+    void Words(ClipRow row);
     void TogglePin(ClipRow row);
     void Delete(ClipRow row);
 }

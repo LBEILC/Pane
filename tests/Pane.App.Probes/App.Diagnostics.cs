@@ -70,6 +70,7 @@ public sealed partial class App
         if(Take("panelkeys-begin",out _)){bool ok=PanelKeys?.Begin(panels["clipboard"].Input,true)==true;File.WriteAllText(output+".panelkeys-begin-result",$"begin={ok};panelkeys={(Pane.Services.PanelKeyRouter.HookInstalled?1:0)}");return true;}
         if(Take("doubletap-probe",out _)){_ = DoubleTapProbe();return true;}
         if(Take("hotkey-probe",out _)){_ = HotkeyProbe();return true;}
+        if(Take("words-probe",out _)){_ = WordsHotkeyProbe();return true;}
         if(Take("localization-probe",out _)){File.WriteAllLines(output+".localization-result",new[]{UiLanguage}.Concat(new TrayMenuView().LocalizationProbe()));return true;}
         if(Take("frames-probe",out _)){_ = FramesProbe();return true;}
         if(Take("restart",out _)){Restart();return true;}

@@ -35,6 +35,7 @@
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).pri" DestinationFiles="$(PublishDir)resources.pri" />
   </Target>
   <ItemGroup><Compile Include="../../tests/Pane.App.Probes/PanelKeysProbe.cs" Link="Diagnostics/PanelKeysProbe.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../tests/Pane.App.Probes/WordsHotkeyProbe.cs" Link="Diagnostics/WordsHotkeyProbe.cs" /></ItemGroup>
   <Target Name="GenerateReleaseNotes" BeforeTargets="PrepareForBuild">
     <Exec Command="powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File &quot;$(MSBuildProjectDirectory)/../../scripts/release-notes.ps1&quot; -Source &quot;$(MSBuildProjectDirectory)/ReleaseNotes&quot; -Output &quot;$(MSBuildProjectDirectory)/$(IntermediateOutputPath)release-notes&quot; -Version &quot;$(Version)&quot;" />
     <ItemGroup>
