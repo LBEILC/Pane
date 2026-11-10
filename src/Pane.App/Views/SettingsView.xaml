@@ -57,7 +57,7 @@
                     <c:PaneIcon Glyph="close" Width="16" Height="16" Foreground="{ThemeResource PaneText2Brush}"/>
                 </Button>
             </Grid>
-            <ScrollViewer x:Name="Scroller" Grid.Row="1" Padding="24,0,24,24" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer x:Name="Scroller" Grid.Row="1" Padding="24,0,24,24" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" BringIntoViewOnFocusChange="False">
                 <StackPanel x:Name="Body"/>
             </ScrollViewer>
         </Grid>

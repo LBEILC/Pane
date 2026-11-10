@@ -356,7 +356,7 @@ public sealed partial class SettingsView
         var form = new StackPanel { Spacing = 6, Padding = new Thickness(14, 10, 14, 10) };
         form.Children.Add(fields);
         form.Children.Add(error);
-        form.Loaded += (_, _) => name.Focus(FocusState.Programmatic);
+        form.Loaded += (_, _) => { name.Focus(FocusState.Programmatic); name.StartBringIntoView(); };
         return form;
     }
 }

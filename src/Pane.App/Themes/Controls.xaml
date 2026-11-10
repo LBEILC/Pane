@@ -13,6 +13,8 @@
     -->
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
+            <!-- 提示气泡的底（下面 ToolTip 样式用）：着色 = PaneTintColor -->
+            <AcrylicBrush x:Key="PaneToolTipBackgroundBrush" TintColor="#FFF6F6F8" TintOpacity="0.42" TintLuminosityOpacity="0.85" FallbackColor="#F2F6F6F8"/>
             <SolidColorBrush x:Key="TextControlForeground" Color="{ThemeResource PaneText1Color}"/>
             <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{ThemeResource PaneText1Color}"/>
             <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{ThemeResource PaneText1Color}"/>
@@ -23,6 +25,7 @@
             <SolidColorBrush x:Key="PaneMatchBackgroundBrush" Color="#24141418"/>
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
+            <AcrylicBrush x:Key="PaneToolTipBackgroundBrush" TintColor="#FF1C1C20" TintOpacity="0.42" TintLuminosityOpacity="0.85" FallbackColor="#F21C1C20"/>
             <SolidColorBrush x:Key="TextControlForeground" Color="{ThemeResource PaneText1Color}"/>
             <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{ThemeResource PaneText1Color}"/>
             <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{ThemeResource PaneText1Color}"/>
@@ -175,6 +178,40 @@
                             </VisualStateGroup>
                         </VisualStateManager.VisualStateGroups>
                     </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+      提示气泡（原型 ui/tooltip.js 的 .pane-tip，2026-11-10 起自绘，原来是系统默认样子）：
+      玻璃底（Pane 着色的亚克力）+ 1px 细描边、圆角 9、内边距 10 6、xs 字 text-1、最宽 260。
+      隐式样式，所有 ToolTipService.ToolTip 都用它；出现 / 消失沿用系统的淡入淡出。
+    -->
+    <Style TargetType="ToolTip">
+        <Setter Property="Foreground" Value="{ThemeResource PaneText1Brush}"/>
+        <Setter Property="Background" Value="{ThemeResource PaneToolTipBackgroundBrush}"/>
+        <Setter Property="BackgroundSizing" Value="InnerBorderEdge"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource PaneStrokeBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="FontFamily" Value="{StaticResource PaneFontUi}"/>
+        <Setter Property="FontSize" Value="{StaticResource PaneTextXs}"/>
+        <Setter Property="Padding" Value="10,6,10,6"/>
+        <Setter Property="MaxWidth" Value="260"/>
+        <Setter Property="CornerRadius" Value="9"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <ContentPresenter x:Name="LayoutRoot" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" BackgroundSizing="{TemplateBinding BackgroundSizing}"
+                                      BorderBrush="{TemplateBinding BorderBrush}" MaxWidth="{TemplateBinding MaxWidth}" Content="{TemplateBinding Content}" ContentTransitions="{TemplateBinding ContentTransitions}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}" TextWrapping="Wrap" CornerRadius="{TemplateBinding CornerRadius}" LineHeight="16">
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="OpenStates">
+                                <VisualState x:Name="Closed"><Storyboard><FadeOutThemeAnimation TargetName="LayoutRoot"/></Storyboard></VisualState>
+                                <VisualState x:Name="Opened"><Storyboard><FadeInThemeAnimation TargetName="LayoutRoot"/></Storyboard></VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </ContentPresenter>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

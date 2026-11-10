@@ -125,7 +125,7 @@ public sealed partial class SettingsView
         }
         box.TextChanged += (_, _) => { iconQuery = box.Text; Fill(); };
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Escape) { iconQuery = null; Render(); e.Handled = true; } };
-        box.Loaded += (_, _) => box.Focus(FocusState.Programmatic);
+        box.Loaded += (_, _) => { box.Focus(FocusState.Programmatic); box.StartBringIntoView(); };
         Fill();
         var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         head.Children.Add(Wrap(box));

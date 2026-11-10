@@ -472,7 +472,7 @@ public sealed partial class SettingsView
     {
         var box = Field(placeholder, width);
         box.Text = value;
-        if (focus) box.Loaded += (_, _) => box.Focus(FocusState.Programmatic);
+        if (focus) box.Loaded += (_, _) => { box.Focus(FocusState.Programmatic); box.StartBringIntoView(); };
         void Commit() { var v = box.Text.Trim(); if (v == value) return; aiFieldError = commit(v); Later(0); }
         box.LostFocus += (_, _) => Commit();
         box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(); e.Handled = true; } };

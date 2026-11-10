@@ -52,6 +52,15 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout),
         ];
         current = sections[0];
+        // 设计预览（只在演示模式）：PANE_DESIGN_TOOLTIP=1 打开后直接显示关闭按钮的提示气泡，截图核对 Controls.xaml 的 ToolTip 样式
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_TOOLTIP") == "1")
+            Loaded += async (_, _) =>
+            {
+                await Task.Delay(150);   // 截图脚本 show 之后很快就取图，早点打开，取图时淡入已经播完
+                var tip = new ToolTip { Content = Strings.Common_CloseEscapeHint };
+                ToolTipService.SetToolTip(CloseButton, tip);
+                tip.IsOpen = true;
+            };
         // 设计预览：PANE_DESIGN_SETTINGS=分区 Id（可加 @像素 先滚下去，如 gesture@700），或 glass（通用页展开「玻璃参数（高级）」并滚到底）
         var design = Environment.GetEnvironmentVariable("PANE_DESIGN_SETTINGS");
         if (design?.Split('@') is [var id, var px] && double.TryParse(px, out var y))
@@ -113,6 +122,10 @@ public sealed partial class SettingsView : UserControl, IPanelView
         BuildNav();
         var logo = Path.Combine(AppContext.BaseDirectory, "Assets", "pane-app.svg");
         if (File.Exists(logo)) Logo.Source = new SvgImageSource(new Uri(logo));
+
+        // 焦点变了不自动滚（issue 46）：窗口重新拿回焦点时宿主把焦点放到第一个可聚焦控件（页面顶上那个），
+        // 自动滚的话页面每次都跳回顶部。只有键盘 Tab 切过去时才滚到控件；代码聚焦的输入框各自滚
+        Body.GotFocus += (_, e) => { if (e.OriginalSource is Control { FocusState: FocusState.Keyboard } c) c.StartBringIntoView(); };
 
         rerender = DispatcherQueue.CreateTimer();
         rerender.IsRepeating = false;

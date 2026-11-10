@@ -264,6 +264,13 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
     static string AttachmentText(ClipEntry e) => e.Kind == ClipKind.Files ? string.Join("\n", e.Files ?? []) : e.Text ?? "";
 
+    // 文字附件拿去搜文件：第一行非空的文字，去掉首尾空白，最多 100 字（同剪贴板短文字当搜索词的上限）
+    static string FileQuery(ClipEntry? e)
+    {
+        var line = (e?.Text ?? "").Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault() ?? "";
+        return line.Length > 100 ? line[..100] : line;
+    }
+
     void PlayAttachIn()
     {
         // 原型 attach-in：从 0.85 放大、淡入，--dur-slow + --ease-spring
@@ -316,6 +323,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 items.Add(new("ai:" + act.Id, LauncherItemKind.Ai, LauncherGroups.Ai, act.Name,
                     act.Id == "translate" ? Strings.Launcher_AttachmentTranslateDescription : Strings.Launcher_AttachmentActionDescription, new(act.Glyph)));
             items.Add(new("web-search", LauncherItemKind.Action, LauncherGroups.Other, Strings.Launcher_WebSearch, Strings.Launcher_DefaultSearchEngine, new("globe")));
+            // 复制后几秒内呼出带进来的文字也能直接搜文件（issue 46）：用第一行，在文件窗口里搜
+            items.Add(new("search-files", LauncherItemKind.Action, LauncherGroups.Other, Strings.Launcher_SearchFiles, Strings.Launcher_OpenFiles, new("folder")));
         }
         var q = query.Trim();
         if (q.Length > 0) items = items.Where(i => i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
@@ -742,6 +751,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             LauncherCell.File => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Tab"], Strings.Launcher_ViewInFiles), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
             LauncherCell.More => (string.Format(Strings.Launcher_SearchInFiles, (object?)(q)), [(["Enter"], Strings.Launcher_OpenFiles)]),
             LauncherCell.Action => ActionFoot(ActionId(item), item.Title, q),
+            LauncherCell.Attachment when item.Id == "search-files" => (string.Format(Strings.Launcher_SearchFilesTarget, (object?)(FileQuery(attachment))), [(["Enter"], Strings.Launcher_OpenFiles)]),
             _ => (item.Title, [(["Enter"], Strings.Common_Execute)]),
         };
         // Tab 兜底的行，提示放得下（不到三个）时加「Tab 搜文件」；应用行已有三个，不加
@@ -1144,6 +1154,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 try { if (Files is { } f) await f.RevealAsync(FilePath(item), CancellationToken.None); }
                 catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.Common_OpenContainingFolder, e); }
                 return;
+            case LauncherCell.Attachment when item.Id == "search-files":
+                OpenFiles?.Invoke(FileQuery(attachment), null); return;
             case LauncherCell.Action:
                 var id = ActionId(item);
                 if (id == "files") { OpenFiles?.Invoke(q, null); return; }

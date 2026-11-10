@@ -726,7 +726,8 @@ public sealed partial class RenameView : UserControl, ISecondaryView, IDisposabl
         return s;
     }
 
-    // 开关式小标签（原型 .tog）：开着是选中底色 + 正文色，关着只有细描边
+    // 开关式小标签（原型 <pane-toggle>）：开着是选中底色 + 主题色描边 + 正文色，关着只有细描边。
+    // 2026-11-10 统一：和定时的快捷时长、设置页的多选标签一样用主题色描边表示选中，不再加粗
     Border Toggle(string label, bool on, Action<bool> changed)
     {
         var text = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, FontFamily = XsProto.FontFamily, FontSize = XsProto.FontSize };
@@ -734,8 +735,8 @@ public sealed partial class RenameView : UserControl, ISecondaryView, IDisposabl
         void Paint()
         {
             b.Background = on ? SelectedProto.Background : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            b.BorderBrush = on ? AccentProto.Background : FillProto.BorderBrush;
             text.Foreground = on ? SmallStrongProto.Foreground : SmallProto.Foreground;
-            text.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
         }
         b.Tapped += (_, e) => { on = !on; Paint(); changed(on); e.Handled = true; };
         b.PointerEntered += (_, _) => { if (!on) b.Background = HoverProto.Background; };
