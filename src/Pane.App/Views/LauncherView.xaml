@@ -142,7 +142,8 @@
         <!-- 提示条（issue 25、062）：新版本已下载好 / 已更新到；只能用鼠标点 -->
         <c:NoticeStrip x:Name="Notice"/>
 
-        <!-- 搜索行：输入框以外的部分（放大镜、Pane 标签、两侧留白）可拖动整个启动器，双击恢复默认位置（宿主处理） -->
+        <!-- 搜索行：输入框和按钮以外的部分（放大镜、两侧留白、输入框上下）可拖动整个启动器，双击恢复默认位置（宿主处理）；
+             右边「Pane」胶囊是按钮，点了打开设置，不能拖（2026-11-11 用户定） -->
         <Grid x:Name="SearchRow" Grid.Row="1" Padding="20,0,20,0" ColumnSpacing="12" Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
@@ -150,6 +151,8 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <!-- 拖动底面：铺满整行、垫在最下面，空白处悬停显示移动光标；按钮、输入框是它的兄弟，光标不受影响 -->
+            <c:MoveSurface Grid.ColumnSpan="4" Margin="-20,0,-20,0"/>
             <!-- 放大镜；用关键字搜网页时换成引擎徽章（issue 43，原型 prototype/engine-badge.html 的 B 玻璃）。
                  徽章 28，用负边距伸出 22 的位置，输入框不跟着挪 -->
             <Grid Width="22" Height="22" VerticalAlignment="Center" IsHitTestVisible="False">
@@ -192,11 +195,13 @@
                      SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                      IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
                      TextChanged="OnTextChanged" PreviewKeyDown="OnInputKeyDown" PreviewKeyUp="OnInputKeyUp" LostFocus="OnInputLostFocus"/>
-            <Border Grid.Column="3" VerticalAlignment="Center" Height="22" Padding="9,0,9,0" CornerRadius="11"
-                    Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
-                <TextBlock Text="Pane" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
-                           CharacterSpacing="40" Foreground="{ThemeResource PaneText2Brush}"/>
-            </Border>
+            <!-- 「Pane」胶囊：打开设置（原型 .lx-badge，胶囊按钮的小号：22 高、xs 字、text-2） -->
+            <Button x:Name="SettingsBadge" Grid.Column="3" VerticalAlignment="Center" Style="{StaticResource PaneTextButton}"
+                    MinHeight="0" Height="22" Padding="9,0,9,0" CornerRadius="11" Foreground="{ThemeResource PaneText2Brush}"
+                    Click="OnSettingsBadge" ToolTipService.ToolTip="{x:Bind loc:Strings.Launcher_OpenSettingsHint}"
+                    AutomationProperties.Name="{x:Bind loc:Strings.Launcher_OpenSettingsHint}">
+                <TextBlock Text="Pane" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" CharacterSpacing="40"/>
+            </Button>
         </Grid>
 
         <!-- 结果区：上沿一条分隔线；滚动条隐藏 -->

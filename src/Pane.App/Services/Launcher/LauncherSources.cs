@@ -33,7 +33,7 @@ internal sealed class ApplicationSource(ILauncherExecutor executor,Action<string
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();
         if(c.Query.Length==0){
-            var home=c.Snapshot.Apps.Where(a=>c.Usage.ContainsKey(a.Id)).OrderByDescending(a=>c.Usage[a.Id].LastUsed).Take(8).Select(a=>Item(a,LauncherGroups.Recent)).ToList();
+            var home=c.Snapshot.Apps.Where(a=>c.Usage.ContainsKey(a.Id)).OrderByDescending(a=>c.Usage[a.Id].LastUsed).Take(Limit(c)).Select(a=>Item(a,LauncherGroups.Recent)).ToList();
             var byId=c.Snapshot.Apps.ToDictionary(a=>a.Id);var pinned=new HashSet<string>();foreach(var id in c.Settings.PinnedApps)if(byId.TryGetValue(c.Snapshot.Aliases.GetValueOrDefault(id,id),out var app)&&pinned.Add(app.Id))home.Add(Item(app,LauncherGroups.Pinned));
             return Rows(home);
         }

@@ -63,7 +63,8 @@ public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record AppAliasEntry(string AppId, string Name, string[] Aliases);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
 // 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
-public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing }
+// RecentOnly 是 issue 47 加的，排在最后，已存的设置值不变
+public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing, RecentOnly }
 public enum LauncherWidth { Compact, Standard, Wide }
 public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=null,
     bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.Clear,

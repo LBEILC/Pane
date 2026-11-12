@@ -44,7 +44,7 @@ public sealed partial class SettingsView
                 Seg([("Clear", Strings.Common_Clear), ("OneMinute", Strings.Settings_Launcher_KeepOneMinute), ("Always", Strings.Settings_Launcher_KeepAlways)], l.KeepInput.ToString(),
                     v => SaveLauncher(x => x with { KeepInput = Enum.Parse<KeepInputMode>(v) }))),
             Row(Strings.Settings_Launcher_Home, l.Home == LauncherHome.Nothing ? Strings.Settings_Launcher_HomeNone : Strings.Settings_Launcher_HomeRecentDescription,
-                Seg([("RecentAndPinned", Strings.Settings_Launcher_HomeRecent), ("PinnedOnly", Strings.Settings_Launcher_HomePinned), ("Nothing", Strings.Settings_Launcher_HomeHidden)], l.Home.ToString(),
+                Seg([("RecentAndPinned", Strings.Settings_Launcher_HomeRecent), ("RecentOnly", Strings.Settings_Launcher_HomeRecentOnly), ("PinnedOnly", Strings.Settings_Launcher_HomePinned), ("Nothing", Strings.Settings_Launcher_HomeHidden)], l.Home.ToString(),
                     v => { SaveLauncher(x => x with { Home = Enum.Parse<LauncherHome>(v) }); Later(); })),
             Row(Strings.Settings_Launcher_ExpandOnOpen, Strings.Settings_Launcher_ExpandOnOpenDescription, expand),
             Row(Strings.Settings_Launcher_AutoAttach, Strings.Settings_Launcher_AutoAttachDescription,

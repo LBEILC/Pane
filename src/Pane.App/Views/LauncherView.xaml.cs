@@ -157,7 +157,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         ? new Size(Width_, noticeHeight + SearchRowHeight) : null;
     public event EventHandler<Size>? SizeRequested;
     public event EventHandler? CloseRequested;
-    public UIElement? DragRegion => SearchRow; // 宿主只在没有可交互控件（输入框、附件的叉）的位置开始拖动
+    public UIElement? DragRegion => SearchRow; // 宿主只在没有可交互控件（输入框、附件的叉、Pane 胶囊）的位置开始拖动
 
     public void OnShowing(PanelShowContext context)
     {
@@ -290,6 +290,13 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         fade.Duration = duration;
         v.StartAnimation("Scale", scale);
         v.StartAnimation("Opacity", fade);
+    }
+
+    // 右边「Pane」胶囊：收起启动器、打开设置（停在上次看的那一页）
+    void OnSettingsBadge(object sender, RoutedEventArgs e)
+    {
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+        ((App)Application.Current).OpenSettings(null);
     }
 
     void OnRemoveAttachment(object sender, RoutedEventArgs e)
@@ -583,17 +590,27 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
         if (result.IsHome)
         {
-            // 设置 → 启动器 →「空启动器显示」：只显示固定时去掉「最近使用」，什么都不显示时只剩搜索栏
-            var home = ((App)Application.Current).Store.Current.Launcher.Home;
-            foreach (var group in result.Items.GroupBy(i => i.Group).Where(g => home switch
+            // 设置 → 启动器 →「未输入时显示」：只显示固定 / 只显示最近时去掉另一组，什么都不显示时只剩搜索栏
+            var home = Options.Home;
+            bool showRecent = home is Pane.Settings.LauncherHome.RecentAndPinned or Pane.Settings.LauncherHome.RecentOnly;
+            bool showPinned = home is Pane.Settings.LauncherHome.RecentAndPinned or Pane.Settings.LauncherHome.PinnedOnly;
+            var groups = result.Items.GroupBy(i => i.Group)
+                .Where(g => g.Key == LauncherGroups.Recent ? showRecent : g.Key == LauncherGroups.Pinned ? showPinned : home != Pane.Settings.LauncherHome.Nothing)
+                .Select(g => (g.Key, Items: g.ToList())).ToList();
+            // 「应用最多显示 N 行」按行分（issue 47）：两组各自换行，所以按整行给。已固定占它需要的行，
+            // 但两组都有时至少给最近使用留一行（N = 1 时只放已固定：固定是用户自己选的）；剩下的整行都给最近使用
+            int maxRows = Math.Clamp(Options.AppRows, 1, 4);
+            int RowsOf(int count) => (count + columns - 1) / columns;
+            int pinnedCount = groups.Where(g => g.Key == LauncherGroups.Pinned).Sum(g => g.Items.Count);
+            bool hasRecent = groups.Any(g => g.Key == LauncherGroups.Recent && g.Items.Count > 0);
+            int pinnedRows = Math.Min(RowsOf(pinnedCount), hasRecent && maxRows > 1 ? maxRows - 1 : maxRows);
+            int recentRows = maxRows - pinnedRows;
+            foreach (var (key, items) in groups)
             {
-                Pane.Settings.LauncherHome.Nothing => false,
-                Pane.Settings.LauncherHome.PinnedOnly => g.Key != LauncherGroups.Recent,
-                _ => true,
-            }))
-            {
-                var s = Section(LauncherGroupLabels.Get(group.Key), LauncherSectionKind.Tiles);
-                foreach (var item in group) Add(s, item, LauncherCell.App);
+                int take = key == LauncherGroups.Recent ? recentRows * columns : key == LauncherGroups.Pinned ? pinnedRows * columns : items.Count;
+                if (take <= 0) continue;
+                var s = Section(LauncherGroupLabels.Get(key), LauncherSectionKind.Tiles);
+                foreach (var item in items.Take(take)) Add(s, item, LauncherCell.App);
             }
         }
         else if (attachmentMode)

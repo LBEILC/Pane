@@ -404,6 +404,7 @@
 附件：
 {1}</value></data>
   <data name="Launcher_RemoveAttachmentHint" xml:space="preserve"><value>移除附件（Esc）</value></data>
+  <data name="Launcher_OpenSettingsHint" xml:space="preserve"><value>打開設定</value></data>
   <data name="Launcher_EditAliases" xml:space="preserve"><value>設定搜尋別名</value></data>
   <data name="Launcher_AliasEditing" xml:space="preserve"><value>為「{0}」設定搜尋別名，多個別名用空格隔開；留空表示不使用</value></data>
   <data name="Launcher_AliasPlaceholder" xml:space="preserve"><value>輸入別名，例如 ow</value></data>
@@ -1194,6 +1195,7 @@
   <data name="Settings_Launcher_HomePinned" xml:space="preserve"><value>只顯示固定</value></data>
   <data name="Settings_Launcher_HomeRecent" xml:space="preserve"><value>最近和固定</value></data>
   <data name="Settings_Launcher_HomeRecentDescription" xml:space="preserve"><value>最近開啟過的應用程式和固定的應用程式。選取應用程式後按 Ctrl+K 或右鍵即可固定</value></data>
+  <data name="Settings_Launcher_HomeRecentOnly" xml:space="preserve"><value>只顯示最近</value></data>
   <data name="Settings_Launcher_ExpandOnOpen" xml:space="preserve"><value>從搜尋欄展開</value></data>
   <data name="Settings_Launcher_ExpandOnOpenDescription" xml:space="preserve"><value>叫出時先顯示搜尋欄，再向下展開</value></data>
   <data name="Launcher_WebHint" xml:space="preserve"><value>輸入要用 {0} 搜尋的內容</value></data>
