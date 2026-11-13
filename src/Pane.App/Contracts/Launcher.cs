@@ -177,6 +177,8 @@ public static class LauncherGroups
     public const string Other = "other";
     public const string Actions = "actions";
     public const string Timer = "timer";   // 定时关机（058）：「30 分钟后关机」这类说法的结果，排在最前，列表样式
+    // 直达（098，issue 52）：输入本身是网址或路径时的「打开网址 / 打开文件夹 / 打开文件」，排在最前（定时之后），列表样式
+    public const string Direct = "direct";
 }
 
 /// <summary>
@@ -184,10 +186,13 @@ public static class LauncherGroups
 /// RemoveFromApps（057，issue 19）：只给单独添加的便携程序和记住的程序，从 LauncherSettings.Portable 里去掉（不删文件），之后重建索引；
 /// 文件夹扫描出来的、安装的软件都不给。
 /// </summary>
-public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps, EditAliases, RemoveFromRecent }
+public enum LauncherItemAction { RunAsAdmin, OpenLocation, CopyPath, Properties, Uninstall, RemoveFromApps, EditAliases, RemoveFromRecent, HideFromSearch }
 // EditAliases 由界面打开编辑，不传给 RunAsync；仅对已索引应用提供。
 // RemoveFromRecent（设计加，2026-11-09，用户要求）：「从最近使用中移除」。只对有使用记录的应用提供（首页「最近使用」里的、搜索里用过的都算）；
 // RunAsync 删掉这个应用的使用记录（次数和最近使用时间），它就不再出现在「最近使用」里，搜索排序也不再因用过而靠前。
+// HideFromSearch（设计加，2026-11-13，issue 49，任务 098）：「不在搜索中显示」。给应用、命令、系统设置项（LauncherGroups.Settings），
+// 放在列表末尾；文件、文件夹、直达项、定时项不给。RunAsync 把 Id 加进 LauncherSettings.HiddenItems，之后搜索和首页「最近使用」都不再出现它；
+// 已固定（Favorites）的照常显示在「已固定」里，不受影响。恢复走 ILauncherHiddenItems.Unhide（设置 → 启动器 →「已隐藏」）。
 // 不动「已固定」，不动应用本身和索引；记录是 launcher-usage.json 里的那一条，删除后照常写盘。
 
 /// <summary>应用的搜索别名（078）。appId 就是应用行的 LauncherItem.Id。</summary>
@@ -245,3 +250,19 @@ public interface ILauncherItemActions
 }
 
 public sealed class LauncherActionException(string message) : Exception(message);
+
+/// <summary>
+/// 已隐藏的搜索条目（098，issue 49）：设置 → 启动器 →「已隐藏」列表用。由 LauncherSearch 实现。
+/// 界面线程调用，不得阻塞（只查内存里的索引快照）。
+/// </summary>
+public interface ILauncherHiddenItems
+{
+    /// <summary>
+    /// 按隐藏的先后顺序（先隐藏的在前）给出每一项：Title、Icon 和搜索结果里一样；
+    /// 索引里已经找不到的（软件卸载了）也要给，Title 用记下的名字，Icon 用对应类型的默认 Glyph，Subtitle 给 null。
+    /// </summary>
+    IReadOnlyList<LauncherItem> List();
+
+    /// <summary>取消隐藏：从 HiddenItems 里去掉并写盘；不存在的 Id 什么也不做。</summary>
+    void Unhide(string id);
+}

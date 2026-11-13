@@ -23,8 +23,9 @@ public sealed record WordsSettings(Hotkey? Hotkey=null, bool CloseAfterCopy=true
 // 设计加（2026-11-05，issue 25、062）：InstallOnStartup = 下次启动时自动安装已下载好的更新（默认关）；
 // IgnoredVersion = 提示条上点了「忽略」的版本；SeenVersion = 看过「更新后」提示的版本，NewsShown = 这一版的提示已经出现过几次（最多 3 次）；
 // AutoInstallFailedVersion = 启动时自动安装失败过的版本，同一版本不再自动装（服务写）
+// 设计加（2026-11-13，Mirror酱）：Source = 更新源；CDK 不在这里（服务用 DPAPI 单独存，见 IUpdateService.MirrorCdk）
 public sealed record UpdateSettings(bool AutoUpdate=true, bool InstallOnStartup=false, string? IgnoredVersion=null,
-    string? SeenVersion=null, int NewsShown=0, string? AutoInstallFailedVersion=null);
+    string? SeenVersion=null, int NewsShown=0, string? AutoInstallFailedVersion=null, Pane.Contracts.UpdateSource Source=Pane.Contracts.UpdateSource.GitHub);
 // 批量重命名（设计加，2026-10-31，040）：存下来的规则组合（预设）；LastRules = 上次执行时的规则，下次打开窗口接着用
 public sealed record RenamePreset(string Name, Pane.Contracts.RenameRule[] Rules);
 public sealed record RenameSettings
@@ -61,6 +62,8 @@ public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey)
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
 public sealed record AppAliasEntry(string AppId, string Name, string[] Aliases);
+// 不在搜索中显示的条目（设计加，2026-11-13，issue 49，任务 098）：Name 是隐藏时的标题，索引里找不到时设置页用它显示
+public sealed record HiddenItemEntry(string Id, string Name);
 public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
 // 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
 // RecentOnly 是 issue 47 加的，排在最后，已存的设置值不变
@@ -99,6 +102,13 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     public string DefaultEngine { get=>defaultEngine; init=>defaultEngine=value??"bing"; }
     string[] pinnedApps=[];
     public string[] PinnedApps { get=>pinnedApps; init=>pinnedApps=value??[]; }
+    // 设计加（2026-11-13，issue 50）：打字时左右键移动输入框里的光标，按 ↑ ↓ 进入结果后才切换格子；默认关（左右键直接切换格子，原来的习惯）
+    public bool ArrowKeysMoveCaret { get; init; }
+    // 设计加（2026-11-13，issue 49，任务 098）：搜索系统设置和组件（LauncherGroups.Settings），默认开；关掉后搜索不给这一组
+    public bool SearchSystemSettings { get; init; } = true;
+    // 设计加（2026-11-13，issue 49，任务 098）：不在搜索中显示的条目，先隐藏的在前；应用 Id 变化时跟着迁移（同别名）
+    HiddenItemEntry[] hiddenItems=[];
+    public HiddenItemEntry[] HiddenItems { get=>hiddenItems; init=>hiddenItems=value??[]; }
     // 启动器的动作行（设计加，2026-10-29）：顺序就是显示顺序，不在里面的不显示。
     // Id：ai:translate、ai:ask、files、ai:<预设动作 Id>、web:<搜索站点的关键字>；认不出的 Id 界面跳过
     string[] actionRow=DefaultActionRow();

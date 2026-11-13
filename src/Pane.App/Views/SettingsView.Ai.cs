@@ -340,6 +340,8 @@ public sealed partial class SettingsView
 
     // 启动器动作行（2026-10-30）：输入任何文字都出现的那一排。显示的在前、按顺序，可上移；关掉的排在后面。
     // 候选：翻译、问 AI、搜文件、其余 AI 预设动作、每个网页搜索站点
+    List<string>? actionRowOrder;
+
     void RenderActionRow(LauncherSettings l)
     {
         var ai = app.Store.Current.Ai;
@@ -348,6 +350,10 @@ public sealed partial class SettingsView
         all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, Strings.FormatName(Strings.Launcher_SearchWith, e.Name), "globe")));
         var shown = l.ActionRow.Where(id => all.Any(a => a.Id == id)).ToList();
         var ordered = shown.Select(id => all.First(a => a.Id == id)).Concat(all.Where(a => !shown.Contains(a.Id))).ToList();
+        // issue 49：开关一拨行就跳到前面，连着点容易点错。页面开着时行的位置不动（只有「上移」改顺序），换分区或重开设置再按显示顺序排
+        if (actionRowOrder is { } frozen)
+            ordered = [.. frozen.Select(id => ordered.Find(a => a.Id == id)).Where(a => a.Id is not null), .. ordered.Where(a => !frozen.Contains(a.Id))];
+        actionRowOrder = ordered.Select(a => a.Id).ToList();
         var rows = new List<FrameworkElement>();
         for (int i = 0; i < ordered.Count; i++)
         {
@@ -356,7 +362,7 @@ public sealed partial class SettingsView
             int pos = shown.IndexOf(id);
             var tools = new List<FrameworkElement>();
             if (on && pos > 0)
-                tools.Add(IconButton("U", Strings.Common_MoveUp, () => { SaveLauncher(x => { var list = x.ActionRow.Where(v => all.Any(a => a.Id == v)).ToList(); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { ActionRow = list.ToArray() }; }); Render(); }));
+                tools.Add(IconButton("U", Strings.Common_MoveUp, () => { SaveLauncher(x => { var list = x.ActionRow.Where(v => all.Any(a => a.Id == v)).ToList(); (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { ActionRow = list.ToArray() }; }); actionRowOrder = null; Render(); }));
             tools.Add(Switch(on, v =>
             {
                 SaveLauncher(x => x with { ActionRow = v ? [.. x.ActionRow.Where(a => a != id), id] : x.ActionRow.Where(a => a != id).ToArray() });

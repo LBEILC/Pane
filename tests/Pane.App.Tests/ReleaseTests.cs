@@ -53,6 +53,7 @@ internal static class ReleaseTests
     {
         public string? Value;public int Writes,Reads;public bool FailWrite;
         public bool Disabled {get;set;}
+        public string? ReadCompatibility(string executable,bool allUsers)=>null;
         public string? Read(){Reads++;return Value;}
         public void Write(string command){if(FailWrite)throw new IOException("模拟权限失败");Writes++;Value=command;}
         public void Delete(){Writes++;Value=null;}

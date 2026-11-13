@@ -3,7 +3,22 @@ using Pane.Contracts;
 using Pane.Settings;
 namespace Pane.Services.Launcher;
 
-internal sealed record SourceContext(string Query,LauncherSnapshot Snapshot,LauncherSettings Settings,IReadOnlyDictionary<string,AppUse> Usage);
+internal sealed record SourceContext(string Query,LauncherSnapshot Snapshot,LauncherSettings Settings,IReadOnlyDictionary<string,AppUse> Usage)
+{
+    sealed record HiddenLookup(LauncherSettings Settings,LauncherSnapshot Snapshot,HashSet<string> Ids);
+    HiddenLookup? hidden;
+    internal bool Hidden(string id)
+    {
+        if(Settings.HiddenItems.Length==0)return false;
+        var lookup=Volatile.Read(ref hidden);
+        // with 复制上下文也必须使用新设置；各来源只发布完整的只读集合。
+        if(lookup==null||!ReferenceEquals(lookup.Settings,Settings)||!ReferenceEquals(lookup.Snapshot,Snapshot)){
+            lookup=new(Settings,Snapshot,Settings.HiddenItems.Select(e=>Snapshot.Aliases.GetValueOrDefault(e.Id,e.Id)).ToHashSet(StringComparer.Ordinal));
+            Volatile.Write(ref hidden,lookup);
+        }
+        return lookup.Ids.Contains(Snapshot.Aliases.GetValueOrDefault(id,id));
+    }
+}
 // 来源可以封装配置或进程通信；汇总者隔离失败和超时，不要求同步完成。
 internal interface ILauncherSource
 {
@@ -33,13 +48,14 @@ internal sealed class ApplicationSource(ILauncherExecutor executor,Action<string
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();
         if(c.Query.Length==0){
-            var home=c.Snapshot.Apps.Where(a=>c.Usage.ContainsKey(a.Id)).OrderByDescending(a=>c.Usage[a.Id].LastUsed).Take(Limit(c)).Select(a=>Item(a,LauncherGroups.Recent)).ToList();
+            var home=c.Snapshot.Apps.Where(a=>!c.Hidden(a.Id)&&c.Usage.ContainsKey(a.Id)).OrderByDescending(a=>c.Usage[a.Id].LastUsed).Take(Limit(c)).Select(a=>Item(a,LauncherGroups.Recent)).ToList();
             var byId=c.Snapshot.Apps.ToDictionary(a=>a.Id);var pinned=new HashSet<string>();foreach(var id in c.Settings.PinnedApps)if(byId.TryGetValue(c.Snapshot.Aliases.GetValueOrDefault(id,id),out var app)&&pinned.Add(app.Id))home.Add(Item(app,LauncherGroups.Pinned));
             return Rows(home);
         }
         var hits=new List<(IndexedApp App,int Tier,NameMatch Match)>();
         var aliases=c.Settings.AppAliases.ToDictionary(a=>a.AppId,a=>a.Aliases);
         foreach(var app in c.Snapshot.Apps){
+            if(c.Hidden(app.Id))continue;
             token.ThrowIfCancellationRequested();
             int tier=4;
             if(aliases.TryGetValue(app.Id,out var names))foreach(var name in names){
@@ -65,10 +81,11 @@ internal abstract class EntrySource(string group,int order,string prefix):Launch
 {
     public override int Limit(SourceContext c)=>3;
     protected abstract SearchEntry[] Entries(SourceContext c);
+    internal virtual SearchEntry[] ListEntries(SourceContext c)=>Entries(c);
     protected virtual NameMatch? Match(SearchEntry entry,string query)=>entry.Name.Match(query);
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();if(c.Query.Length==0)return Rows([]);
-        return Rows(Entries(c).Select(e=>(Entry:e,Match:Match(e,c.Query))).Where(x=>x.Match!=null).OrderByDescending(x=>x.Match!.Score).Take(Limit(c)).Select(x=>new LauncherItem(x.Entry.Id,x.Entry.Kind,Group,x.Entry.Name.Name,x.Entry.Subtitle,new(x.Entry.Glyph),x.Match!.Spans)));
+        return Rows(Entries(c).Where(e=>!c.Hidden(e.Id)).Select(e=>(Entry:e,Match:Match(e,c.Query))).Where(x=>x.Match!=null).OrderByDescending(x=>x.Match!.Score).Take(Limit(c)).Select(x=>new LauncherItem(x.Entry.Id,x.Entry.Kind,Group,x.Entry.Name.Name,x.Entry.Subtitle,new(x.Entry.Glyph),x.Match!.Spans)));
     }
 }
 internal sealed class FavoriteSource(ILauncherExecutor executor):EntrySource(LauncherGroups.Favorites,2,"favorite:")

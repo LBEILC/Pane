@@ -119,6 +119,7 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
         string PathName => Path.Combine(root, "run.txt");
         public string? Read() => File.Exists(PathName) ? File.ReadAllText(PathName) : null;
         public bool Disabled => false;
+        public string? ReadCompatibility(string executable,bool allUsers)=>null;
         public void Write(string command) { SetupFiles.Check(PathName); Directory.CreateDirectory(root); File.WriteAllText(PathName, command); }
         public void Delete() { SetupFiles.Check(PathName); File.Delete(PathName); }
     }

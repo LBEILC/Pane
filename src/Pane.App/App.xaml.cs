@@ -80,7 +80,7 @@ public sealed partial class App : Application
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
                 var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
                 using var installer=System.Diagnostics.Process.Start(start)??throw new IOException(Strings.Setup_InstallerLaunchFailed);Shutdown();
-            });
+            }, selectedSource:()=>Store.Current.Update.Source);
             StartUpdates();/* 设计接线：软件内更新 */StartBackground();StartReleaseProbe();
             timer=queue.CreateTimer();timer.Interval=TimeSpan.FromMilliseconds(8);timer.Tick+=(_,_)=>{try{Tick();}finally{if(!NeedsFrames)timer.Stop();}};timer.Start();
         }catch(Exception e){ReportCrash(e);Shutdown();}

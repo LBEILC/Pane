@@ -34,6 +34,7 @@ internal static class SingleInstance
         return false;
     }
     public static async Task Listen(Action<string> command,CancellationToken cancel) {
+        AutostartDiagnostics.Ready();
         while(!cancel.IsCancellationRequested) {
             try {using var pipe=new NamedPipeServerStream(key,PipeDirection.InOut,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous|PipeOptions.CurrentUserOnly);
                 await pipe.WaitForConnectionAsync(cancel).ConfigureAwait(false);using var reader=new StreamReader(pipe,leaveOpen:true);var line=await reader.ReadLineAsync(cancel).ConfigureAwait(false);

@@ -48,7 +48,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         WebSearchHistory=new(store);
         portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
         actions=new(portablePlatform,executor,process);
-        sources=[new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
+        sources=[new DirectSource(executor),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
         var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
         try{if(File.Exists(path))uses=JsonSerializer.Deserialize(File.ReadAllText(path),LauncherJson.Default.DictionaryStringAppUse)??[];}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
@@ -128,11 +128,23 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         lock(kinds){if(kinds.Count>2000)kinds.Clear();kinds[dark]=k;}return k;
     }
     SourceContext Context(string query){Dictionary<string,AppUse> usage;lock(sync)usage=new(uses);return new(query.Trim(),Volatile.Read(ref snapshot),store.Current.Launcher,usage);}
-    public async Task<LauncherResult> SearchAsync(string query,CancellationToken cancellationToken)
+    public Task<LauncherResult> SearchAsync(string query,CancellationToken cancellationToken)=>SearchCoreAsync(query,null,cancellationToken);
+    public Task<LauncherResult> SearchAsync(string query,Action<LauncherResult> partial,CancellationToken cancellationToken)=>SearchCoreAsync(query,partial,cancellationToken);
+    async Task<LauncherResult> SearchCoreAsync(string query,Action<LauncherResult>? partial,CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
-        var pending=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
+        var selected=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).ToArray();
+        var pending=selected.Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
+        if(partial!=null){
+            var local=await Task.WhenAll(pending.Where((_,i)=>selected[i] is not FileSource)).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            if(pending.Any(t=>!t.IsCompleted))partial(Result(local,context));
+        }
         var groups=await Task.WhenAll(pending).ConfigureAwait(false);cancellationToken.ThrowIfCancellationRequested();
+        return Result(groups,context);
+    }
+    LauncherResult Result(IReadOnlyList<LauncherItem>[] groups,SourceContext context)
+    {
         var rows=groups.SelectMany(g=>g).Where(item=>store.Current.Clipboard.Enabled||item.Id!="command:clipboard").ToArray();
         bool dark=Pane.Services.Icons.IconTheme.IsDark(store.Current.General.Theme);
         var apps=context.Snapshot.Apps.ToDictionary(a=>a.Id);

@@ -18,11 +18,12 @@ internal sealed class SystemSettingsSource:LauncherSource
     }
     // TODO(design): 设置组未规定条数，暂沿用既有列表来源的 3 条上限。
     public override int Limit(SourceContext c)=>3;
+    internal IEnumerable<LauncherItem> ListEntries()=>entries.Select(e=>new LauncherItem("system:"+e.Setting.Key,LauncherItemKind.Command,Group,e.Setting.DisplayTitle,e.Setting.English,new(e.Setting.Glyph)));
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token)
     {
-        token.ThrowIfCancellationRequested();if(c.Query.Length==0)return Rows([]);
+        token.ThrowIfCancellationRequested();if(c.Query.Length==0||!c.Settings.SearchSystemSettings)return Rows([]);
         var hits=new List<(SystemSetting Setting,NameMatch Match)>();
-        foreach(var entry in entries){token.ThrowIfCancellationRequested();var match=entry.Name.Match(c.Query);foreach(var alias in entry.Aliases)if(alias.Match(c.Query) is {} other&&(match==null||other.Score>match.Score))match=new(other.Score,[]);if(match!=null)hits.Add((entry.Setting,match));}
+        foreach(var entry in entries){if(c.Hidden("system:"+entry.Setting.Key))continue;token.ThrowIfCancellationRequested();var match=entry.Name.Match(c.Query);foreach(var alias in entry.Aliases)if(alias.Match(c.Query) is {} other&&(match==null||other.Score>match.Score))match=new(other.Score,[]);if(match!=null)hits.Add((entry.Setting,match));}
         return Rows(hits.OrderByDescending(h=>h.Match.Score).ThenByDescending(h=>c.Usage.GetValueOrDefault("system:"+h.Setting.Key)?.Count??0).ThenByDescending(h=>c.Usage.GetValueOrDefault("system:"+h.Setting.Key)?.LastUsed??DateTimeOffset.MinValue).ThenBy(h=>h.Setting.DisplayTitle,StringComparer.OrdinalIgnoreCase).Take(Limit(c)).Select(h=>new LauncherItem("system:"+h.Setting.Key,LauncherItemKind.Command,Group,h.Setting.DisplayTitle,h.Setting.English,new(h.Setting.Glyph),h.Match.Spans)));
     }
     public override async Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token)

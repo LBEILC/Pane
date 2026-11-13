@@ -15,6 +15,7 @@ static partial class Program
     static PaneSettings Defaults()=>new(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Ctrl,32)),new(new(KeyModifiers.Ctrl,86)));
     static async Task Main(string[] args)
     {
+        if(args is ["--mirror-export"]){await MirrorExport097Tests();return;}
         if(args is ["--083"]){await Transfer083Tests();TestResults.Pass();return;}
         if(args is ["--082"]){await Storage082Tests();TestResults.Pass();return;}
         if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}

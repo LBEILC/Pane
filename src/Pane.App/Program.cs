@@ -11,8 +11,8 @@ internal static class Program
         if(Pane.Hosting.SetupEntry.TryRun(args,RunApplication))return;
         if(args.FirstOrDefault()=="--launcher-index") { Environment.ExitCode=Pane.Services.Launcher.IndexWorker.Run(args);return; }
         var command=Pane.Hosting.LaunchArguments.Parse(args);if(command==Pane.Hosting.LaunchCommand.Invalid){Environment.ExitCode=2;return;}
-        try {Pane.Hosting.RestartProcess.WaitForParent();if(!Pane.Hosting.SingleInstance.Enter(command))return;if(Pane.App.TryStartupUpdate())return;Pane.Hosting.NativeCrashRecovery.Start();RunApplication();}
-        catch(Exception error){if(Pane.Hosting.RuntimeMode.Current.IsProduction)new Pane.Hosting.CrashLog(Pane.Hosting.RuntimeMode.Current.DataDirectory).Write(error);Environment.ExitCode=1;}
+        try {Pane.Hosting.AutostartDiagnostics.Begin(command);Pane.Hosting.RestartProcess.WaitForParent();bool entered=Pane.Hosting.SingleInstance.Enter(command);Pane.Hosting.AutostartDiagnostics.AfterSingleInstance(command,entered);if(!entered)return;if(Pane.App.TryStartupUpdate())return;Pane.Hosting.NativeCrashRecovery.Start();RunApplication();}
+        catch(Exception error){Pane.Hosting.AutostartDiagnostics.Failed(command,error);if(Pane.Hosting.RuntimeMode.Current.IsProduction)new Pane.Hosting.CrashLog(Pane.Hosting.RuntimeMode.Current.DataDirectory).Write(error);Environment.ExitCode=1;}
         finally {Pane.Hosting.NativeCrashRecovery.Current?.Stop();Pane.Hosting.SingleInstance.Release();}
         if(Pane.Hosting.RestartProcess.Requested && Environment.ExitCode==0) {
             try { Pane.Hosting.RestartProcess.Start(); }

@@ -9,6 +9,7 @@ internal interface IStartupRegistry
 {
     string? Read();
     bool Disabled {get;}
+    string? ReadCompatibility(string executable,bool allUsers);
     void Write(string command);
     void Delete();
 }
@@ -17,6 +18,12 @@ internal sealed class WindowsStartupRegistry:IStartupRegistry
     const string Run=@"Software\Microsoft\Windows\CurrentVersion\Run";
     public string? Read(){using var key=Registry.CurrentUser.OpenSubKey(Run);return key?.GetValue("Pane") as string;}
     public bool Disabled {get {using var key=Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run");return key?.GetValue("Pane") is byte[] b&&b.Length>=4&&(b[0] is 3 or 7);}}
+    public string? ReadCompatibility(string executable,bool allUsers){
+        using var key=(allUsers?Registry.LocalMachine:Registry.CurrentUser).OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers");
+        // 注册表值名按完整路径匹配；显式忽略大小写，与启动项判断一致。
+        var name=key?.GetValueNames().FirstOrDefault(name=>string.Equals(name,executable,StringComparison.OrdinalIgnoreCase));
+        return name==null?null:key!.GetValue(name) as string;
+    }
     public void Write(string command){using var key=Registry.CurrentUser.CreateSubKey(Run);key.SetValue("Pane",command,RegistryValueKind.String);}
     public void Delete(){using var key=Registry.CurrentUser.OpenSubKey(Run,true);key?.DeleteValue("Pane",false);}
 }
@@ -24,13 +31,18 @@ internal sealed class AutostartService(bool production,string executable,Setting
 {
     string Command=>$"\"{executable}\" --autostart";
     public string? UnavailableReason=>production?null:Strings.Settings_Autostart_Development;
-    public AutostartState State {get {
+    public AutostartState State=>GetState(production,executable,registry);
+    internal static AutostartState GetState(bool production,string executable,IStartupRegistry registry){
         if(!production)return AutostartState.Unavailable;
         var value=registry.Read();
-        if(value==null||!IsPane(value))return AutostartState.Off;
+        if(!PointsTo(value,executable))return AutostartState.Off;
+        var user=registry.ReadCompatibility(executable,false);
+        var machine=registry.ReadCompatibility(executable,true);
+        if(RequiresElevation(user)||RequiresElevation(machine))return AutostartState.ElevationRequired;
         if(registry.Disabled)return AutostartState.DisabledInTaskManager;
-        return PointsTo(value,executable)?AutostartState.On:AutostartState.Off;
-    }}
+        return AutostartState.On;
+    }
+    internal static bool RequiresElevation(string? flags)=>flags?.Split(' ',StringSplitOptions.RemoveEmptyEntries).Contains("RUNASADMIN",StringComparer.OrdinalIgnoreCase)==true;
     internal static string? Executable(string? command){if(string.IsNullOrWhiteSpace(command))return null;command=command.Trim();if(command[0]=='"'){int end=command.IndexOf('"',1);return end>1?command[1..end]:null;}int space=command.IndexOf(' ');return space<0?command:command[..space];}
     internal static bool PointsTo(string? command,string executable)=>string.Equals(Executable(command),executable,StringComparison.OrdinalIgnoreCase);
     static bool IsPane(string? command)=>string.Equals(Path.GetFileName(Executable(command)),"Pane.App.exe",StringComparison.OrdinalIgnoreCase);

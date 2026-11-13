@@ -35,17 +35,18 @@
 
         <!-- 结果；第一个字回来前，第一行位置显示等待状态（三个依次亮起的点 + 「正在等回复」，issue 12） -->
         <Grid>
-            <ScrollViewer x:Name="OutScroll" Margin="0,8,0,0" MaxHeight="300" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                <RichTextBlock x:Name="Out" FontFamily="{StaticResource PaneFontUi}" Foreground="{ThemeResource PaneText1Brush}"
-                               TextWrapping="Wrap" IsTextSelectionEnabled="True" SelectionHighlightColor="{StaticResource PaneAccentBrush}">
-                    <Paragraph>
-                        <Run x:Name="OutRun"/>
-                        <InlineUIContainer>
-                            <Border x:Name="Caret" Width="2" Background="{ThemeResource PaneText1Brush}" Margin="2,0,0,-3"/>
-                        </InlineUIContainer>
-                    </Paragraph>
-                </RichTextBlock>
+            <ScrollViewer x:Name="OutScroll" Margin="0,8,0,0" MaxHeight="300" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnOutScrolled">
+                <!-- 结果按 Markdown 排（Markdown.cs），流式生成时光标接在最后一段末尾 -->
+                <StackPanel x:Name="Out" Spacing="8"/>
             </ScrollViewer>
+            <!-- 往上翻过就不再自动滚到底；生成中出现「回到最新」，点了恢复跟随 -->
+            <Button x:Name="JumpButton" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,4"
+                    Height="{StaticResource PaneControlXs}" Padding="10,0,10,0" CornerRadius="12" Visibility="Collapsed" Click="OnJump" IsTabStop="False">
+                <StackPanel Orientation="Horizontal" Spacing="5">
+                    <c:PaneIcon Glyph="chev-d" Width="12" Height="12" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="JumpText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"/>
+                </StackPanel>
+            </Button>
             <StackPanel x:Name="Waiting" Margin="0,8,0,0" VerticalAlignment="Top" Orientation="Horizontal" Spacing="10" Visibility="Collapsed" IsHitTestVisible="False">
                 <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
                     <Ellipse x:Name="Dot1" Width="6" Height="6" Fill="{StaticResource PaneAccentBrush}"/>
@@ -69,6 +70,11 @@
             <c:WrapPanel x:Name="Foot" Margin="0,8,0,0" HorizontalSpacing="14" VerticalSpacing="4"/>
             <TextBlock x:Name="HintLabelProto" Visibility="Collapsed" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
             <Border x:Name="KbdProto" Visibility="Collapsed" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
+            <!-- Markdown 用的样板（NativeAOT 下不按名字查资源） -->
+            <TextBlock x:Name="Text1Proto" Visibility="Collapsed" FontFamily="{StaticResource PaneFontUi}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="Text2Proto" Visibility="Collapsed" FontFamily="{StaticResource PaneFontMono}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="MathProto" Visibility="Collapsed" FontFamily="{StaticResource PaneFontMath}" Foreground="{StaticResource PaneAccentBrush}"/>
+            <Border x:Name="CodeProto" Visibility="Collapsed" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
         </Grid>
     </StackPanel>
 </UserControl>

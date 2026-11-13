@@ -55,7 +55,7 @@ static partial class Program
         }
         foreach(var app in apps){
             var item=new LauncherItem(app.Id,LauncherItemKind.App,LauncherGroups.Applications,app.Name.Name,null,new("app"));
-            Check((await search.GetActionsAsync(item,default)).Last()==LauncherItemAction.EditAliases,"078 所有索引应用菜单末项 "+app.Id);
+            Check((await search.GetActionsAsync(item,default)).Where(a=>a!=LauncherItemAction.HideFromSearch).Last()==LauncherItemAction.EditAliases,"078 所有索引应用菜单末项 "+app.Id);
         }
         foreach(var kind in new[]{LauncherItemKind.File,LauncherItemKind.Folder,LauncherItemKind.Command,LauncherItemKind.App}){
             var item=new LauncherItem(kind==LauncherItemKind.App?"app:missing":@"file:C:\Fixture\test.txt",kind,"","",null,new("doc"));

@@ -179,7 +179,13 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void OnGlassChanged(object? sender, EventArgs e) { var key = LookKey(); if (key != lookKey) { lookKey = key; Later(); } }
     void OnHotkeyOccupied(object? sender, HotkeyConflict e) => Later();
     // 可能在后台线程触发
-    void OnUpdateChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "about") Later(0); });
+    // 正在 CDK 框里打字时不重建（重建会换掉输入框、丢焦点）：记下来，离开输入框时再刷新（SettingsView.About.cs）
+    void OnUpdateChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() =>
+    {
+        if (current.Id != "about") return;
+        if (cdkBox is { FocusState: not FocusState.Unfocused }) { updateRenderPending = true; return; }
+        Later(0);
+    });
     void OnFileSearchChanged(object? sender, EventArgs e) => DispatcherQueue.TryEnqueue(() => { if (current.Id == "launcher") Later(0); });
     void Later(double ms = 320) { rerender.Stop(); rerender.Interval = TimeSpan.FromMilliseconds(ms * app.Glass.Current.MotionSpeed); rerender.Start(); }
 
@@ -230,6 +236,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     void Render(bool resetScroll)
     {
         rerender.Stop();
+        if (resetScroll) actionRowOrder = null;   // 换分区：动作行按显示顺序重新排
         // 刚拨的开关 / 分段还在播动画：推迟到播完再重建（换分区 resetScroll 不等，旧控件本来就不要了）
         if (!resetScroll && Pane.Views.Controls.MotionHold.Remaining is > 0 and var wait)
         {

@@ -31,7 +31,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     const double SearchRowHeight = 60, FootHeight = 34;
     // 宽度、应用行数、文件个数跟设置走（issue 24，docs/design.md「启动器尺寸与显示数量」）：格子 82 宽，左右内边距各 8 + 1，
     // 紧凑 / 标准 / 宽 = 一行 6 / 7 / 9 个 = 510 / 592 / 756。每次呼出时按当前设置算一次
-    double Width_ = 592, ResultsMaxHeight = 452;
+    double Width_ = 592, ResultsMaxHeight = 452, AiMaxHeight = 560;
     int columns = 7;
     int MaxApps => Math.Clamp(Options.AppRows, 1, 4) * columns;
     static int MaxFiles => Options.FileRows is 3 or 5 or 8 or 10 ? Options.FileRows : 3;
@@ -52,6 +52,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (Hosting.GlassPanel.GetMonitorInfoW(Hosting.GlassPanel.MonitorFromPoint(point, 2), ref info)) work = (info.Work.Bottom - info.Work.Top) / scale;
         ResultsMaxHeight = Math.Max(300, Math.Floor(work * 0.7) - SearchRowHeight - FootHeight - 1);
         Scroller.MaxHeight = ResultsMaxHeight;
+        // 问 AI 时面板可以更长（用户群反馈）：整个面板到工作区的 76%（面板顶在约 23% 处，下面还留一点边）
+        AiMaxHeight = Math.Max(360, Math.Floor(work * 0.76) - SearchRowHeight - 1);
     }
     static string Placeholder => Strings.Launcher_SearchPlaceholder;
     // 设置 → 启动器：「复制后自动带入」时长、「再次呼出时」怎么处理上次输入、动作行
@@ -162,6 +164,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     public void OnShowing(PanelShowContext context)
     {
         activate = context.Activate;
+        navigating = false;
         previousWindow = context.PreviousForegroundWindow;
         ApplyGeometry(context);
         var notice = ((App)Application.Current).CurrentNotice();
@@ -376,6 +379,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (aliasItem is not null) { AliasFoot(); return; }   // 编辑别名时输入框装的是别名，不搜索
         if (aiMode) ExitAi(); // 卡片打开时继续打字 = 回到列表重新搜
         menuItem = null;      // 操作列表里打字 = 回到列表接着搜
+        navigating = false;   // 打字 = 左右键回到移动光标（issue 50）
         // 设计改（2026-10-30）：不再防抖，每次按键直接搜（026 补测：防抖 60 ms 加等慢来源，结果比 uTools 晚 110～170 ms）
         _ = Refresh(Input.Text);
     }
@@ -634,8 +638,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         {
             // 用搜索关键字搜网页（「bd 天气」）：只出网页一组，第一项就是用这个站点搜，下面跟站点给的搜索建议（037）
             webEngine = web.Engine;
+            // 关键字后面是网址：第一条直接打开它，搜索排在下面
+            var address = WebAddress(web.Text);
+            if (address is not null)
+                Add(Section(Strings.Common_Open, LauncherSectionKind.List), new("direct:url:" + address, LauncherItemKind.Web, LauncherGroups.Direct, address, Strings.Launcher_DirectOpenUrl, new("globe"), Hotkey: "Enter"), LauncherCell.Command);
             var s = Section(web.Engine.Name, LauncherSectionKind.List);
-            Add(s, WebItem(web.Engine, web.Text, Strings.FormatName(Strings.Launcher_SearchWithQuery, web.Engine.Name, web.Text), "Enter"), LauncherCell.Command);
+            Add(s, WebItem(web.Engine, web.Text, Strings.FormatName(Strings.Launcher_SearchWithQuery, web.Engine.Name, web.Text), address is null ? "Enter" : ""), LauncherCell.Command);   // 有「打开网址」时 Enter 徽标只留给它（空串不显示，但仍按「第一项」处理 Tab）
             var recent = History?.Recent(web.Engine, web.Text, 3) ?? [];
             foreach (var text in recent) AddHistory(s, web.Engine, text);
             if (suggested.Query == web.Engine.Keyword + " " + web.Text)
@@ -662,6 +670,13 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         else if (q.Length > 0)
         {
+            // 直达（098，issue 52）：输入本身是网址或路径，「打开网址 / 打开文件夹 / 打开文件」排在最前、列表样式，默认选中
+            var opens = result.Items.Where(i => i.Group == LauncherGroups.Direct).ToList();
+            if (opens.Count > 0)
+            {
+                var s = Section(Strings.Common_Open, LauncherSectionKind.List);
+                foreach (var item in opens) Add(s, item, item.Kind is LauncherItemKind.File or LauncherItemKind.Folder ? LauncherCell.File : LauncherCell.Command);
+            }
             // 定时关机（058）：「30 分钟后关机」这类说法排在最前、列表样式，默认选中
             var timers = result.Items.Where(i => i.Group == LauncherGroups.Timer).ToList();
             if (timers.Count > 0)
@@ -692,7 +707,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 for (int i = 0; i < actions.Count; i++) Add(s, actions[i], LauncherCell.Action, i < 9 ? (i + 1).ToString() : null);
             }
             // 常用（设置里加的文件 / 文件夹）在前，再是 Everything 的前 3 个
-            var favorites = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group != LauncherGroups.Files).ToList();
+            var favorites = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group is not (LauncherGroups.Files or LauncherGroups.Direct)).ToList();
             var files = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group == LauncherGroups.Files).ToList();
             if (favorites.Count + files.Count > 0)
             {
@@ -754,10 +769,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             LauncherCell.App => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
             LauncherCell.Menu when menuItem is { } target => (string.Format(Strings.Launcher_MenuTarget, (object?)(item.Title), (object?)(target.Title)), [(["Enter"], Strings.Common_Execute), (["Esc"], Strings.Common_Back)]),
             LauncherCell.Command when item.Id == "terminal:hint" => (Strings.Launcher_TerminalHelp, []),
-            LauncherCell.Command when item.Id.StartsWith("direct:", StringComparison.Ordinal) && DirectQuery(q) is { } d => ActionFoot(d.ActionId, item.Title, d.Text),
+            LauncherCell.Command when IsKeywordDirect(item) && DirectQuery(q) is { } d => ActionFoot(d.ActionId, item.Title, d.Text),
             LauncherCell.Command when item.Group == LauncherGroups.Terminal => (string.Format(Strings.Launcher_RunInTerminal, (object?)(item.Subtitle)), [(["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_RunAsAdmin)]),
             LauncherCell.Command when item.Group == LauncherGroups.Completion => (string.Format(Strings.Launcher_RunTarget, (object?)(item.Title)), [(["Tab"], Strings.Launcher_FillInput), (["Enter"], Strings.Common_Run), (["Ctrl", "+", "Shift", "+", "Enter"], Strings.Launcher_AsAdmin)]),
             LauncherCell.Command when item.Id == "web:hint" => (item.Title, []),
+            // 直达（098 / issue 52）：打开网址
+            LauncherCell.Command when item.Group == LauncherGroups.Direct => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
             // 关键字搜网页（issue 43）：底栏写用哪个站点，不重复结果行；历史行多一个 Shift+Delete 删除
             LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (Strings.FormatName(Strings.Launcher_SearchUsing, we.Name),
                 row.HistoryText is null ? [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)] : [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput), (["Shift", "+", "Delete"], Strings.Common_Delete)]),
@@ -773,7 +790,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         };
         // Tab 兜底的行，提示放得下（不到三个）时加「Tab 搜文件」；应用行已有三个，不加
         if (TabFallback && keys.Length < 3 && !keys.Any(k => k.Item1 is ["Tab"]) && row.Cell is LauncherCell.Calc or LauncherCell.Command or LauncherCell.Action
-            && item.Id != "terminal:hint" && !item.Id.StartsWith("direct:", StringComparison.Ordinal) && item.Group is not (LauncherGroups.Terminal or LauncherGroups.Completion or LauncherGroups.Timer)
+            && item.Id != "terminal:hint" && !IsKeywordDirect(item) && item.Group is not (LauncherGroups.Terminal or LauncherGroups.Completion or LauncherGroups.Timer or LauncherGroups.Direct)
             && !(row.Cell == LauncherCell.Action && ActionId(item) == "files"))
             keys = [.. keys, (["Tab"], Strings.Launcher_SearchFiles)];
         FootWhat.Text = what;
@@ -817,6 +834,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         Foot.Visibility = Visibility.Collapsed;
         Card.Visibility = Visibility.Visible;
         ResultsArea.Visibility = Visibility.Visible;
+        Card.HeightBudget = AiMaxHeight - Card.Margin.Top - Card.Margin.Bottom;
         Card.Start(ai, request, title, glyph, source, compact: false,
             [(["Enter"], Strings.Common_Paste), (["Ctrl", "+", "C"], Strings.Common_Copy), (["Ctrl", "+", "R"], Strings.Common_Regenerate),
              (["Tab"], actionId == "translate" ? Strings.Launcher_TranslateWindow : Strings.Launcher_ContinueChat), (["Esc"], Strings.Common_Back)],
@@ -924,6 +942,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
     double TopOf(FrameworkElement e) => e.TransformToVisual(ResultsContent).TransformPoint(new Point(0, 0)).Y;
 
+    // issue 50：设置「打字时左右键移动光标」打开时，有输入时左右键移动输入框里的光标；按过 ↑ ↓ 进入结果区之后才在格子之间切换，
+    // 再打字就回到移动光标。关着（默认）照原来，左右键直接切换格子。输入为空（首页图块）时没有光标可移，左右键一直切换格子
+    bool navigating;
+    bool ArrowsMoveTiles => SelectedIsTile && (!Options.ArrowKeysMoveCaret || navigating || Input.Text.Length == 0);
     bool SelectedIsTile => selected >= 0 && selected < rows.Count && sections.FirstOrDefault(s => s.Rows.Contains(rows[selected]))?.Kind == LauncherSectionKind.Tiles;
 
     void ShowNumbers(bool show) { foreach (var r in rows) r.ShowNumber = show; }
@@ -959,7 +981,11 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 case VirtualKey.R when ctrl: Card.Retry(); break;
                 case VirtualKey.Tab: ContinueCard(); break;
                 case VirtualKey.Escape: ExitAi(); break;
-                case VirtualKey.Up or VirtualKey.Down: break;
+                // 结果长了用 ↑ ↓ / PageUp PageDown 翻看；往上翻就不再自动滚到底
+                case VirtualKey.Up: Card.ScrollBy(-72); break;
+                case VirtualKey.Down: Card.ScrollBy(72); break;
+                case VirtualKey.PageUp: Card.ScrollBy(-Card.PageHeight); break;
+                case VirtualKey.PageDown: Card.ScrollBy(Card.PageHeight); break;
                 default: return; // 其他键照常打字（打字会回到列表）
             }
             e.Handled = true;
@@ -998,10 +1024,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         switch (e.Key)
         {
             case VirtualKey.K when ctrl: _ = OpenMenu(selected); break;
-            case VirtualKey.Down: MoveLine(1); break;
-            case VirtualKey.Up: MoveLine(-1); break;
-            case VirtualKey.Right when SelectedIsTile: MoveInLine(1); break;
-            case VirtualKey.Left when SelectedIsTile: MoveInLine(-1); break;
+            case VirtualKey.Down: navigating = true; MoveLine(1); break;
+            case VirtualKey.Up: navigating = true; MoveLine(-1); break;
+            case VirtualKey.Right when ArrowsMoveTiles: MoveInLine(1); break;
+            case VirtualKey.Left when ArrowsMoveTiles: MoveInLine(-1); break;
             case VirtualKey.Enter: _ = Execute(selected, false, ctrl, Down(VirtualKey.Shift)); break;
             case VirtualKey.Tab: _ = Execute(selected, true, false); break;
             case VirtualKey.Delete when Down(VirtualKey.Shift) && selected >= 0 && selected < rows.Count && rows[selected].HistoryText is not null:
@@ -1115,6 +1141,19 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         return System.IO.Path.Combine(item.Subtitle ?? "", item.Title);
     }
 
+    // 关键字直达（052）的动作项；098 的网址 / 路径直达（Group 为 Direct）不算，照常交给服务
+    static bool IsKeywordDirect(LauncherItem item) => item.Id.StartsWith("direct:", StringComparison.Ordinal) && item.Group != LauncherGroups.Direct;
+
+    // 网页关键字后面跟的是网址（issue 52，「go https://…」）：认法同服务的直达，只认 http / https 和 www. 开头
+    static string? WebAddress(string text)
+    {
+        text = text.Trim();
+        if (text.Length == 0 || text.Any(char.IsWhiteSpace)) return null;
+        if (text.StartsWith("www.", StringComparison.OrdinalIgnoreCase)) text = "https://" + text;
+        if (!text.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !text.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) return null;
+        return Uri.TryCreate(text, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && uri.Host.Length > 0 ? uri.AbsoluteUri : null;
+    }
+
     async Task Execute(int index, bool tab, bool ctrl, bool shift = false)
     {
         if (index < 0 || index >= rows.Count) return;
@@ -1124,7 +1163,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (row.Cell == LauncherCell.Menu) { if (!tab) await RunMenu(row); return; }
 
         // 关键字直达（052）：和动作行同样的动作，只是内容去掉了关键字；Tab 照动作行展开成翻译 / 对话窗口
-        if (item.Id.StartsWith("direct:", StringComparison.Ordinal))
+        if (IsKeywordDirect(item))
         {
             if (DirectQuery(q) is not { } d) return;
             switch (d.ActionId)
@@ -1287,6 +1326,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         LauncherItemAction.RemoveFromApps => (Strings.Launcher_RemoveFromApps, "eye-off"),   // 057：不删文件，只是不再列出
         LauncherItemAction.EditAliases => (Strings.Launcher_EditAliases, "hash"),           // 078 / issue 33
         LauncherItemAction.RemoveFromRecent => (Strings.Launcher_RemoveFromRecent, "eraser"), // 只删使用记录，应用照常能搜到
+        LauncherItemAction.HideFromSearch => (Strings.Launcher_HideFromSearch, "eye-off"),   // 098 / issue 49：设置 → 启动器 →「已隐藏」里恢复
         LauncherItemAction.Uninstall => (Strings.Launcher_Uninstall, "trash"),
         _ => (Strings.Launcher_MoreActions, "info"),
     };
@@ -1315,7 +1355,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         catch (Exception e) { MenuFailed(row, e); return; }
         // 从应用列表移除（057）：不收起启动器，回到结果重新搜，这一项就不在了
-        if (action is LauncherItemAction.RemoveFromApps or LauncherItemAction.RemoveFromRecent) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
+        if (action is LauncherItemAction.RemoveFromApps or LauncherItemAction.RemoveFromRecent or LauncherItemAction.HideFromSearch) { menuItem = null; Disarm(); _ = Refresh(Input.Text); return; }
         CloseRequested?.Invoke(this, EventArgs.Empty);
     }
 

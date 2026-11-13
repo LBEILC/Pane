@@ -19,7 +19,7 @@ function Assert-Path([string]$Root,[string]$Relative) {
     }
 }
 # 白名单和扫描规则的唯一政策来源：docs/internal.md。
-$allow='^(src/|tests/|scripts/|public/docs/|README\.md$|README\.en\.md$|LICENSE$|LICENSE-EXCEPTION\.md$|THIRD_PARTY_NOTICES\.md$|\.gitignore$|\.gitattributes$)'
+$allow='^(src/|tests/|scripts/|public/docs/|\.github/workflows/|README\.md$|README\.en\.md$|LICENSE$|LICENSE-EXCEPTION\.md$|THIRD_PARTY_NOTICES\.md$|\.gitignore$|\.gitattributes$)'
 $ignored=@(Paths $repo @('ls-files','-z','-ci','--exclude-standard'))
 $files=@{}
 foreach($entry in (Paths $repo @('ls-files','--stage','-z'))) {

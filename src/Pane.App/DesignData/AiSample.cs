@@ -1,5 +1,6 @@
 // 界面开发用的 AI 假服务：照原型 prototype/data.js 的 aiCanned，逐字吐出写好的结果。不联网。
-// 环境变量 PANE_DESIGN_AI=notconfigured / error 用来预览「未配置」「出错」两种卡片。
+// 环境变量 PANE_DESIGN_AI=notconfigured / error 用来预览「未配置」「出错」两种卡片；PANE_DESIGN_AI_INSTANT=1 一次吐完（截图用）。
+// 问题里带「公式」或「Markdown」时给一段含标题、公式、表格、引用、嵌套列表、代码块、链接的回答，看 Markdown 排版。
 using System.Runtime.CompilerServices;
 using Pane.Contracts;
 
@@ -40,13 +41,33 @@ public sealed class AiSample : IAiService
             "explain" => "（演示）解释：Glassmorphism（玻璃拟态）是一种界面风格，用模糊的半透明面板模拟磨砂玻璃，再加细亮边增加层次。",
             _ => $"（演示）关于“{request.Question}”：正式版会把问题发给你在设置里配置的 AI 服务，回答像这样逐字出现。",
         };
+        if (IsRich(request.Question)) answer = Rich;
+        await foreach (var piece in Stream(answer, 28, cancellationToken)) yield return piece;
+    }
+
+    static bool IsRich(string? q) => q is not null && (q.Contains("公式") || q.Contains("Markdown", StringComparison.OrdinalIgnoreCase));
+
+    static async IAsyncEnumerable<string> Stream(string answer, int delay, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (Environment.GetEnvironmentVariable("PANE_DESIGN_AI_INSTANT") == "1") { yield return answer; yield break; }
         var chars = answer.EnumerateRunes().Select(r => r.ToString()).ToArray();
         for (int i = 0; i < chars.Length; i += 2)
         {
-            await Task.Delay(28, cancellationToken);
+            await Task.Delay(delay, cancellationToken);
             yield return string.Concat(chars.Skip(i).Take(2));
         }
     }
+
+    const string Rich = "## 一元二次方程的求根公式\n\n"
+        + "对于 $ax^2 + bx + c = 0$（$a \\neq 0$），两个根是：\n\n"
+        + "$$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$\n\n"
+        + "其中**判别式** $\\Delta = b^2 - 4ac$ 决定根的情况：\n\n"
+        + "| 判别式 | 根的情况 |\n|:--|:--|\n"
+        + "| $\\Delta > 0$ | 两个不相等的实根 |\n| $\\Delta = 0$ | 两个相等的实根 |\n| $\\Delta < 0$ | 没有实根，有一对共轭复根 |\n\n"
+        + "> 小提示：系数是小数时，先乘上公分母再算，*更不容易出错*。\n\n"
+        + "1. 先算 $\\Delta$；\n2. 再代入公式：\n   - 取 `+` 得 $x_1$\n   - 取 `-` 得 $x_2$\n\n"
+        + "```python\nimport math\nx1 = (-b + math.sqrt(b * b - 4 * a * c)) / (2 * a)\n```\n\n"
+        + "更多推导见 [维基百科](https://zh.wikipedia.org/wiki/一元二次方程)。";
 
     public Task<IReadOnlyList<AiModel>> ListModelsAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AiModel>>([new("demo", "演示模型"), new("demo-mini", "演示模型 mini")]);
@@ -66,14 +87,11 @@ public sealed class AiSample : IAiService
             answer = "让玻璃上的文字保持清晰，主要靠三件事：背景要糊、底色要压、文字要够实。\n\n- 模糊半径不低于 30 像素，背后的细节糊掉，文字才不打架；\n- 深色主题加一层深色着色（约 40%），亮壁纸也压得住；\n- 正文用不透明的文字色，`主题色` 只用在小面积的强调上。";
         else if (q.Contains("代码") || q.Contains("函数") || q.Contains("防抖"))
             answer = "可以用一个简单的防抖函数：每次输入都重新计时，停手 600 毫秒后才真正执行。\n\n```\nfunction debounce(fn, ms = 600) {\n  let t;\n  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };\n}\n```";
+        else if (IsRich(q))
+            answer = Rich;
         else
             answer = $"（演示）关于「{q}」：正式版会把这段对话发给你在设置里配置的 AI，回答逐字流出来。\n\n可以接着追问，上下文会一直带着；关掉窗口就清空。";
-        var chars = answer.EnumerateRunes().Select(r => r.ToString()).ToArray();
-        for (int i = 0; i < chars.Length; i += 2)
-        {
-            await Task.Delay(24, cancellationToken);
-            yield return string.Concat(chars.Skip(i).Take(2));
-        }
+        await foreach (var piece in Stream(answer, 24, cancellationToken)) yield return piece;
     }
 }
 

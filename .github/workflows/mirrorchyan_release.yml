@@ -4,12 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: release tag to upload (blank uses latest release)
+        description: Release tag (leave empty for the latest release)
         default: ''
         required: false
         type: string
   release:
     types: [published]
+
+permissions:
+  contents: read
 
 jobs:
   mirrorchyan:
@@ -28,7 +31,7 @@ jobs:
           filetype: latest-release
           filename: ${{ matrix.filename }}
           mirrorchyan_rid: Pane
-          tag: ${{ inputs.tag }}
+          tag: ${{ inputs.tag || github.event.release.tag_name }}
 
           os: ${{ matrix.os }}
           arch: ${{ matrix.arch }}

@@ -5,6 +5,7 @@ internal sealed class CrashLog(string dataDirectory)
     static readonly object sync = new();
     string DirectoryPath=>Path.Combine(dataDirectory,"logs");
     public void Write(Exception exception){
+        AutostartDiagnostics.StartupFailed(exception);
         try {
             Directory.CreateDirectory(DirectoryPath);
             // 异常 Message 可能带剪贴板或查询正文；仅保存已知固定消息，其余脱敏。

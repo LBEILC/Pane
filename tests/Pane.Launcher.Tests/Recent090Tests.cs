@@ -26,7 +26,7 @@ static partial class Program
                 var rows=(await search.SearchAsync("测试应用",default)).Items.Where(i=>i.Kind==LauncherItemKind.App).ToArray();
                 var used=rows.Single(i=>i.Id=="app:2");var unused=rows.Single(i=>i.Id=="app:3");
                 Check(rows[0].Id==used.Id,"090 使用记录提高同名应用排序");
-                Check((await search.GetActionsAsync(used,default)).Last()==LauncherItemAction.RemoveFromRecent,"090 用过的应用末尾提供移除，含合并 Id");
+                Check((await search.GetActionsAsync(used,default)).Where(a=>a!=LauncherItemAction.HideFromSearch).Last()==LauncherItemAction.RemoveFromRecent,"090 用过的应用末尾提供移除，含合并 Id");
                 Check(!(await search.GetActionsAsync(unused,default)).Contains(LauncherItemAction.RemoveFromRecent),"090 同名未用应用不提供移除");
                 foreach(var kind in new[]{LauncherItemKind.File,LauncherItemKind.Folder,LauncherItemKind.Command})
                     Check(!(await search.GetActionsAsync(used with{Kind=kind},default)).Contains(LauncherItemAction.RemoveFromRecent),"090 非应用不提供移除 "+kind);

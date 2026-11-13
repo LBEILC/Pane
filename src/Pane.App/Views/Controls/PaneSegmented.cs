@@ -26,11 +26,20 @@ public sealed partial class PaneSegmented : UserControl
         var radius = ((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft;
         var layer = new Canvas { IsHitTestVisible = false };
         var row = new Grid();
+        // 每格至少放得下最宽那个选项加粗（选中态 SemiBold）后的宽度：各格等宽，选中项变粗时整体宽度不变，
+        // 不然切换选项时最宽那格跟着变、整个控件看起来在抖（issue 47 提问者指出）
+        double widest = 0;
+        foreach (var o in this.options)
+        {
+            var probe = new TextBlock { Text = o.Label, FontFamily = strongProto.FontFamily, FontSize = strongProto.FontSize, FontWeight = FontWeights.SemiBold };
+            probe.Measure(new Windows.Foundation.Size(double.PositiveInfinity, double.PositiveInfinity));
+            widest = Math.Max(widest, probe.DesiredSize.Width);
+        }
         for (int i = 0; i < this.options.Length; i++)
         {
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var text = new TextBlock { Text = this.options[i].Label, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontFamily = strongProto.FontFamily, FontSize = strongProto.FontSize };
-            var item = new Border { Height = PaneTokens.ControlMd - 4, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Child = text };
+            var item = new Border { Height = PaneTokens.ControlMd - 4, MinWidth = Math.Ceiling(widest) + 20, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Child = text };
             Grid.SetColumn(item, i);
             int index = i;
             item.Tapped += (_, _) => Select(index, true);

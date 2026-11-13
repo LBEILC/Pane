@@ -106,6 +106,9 @@ internal static class UpdateTests
 
 internal sealed class UpdateServer : IAsyncDisposable
 {
+    internal sealed record Reply(int Status, byte[] Body, string ContentType = "application/octet-stream", string? Location = null);
+    public Func<string, Task<Reply?>>? Respond;
+    public System.Collections.Concurrent.ConcurrentQueue<string> Paths = new();
     readonly TcpListener listener = new(IPAddress.Loopback, 0);
     readonly CancellationTokenSource stop = new();
     readonly Task loop;
@@ -132,6 +135,12 @@ internal sealed class UpdateServer : IAsyncDisposable
             string? line; while (!string.IsNullOrEmpty(line = await reader.ReadLineAsync(stop.Token)))
             { if (line.StartsWith("User-Agent: Pane/")) UserAgent = true; if (line.StartsWith("Authorization:") || line.StartsWith("Cookie:")) Credentials = true; }
             Interlocked.Increment(ref Requests);
+            string path = first.Split(' ')[1]; Paths.Enqueue(path);
+            if (Respond != null && await Respond(path) is {} reply)
+            {
+                byte[] head = Encoding.ASCII.GetBytes($"HTTP/1.1 {reply.Status} Test\r\nContent-Length: {reply.Body.Length}\r\nContent-Type: {reply.ContentType}\r\nConnection: close\r\n" + (reply.Location == null ? "" : "Location: " + reply.Location + "\r\n") + "\r\n");
+                await stream.WriteAsync(head, stop.Token); await stream.WriteAsync(reply.Body, stop.Token); return;
+            }
             if (Disconnect) return;
             string name = $"Pane-Setup-{Version}.exe", host = Url.GetLeftPart(UriPartial.Authority);
             byte[] body;

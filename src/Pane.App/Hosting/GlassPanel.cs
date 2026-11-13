@@ -284,8 +284,10 @@ public sealed partial class GlassPanel : IDisposable
     {
         double speed=parameters.Current.MotionSpeed;double[] curve=Showing?spring:smooth;
         float toScale=(float)(Showing?1:GlassParameters.Token("PaneEnterScale")),toOpacity=Showing?1:0;
-        var scaleTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Showing?"PaneDurSlow":"PaneDurFast")*speed));
-        var fadeTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*speed));
+        // 设计改（2026-11-13，用户群反馈「剪贴板打开比同类慢」）：出现的缩放 360 → 220 ms、淡入 220 → 120 ms，收起不变；
+        // 视图的 OnShown（聚焦、选中）在缩放播完时才调用，所以缩放时长也决定了面板多久能用
+        var scaleTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*speed));
+        var fadeTime=TimeSpan.FromMilliseconds(Math.Max(1,GlassParameters.Token("PaneDurFast")*speed));
         Vector2 P(double[] c,int i)=>new((float)c[i],(float)c[i+1]);
         {
             var c=compositor;
@@ -314,9 +316,9 @@ public sealed partial class GlassPanel : IDisposable
         if(Shown&&!animating)CheckOutsideClick();
         if(Shown&&!animating&&Passive)CheckPassiveForeground();
         if(!animating)return;
-        double t=animation.Elapsed.TotalMilliseconds,duration=GlassParameters.Token(Showing?"PaneDurSlow":"PaneDurFast")*parameters.Current.MotionSpeed;
+        double t=animation.Elapsed.TotalMilliseconds,duration=GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*parameters.Current.MotionSpeed;
         double a=Ease(Math.Min(1,t/duration),Showing?spring:smooth);
-        double b=Ease(Math.Min(1,t/(GlassParameters.Token(Showing?"PaneDurNormal":"PaneDurFast")*parameters.Current.MotionSpeed)),smooth);
+        double b=Ease(Math.Min(1,t/(GlassParameters.Token("PaneDurFast")*parameters.Current.MotionSpeed)),smooth);
         // 这里只跟踪当前值（中途反向时作起点、诊断用），画面由合成器的动画负责
         scale=(float)(startScale+((Showing?1:GlassParameters.Token("PaneEnterScale"))-startScale)*a);opacity=(float)(startOpacity+((Showing?1:0)-startOpacity)*b);
         if(t>=duration&&minimizing){animating=false;minimizing=false;StopAnimations();Layout(positionX,positionY);Native.ShowWindow(Input,6);return;}

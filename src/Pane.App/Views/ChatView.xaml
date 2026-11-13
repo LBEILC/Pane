@@ -57,9 +57,17 @@
         </Grid>
 
         <!-- 对话 -->
-        <ScrollViewer x:Name="ChatScroller" Grid.Row="1" Padding="22,18,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+        <ScrollViewer x:Name="ChatScroller" Grid.Row="1" Padding="22,18,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnChatScrolled">
             <StackPanel x:Name="Messages" Spacing="16"/>
         </ScrollViewer>
+        <!-- 往上翻过就不再自动滚到底；生成中出现「回到最新」，点了恢复跟随 -->
+        <Button x:Name="JumpButton" Grid.Row="1" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
+                Height="{StaticResource PaneControlSm}" Padding="12,0,12,0" CornerRadius="14" Visibility="Collapsed" Click="OnJump" IsTabStop="False">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:PaneIcon Glyph="chev-d" Width="13" Height="13" VerticalAlignment="Center"/>
+                <TextBlock x:Name="JumpText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"/>
+            </StackPanel>
+        </Button>
         <!-- 空状态：两个示例问题 -->
         <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
             <TextBlock TextAlignment="Center" LineHeight="24" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"
@@ -106,6 +114,7 @@
             <TextBlock x:Name="HintLabelProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
             <TextBlock x:Name="BodyProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
             <TextBlock x:Name="MonoProto" FontFamily="{StaticResource PaneFontMono}" FontSize="12" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="MathProto" FontFamily="{StaticResource PaneFontMath}" Foreground="{StaticResource PaneAccentBrush}"/>
             <TextBlock x:Name="ErrorProto" Foreground="{StaticResource PaneDangerBrush}"/>
             <TextBlock x:Name="Text3Proto" Foreground="{ThemeResource PaneText3Brush}"/>
             <Border x:Name="BubbleProto" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>

@@ -40,6 +40,9 @@ public sealed partial class SettingsView
             hotkeyRow,
             Row(Strings.Settings_Launcher_Position, moved ? Strings.Settings_Launcher_PositionSaved : Strings.Settings_Launcher_PositionDefault, reset),
             Row(Strings.Settings_Launcher_HideOnBlur, Strings.Settings_Launcher_HideOnBlurDescription, Switch(l.HideOnBlur, v => SaveLauncher(x => x with { HideOnBlur = v }))),
+            Row(Strings.Settings_Launcher_ArrowKeysMoveCaret, Strings.Settings_Launcher_ArrowKeysMoveCaretDescription, Switch(l.ArrowKeysMoveCaret, v => SaveLauncher(x => x with { ArrowKeysMoveCaret = v }))),
+            // 098 / issue 49：不想在启动器里看到 Windows 设置和控制面板的项目
+            Row(Strings.Settings_Launcher_SearchSystemSettings, Strings.Settings_Launcher_SearchSystemSettingsDescription, Switch(l.SearchSystemSettings, v => SaveLauncher(x => x with { SearchSystemSettings = v }))),
             Row(Strings.Settings_Launcher_KeepInput, Strings.Settings_Launcher_KeepInputDescription,
                 Seg([("Clear", Strings.Common_Clear), ("OneMinute", Strings.Settings_Launcher_KeepOneMinute), ("Always", Strings.Settings_Launcher_KeepAlways)], l.KeepInput.ToString(),
                     v => SaveLauncher(x => x with { KeepInput = Enum.Parse<KeepInputMode>(v) }))),
@@ -149,6 +152,18 @@ public sealed partial class SettingsView
         if (aliasList.Count == 0) aliasList.Add(Row(Strings.Settings_Launcher_AliasesEmpty, null));
         Group(Strings.Settings_Launcher_Aliases, aliasList.ToArray(), Strings.Settings_Launcher_AliasesDescription);
 
+        // 已隐藏（098，issue 49）：启动器里 Ctrl+K →「不在搜索中显示」的项目，这里恢复；软件卸载了也列出来，用隐藏时记下的名字
+        var hiddenList = (HiddenItems?.List() ?? []).Select(item =>
+        {
+            var restore = Button(Strings.Settings_Launcher_Unhide, null, () => { HiddenItems?.Unhide(item.Id); Render(); });
+            var sub = item.Subtitle ?? Strings.Settings_Launcher_HiddenMissing;
+            return item.Icon.ImagePath is { } path
+                ? ListRow(AppIcon(path), Text(item.Title, LabelProto), sub, false, restore)
+                : ListRow(item.Icon.Glyph, item.Title, sub, false, restore);
+        }).ToList<FrameworkElement>();
+        if (hiddenList.Count == 0) hiddenList.Add(Row(Strings.Settings_Launcher_HiddenEmpty, null));
+        Group(Strings.Settings_Launcher_Hidden, hiddenList.ToArray(), Strings.Settings_Launcher_HiddenDescription);
+
         var engines = l.SearchEngines.Select(e =>
         {
             bool def = e.Keyword == l.DefaultEngine;
@@ -230,6 +245,8 @@ public sealed partial class SettingsView
     internal static IPortableAppsStatus? PortableApps { get; set; }
     internal static IDataStorage? DataStorage { get; set; }
     internal static IAppAliases? AppAliases { get; set; }
+    // 已隐藏的搜索条目（098，issue 49）：启动器能力启用时由宿主设（同 AppAliases），停用时清掉
+    internal static ILauncherHiddenItems? HiddenItems { get; set; }
 
     FrameworkElement PortableRow(PortableEntry p, IPortableAppsStatus scan)
     {

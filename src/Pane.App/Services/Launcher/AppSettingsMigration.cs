@@ -17,9 +17,10 @@ internal static class AppSettingsMigration
         Overrides=Remap(settings.Overrides,aliases),CustomIcons=Remap(settings.CustomIcons,aliases)
     };
     public static PaneSettings Apply(PaneSettings settings,IReadOnlyDictionary<string,string> aliases){
-        if(!aliases.Keys.Any(id=>settings.Launcher.PinnedApps.Contains(id)||settings.Launcher.AppAliases.Any(a=>a.AppId==id)||settings.Icons.Overrides.ContainsKey(id)||settings.Icons.CustomIcons.ContainsKey(id)))return settings;
+        if(!aliases.Keys.Any(id=>settings.Launcher.PinnedApps.Contains(id)||settings.Launcher.AppAliases.Any(a=>a.AppId==id)||settings.Launcher.HiddenItems.Any(e=>e.Id==id)||settings.Icons.Overrides.ContainsKey(id)||settings.Icons.CustomIcons.ContainsKey(id)))return settings;
         return settings with{
             Launcher=settings.Launcher with{
+                HiddenItems=settings.Launcher.HiddenItems.Select(e=>e with{Id=aliases.GetValueOrDefault(e.Id,e.Id)}).DistinctBy(e=>e.Id).ToArray(),
                 PinnedApps=settings.Launcher.PinnedApps.Select(id=>aliases.GetValueOrDefault(id,id)).Distinct().ToArray(),
                 AppAliases=settings.Launcher.AppAliases.GroupBy(a=>aliases.GetValueOrDefault(a.AppId,a.AppId)).Select(g=>
                     new AppAliasEntry(g.Key,g.FirstOrDefault(a=>a.AppId==g.Key)?.Name??g.First().Name,

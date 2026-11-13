@@ -15,6 +15,7 @@ public sealed partial class App
     {
         public string? Read()=>null;
         public bool Disabled=>false;
+        public string? ReadCompatibility(string executable,bool allUsers)=>null;
         public void Write(string command)=>throw new InvalidOperationException("隔离测试禁止写注册表");
         public void Delete()=>throw new InvalidOperationException("隔离测试禁止写注册表");
     }

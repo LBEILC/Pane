@@ -24,6 +24,7 @@
   <data name="Ai_Card_LoginExpired" xml:space="preserve"><value>ChatGPT 登入已過期，請重新登入</value></data>
   <data name="Ai_Card_NotConfigured" xml:space="preserve"><value>尚未設定 AI 服務</value></data>
   <data name="Ai_Card_Waiting" xml:space="preserve"><value>正在等待回覆</value></data>
+  <data name="Ai_Card_JumpToLatest" xml:space="preserve"><value>回到最新</value></data>
   <data name="Ai_Card_QuotaExceeded" xml:space="preserve"><value>該帳號的額度已用完</value></data>
   <data name="Ai_Chat_ChangeModel" xml:space="preserve"><value>更換模型（僅本次對話）</value></data>
   <data name="Ai_Chat_Empty" xml:space="preserve"><value>新的對話
@@ -1189,6 +1190,15 @@
   <data name="Settings_Launcher_FileSearchDescription" xml:space="preserve"><value>檔名搜尋依賴 Everything；Pane 不自建全盤索引。啟動器中顯示的數量可在上方「外觀」中調整，其餘結果在檔案視窗中查看</value></data>
   <data name="Settings_Launcher_HideOnBlur" xml:space="preserve"><value>失去焦點時收起</value></data>
   <data name="Settings_Launcher_HideOnBlurDescription" xml:space="preserve"><value>切換到其他視窗時自動收起</value></data>
+  <data name="Settings_Launcher_ArrowKeysMoveCaret" xml:space="preserve"><value>輸入時左右鍵移動游標</value></data>
+  <data name="Settings_Launcher_ArrowKeysMoveCaretDescription" xml:space="preserve"><value>開啟後，輸入時 ← → 移動游標，按 ↑ ↓ 進入結果後再切換；關閉時 ← → 直接切換應用程式和動作</value></data>
+  <data name="Settings_Launcher_SearchSystemSettings" xml:space="preserve"><value>搜尋系統設定</value></data>
+  <data name="Settings_Launcher_SearchSystemSettingsDescription" xml:space="preserve"><value>搜尋時列出 Windows 設定和控制台裡的項目</value></data>
+  <data name="Settings_Launcher_Hidden" xml:space="preserve"><value>已隱藏</value></data>
+  <data name="Settings_Launcher_HiddenDescription" xml:space="preserve"><value>在啟動器的結果上按 Ctrl+K，選「不在搜尋中顯示」</value></data>
+  <data name="Settings_Launcher_HiddenEmpty" xml:space="preserve"><value>沒有隱藏的項目</value></data>
+  <data name="Settings_Launcher_HiddenMissing" xml:space="preserve"><value>已找不到，可能已解除安裝</value></data>
+  <data name="Settings_Launcher_Unhide" xml:space="preserve"><value>恢復顯示</value></data>
   <data name="Settings_Launcher_Home" xml:space="preserve"><value>未輸入時顯示</value></data>
   <data name="Settings_Launcher_HomeHidden" xml:space="preserve"><value>都不顯示</value></data>
   <data name="Settings_Launcher_HomeNone" xml:space="preserve"><value>叫出時只有一行搜尋欄</value></data>
@@ -1238,8 +1248,9 @@
   <data name="Settings_LauncherEntry_Invalid" xml:space="preserve"><value>啟動器入口無效</value></data>
   <data name="Settings_LauncherPosition_Invalid" xml:space="preserve"><value>啟動器位置無效</value></data>
   <data name="Settings_Motion" xml:space="preserve"><value>動畫效果</value></data>
-  <data name="Settings_Motion_Description" xml:space="preserve"><value>「減弱」會縮短過渡</value></data>
+  <data name="Settings_Motion_Description" xml:space="preserve"><value>「減弱」會縮短過渡；「關閉」時面板直接出現</value></data>
   <data name="Settings_Motion_Normal" xml:space="preserve"><value>標準</value></data>
+  <data name="Settings_Motion_Off" xml:space="preserve"><value>關閉</value></data>
   <data name="Settings_Motion_Reduced" xml:space="preserve"><value>減弱</value></data>
   <data name="Settings_PanelRadius" xml:space="preserve"><value>視窗圓角</value></data>
   <data name="Settings_PanelRadius_Description" xml:space="preserve"><value>玻璃面板的圓角（自繪，帶反鋸齒）</value></data>
@@ -1252,7 +1263,7 @@
   <data name="Settings_SaveInvalid" xml:space="preserve"><value>填寫的內容無效，未儲存</value></data>
   <data name="Settings_SearchEngine_Invalid" xml:space="preserve"><value>搜尋引擎設定無效</value></data>
   <data name="Settings_ShowTrayIcon" xml:space="preserve"><value>在工作列通知區域顯示圖示</value></data>
-  <data name="Settings_ShowTrayIcon_Description" xml:space="preserve"><value>關閉後仍可透過熱鍵開啟設定</value></data>
+  <data name="Settings_ShowTrayIcon_Description" xml:space="preserve"><value>關閉後可呼出啟動器，點右上角的「Pane」或搜尋「Pane 設定」開啟設定</value></data>
   <data name="Settings_Startup" xml:space="preserve"><value>啟動</value></data>
   <data name="Settings_Super_ActionHidden" xml:space="preserve"><value>不顯示</value></data>
   <data name="Settings_Super_ActionPosition" xml:space="preserve"><value>第 {0} 個</value></data>
@@ -1465,7 +1476,6 @@
   <data name="Update_RateLimited" xml:space="preserve"><value>GitHub 暫時限制了檢查次數，請稍後重試</value></data>
   <data name="Update_ReadyNotification" xml:space="preserve"><value>Pane {0} 已下載完成，可在 設定 → 關於 中重新啟動更新</value></data>
   <data name="Update_ReadyVersion" xml:space="preserve"><value>{0} 已下載完成</value></data>
-  <data name="Update_ReleaseDetails" xml:space="preserve"><value>{0} · {1:M 月 d 日}釋出</value></data>
   <data name="Update_RestartAndUpdate" xml:space="preserve"><value>重新啟動並更新</value></data>
   <data name="Update_StorageFailed" xml:space="preserve"><value>無法儲存更新檔，請檢查磁碟空間</value></data>
   <data name="Update_Title" xml:space="preserve"><value>更新</value></data>
@@ -1606,6 +1616,32 @@
   <data name="Update_ViewOnGitHub" xml:space="preserve"><value>在 GitHub 上查看</value></data>
   <data name="Update_InstallOnStartup" xml:space="preserve"><value>下次啟動時自動安裝</value></data>
   <data name="Update_InstallOnStartupDescription" xml:space="preserve"><value>已下載的更新將在下次啟動 Pane 時（例如開機）自動安裝，不再詢問</value></data>
+  <data name="Update_Source" xml:space="preserve"><value>更新源</value></data>
+  <data name="Update_SourceGitHubDescription" xml:space="preserve"><value>從 GitHub 檢查和下載更新</value></data>
+  <data name="Update_SourceMirrorDescription" xml:space="preserve"><value>從 Mirror酱 檢查更新；填寫 CDK 後也從 Mirror酱 下載，國內速度更快</value></data>
+  <data name="Update_SourceFellBack" xml:space="preserve"><value>無法連線 Mirror酱，本次已改為從 GitHub 檢查</value></data>
+  <data name="Update_SourceMirror" xml:space="preserve"><value>Mirror酱</value></data>
+  <data name="Update_MirrorCdk" xml:space="preserve"><value>Mirror酱 CDK</value></data>
+  <data name="Update_CdkPlaceholder" xml:space="preserve"><value>CDK（選填）</value></data>
+  <data name="Update_CdkNone" xml:space="preserve"><value>不填寫也能檢查更新，下載將從 GitHub 進行</value></data>
+  <data name="Update_CdkChecking" xml:space="preserve"><value>正在校驗 CDK…</value></data>
+  <data name="Update_CdkValid" xml:space="preserve"><value>有效期至 {0}</value></data>
+  <data name="Update_CdkValidSoon" xml:space="preserve"><value>有效期至 {0}，還剩 {1} 天</value></data>
+  <data name="Update_CdkUnknown" xml:space="preserve"><value>暫時無法校驗 CDK，將在下次檢查時重試</value></data>
+  <data name="Update_CdkProblem" xml:space="preserve"><value>CDK 無法使用</value></data>
+  <data name="Update_CdkExpired" xml:space="preserve"><value>CDK 已過期，更新將改從 GitHub 下載</value></data>
+  <data name="Update_CdkInvalid" xml:space="preserve"><value>CDK 不正確，請檢查是否填錯</value></data>
+  <data name="Update_CdkQuotaExhausted" xml:space="preserve"><value>CDK 今日下載次數已用完，更新將改從 GitHub 下載</value></data>
+  <data name="Update_CdkMismatched" xml:space="preserve"><value>此 CDK 不適用於 Pane</value></data>
+  <data name="Update_CdkBlocked" xml:space="preserve"><value>CDK 已被封禁，請聯絡 Mirror酱 售後</value></data>
+  <data name="Update_CdkGet" xml:space="preserve"><value>取得 CDK</value></data>
+  <data name="Update_CdkRenew" xml:space="preserve"><value>續費 CDK</value></data>
+  <data name="Update_ShowCdk" xml:space="preserve"><value>顯示 CDK</value></data>
+  <data name="Update_HideCdk" xml:space="preserve"><value>隱藏 CDK</value></data>
+  <data name="Update_UseGitHub" xml:space="preserve"><value>改用 GitHub</value></data>
+  <data name="Update_FromGitHub" xml:space="preserve"><value>從 GitHub 下載</value></data>
+  <data name="Update_FromMirror" xml:space="preserve"><value>從 Mirror酱 下載</value></data>
+  <data name="Update_ReleasedOn" xml:space="preserve"><value>{0:M 月 d 日}釋出</value></data>
   <data name="Update_Changelog" xml:space="preserve"><value>更新日誌</value></data>
   <data name="Update_ChangelogDescription" xml:space="preserve"><value>{0} 以來每個版本的更新內容</value></data>
   <data name="Update_ChangelogOpen" xml:space="preserve"><value>查看</value></data>
@@ -1621,4 +1657,11 @@
   <data name="Notice_Updated" xml:space="preserve"><value>已更新到 {0}</value></data>
   <data name="Notice_View" xml:space="preserve"><value>查看</value></data>
   <data name="Notice_Dismiss" xml:space="preserve"><value>不再提示</value></data>
+  <data name="Update_MirrorDownloadFailed" xml:space="preserve"><value>從 Mirror酱 下載失敗，請稍後重試</value></data>
+  <data name="Settings_Autostart_ElevationRequired" xml:space="preserve"><value>開機時會被系統略過</value></data>
+  <data name="Settings_Autostart_ElevationHint" xml:space="preserve"><value>Pane.App.exe 設定了「以系統管理員身分執行」，Windows 開機時不會啟動它；請在程式內容的「相容性」中取消勾選</value></data>
+  <data name="Launcher_HideFromSearch" xml:space="preserve"><value>不在搜尋中顯示</value></data>
+  <data name="Launcher_DirectOpenUrl" xml:space="preserve"><value>開啟網址</value></data>
+  <data name="Launcher_DirectOpenFolder" xml:space="preserve"><value>開啟資料夾</value></data>
+  <data name="Launcher_DirectOpenFile" xml:space="preserve"><value>開啟檔案</value></data>
 </root>

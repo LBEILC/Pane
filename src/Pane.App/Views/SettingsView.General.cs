@@ -40,8 +40,10 @@ public sealed partial class SettingsView
                 v => SaveGeneral(x => x with { PanelRadius = double.Parse(v) }))),
             Row(Strings.Settings_GlassOpacity, Strings.Settings_GlassOpacity_Description,
                 GlassSlider(0, 1, 0.01, p => p.TintOpacity, (p, v) => p with { TintOpacity = v }, null)),
-            Row(Strings.Settings_Motion, Strings.Settings_Motion_Description, Seg([("normal", Strings.Settings_Motion_Normal), ("reduced", Strings.Settings_Motion_Reduced)], g.MotionSpeed < 1 ? "reduced" : "normal",
-                v => SaveGeneral(x => x with { MotionSpeed = v == "reduced" ? 0.5 : 1 }))));
+            Row(Strings.Settings_Motion, Strings.Settings_Motion_Description, Seg([("normal", Strings.Settings_Motion_Normal), ("reduced", Strings.Settings_Motion_Reduced), ("off", Strings.Settings_Motion_Off)],
+                g.MotionSpeed <= 0.05 ? "off" : g.MotionSpeed < 1 ? "reduced" : "normal",
+                // 「关闭」用 0.01 倍速：各处动画 1～4 毫秒播完，等于直接出现，又不用给每处动画单独加判断
+                v => SaveGeneral(x => x with { MotionSpeed = v switch { "reduced" => 0.5, "off" => 0.01, _ => 1 } }))));
         RenderFonts(g);
         RenderGlassAdvanced();
     }
@@ -223,7 +225,7 @@ public sealed partial class SettingsView
         var label = Strings.Settings_Autostart;
         var auto = app.Autostart;
         var state = auto.State;
-        var toggle = Switch(state is AutostartState.On or AutostartState.DisabledInTaskManager, v =>
+        var toggle = Switch(state is AutostartState.On or AutostartState.DisabledInTaskManager or AutostartState.ElevationRequired, v =>
         {
             try { auto.Set(v); autostartError = null; }
             catch (Exception e) { autostartError = App.FailureReason(e) ?? Strings.Settings_Autostart_ChangeFailed; }
@@ -237,6 +239,9 @@ public sealed partial class SettingsView
         if (autostartError != null) return Row(label, null, Status(false, string.Format(Strings.Settings_Autostart_Error, autostartError)), toggle);
         if (state == AutostartState.DisabledInTaskManager)
             return Row(label, Strings.Settings_Autostart_EnableInTaskManager, Status(false, Strings.Settings_Autostart_DisabledInTaskManager), toggle);
+        // 099 / issue 48：exe 设了「以管理员身份运行」，开机时 Windows 直接跳过，不替用户改兼容性设置
+        if (state == AutostartState.ElevationRequired)
+            return Row(label, Strings.Settings_Autostart_ElevationHint, Status(false, Strings.Settings_Autostart_ElevationRequired), toggle);
         return Row(label, Strings.Settings_Autostart_Description, toggle);
     }
 }

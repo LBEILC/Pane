@@ -116,6 +116,112 @@ public sealed partial class SettingsView
             .Select(k => (Label: k.Item2, Count: notes.Items.Count(i => i.Kind == k.Item1))).Where(k => k.Count > 0)
             .Select(k => string.Format(Strings.Update_KindCount, (object?)k.Label, (object?)k.Count)));
 
+    // ---------------- 更新源与 Mirror酱 CDK（2026-11-13，docs/design.md「Mirror酱 更新源」；原型 prototype/settings.js 的 renderUpdateSource）----------------
+    // 「更新源」分段，切换后立刻重新检查；选 Mirror酱 时就地展开 CDK 一行：输入框默认遮住、眼睛按钮显示，
+    // 失焦或回车就保存并带它检查一次（分成规则：新 CDK 第一个带它检查的 app 拿分成），说明文字跟着校验结果变；
+    // CDK 出错时多一行原因和「改用 GitHub」（直接把更新源切回 GitHub）。
+    const string MirrorUrl = "https://mirrorchyan.com/zh/projects?rid=Pane&source=pane-settings";
+    PasswordBox? cdkBox;
+    string? cdkDraft;              // 输入框里还没提交的内容：页面重建时放回去
+    bool cdkShown, updateRenderPending;
+    CancellationTokenSource? sourceCheck;
+
+    // 切换更新源、保存 CDK 后的检查：单独一个取消源，不去取消正在进行的下载（那是 Run 的 updateWork）
+    void CheckNow(IUpdateService u)
+    {
+        sourceCheck?.Cancel();
+        sourceCheck = new CancellationTokenSource();
+        _ = Guard(u.CheckAsync(sourceCheck.Token));
+        static async Task Guard(Task t) { try { await t; } catch (Exception) { } }   // 失败由服务放进 State / Error
+    }
+
+    void SaveSource(IUpdateService u, UpdateSource next)
+    {
+        if (app.Store.Current.Update.Source == next) return;
+        app.Store.Save(app.Store.Current with { Update = app.Store.Current.Update with { Source = next } });
+        if (next == UpdateSource.MirrorChyan) { revealKey = "mirror"; Later(); CheckNow(u); }
+        else Collapse("mirror", () => { Render(); CheckNow(u); });
+    }
+
+    IEnumerable<FrameworkElement> SourceRows(IUpdateService u)
+    {
+        var source = app.Store.Current.Update.Source;
+        bool mirror = source == UpdateSource.MirrorChyan;
+        string desc = !mirror ? Strings.Update_SourceGitHubDescription
+            : u.CheckedFrom == UpdateOrigin.GitHub && u.State != UpdateState.Checking ? Strings.Update_SourceFellBack : Strings.Update_SourceMirrorDescription;
+        yield return Row(Strings.Update_Source, desc,
+            Seg([(nameof(UpdateSource.GitHub), "GitHub"), (nameof(UpdateSource.MirrorChyan), Strings.Update_SourceMirror)], source.ToString(),
+                v => SaveSource(u, Enum.Parse<UpdateSource>(v))));
+        if (mirror) yield return Reveal("mirror", MirrorRows(u));
+    }
+
+    List<FrameworkElement> MirrorRows(IUpdateService u)
+    {
+        var status = u.CdkStatus;
+        bool known = u.CdkExpires is not null && status is MirrorCdkStatus.Valid or MirrorCdkStatus.Unknown;
+        string? desc = status == MirrorCdkStatus.Checking ? Strings.Update_CdkChecking
+            : known && u.CdkExpires is { } expires ? ExpiryText(expires)
+            : status == MirrorCdkStatus.Unknown ? Strings.Update_CdkUnknown
+            : status == MirrorCdkStatus.None ? Strings.Update_CdkNone : null;
+
+        var box = new PasswordBox
+        {
+            PlaceholderText = Strings.Update_CdkPlaceholder, Width = 220, Height = PaneTokens.ControlMd, Padding = new Thickness(10, 6, 10, 0),
+            FontFamily = SmallStrongProto.FontFamily, FontSize = SmallStrongProto.FontSize,
+            Password = cdkDraft ?? u.MirrorCdk,
+            PasswordRevealMode = cdkShown ? PasswordRevealMode.Visible : PasswordRevealMode.Hidden,   // 不用自带的按住查看，统一用右边的眼睛
+        };
+        cdkBox = box;
+        box.PasswordChanged += (_, _) => cdkDraft = box.Password;
+        void Commit()
+        {
+            cdkDraft = null;
+            var value = box.Password.Trim();
+            bool changed = value != u.MirrorCdk;
+            if (changed) { u.SaveMirrorCdk(value); CheckNow(u); }
+            if (changed || updateRenderPending) { updateRenderPending = false; Later(0); }
+        }
+        box.LostFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Enter) { Commit(); e.Handled = true; } };
+        var wrap = new Border
+        {
+            Child = box, CornerRadius = new CornerRadius(((CornerRadius)Application.Current.Resources["PaneRadiusControl"]).TopLeft),
+            Background = FillProto.Background, BorderBrush = FillProto.BorderBrush, BorderThickness = new Thickness(1),
+        };
+        Button? eye = null;
+        eye = IconButton(cdkShown ? "eye-off" : "eye", cdkShown ? Strings.Update_HideCdk : Strings.Update_ShowCdk, () =>
+        {
+            cdkShown = !cdkShown;
+            box.PasswordRevealMode = cdkShown ? PasswordRevealMode.Visible : PasswordRevealMode.Hidden;
+            ((PaneIcon)eye!.Content).Glyph = cdkShown ? "eye-off" : "eye";
+            ToolTipService.SetToolTip(eye, cdkShown ? Strings.Update_HideCdk : Strings.Update_ShowCdk);
+        });
+        var rows = new List<FrameworkElement>
+        {
+            Row(Strings.Update_MirrorCdk, desc, wrap, eye, Button(known ? Strings.Update_CdkRenew : Strings.Update_CdkGet, "external", () => OpenUrl(MirrorUrl))),
+        };
+        string? problem = status switch
+        {
+            MirrorCdkStatus.Expired => Strings.Update_CdkExpired,
+            MirrorCdkStatus.Invalid => Strings.Update_CdkInvalid,
+            MirrorCdkStatus.QuotaExhausted => Strings.Update_CdkQuotaExhausted,
+            MirrorCdkStatus.Mismatched => Strings.Update_CdkMismatched,
+            MirrorCdkStatus.Blocked => Strings.Update_CdkBlocked,
+            _ => null,
+        };
+        if (problem != null)
+            rows.Add(Row(Strings.Update_CdkProblem, null, Status(false, problem), Button(Strings.Update_UseGitHub, null, () => SaveSource(u, UpdateSource.GitHub))));
+        return rows;
+    }
+
+    // 「有效期至 2027-01-01」；7 天内到期加上还剩几天
+    static string ExpiryText(DateTimeOffset expires)
+    {
+        int days = (int)Math.Ceiling((expires - DateTimeOffset.Now).TotalDays);
+        string date = expires.LocalDateTime.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        return days <= 7 ? string.Format(Strings.Update_CdkValidSoon, (object?)date, (object?)Math.Max(days, 0)) : string.Format(Strings.Update_CdkValid, (object?)date);
+    }
+
     void RenderUpdate(IUpdateService u)
     {
         void Run(Func<CancellationToken, Task> work)
@@ -130,6 +236,18 @@ public sealed partial class SettingsView
             : DateTimeOffset.Now - v < TimeSpan.FromHours(1) ? string.Format(Strings.Update_CheckedMinutesAgo, (object?)((int)(DateTimeOffset.Now - v).TotalMinutes))
             : DateTimeOffset.Now - v < TimeSpan.FromDays(1) ? string.Format(Strings.Update_CheckedHoursAgo, (object?)((int)(DateTimeOffset.Now - v).TotalHours)) : string.Format(Strings.Update_CheckedOn, (object?)(v.LocalDateTime));
         string Size(long b) => $"{b / 1024.0 / 1024:0.#} MB";
+        // 选了 Mirror酱 才说从哪边下载（只用 GitHub 时不用说）
+        string? Origin() => app.Store.Current.Update.Source != UpdateSource.MirrorChyan || u.DownloadFrom is not { } from ? null
+            : from == UpdateOrigin.MirrorChyan ? Strings.Update_FromMirror : Strings.Update_FromGitHub;
+        // 「34.4 MB · 11 月 12 日发布 · 从 Mirror酱 下载」：Mirror酱 查到的没有日期、不带 CDK 时也没有大小，缺哪项不写哪项
+        string? ReleaseDetails(UpdateRelease r)
+        {
+            var parts = new List<string>();
+            if (r.SizeBytes > 0) parts.Add(Size(r.SizeBytes));
+            if (r.PublishedAt is { } published) parts.Add(string.Format(Strings.Update_ReleasedOn, (object?)(published.LocalDateTime)));
+            if (Origin() is { } origin) parts.Add(origin);
+            return parts.Count == 0 ? null : string.Join(" · ", parts);
+        }
         var check = Button(u.State == UpdateState.Checking ? Strings.Update_Checking : Strings.Update_CheckNow, "refresh", () => Run(u.CheckAsync));
         Enable(check, u.State is not (UpdateState.Checking or UpdateState.Downloading));
         var rows = new List<FrameworkElement>();
@@ -137,11 +255,12 @@ public sealed partial class SettingsView
         switch (u.State)
         {
             case UpdateState.Available when latest is not null:
-                rows.Add(Row(string.Format(Strings.Update_AvailableVersion, (object?)(latest.Version)), string.Format(Strings.Update_ReleaseDetails, (object?)(Size(latest.SizeBytes)), (object?)(latest.PublishedAt.LocalDateTime)),
+                rows.Add(Row(string.Format(Strings.Update_AvailableVersion, (object?)(latest.Version)), ReleaseDetails(latest),
                     Button(Strings.Update_Download, "plus", () => Run(u.DownloadAsync))));
                 break;
             case UpdateState.Downloading when latest is not null:
-                rows.Add(Row(string.Format(Strings.Update_DownloadingVersion, (object?)(latest.Version)), string.Format(Strings.Update_DownloadProgress, (object?)(u.DownloadProgress), (object?)(Size(latest.SizeBytes))), Chip($"{u.DownloadProgress:P0}")));
+                rows.Add(Row(string.Format(Strings.Update_DownloadingVersion, (object?)(latest.Version)),
+                    latest.SizeBytes > 0 ? string.Format(Strings.Update_DownloadProgress, (object?)(u.DownloadProgress), (object?)(Size(latest.SizeBytes))) : Origin(), Chip($"{u.DownloadProgress:P0}")));
                 break;
             case UpdateState.Ready when latest is not null:
                 rows.Add(Row(string.Format(Strings.Update_ReadyVersion, (object?)(latest.Version)), Strings.Update_InstallDescription,
@@ -172,6 +291,7 @@ public sealed partial class SettingsView
             tail.Children.Add(link);
             rows.Add(tail);
         }
+        rows.AddRange(SourceRows(u));
         var update = app.Store.Current.Update;
         rows.Add(Row(Strings.Update_Automatic, Strings.Update_AutomaticDescription,
             Switch(update.AutoUpdate, v => { app.Store.Save(app.Store.Current with { Update = app.Store.Current.Update with { AutoUpdate = v } }); Render(); })));

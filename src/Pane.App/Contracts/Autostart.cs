@@ -9,6 +9,11 @@ public enum AutostartState
     DisabledInTaskManager,
     /// <summary>当前不能注册（开发版、从构建目录运行等），原因见 <see cref="IAutostart.UnavailableReason"/>。</summary>
     Unavailable,
+    /// <summary>
+    /// 注册了，但 Pane.App.exe 设了「以管理员身份运行」（兼容性设置，当前用户或所有用户），开机时 Windows 会直接跳过它（issue 48，任务 099）。
+    /// 设置页照实提示，不替用户改兼容性设置。优先级：Unavailable、Off 先判断，然后是这一项，再是 DisabledInTaskManager。
+    /// </summary>
+    ElevationRequired,
 }
 
 public interface IAutostart

@@ -10,7 +10,7 @@ using Pane.Services.Setup;
 
 namespace Pane.Services.Updates;
 
-internal sealed class UpdateService : IUpdateService, IDisposable
+internal sealed partial class UpdateService : IUpdateService, IDisposable
 {
     internal static readonly Uri ProductionSource = new("https://api.github.com/repos/LBEILC/Pane/releases/latest");
     readonly HttpClient http;
@@ -36,7 +36,8 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     public event EventHandler? Changed;
 
     // 测试源只由测试宿主显式注入；产品接线不读取任何更新源环境变量。
-    public UpdateService(string version, string data, Func<bool> automatic, Action<string> install, Uri? testSource = null)
+    public UpdateService(string version, string data, Func<bool> automatic, Action<string> install, Uri? testSource = null,
+        Func<UpdateSource>? selectedSource = null, Uri? testMirrorSource = null)
     {
         CurrentVersion = version; directory = Path.Combine(data, "updates");
         this.automatic = automatic; this.install = install; source = testSource ?? ProductionSource;
@@ -45,24 +46,38 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         http = new(new HttpClientHandler { UseCookies = false, UseDefaultCredentials = false, AllowAutoRedirect = false });
         http.DefaultRequestHeaders.UserAgent.ParseAdd("Pane/" + version);
         http.Timeout = TimeSpan.FromMinutes(10);
+        InitializeMirror(data, selectedSource, testMirrorSource);
         timer = new Timer(_ => _ = TickAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(24));
         RestoreReady();
     }
-    async Task TickAsync() { if (!disposed && automatic()) await CheckAsync(lifetime.Token).ConfigureAwait(false); }
+    async Task TickAsync() { if (!disposed && automatic()) await CheckOperation(lifetime.Token, true).ConfigureAwait(false); }
     void Set(UpdateState state, string? error = null) { State = state; Error = error; FailedStep = state == UpdateState.Failed ? activeStep : null; Changed?.Invoke(this, EventArgs.Empty); }
-    public async Task CheckAsync(CancellationToken cancellationToken)
+    public Task CheckAsync(CancellationToken cancellationToken) => CheckOperation(cancellationToken, false);
+    async Task CheckCore(CancellationToken token)
     {
-        if (disposed || !await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
-        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
-        try
-        {
-            if (DateTimeOffset.UtcNow < retryAfter) return;
+            var selection = selectedSource();
+            if (selection == UpdateSource.GitHub && DateTimeOffset.UtcNow < retryAfter) return;
             activeStep = UpdateStep.Check;
             Set(UpdateState.Checking); LastChecked = DateTimeOffset.UtcNow;
-            using var response = await GetAsync(source, cancel.Token).ConfigureAwait(false);
-            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancel.Token).ConfigureAwait(false));
+            Latest = null; readyPath = null; asset = sums = null; mirrorTicket = null; DownloadFrom = null;
+            bool allowAutomatic = true;
+            if (selection == UpdateSource.MirrorChyan && await CheckMirror(token).ConfigureAwait(false))
+                allowAutomatic = CdkStatus is not (MirrorCdkStatus.Invalid or MirrorCdkStatus.Mismatched or MirrorCdkStatus.Blocked);
+            else
+                await CheckGitHub(token).ConfigureAwait(false);
+            token.ThrowIfCancellationRequested();
+            if (Latest == null) { if (State != UpdateState.Failed) Set(UpdateState.UpToDate); return; }
+            Set(UpdateState.Available);
+            if (TryReuseReady()) return;
+            if (automatic() && allowAutomatic) await DownloadCore(token).ConfigureAwait(false);
+    }
+    async Task CheckGitHub(CancellationToken token)
+    {
+            CheckedFrom = UpdateOrigin.GitHub;
+            if (DateTimeOffset.UtcNow < retryAfter) { Set(UpdateState.Failed, Strings.Update_RateLimited); return; }
+            using var response = await GetAsync(source, token).ConfigureAwait(false);
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token).ConfigureAwait(false));
             var root = json.RootElement;
-            Latest = null; readyPath = null; asset = sums = null;
             string version = root.GetProperty("tag_name").GetString()!.TrimStart('v');
             if (root.GetProperty("draft").GetBoolean() || root.GetProperty("prerelease").GetBoolean() ||
                 !Regex.IsMatch(version, @"^\d+\.\d+\.\d+(\.\d+)?$") || SetupFiles.CompareVersions(version, CurrentVersion) <= 0)
@@ -76,18 +91,13 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             var published = root.GetProperty("published_at").GetDateTimeOffset();
             Latest = new(version, PlainNotes(body), published, package.GetProperty("size").GetInt64(),
                 ValidateUrl(root.GetProperty("html_url").GetString()!).AbsoluteUri, ReleaseNotesCatalog.ParseMarkdown(body, version, published));
-            Set(UpdateState.Available);
-            if (automatic() || File.Exists(Path.Combine(directory, name))) await DownloadCore(cancel.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? (Latest == null ? UpdateState.Idle : UpdateState.Available) : UpdateState.Failed, cancel.IsCancellationRequested ? null : Strings.Update_CheckTimeout); }
-        catch (Exception e) when (Expected(e)) { Set(UpdateState.Failed, Message(e)); }
-        finally { gate.Release(); }
+            DownloadFrom = UpdateOrigin.GitHub;
     }
     public async Task DownloadAsync(CancellationToken cancellationToken)
     {
         if (disposed || !await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
-        try { if (Latest != null && asset != null && sums != null) await DownloadCore(cancel.Token).ConfigureAwait(false); }
+        try { if (Latest != null) await DownloadCore(cancel.Token).ConfigureAwait(false); }
         catch (OperationCanceledException) { Set(cancel.IsCancellationRequested ? UpdateState.Available : UpdateState.Failed, cancel.IsCancellationRequested ? null : Strings.Update_DownloadTimeout); }
         catch (Exception e) when (Expected(e)) { Set(UpdateState.Failed, Message(e)); }
         finally { gate.Release(); }
@@ -95,7 +105,10 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     async Task DownloadCore(CancellationToken token)
     {
         activeStep = UpdateStep.Download;
+        if (TryReuseReady()) return;
+        if (DownloadFrom == UpdateOrigin.MirrorChyan) { await DownloadMirror(token).ConfigureAwait(false); return; }
         if (DateTimeOffset.UtcNow < retryAfter) { Set(UpdateState.Failed, Strings.Update_RateLimited); return; }
+        if (asset == null || sums == null) await LoadGitHubAssets(token).ConfigureAwait(false);
         Directory.CreateDirectory(directory);
         string name = $"Pane-Setup-{Latest!.Version}.exe", target = Path.Combine(directory, name), partial = target + ".partial";
         readyPath = null; DownloadProgress = 0; Set(UpdateState.Downloading);
@@ -150,7 +163,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
     void CacheReady(string path, string hash)
     {
         string record = Path.Combine(directory, "ready.json"), temporary = record + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new CachedUpdate(Latest!, hash), ReleaseNotesJson.Default.CachedUpdate));
+        File.WriteAllText(temporary, JsonSerializer.Serialize(new CachedUpdate(Latest!, hash, DownloadFrom ?? UpdateOrigin.GitHub), ReleaseNotesJson.Default.CachedUpdate));
         File.Move(temporary, record, true);
         Ready(path);
     }
@@ -166,7 +179,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
             if (!File.Exists(path) || new FileInfo(path).Length != release.SizeBytes) return;
             using var stream = File.OpenRead(path);
             if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(cache.Hash, StringComparison.OrdinalIgnoreCase)) return;
-            Latest = release; readyPath = path; DownloadProgress = 1; State = UpdateState.Ready;
+            Latest = release; readyPath = path; DownloadProgress = 1; State = UpdateState.Ready; DownloadFrom = cache.Origin;
         }
         catch (Exception e) when (Expected(e)) { new SelectionLog(Path.GetDirectoryName(directory)!).Write("update-cache skipped: " + e.GetType().Name); }
     }
@@ -201,7 +214,7 @@ internal sealed class UpdateService : IUpdateService, IDisposable
         notes = Regex.Replace(notes, @"<[^>]+>|[`*_~]", "").Trim();
         return notes[..Math.Min(2000, notes.Length)];
     }
-    static bool Expected(Exception e) => e is InvalidDataException or HttpRequestException or IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException or ArgumentException;
+    static bool Expected(Exception e) => e is InvalidDataException or HttpRequestException or IOException or UnauthorizedAccessException or JsonException or InvalidOperationException or FormatException or ArgumentException or KeyNotFoundException;
     // TODO(design): 请确认网络、限流、磁盘和启动失败的短句；校验失败沿用任务说明。
     static string Message(Exception e) => e switch
     {

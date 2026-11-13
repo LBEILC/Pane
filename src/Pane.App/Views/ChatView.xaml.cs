@@ -1,6 +1,6 @@
 using Pane.Localization;
 // AI 对话窗口逻辑（设计负责人）。照原型 prototype/launcher.html「二级：AI 对话窗口」：
-// 用户消息右侧气泡，AI 回答左侧正文（段落、列表、行内代码、代码块），逐字流出；回答下方复制，最后一条可「重新回答」。
+// 用户消息右侧气泡，AI 回答左侧正文（Markdown 和公式，见 Controls/Markdown.cs），逐字流出；往上翻就不再自动滚到底；回答下方复制，最后一条可「重新回答」。
 // 生成中发送键变成停止键；Esc 先停止、再清空输入（不关窗口）；Ctrl+N 新对话；Ctrl+W 关。只保留当前这次对话，关窗口即清空。
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
@@ -47,9 +47,25 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         Hints.Children.Add(new TextBlock { Text = Strings.Ai_Chat_SessionOnly, VerticalAlignment = VerticalAlignment.Center, FontFamily = HintLabelProto.FontFamily, FontSize = HintLabelProto.FontSize, Foreground = HintLabelProto.Foreground });
         PreviewKeyDown += OnKeyDown;
         PointerPressed += (_, e) => { if (ModelMenu.Visibility == Visibility.Visible && !IsInside(e.OriginalSource, ModelMenu) && !IsInside(e.OriginalSource, ModelButton)) ModelMenu.Visibility = Visibility.Collapsed; };
+        // 流式回答每 50 毫秒最多重排一次（整段按 Markdown 重排）
+        refresh = DispatcherQueue.CreateTimer();
+        refresh.Interval = TimeSpan.FromMilliseconds(50);
+        refresh.IsRepeating = false;
+        refreshTick = (_, _) => { if (pending is { } m) Refresh(m); };
+        refresh.Tick += refreshTick;
+        // 跟随底部：用户往上滚（滚轮、触摸板）就不再自动滚到底；滚回底部恢复
+        wheel = (_, e) => { if (e.GetCurrentPoint(ChatScroller).Properties.MouseWheelDelta > 0) Unfollow(); };
+        ChatScroller.AddHandler(PointerWheelChangedEvent, wheel, handledEventsToo: true);
+        ChatScroller.DirectManipulationStarted += (_, _) => Unfollow();
+        JumpText.Text = Strings.Ai_Card_JumpToLatest;
         Render();
         SetBusy(false);
     }
+
+    readonly Microsoft.UI.Dispatching.DispatcherQueueTimer refresh;
+    readonly Windows.Foundation.TypedEventHandler<Microsoft.UI.Dispatching.DispatcherQueueTimer, object> refreshTick;
+    readonly PointerEventHandler wheel;
+    Message? pending;
 
     /// <summary>
     /// 打开（或复用）窗口时宿主调用。history：从启动器 AI 卡片「继续对话」带过来的一问一答（替换当前对话）；
@@ -90,7 +106,13 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
     // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
-    public void Dispose() => Stop();
+    public void Dispose()
+    {
+        Stop();
+        refresh.Stop();
+        refresh.Tick -= refreshTick;   // 计时器不参与 XAML 引用跟踪，不退订会把整个视图留住
+        ChatScroller.RemoveHandler(PointerWheelChangedEvent, wheel);
+    }
 
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 
@@ -171,6 +193,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         if (text.Length == 0 || Busy) return;
         messages.Add(new Message(AiChatRole.User, text));
         Input.Text = "";
+        follow = true;   // 发出新问题时回到底部重新跟随
         _ = Reply();
     }
 
@@ -189,13 +212,16 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
             {
                 if (cts.IsCancellationRequested) break;
                 answer.Text += piece;
-                Refresh(answer);
+                pending = answer;
+                if (!refresh.IsRunning) refresh.Start();
             }
         }
         catch (OperationCanceledException) { }
         catch (Exception e) { answer.Error = App.FailureReason(e) ?? Strings.Common_TryAgain; }
         finally
         {
+            refresh.Stop();
+            pending = null;
             answer.Live = false;
             if (cts.IsCancellationRequested && answer.Error is null) answer.Stopped = true;
             if (running == cts) running = null;
@@ -257,7 +283,39 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         ScrollToEnd();
     }
 
-    void ScrollToEnd() { ChatScroller.UpdateLayout(); ChatScroller.ChangeView(null, ChatScroller.ScrollableHeight, null, true); }
+    void ScrollToEnd()
+    {
+        UpdateJump();
+        if (!follow) return;
+        ChatScroller.UpdateLayout();
+        ChatScroller.ChangeView(null, ChatScroller.ScrollableHeight, null, true);
+    }
+
+    // ---------------- 跟随底部 ----------------
+
+    bool follow = true;
+
+    void Unfollow()
+    {
+        if (ChatScroller.ScrollableHeight <= 0) return;
+        follow = false;
+        UpdateJump();
+    }
+
+    void OnChatScrolled(object? sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (!follow && !e.IsIntermediate && ChatScroller.VerticalOffset >= ChatScroller.ScrollableHeight - 2) follow = true;
+        UpdateJump();
+    }
+
+    void OnJump(object sender, RoutedEventArgs e)
+    {
+        follow = true;
+        UpdateJump();
+        ChatScroller.ChangeView(null, ChatScroller.ScrollableHeight, null);
+    }
+
+    void UpdateJump() => JumpButton.Visibility = !follow && Busy ? Visibility.Visible : Visibility.Collapsed;
 
     FrameworkElement UserBubble(string text) => new Border
     {
@@ -274,8 +332,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
     FrameworkElement AiBlock(Message m, bool last)
     {
         var panel = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = Math.Max(300, (ActualWidth > 0 ? ActualWidth : 780) * 0.92 - 44) };
-        if (m.Text.Length > 0) foreach (var block in Markdown(m.Text)) panel.Children.Add(block);
-        if (m.Live) panel.Children.Add(Caret());
+        if (m.Text.Length > 0 || m.Live) foreach (var block in MarkdownRender.Build(m.Text, Md, m.Live ? Caret() : null, out _)) panel.Children.Add(block);
         if (m.Stopped) panel.Children.Add(Note(Strings.Ai_Chat_Stopped, Text3Proto.Foreground));
         if (m.Error is { } error) panel.Children.Add(Note(error, ErrorProto.Foreground));
         if (!m.Live)
@@ -298,111 +355,29 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     TextBlock Note(string text, Brush brush) => new() { Text = text, FontFamily = BodyProto.FontFamily, FontSize = 13, Foreground = brush, TextWrapping = TextWrapping.Wrap };
 
-    Border Caret() => new() { Width = 7, Height = 15, CornerRadius = new CornerRadius(2), Background = Text3Proto.Foreground, HorizontalAlignment = HorizontalAlignment.Left };
+    Border Caret() => new() { Width = 7, Height = 15, CornerRadius = new CornerRadius(2), Background = Text3Proto.Foreground, Margin = new Thickness(3, 0, 0, -2) };
 
-    TextBlock Body(string text, bool selectable)
+    MarkdownStyle? style;
+    MarkdownStyle Md => style ??= new MarkdownStyle
     {
-        var t = new TextBlock { FontFamily = BodyProto.FontFamily, FontSize = BodyProto.FontSize, Foreground = BodyProto.Foreground, LineHeight = 24, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = selectable };
-        Inline(t, text);
-        return t;
-    }
-
-    // 很小的 Markdown 子集：``` 代码块、"- " / "* " / "1. " 列表、空行分段；行内 `代码` 和 **加粗**
-    IEnumerable<FrameworkElement> Markdown(string text)
-    {
-        var lines = text.Replace("\r\n", "\n").Split('\n');
-        var para = new List<string>();
-        for (int i = 0; i < lines.Length; i++)
-        {
-            var line = lines[i];
-            if (line.TrimStart().StartsWith("```", StringComparison.Ordinal))
-            {
-                foreach (var p in Flush()) yield return p;
-                var code = new List<string>();
-                for (i++; i < lines.Length && !lines[i].TrimStart().StartsWith("```", StringComparison.Ordinal); i++) code.Add(lines[i]);
-                yield return CodeBlock(string.Join("\n", code));
-                continue;
-            }
-            if (ListItem(line) is { } item)
-            {
-                foreach (var p in Flush()) yield return p;
-                var grid = new Grid { ColumnSpacing = 8, Margin = new Thickness(6, 0, 0, 0) };
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-                grid.Children.Add(new TextBlock { Text = item.Bullet, FontFamily = BodyProto.FontFamily, FontSize = BodyProto.FontSize, Foreground = Text3Proto.Foreground, LineHeight = 24 });
-                var body = Body(item.Text, true);
-                Grid.SetColumn(body, 1);
-                grid.Children.Add(body);
-                yield return grid;
-                continue;
-            }
-            if (line.Trim().Length == 0) { foreach (var p in Flush()) yield return p; continue; }
-            para.Add(line);
-        }
-        foreach (var p in Flush()) yield return p;
-
-        IEnumerable<FrameworkElement> Flush()
-        {
-            if (para.Count == 0) yield break;
-            var t = string.Join("\n", para);
-            para.Clear();
-            yield return Body(t, true);
-        }
-    }
-
-    static (string Bullet, string Text)? ListItem(string line)
-    {
-        var t = line.TrimStart();
-        if (t.StartsWith("- ", StringComparison.Ordinal) || t.StartsWith("* ", StringComparison.Ordinal)) return ("•", t[2..]);
-        int dot = t.IndexOf(". ", StringComparison.Ordinal);
-        if (dot is > 0 and <= 3 && t[..dot].All(char.IsAsciiDigit)) return (t[..(dot + 1)], t[(dot + 2)..]);
-        return null;
-    }
-
-    Border CodeBlock(string code) => new()
-    {
-        Padding = new Thickness(12, 10, 12, 10),
-        CornerRadius = new CornerRadius(12),
-        Background = CodeProto.Background,
-        BorderBrush = CodeProto.BorderBrush,
-        BorderThickness = new Thickness(1),
-        Child = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            HorizontalScrollMode = ScrollMode.Auto,
-            VerticalScrollMode = ScrollMode.Disabled,
-            Content = new TextBlock { Text = code, FontFamily = MonoProto.FontFamily, FontSize = 12, LineHeight = 19, Foreground = BodyProto.Foreground, IsTextSelectionEnabled = true },
-        },
+        Font = BodyProto.FontFamily,
+        Mono = MonoProto.FontFamily,
+        MathFont = MathProto.FontFamily,
+        Size = BodyProto.FontSize,
+        LineHeight = 24,
+        Text1 = BodyProto.Foreground,
+        Text2 = MonoProto.Foreground,
+        Text3 = Text3Proto.Foreground,
+        Stroke = CodeProto.BorderBrush,
+        CodeFill = CodeProto.Background,
+        Accent = (SolidColorBrush)MathProto.Foreground,
     };
 
-    void Inline(TextBlock t, string text)
+    TextBlock Body(string text, bool selectable) => new()
     {
-        int i = 0;
-        while (i < text.Length)
-        {
-            int code = text.IndexOf('`', i), bold = text.IndexOf("**", i, StringComparison.Ordinal);
-            int next = code < 0 ? bold : bold < 0 ? code : Math.Min(code, bold);
-            if (next < 0) { t.Inlines.Add(new Run { Text = text[i..] }); break; }
-            if (next > i) t.Inlines.Add(new Run { Text = text[i..next] });
-            if (next == code)
-            {
-                int end = text.IndexOf('`', code + 1);
-                if (end < 0) { t.Inlines.Add(new Run { Text = text[code..] }); break; }
-                t.Inlines.Add(new Run { Text = text[(code + 1)..end], FontFamily = MonoProto.FontFamily, FontSize = 12.5, Foreground = MonoProto.Foreground });
-                i = end + 1;
-            }
-            else
-            {
-                int end = text.IndexOf("**", bold + 2, StringComparison.Ordinal);
-                if (end < 0) { t.Inlines.Add(new Run { Text = text[bold..] }); break; }
-                var b = new Bold();
-                b.Inlines.Add(new Run { Text = text[(bold + 2)..end] });
-                t.Inlines.Add(b);
-                i = end + 2;
-            }
-        }
-    }
+        Text = text, FontFamily = BodyProto.FontFamily, FontSize = BodyProto.FontSize, Foreground = BodyProto.Foreground, LineHeight = 24,
+        TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = selectable,
+    };
 
     // ---------------- 键盘 ----------------
 
