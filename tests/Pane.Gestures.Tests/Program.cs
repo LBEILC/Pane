@@ -13,6 +13,15 @@ static partial class Program
     static GestureBinding Binding(string name,GestureDirection[] dirs,GestureModifier modifier=0,bool immediate=false,GestureCommand? command=null)=>new(name,new(GestureButton.Right,dirs,modifier),command??new DoNothingCommand(),immediate);
     static void Main(string[] args)
     {
+        if(args is ["--101-command",var directory]){
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory,"gesture fixture.cmd"),"@echo off\r\n>gesture.tmp echo %~1 %WG_PROCID%\r\nmove /y gesture.tmp gesture.txt >nul\r\n");
+            string result=Path.Combine(directory,"gesture.txt");
+            File.Delete(result);
+            new WindowsSystem(()=>{}).Run("\"gesture fixture.cmd\" \"a b\"",false,Path.GetFullPath(directory),CommandExecutor.Variables(Target));
+            Check(SpinWait.SpinUntil(()=>File.Exists(result),5000)&&File.ReadAllText(result).TrimEnd()=="a b 456","手势带引号路径、参数与环境变量");
+            Console.WriteLine($"PASS gesture command assertions={checks}");return;
+        }
         if(args.Length==2&&args[0]=="--import"){
             var importer=new WGesturesImporter();var preview=importer.Preview()??throw new InvalidDataException("未找到 WGestures 配置");
             Console.WriteLine($"导入预览：全局 {preview.GlobalCount}，程序规则 {preview.AppRuleCount}，禁用 {preview.DisabledAppCount}");

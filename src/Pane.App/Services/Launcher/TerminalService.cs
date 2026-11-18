@@ -1,5 +1,6 @@
 using Pane.Localization;
 using System.Diagnostics;
+using System.Text;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -8,7 +9,7 @@ using Pane.Contracts;
 using Pane.Settings;
 namespace Pane.Services.Launcher;
 
-internal sealed record LaunchRequest(string FileName,string[] Arguments,string WorkingDirectory,bool Elevated=false);
+internal sealed record LaunchRequest(string FileName,string[] Arguments,string WorkingDirectory,bool Elevated=false,string? RawArguments=null);
 internal interface ILaunchProcess { Task StartAsync(LaunchRequest request,CancellationToken token); }
 internal sealed class LaunchProcess:ILaunchProcess
 {
@@ -16,7 +17,8 @@ internal sealed class LaunchProcess:ILaunchProcess
     {
         token.ThrowIfCancellationRequested();
         var start=new ProcessStartInfo(request.FileName){UseShellExecute=true,WorkingDirectory=request.WorkingDirectory,Verb=request.Elevated?"runas":""};
-        foreach(var arg in request.Arguments)start.ArgumentList.Add(arg);
+        if(request.RawArguments!=null)start.Arguments=request.RawArguments;
+        else foreach(var arg in request.Arguments)start.ArgumentList.Add(arg);
         using var process=Process.Start(start);
         return Task.CompletedTask;
     }
@@ -154,8 +156,28 @@ internal sealed class TerminalService:IDisposable
         string command=raw.TrimStart();if(string.IsNullOrWhiteSpace(command))return;
         var cmd=environment.FindProgram("cmd.exe")??"cmd.exe";var terminal=environment.FindProgram("wt.exe");
         // 提权必须创建独立窗口，避免把命令转发给已有的普通权限窗口；-d 固定新标签页的工作目录。
-        string[] args=terminal==null?["/k",command]:["-w",elevated?"new":"0","new-tab","-d",environment.Home,"--",cmd,"/k",command];
-        await process.StartAsync(new(terminal??cmd,args,environment.Home,elevated),token).ConfigureAwait(false);
+        LaunchRequest request;
+        if(terminal==null)request=new(cmd,[],environment.Home,elevated,$"/s /k \"{command}\"");
+        else
+        {
+            // wt 会给含空格的参数补一对引号，正好供 cmd /s 剥掉；无空格时自行补齐。
+            string payload=command.Replace(";",@"\;");
+            if(!command.Contains(' '))payload=$"\"{payload}\"";
+            string[] child=[cmd.Replace(";",@"\;"),"/s","/k",payload];
+            if(command.Contains('%')){
+                // wt 在创建子进程前展开环境变量；用系统 PowerShell 传递编码后的正文，
+                // 再在同一终端中启动 cmd，使变量只由最终的 cmd 展开。
+                string encoded=Convert.ToBase64String(Encoding.Unicode.GetBytes($"/s /k \"{command}\""));
+                string script="$p=[Diagnostics.ProcessStartInfo]::new();$p.UseShellExecute=$false;"+
+                    "$p.FileName=[IO.Path]::Combine([Environment]::SystemDirectory,'cmd.exe');"+
+                    $"$p.Arguments=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String('{encoded}'));"+
+                    "$p.WorkingDirectory=(Get-Location).ProviderPath;$child=[Diagnostics.Process]::Start($p);$child.WaitForExit();exit $child.ExitCode";
+                string bootstrap=Path.Combine(Environment.SystemDirectory,@"WindowsPowerShell\v1.0\powershell.exe");
+                child=[bootstrap,"-NoLogo","-NoProfile","-NonInteractive","-Command",script.Replace(";",@"\;")];
+            }
+            request=new(terminal,["-w",elevated?"new":"0","new-tab","-d",environment.Home.Replace(";",@"\;"),"--",..child],environment.Home,elevated);
+        }
+        await process.StartAsync(request,token).ConfigureAwait(false);
         History.Record(raw);
     }
     public void Dispose()=>programs.Dispose();

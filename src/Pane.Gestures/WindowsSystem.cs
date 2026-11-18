@@ -35,7 +35,7 @@ public sealed class WindowsSystem(Action pause,Func<bool>? isActive=null) : ISys
         // 命令正文由用户提供，原样作为 cmd 的 /c 或 /k 参数；变量经子进程环境传递。
         var info=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"cmd.exe")) {
             UseShellExecute=false,CreateNoWindow=!showWindow,WindowStyle=showWindow?ProcessWindowStyle.Normal:ProcessWindowStyle.Hidden,WorkingDirectory=directory,
-            Arguments=(showWindow?"/d /k ":"/d /c ")+command };
+            Arguments=$"/d /s {(showWindow?"/k":"/c")} \"{command}\"" };
         foreach(var pair in variables)info.Environment[pair.Key]=pair.Value;
         using var process=Process.Start(info)??throw new InvalidOperationException("命令未启动");
     }

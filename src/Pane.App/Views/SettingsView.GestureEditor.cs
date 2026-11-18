@@ -328,8 +328,11 @@ public sealed partial class SettingsView
         draft = null;
         static IReadOnlyList<G.GestureBinding> Put(IReadOnlyList<G.GestureBinding> list, int index, G.GestureBinding b) =>
             index < 0 ? [.. list, b] : list.Select((g, i) => i == index ? b : g).ToArray();
-        if (appIndex < 0) SaveGestures(x => x with { Global = Put(x.Global, index, binding) });
-        else SaveGestures(x => x with { Apps = x.Apps.Select((r, j) => j == appIndex ? r with { Bindings = Put(r.Bindings, index, binding) } : r).ToArray() });
+        // 选的触发键在「触发键」里没开（默认只开右键）时一并打开，否则这条手势永远不会触发（issue 66）
+        G.GestureConfig Enable(G.GestureConfig x) => x.Settings.EnabledButtons.HasFlag(binding.Pattern.Button) ? x
+            : x with { Settings = x.Settings with { EnabledButtons = x.Settings.EnabledButtons | binding.Pattern.Button } };
+        if (appIndex < 0) SaveGestures(x => Enable(x) with { Global = Put(x.Global, index, binding) });
+        else SaveGestures(x => Enable(x) with { Apps = x.Apps.Select((r, j) => j == appIndex ? r with { Bindings = Put(r.Bindings, index, binding) } : r).ToArray() });
     }
 
     // 单选的小标签（复用 ToggleChip：选中的那个点了不响应）

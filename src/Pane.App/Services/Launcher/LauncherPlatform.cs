@@ -54,17 +54,18 @@ internal sealed class WindowsAppCatalog(string directory,IReadOnlyList<IIconProc
         var watch=Stopwatch.StartNew();var apps=new List<IndexedApp>();var candidates=new List<CatalogEntry>();
         int shell=0,links=0,filtered=0,icons=0,unresolvedMetadata=0;Exception? failure=null;var iconFailures=new Dictionary<int,int>();
         var cache=Path.Combine(directory,"launcher-icons");Directory.CreateDirectory(cache);
+        var registered=UninstallMatching.Executables(new WindowsLauncherActionPlatform().ReadUninstall());
         LauncherNative.AppRow row=(name,id,target,args,parsing,source)=>{
             if(token.IsCancellationRequested||failure!=null)return;
             try {
                 if(source==0)shell++;else links++;
                 bool packaged=id.Contains('!');string ext=Path.GetExtension(target);
                 if(source==0&&id.Length>0)parsing="shell:AppsFolder\\"+id;
-                string lower=(name+" "+Path.GetFileName(target)).ToLowerInvariant();
-                if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(parsing)||IsAuxiliaryName(lower)||(!packaged&&ext.Length>0&&!new[]{".exe",".com",".msc",".cpl",".lnk"}.Contains(ext,StringComparer.OrdinalIgnoreCase))||source==1&&string.IsNullOrEmpty(target)&&string.IsNullOrEmpty(id)){filtered++;return;}
+                if(string.IsNullOrWhiteSpace(name)||string.IsNullOrWhiteSpace(parsing)||(!packaged&&ext.Length>0&&!new[]{".exe",".com",".msc",".cpl",".lnk"}.Contains(ext,StringComparer.OrdinalIgnoreCase))||source==1&&string.IsNullOrEmpty(target)&&string.IsNullOrEmpty(id)){filtered++;return;}
                 string stable=AppDeduplication.StableId(AppDeduplication.Identity(id,target,args,parsing));
                 var resolved=new StringBuilder(32768);var arguments=new StringBuilder(32768);var resource=new StringBuilder(32768);
                 if(LauncherNative.PaneLauncherResolve(parsing,resolved,arguments,resource,out int iconIndex)==1){if(resolved.Length>0)target=resolved.ToString();args=arguments.ToString();}
+                if(SecondaryAppNames.Auxiliary(name,target,registered)){filtered++;return;}
                 candidates.Add(new(name,id,target,args,parsing,source,stable,resource.ToString(),iconIndex));
             }catch(Exception e){failure=e;}
         };

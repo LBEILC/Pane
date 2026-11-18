@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--101-real")){await TerminalProbe101();return;}
         if(args.Contains("--098")){await DirectHidden098Tests();return;}
         if(args.Contains("--089")){await Web089Tests(args.Contains("--live"));return;}
         if(args.Contains("--082")){await StorageCache082Tests();return;}
@@ -33,6 +34,12 @@ static partial class Program
         if(args.Contains("--file-icons")){await FileIconTests();return;}
         if(args.Contains("--files-performance")){await FilePerformance();return;}
         if(args.Contains("--probe")){await Probe();return;}
+        var uninstallPaths=UninstallMatching.Executables([new("fixture",null,null,@"""C:\Program Files\Foo\Foo.exe"" /uninstall",false,@"C:\Other App\Quiet.exe /s")]);
+        Check(!SecondaryAppNames.Auxiliary("Uninstall Tool","UninstallTool.exe",uninstallPaths),"保留 Uninstall Tool");
+        foreach(var pair in new[]{("Uninstall Pane","Uninstall Pane.exe"),("卸载 某软件","unins000.exe"),("Uninstall Foo",@"C:\Program Files\Foo\Foo.exe"),("Uninstall Foo",@"C:\Other App\Quiet.exe"),("Uninstall Foo","msiexec.exe"),("Readme","Foo.exe")})
+            Check(SecondaryAppNames.Auxiliary(pair.Item1,pair.Item2,uninstallPaths),"排除辅助程序 "+pair);
+        Check(!SecondaryAppNames.Auxiliary("Foo",@"C:\Program Files\Foo\Foo.exe",uninstallPaths),"主入口共用卸载程序");
+        Check(!PortableCatalog.Auxiliary("UninstallTool")&&PortableCatalog.Auxiliary("Installer")&&PortableCatalog.Auxiliary("Foo-uninstaller"),"便携卸载文件名规则");
         foreach(var name in new[]{"卸載程式", "產品幫助", "產品說明"}) Check(WindowsAppCatalog.IsAuxiliaryName(name), "繁体辅助程序过滤:"+name);
         Check(!WindowsAppCatalog.IsAuxiliaryName("正常應用程式"), "繁体普通程序保留");
         ApplicationNameTests();

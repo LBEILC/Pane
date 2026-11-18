@@ -61,7 +61,7 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     {
         if (Pane.Views.Files.SystemIcons.Load(png) is not { } image || ReferenceEquals(image, picture)) return;
         picture = image;
-        Changed(nameof(Picture)); Changed(nameof(PictureVisibility)); Changed(nameof(ColoredVisibility)); Changed(nameof(PlainVisibility));
+        Changed(nameof(Picture)); Changed(nameof(PictureVisibility)); Changed(nameof(ColoredVisibility)); Changed(nameof(PlainVisibility)); Changed(nameof(PlainGlyphVisibility));
     }
 
     /// <summary>网页搜索历史行（issue 39）：搜过的词。选中（含鼠标悬停）时行尾出 ×，Shift+Delete 也能删。</summary>
@@ -75,6 +75,25 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     public Visibility PictureVisibility => Picture is null ? Visibility.Collapsed : Visibility.Visible;
     public Visibility ColoredVisibility => Picture is null && Gradient is not null ? Visibility.Visible : Visibility.Collapsed;
     public Visibility PlainVisibility => Picture is null && Gradient is null ? Visibility.Visible : Visibility.Collapsed;
+
+    /// <summary>
+    /// 动作行里的网页搜索站点（issue 56）：中性底图块里放站点自己的图标，不再一排都是地球。
+    /// 图形和搜索框的引擎徽章同一处理（<see cref="EngineBadgeImages"/>）：一般图标按笔画范围居中，自带底色的整张铺满图块。取不到就保留地球。
+    /// </summary>
+    internal void SetEngine(EngineBadgeImages.Glyph? glyph)
+    {
+        engineGlyph = glyph is { FullBleed: false } ? glyph.Source : null;
+        engineFull = glyph is { FullBleed: true } ? glyph.Source : null;
+        Changed(nameof(SiteGlyph)); Changed(nameof(SiteFull));
+        Changed(nameof(SiteGlyphVisibility)); Changed(nameof(SiteFullVisibility)); Changed(nameof(PlainGlyphVisibility));
+    }
+    ImageSource? engineGlyph, engineFull;
+    public ImageSource? SiteGlyph => engineGlyph;
+    public ImageSource? SiteFull => engineFull;
+    public Visibility SiteGlyphVisibility => engineGlyph is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility SiteFullVisibility => engineFull is null ? Visibility.Collapsed : Visibility.Visible;
+    /// <summary>中性图块上的线条图标：有站点图标时让位。</summary>
+    public Visibility PlainGlyphVisibility => Picture is null && Gradient is null && engineGlyph is null && engineFull is null ? Visibility.Visible : Visibility.Collapsed;
     public Visibility HotkeyVisibility => string.IsNullOrEmpty(Item.Hotkey) ? Visibility.Collapsed : Visibility.Visible;
 
     /// <summary>动作格子的序号（1～7）：按住 Alt 时显示，Alt+数字直接触发。</summary>

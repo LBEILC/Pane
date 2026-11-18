@@ -4,11 +4,34 @@ namespace Pane.Services.Launcher;
 // 辅助程序和次要名字的排除规则集中在此；目录扫描仍沿用原有辅助程序范围。
 internal static class SecondaryAppNames
 {
-    static readonly string[] AuxiliaryParts=["uninstall","unins0","卸载","卸載","帮助","幫助","說明","readme"," help"];
+    static readonly string[] UninstallParts=["uninstall","unins0","卸载","卸載"];
+    static readonly string[] AuxiliaryParts=["帮助","幫助","說明","readme"," help"];
     static readonly string[] PortableParts=["setup","install","update","updater","crash","crashpad","helper","reporter"];
     static readonly HashSet<string> Generic=new(["launcher","update","updater","setup","uninstall","unins000","app","main","start","run","client","helper"],StringComparer.OrdinalIgnoreCase);
-    internal static bool Auxiliary(string name)=>AuxiliaryParts.Any(p=>name.Contains(p,StringComparison.OrdinalIgnoreCase))||name.StartsWith("help",StringComparison.OrdinalIgnoreCase);
-    internal static bool PortableAuxiliary(string name)=>Auxiliary(name)||PortableParts.Any(p=>name.Contains(p,StringComparison.OrdinalIgnoreCase));
+    static bool Help(string name)=>AuxiliaryParts.Any(p=>name.Contains(p,StringComparison.OrdinalIgnoreCase))||name.StartsWith("help",StringComparison.OrdinalIgnoreCase);
+    static bool UninstallerFile(string name)
+    {
+        string stem=name.ToLowerInvariant();
+        return stem is "uninst" or "uninstall" or "uninstaller"
+            ||stem.StartsWith("unins",StringComparison.Ordinal)&&stem.Length>5&&stem.AsSpan(5).IndexOfAnyExceptInRange('0','9')<0
+            ||stem.Contains("卸载")||stem.Contains("卸載")
+            ||new[]{' ','_','-'}.Any(c=>stem.StartsWith("uninstall"+c,StringComparison.Ordinal)||stem.EndsWith(c+"uninstall",StringComparison.Ordinal)||stem.EndsWith(c+"uninstaller",StringComparison.Ordinal));
+    }
+    internal static bool Auxiliary(string name,string? target=null,IReadOnlySet<string>? registered=null)
+    {
+        string file=Path.GetFileName(target)??"";
+        string combined=name+" "+file;
+        if(Help(combined)||UninstallerFile(Path.GetFileNameWithoutExtension(file)))return true;
+        if(!UninstallParts.Any(p=>combined.Contains(p,StringComparison.OrdinalIgnoreCase)))return false;
+        return file.Length==0||file.Equals("msiexec.exe",StringComparison.OrdinalIgnoreCase)
+            ||UninstallMatching.Normalize(target,false) is {} path&&registered?.Contains(path)==true;
+    }
+    internal static bool PortableAuxiliary(string name)
+    {
+        // install 与 uninstall 重叠，其他安装、更新和帮助程序仍按旧片段过滤。
+        string remaining=name.Replace("uninstall"," ",StringComparison.OrdinalIgnoreCase);
+        return Help(name)||UninstallerFile(name)||PortableParts.Any(p=>remaining.Contains(p,StringComparison.OrdinalIgnoreCase));
+    }
 
     internal static SearchName[] Collect(PinyinTable table,string display,string? target,bool packaged,Func<string,string?>? description=null)
     {

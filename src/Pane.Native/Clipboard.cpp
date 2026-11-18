@@ -96,21 +96,42 @@ API int PaneClipSaveImage(const wchar_t* input,const wchar_t* full,const wchar_t
  if(SUCCEEDED(hr))hr=Save(f.Get(),scale.Get(),thumb);return SUCCEEDED(hr);
 }
 API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars,int mode){
- Apartment apartment;HGLOBAL data=nullptr,png=nullptr;UINT format=CF_UNICODETEXT;
+ Apartment apartment;HGLOBAL data=nullptr,png=nullptr,dib=nullptr;UINT format=CF_UNICODETEXT;
  if(image){
   auto f=Factory();if(!f)return 0;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> frame;ComPtr<IWICFormatConverter> convert;
   HRESULT hr=f->CreateDecoderFromFilename(image,nullptr,GENERIC_READ,WICDecodeMetadataCacheOnLoad,&decoder);if(SUCCEEDED(hr))hr=decoder->GetFrame(0,&frame);
   UINT w=0,h=0;if(SUCCEEDED(hr))hr=frame->GetSize(&w,&h);if(FAILED(hr)||!w||!h||static_cast<unsigned long long>(w)*h*4>MAXDWORD-sizeof(BITMAPV5HEADER))return 0;
   if(SUCCEEDED(hr))hr=f->CreateFormatConverter(&convert);if(SUCCEEDED(hr))hr=convert->Initialize(frame.Get(),GUID_WICPixelFormat32bppBGRA,WICBitmapDitherTypeNone,nullptr,0,WICBitmapPaletteTypeCustom);
   std::vector<BYTE> bytes(sizeof(BITMAPV5HEADER)+static_cast<size_t>(w)*h*4);auto header=reinterpret_cast<BITMAPV5HEADER*>(bytes.data());header->bV5Size=sizeof(*header);header->bV5Width=static_cast<LONG>(w);header->bV5Height=-static_cast<LONG>(h);header->bV5Planes=1;header->bV5BitCount=32;header->bV5Compression=BI_BITFIELDS;header->bV5RedMask=0xff0000;header->bV5GreenMask=0xff00;header->bV5BlueMask=0xff;header->bV5AlphaMask=0xff000000;header->bV5CSType=LCS_sRGB;
-  if(SUCCEEDED(hr))hr=convert->CopyPixels(nullptr,w*4,w*h*4,bytes.data()+sizeof(*header));if(FAILED(hr))return 0;data=Memory(bytes.data(),bytes.size());format=CF_DIBV5;
-  ComPtr<IStream> stream;if(SUCCEEDED(CreateStreamOnHGlobal(nullptr,TRUE,&stream))&&SUCCEEDED(Encode(f.Get(),frame.Get(),stream.Get()))){HGLOBAL mem=nullptr;GetHGlobalFromStream(stream.Get(),&mem);auto ptr=GlobalLock(mem);if(ptr){png=Memory(ptr,GlobalSize(mem));GlobalUnlock(mem);}}
+  if(SUCCEEDED(hr))hr=convert->CopyPixels(nullptr,w*4,w*h*4,bytes.data()+sizeof(*header));if(FAILED(hr))return 0;
+  ComPtr<IStream> stream;STATSTG stats{};HGLOBAL encoded=nullptr;
+  if(FAILED(CreateStreamOnHGlobal(nullptr,TRUE,&stream))||FAILED(Encode(f.Get(),frame.Get(),stream.Get()))||
+     FAILED(stream->Stat(&stats,STATFLAG_NONAME))||FAILED(GetHGlobalFromStream(stream.Get(),&encoded)))return 0;
+  auto ptr=GlobalLock(encoded);if(!ptr)return 0;
+  png=Memory(ptr,static_cast<size_t>(stats.cbSize.QuadPart));GlobalUnlock(encoded);
+  if(!png)return 0;
+  data=Memory(bytes.data(),bytes.size());format=CF_DIBV5;
+  // V5 保留直通 BGRA。传统 DIB 采用 Chromium 读取时预期的预乘颜色和自下而上行序。
+  BITMAPINFOHEADER info{};info.biSize=sizeof(info);info.biWidth=w;info.biHeight=h;
+  info.biPlanes=1;info.biBitCount=32;info.biCompression=BI_RGB;info.biSizeImage=w*h*4;
+  auto pixels=bytes.data()+sizeof(*header);
+  const size_t stride=static_cast<size_t>(w)*4;
+  for(size_t i=0;i<info.biSizeImage;i+=4){
+   BYTE alpha=pixels[i+3];
+   if(alpha!=255)for(size_t c=0;c<3;c++)pixels[i+c]=static_cast<BYTE>((pixels[i+c]*alpha+127)/255);
+  }
+  for(UINT y=0;y<h/2;y++)std::swap_ranges(pixels+y*stride,pixels+(y+1)*stride,pixels+(h-1-y)*stride);
+  auto begin=pixels-sizeof(info);memcpy(begin,&info,sizeof(info));
+  dib=Memory(begin,sizeof(info)+info.biSizeImage);
  }else if(files&&fileChars>1){format=CF_HDROP;std::vector<BYTE> bytes(sizeof(DROPFILES)+static_cast<size_t>(fileChars)*2);auto drop=reinterpret_cast<DROPFILES*>(bytes.data());drop->pFiles=sizeof(DROPFILES);drop->fWide=TRUE;memcpy(bytes.data()+sizeof(DROPFILES),files,static_cast<size_t>(fileChars)*2);data=Memory(bytes.data(),bytes.size());}
- else if(text)data=Memory(text,(wcslen(text)+1)*2);if(!data){if(png)GlobalFree(png);return 0;}
+ else if(text)data=Memory(text,(wcslen(text)+1)*2);if(!data||(image&&!dib)){if(png)GlobalFree(png);if(dib)GlobalFree(dib);if(data)GlobalFree(data);return 0;}
  DWORD one=1;HGLOBAL marker=Memory(&one,sizeof(one));HWND owner=CreateWindowW(L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);
  bool opened=false;if(owner&&marker)for(int i=0;i<5&&!opened;i++){opened=OpenClipboard(owner)!=0;if(!opened)Sleep(15);}
- bool ok=opened&&EmptyClipboard()&&Put(RegisterClipboardFormatW(mode==1?L"Pane.OwnClipboard":L"Pane.SourceClipboard"),marker)&&Put(format,data);
- if(ok&&png)ok=Put(RegisterClipboardFormatW(L"PNG"),png);if(opened)CloseClipboard();if(owner)DestroyWindow(owner);if(marker)GlobalFree(marker);if(data)GlobalFree(data);if(png)GlobalFree(png);return ok;
+ bool ok=opened&&EmptyClipboard()&&Put(RegisterClipboardFormatW(mode==1?L"Pane.OwnClipboard":L"Pane.SourceClipboard"),marker);
+ if(ok&&png)ok=Put(RegisterClipboardFormatW(L"PNG"),png);
+ if(ok)ok=Put(format,data);
+ if(ok&&dib)ok=Put(CF_DIB,dib);
+ if(opened&&!ok&&image&&!marker)EmptyClipboard();if(opened)CloseClipboard();if(owner)DestroyWindow(owner);if(marker)GlobalFree(marker);if(data)GlobalFree(data);if(png)GlobalFree(png);if(dib)GlobalFree(dib);return ok;
 }
 API int PaneClipSaveDialog(const wchar_t* source,const wchar_t* name){
  Apartment apartment;ComPtr<IFileSaveDialog> dialog;HRESULT hr=CoCreateInstance(CLSID_FileSaveDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&dialog));

@@ -21,6 +21,41 @@ static partial class Program
         public HashSet<string> Missing=new(StringComparer.OrdinalIgnoreCase);
         public string? FindProgram(string name)=>Missing.Contains(name)?null:Path.Combine(@"C:\Windows\System32",name);
     }
+    sealed class ProbeEnvironment101(string directory,bool useWt):ILauncherEnvironment
+    {
+        readonly LauncherEnvironment installed=new();
+        public string Home=>directory;
+        public bool HibernateAvailable=>false;
+        public string? FindProgram(string name)=>name=="wt.exe"&&!useWt?null:installed.FindProgram(name);
+    }
+    static async Task TerminalProbe101()
+    {
+        var installed=new LauncherEnvironment();
+        bool hasWt=installed.FindProgram("wt.exe")!=null;
+        foreach(var (useWt,variables) in hasWt?new[]{(true,true),(false,true),(true,false)}:new[]{(false,true)}){
+            // 前一个自退窗口可能尚在关闭，待窗口注销后再测试 wt -w 0。
+            await Task.Delay(1200);
+            var directory=TestResults.NewDirectory("terminal101-");
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(Path.Combine(directory,"probe command.cmd"),
+                "@echo off\r\nsetlocal EnableDelayedExpansion\r\n>received.txt echo(!cmdcmdline!\r\n>argument.txt echo(%~1\r\n");
+            using var service=new TerminalService(new SettingsStore(directory,Defaults()),new ProbeEnvironment101(directory,useWt),new LaunchProcess(),new TerminalPrograms([],[]));
+            string command="\"probe command.cmd\" \"a b\" & echo \"left&right;\" > source.txt & type source.txt | \"%SystemRoot%\\System32\\findstr.exe\" right > output.txt && echo %OS%>>output.txt & move /y output.txt done.txt >nul & exit";
+            if(!variables)command=command.Replace("%SystemRoot%",Environment.GetFolderPath(Environment.SpecialFolder.Windows)).Replace("%OS%","fixture");
+            await service.ExecuteAsync(service.Search(">"+command).Items[0],false,default);
+            string file=Path.Combine(directory,"done.txt");
+            for(int i=0;i<200;i++){
+                if(File.Exists(file))break;
+                await Task.Delay(50);
+            }
+            string received=File.ReadAllText(Path.Combine(directory,"received.txt")).TrimEnd();
+            Check(received.EndsWith($"/s /k \"{command}\"",StringComparison.Ordinal),"cmd 实收命令行");
+            Check(File.ReadAllText(Path.Combine(directory,"argument.txt")).TrimEnd()=="a b","带空格的参数");
+            var lines=File.ReadAllLines(file);
+            Check(lines.Length==2&&lines[0].TrimEnd()=="\"left&right;\""&&lines[1].TrimEnd()==(variables?Environment.GetEnvironmentVariable("OS"):"fixture"),"管道、重定向、连接符、分号和变量："+string.Join("|",lines));
+        }
+        Console.WriteLine($"PASS real terminal assertions={checks};wt={hasWt}");
+    }
     sealed class Process037:ILaunchProcess
     {
         public List<LaunchRequest> Requests=[];public Exception? Error;
@@ -60,13 +95,38 @@ static partial class Program
         foreach(var id in new[]{"command:logoff","command:hibernate"}){await service.ExecuteAsync(new(id,LauncherItemKind.Command,LauncherGroups.Commands,"","",new("moon")),default);Check(executor.Calls[^1]==id,"系统命令假执行器:"+id);}
         foreach(var q in new[]{">","> ",">   "})Check((await service.SearchAsync(q,default)).Items[0].Id=="terminal:hint","空命令:"+q);
         var hint=(await service.SearchAsync(">",default)).Items[0];int before=process.Requests.Count;await service.ExecuteAsync(hint,default);Check(process.Requests.Count==before,"提示项不执行");
-        string command="echo \"a b\" & echo %PATH% | find \"a\"";
+        string command="echo \"a b\" & echo PATH | find \"a\"";
         var terminal=(await service.SearchAsync(">"+command,default)).Items[0];Check(terminal.Subtitle==command&&terminal.Group==LauncherGroups.Terminal&&terminal.Hotkey=="Enter","终端项契约");
         before=files.Calls;var result=await service.SearchAsync(">py",default);Check(files.Calls==before&&result.Items.All(i=>i.Group is LauncherGroups.Terminal or LauncherGroups.Completion),"终端不查其他来源");Check(result.Items.Any(i=>i.Title=="python")&&result.Items.Count<=7,"程序名前缀和数量上限");
         Check((await service.SearchAsync(">python a",default)).Items.Count==1,"只补第一词");
-        await service.ExecuteAsync(terminal,default);var request=process.Requests[^1];Check(request.FileName.EndsWith("wt.exe")&&request.Arguments.SequenceEqual(["-w","0","new-tab","-d",platform.Home,"--",@"C:\Windows\System32\cmd.exe","/k",command])&&request.WorkingDirectory==platform.Home&&!request.Elevated,"wt 参数数组与原始命令");
-        platform.Missing.Add("wt.exe");await service.ExecuteElevatedAsync(terminal,default);request=process.Requests[^1];Check(request.FileName.EndsWith("cmd.exe")&&request.Arguments.SequenceEqual(["/k",command])&&request.Elevated,"cmd 管理员参数");
+        await service.ExecuteAsync(terminal,default);var request=process.Requests[^1];Check(request.FileName.EndsWith("wt.exe")&&request.Arguments.SequenceEqual(["-w","0","new-tab","-d",platform.Home,"--",@"C:\Windows\System32\cmd.exe","/s","/k",command])&&request.WorkingDirectory==platform.Home&&!request.Elevated,"wt 参数数组与原始命令");
+        platform.Missing.Add("wt.exe");await service.ExecuteElevatedAsync(terminal,default);request=process.Requests[^1];Check(request.FileName.EndsWith("cmd.exe")&&request.RawArguments==$"/s /k \"{command}\""&&request.Elevated,"cmd 管理员参数");
         platform.Missing.Remove("wt.exe");await service.ExecuteElevatedAsync(terminal,default);Check(process.Requests[^1].Elevated&&process.Requests[^1].FileName.EndsWith("wt.exe")&&process.Requests[^1].Arguments[1]=="new","wt 管理员独立窗口分支");
+        foreach(string sample in new[]{""" "C:\Program Files\x\y.exe" "a b" """.Trim(),"echo %TEMP% & echo x | find \"x\" && echo a;b > output","echo \"a;b\" & echo ok","dir","echo;a"})
+        foreach(bool useWt in new[]{false,true})
+        foreach(bool elevated in new[]{false,true})
+        {
+            if(useWt)platform.Missing.Remove("wt.exe");else platform.Missing.Add("wt.exe");
+            var item=(await service.SearchAsync(">"+sample,default)).Items[0];
+            if(elevated)await service.ExecuteElevatedAsync(item,default);else await service.ExecuteAsync(item,default);
+            var actual=process.Requests[^1];
+            string expected=$"/s /k \"{sample}\"";
+            if(useWt)
+            {
+                Check(actual.Arguments[1]==(elevated?"new":"0"),"wt 目标窗口");
+                if(sample.Contains('%')){
+                    string encoded=Convert.ToBase64String(System.Text.Encoding.Unicode.GetBytes(expected));
+                    Check(actual.Arguments[^2]=="-Command"&&actual.Arguments[^1].Contains("FromBase64String('"+encoded+"')"),"wt 变量延迟到 cmd 展开");
+                }else{
+                    string payload=actual.Arguments[^1].Replace(@"\;",";");
+                    string reconstructed=string.Join(" ",actual.Arguments[^3..^1])+" "+(payload.Contains(' ')?$"\"{payload}\"":payload);
+                    Check(reconstructed==expected&&actual.Arguments[^1].Contains(@"\;")==sample.Contains(';'),"wt 重建命令行");
+                }
+            }
+            else Check(actual.RawArguments==expected&&actual.FileName.EndsWith("cmd.exe"),"cmd 原始命令行");
+            Check(actual.Elevated==elevated,"终端提权标志");
+        }
+        platform.Missing.Remove("wt.exe");
         var spaced=(await service.SearchAsync("> secret",default)).Items[0];Check(spaced.Subtitle=="secret","前导空格解析");await service.ExecuteAsync(spaced,default);
         var history=(TerminalHistory)service.TerminalHistory;Check(history.Match("secret").Length==0,"前导空格不保存");
         history.Clear();for(int i=0;i<25;i++)history.Record("echo "+i);Check(history.Match("").Length==20&&history.Match("")[0]=="echo 24"&&!history.Match("").Contains("echo 0"),"最近20条");history.Record("echo 20");Check(history.Match("")[0]=="echo 20"&&history.Match("").Count(s=>s=="echo 20")==1,"历史去重移至最前");

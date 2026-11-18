@@ -366,6 +366,15 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         return items;
     }
 
+    // 动作行的网页搜索站点换成站点图标（issue 56）。内置五个站点总是有图标；用户自加的站点没缓存时先保持地球，
+    // 后台取好后 OnEngineIconReady 再补上
+    async Task FillEngineIcon(LauncherRow row)
+    {
+        if (!ActionId(row.Item).StartsWith("web:", StringComparison.Ordinal) || Engine(ActionId(row.Item)) is not { } engine) return;
+        if (((App)Application.Current).EngineIcons?.TryGet(engine) is not { } icon) { HookEngineIcons(); return; }
+        row.SetEngine(await EngineBadgeImages.LoadAsync(icon, ActualTheme == ElementTheme.Dark));
+    }
+
     static Settings.SearchEngine? Engine(string actionId) =>
         Options.SearchEngines.FirstOrDefault(e => string.Equals("web:" + e.Keyword, actionId, StringComparison.OrdinalIgnoreCase));
 
@@ -473,11 +482,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     {
         int version = ++badgeVersion;
         var app = (App)Application.Current;
-        if (app.EngineIcons is { } icons && !ReferenceEquals(icons, hookedIcons))
-        {
-            if (hookedIcons is not null) hookedIcons.Ready -= OnEngineIconReady;
-            icons.Ready += OnEngineIconReady; hookedIcons = icons;
-        }
+        HookEngineIcons();
         EngineBadgeImages.Glyph? glyph = null;
         if (app.EngineIcons?.TryGet(engine) is { } icon) glyph = await EngineBadgeImages.LoadAsync(icon, ActualTheme == ElementTheme.Dark);
         if (version != badgeVersion) return;   // 等图标的时候已经换了站点
@@ -494,7 +499,18 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     void OnEngineIconReady(object? sender, string url) => DispatcherQueue.TryEnqueue(() =>
     {
         if (badgeEngine is { } e && e.UrlTemplate == url) _ = FillBadge(e);
+        foreach (var r in rows)
+            if (r.Cell == LauncherCell.Action && Engine(ActionId(r.Item)) is { } engine && engine.UrlTemplate == url) _ = FillEngineIcon(r);
     });
+
+    void HookEngineIcons()
+    {
+        if (((App)Application.Current).EngineIcons is { } icons && !ReferenceEquals(icons, hookedIcons))
+        {
+            if (hookedIcons is not null) hookedIcons.Ready -= OnEngineIconReady;
+            icons.Ready += OnEngineIconReady; hookedIcons = icons;
+        }
+    }
 
     // 放大镜和徽章交替：进入时放大镜缩小淡出，徽章回弹放大淡入；换站点时徽章轻轻弹一下；退出反过来（原型 .slot.web）
     void PlayBadge(bool web, bool wasWeb)
@@ -705,6 +721,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             {
                 var s = Section(string.Format(Strings.Launcher_AttachmentTarget, (object?)((q.Length > 24 ? q[..24] + "…" : q))), LauncherSectionKind.Tiles);
                 for (int i = 0; i < actions.Count; i++) Add(s, actions[i], LauncherCell.Action, i < 9 ? (i + 1).ToString() : null);
+                foreach (var r in s.Rows) _ = FillEngineIcon(r);
             }
             // 常用（设置里加的文件 / 文件夹）在前，再是 Everything 的前 3 个
             var favorites = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group is not (LauncherGroups.Files or LauncherGroups.Direct)).ToList();

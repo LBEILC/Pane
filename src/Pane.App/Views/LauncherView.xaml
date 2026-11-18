@@ -84,14 +84,21 @@
                             <Border CornerRadius="10" Background="{x:Bind Gradient}" BorderBrush="#2EFFFFFF" BorderThickness="1" Visibility="{x:Bind ColoredVisibility}"/>
                             <Border CornerRadius="10" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1" Visibility="{x:Bind PlainVisibility}"/>
                             <c:PaneIcon Width="22" Height="22" Glyph="{x:Bind Glyph}" StrokeWidth="1.9" Foreground="White" Visibility="{x:Bind ColoredVisibility}"/>
-                            <c:PaneIcon Width="22" Height="22" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource PaneText1Brush}" Visibility="{x:Bind PlainVisibility}"/>
+                            <c:PaneIcon Width="22" Height="22" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource PaneText1Brush}" Visibility="{x:Bind PlainGlyphVisibility, Mode=OneWay}"/>
                             <Image Width="40" Height="40" Source="{x:Bind Picture}" Visibility="{x:Bind PictureVisibility}"/>
+                            <!-- 网页搜索站点的图标（issue 56）：一般图标 20 居中；自带底色的铺满图块、圆角裁切 -->
+                            <Image Width="20" Height="20" Stretch="Uniform" Source="{x:Bind SiteGlyph, Mode=OneWay}" Visibility="{x:Bind SiteGlyphVisibility, Mode=OneWay}"/>
+                            <Border CornerRadius="10" Visibility="{x:Bind SiteFullVisibility, Mode=OneWay}">
+                                <Image Stretch="UniformToFill" Source="{x:Bind SiteFull, Mode=OneWay}"/>
+                            </Border>
                         </Grid>
                         <TextBlock c:MatchText.Source="{x:Bind Match}" HorizontalAlignment="Center" TextAlignment="Center"
-                                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" LineHeight="15.6"
+                                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" LineHeight="15.6" LineStackingStrategy="BlockLineHeight"
                                    Foreground="{ThemeResource PaneText1Brush}" TextWrapping="WrapWholeWords" MaxLines="2" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6,-4,0,0" MinWidth="16" Height="16" Padding="4,0,4,0"
+                    <!-- 行高锁死 15.6（issue 68）：系统字体换成行高更大的字体时，默认 MaxHeight 会把行撑高，第二行被格子 92 的高度裁掉；
+                         序号徽章贴在格子内左上角，不再伸出格子（伸出去的部分会被外层滚动区和分区裁掉） -->
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,2,0,0" MinWidth="16" Height="16" Padding="4,0,4,0"
                             CornerRadius="5" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
                             Visibility="{x:Bind NumberVisibility, Mode=OneWay}">
                         <TextBlock Text="{x:Bind Number}" FontFamily="{StaticResource PaneFontUi}" FontSize="10" LineHeight="14" TextAlignment="Center"

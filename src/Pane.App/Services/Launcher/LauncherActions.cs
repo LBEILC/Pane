@@ -8,7 +8,7 @@ using Pane.Localization;
 namespace Pane.Services.Launcher;
 
 internal sealed record ActionTarget(string Path,string[] Arguments) { public string? RawArguments {get;init;} }
-internal sealed record UninstallEntry(string Id,string? Location,string? Icon,string? Command,bool SystemComponent);
+internal sealed record UninstallEntry(string Id,string? Location,string? Icon,string? Command,bool SystemComponent,string? QuietCommand=null);
 
 internal static class UninstallMatching
 {
@@ -20,6 +20,22 @@ internal static class UninstallMatching
             if(!Path.IsPathFullyQualified(path)||localOnly&&path.StartsWith(@"\\")||path.IndexOf(':',2)>=0)return null;
             return Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         }catch(ArgumentException){return null;}catch(NotSupportedException){return null;}
+    }
+    internal static HashSet<string> Executables(IEnumerable<UninstallEntry> entries)
+    {
+        var paths=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var entry in entries)
+        foreach(var value in new[]{entry.Command,entry.QuietCommand})
+        {
+            if(string.IsNullOrWhiteSpace(value))continue;
+            string command=Environment.ExpandEnvironmentVariables(value.Trim());
+            // 兼容登记里未加引号的带空格路径。
+            int end=command.IndexOf(".exe",StringComparison.OrdinalIgnoreCase);
+            string executable=command[0]!='"'&&end>=0&&(end+4==command.Length||char.IsWhiteSpace(command[end+4]))
+                ?command[..(end+4)]:WindowsLauncherActionPlatform.Split(command)[0];
+            if(Normalize(executable,false) is {} path)paths.Add(path);
+        }
+        return paths;
     }
     internal static bool Broad(string path)
     {
@@ -77,18 +93,23 @@ internal sealed class WindowsLauncherActionPlatform:LauncherActionPlatform
         }
         return path!=null&&Path.GetExtension(path).Equals(".exe",StringComparison.OrdinalIgnoreCase)&&File.Exists(path)?new(path,args){RawArguments=raw}:null;
     }
+    static bool RegistryUnavailable(Exception e)=>e is UnauthorizedAccessException or IOException or System.Security.SecurityException;
     internal override IReadOnlyList<UninstallEntry> ReadUninstall()
     {
         // 按需读取，无常驻监听；每次执行重新匹配，避免使用过期卸载登记。
         var rows=new List<UninstallEntry>();
         foreach(var hive in new[]{RegistryHive.CurrentUser,RegistryHive.LocalMachine})
         foreach(var view in new[]{RegistryView.Registry64,RegistryView.Registry32}){
-            using var root=RegistryKey.OpenBaseKey(hive,view);
-            using var uninstall=root.OpenSubKey(hive==RegistryHive.CurrentUser&&view==RegistryView.Registry32?@"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall":@"Software\Microsoft\Windows\CurrentVersion\Uninstall");if(uninstall==null)continue;
-            foreach(var name in uninstall.GetSubKeyNames()){
-                using var key=uninstall.OpenSubKey(name);if(key==null)continue;
-                rows.Add(new($"{hive}/{view}/{name}",key.GetValue("InstallLocation") as string,key.GetValue("DisplayIcon") as string,key.GetValue("UninstallString") as string,Equals(key.GetValue("SystemComponent"),1)));
-            }
+            try{
+                using var root=RegistryKey.OpenBaseKey(hive,view);
+                using var uninstall=root.OpenSubKey(hive==RegistryHive.CurrentUser&&view==RegistryView.Registry32?@"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall":@"Software\Microsoft\Windows\CurrentVersion\Uninstall");if(uninstall==null)continue;
+                foreach(var name in uninstall.GetSubKeyNames()){
+                    try{
+                        using var key=uninstall.OpenSubKey(name);if(key==null)continue;
+                        rows.Add(new($"{hive}/{view}/{name}",key.GetValue("InstallLocation") as string,key.GetValue("DisplayIcon") as string,key.GetValue("UninstallString") as string,Equals(key.GetValue("SystemComponent"),1),key.GetValue("QuietUninstallString") as string));
+                    }catch(Exception e) when(RegistryUnavailable(e)){}
+                }
+            }catch(Exception e) when(RegistryUnavailable(e)){}
         }
         return rows;
     }

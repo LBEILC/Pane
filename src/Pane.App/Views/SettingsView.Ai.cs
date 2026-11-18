@@ -368,9 +368,29 @@ public sealed partial class SettingsView
                 SaveLauncher(x => x with { ActionRow = v ? [.. x.ActionRow.Where(a => a != id), id] : x.ActionRow.Where(a => a != id).ToArray() });
                 Render();
             }));
-            rows.Add(ListRow(glyph, name, on ? string.Format(pos < 9 ? Strings.Settings_Launcher_ActionPositionHotkey : Strings.Settings_Launcher_ActionPosition, pos + 1, pos + 1) : Strings.Settings_Launcher_ActionHidden, false, tools.ToArray()));
+            rows.Add(ListRow(ActionLead(id, glyph, l), Text(name, LabelProto), on ? string.Format(pos < 9 ? Strings.Settings_Launcher_ActionPositionHotkey : Strings.Settings_Launcher_ActionPosition, pos + 1, pos + 1) : Strings.Settings_Launcher_ActionHidden, false, tools.ToArray()));
         }
         Group(Strings.Settings_Launcher_ActionRow, rows.ToArray(), Strings.Settings_Launcher_ActionRowDescription);
+    }
+
+    // 行首图块：网页搜索站点换成站点图标（issue 56，和启动器动作行一致），取不到时保留地球
+    FrameworkElement ActionLead(string id, string glyph, LauncherSettings l)
+    {
+        var lead = new Border
+        {
+            Width = 30, Height = 30, CornerRadius = new CornerRadius(8), Background = FillProto.Background, BorderBrush = FillProto.BorderBrush, BorderThickness = new Thickness(1),
+            Child = new PaneIcon { Glyph = glyph, Width = 16, Height = 16, Foreground = IconProto.Foreground },
+        };
+        if (id.StartsWith("web:", StringComparison.Ordinal) && l.SearchEngines.FirstOrDefault(e => "web:" + e.Keyword == id) is { } engine
+            && app.EngineIcons?.TryGet(engine) is { } icon)
+            _ = FillLead(lead, icon);
+        return lead;
+    }
+
+    async Task FillLead(Border lead, EngineIcon icon)
+    {
+        if (await Pane.Views.Launcher.EngineBadgeImages.LoadAsync(icon, ActualTheme == ElementTheme.Dark) is not { } g) return;
+        lead.Child = g.FullBleed ? new Image { Source = g.Source, Stretch = Stretch.UniformToFill } : new Image { Source = g.Source, Width = 15, Height = 15, Stretch = Stretch.Uniform };
     }
 
     // 翻译用模型：单独指定一个快模型，空着 = 和主模型相同。候选用上面「拉取模型列表」拉到的
