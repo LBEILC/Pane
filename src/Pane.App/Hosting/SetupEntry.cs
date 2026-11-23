@@ -51,11 +51,12 @@ internal static class SetupEntry
             return true;
         }
         if (args.FirstOrDefault() is not ("--setup" or "--uninstall" or "--uninstall-worker")) return false;
-        UninstallChain.Log("application-entry", path: Environment.ProcessPath);
         try
         {
             int isolatedIndex = Array.IndexOf(args, "--self-test-root");
             if (isolatedIndex >= 0 && isolatedIndex + 1 < args.Length) IsolatedRoot = SetupPaths.Isolated(args[isolatedIndex + 1]).Root;
+            UninstallChain.IsolatedLogRoot=IsolatedRoot;
+            UninstallChain.Log("application-entry",path:Environment.ProcessPath);
             AutoUpdate = args[0] == "--setup" && args.Contains("--auto-update");
             args = args.Where(a => a != "--auto-update").ToArray();
             var options = new Dictionary<string, string>(StringComparer.Ordinal);

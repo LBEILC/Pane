@@ -1,3 +1,4 @@
+param([switch]$DialogSearch)
 $ErrorActionPreference='Stop'
 $repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $repo 'scripts/find-build-tools.ps1')
@@ -9,7 +10,9 @@ New-Item -ItemType Directory -Force $out | Out-Null
 & cl.exe @('/nologo','/utf-8','/std:c++17','/EHsc','/MT','/W4','/WX',"$PSScriptRoot/FolderJumpTests.cpp","/Fo$out/FolderJumpTests.obj","/Fe$out/FolderJumpTests.exe",'/link','user32.lib','advapi32.lib','shell32.lib','shlwapi.lib','ole32.lib','oleaut32.lib','uuid.lib','comdlg32.lib')
 if($LASTEXITCODE -ne 0){throw 'Folder jump tests build failed'}
 Add-Type -Path (Join-Path $repo 'experiments/027-idle/HiddenDesktop.cs')
-$log=Join-Path $out 'hidden.log'
-$code=[HiddenDesktop027]::Run((Join-Path $out 'FolderJumpTests.exe'),@($log),$repo,45000)
+$log=Join-Path $out $(if($DialogSearch){'dialog-search.log'}else{'hidden.log'})
+$arguments=@($log)
+if($DialogSearch){$arguments+='--107'}
+$code=[HiddenDesktop027]::Run((Join-Path $out 'FolderJumpTests.exe'),$arguments,$repo,240000)
 Get-Content -LiteralPath $log
 if($code -ne 0){throw "Folder jump tests failed: $code"}

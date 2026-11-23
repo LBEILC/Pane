@@ -24,7 +24,7 @@ internal static class UninstallTests
             }
             UninstallChain.Launch(paths, paths.Uninstaller, root, Capture,
                 copy: (_, _) => throw new UnauthorizedAccessException());
-            Check(step == "copy-helper" && failure is UnauthorizedAccessException, "复制失败被提示边界截获");
+            Check(step == "copy-helper" && failure is IOException { InnerException: UnauthorizedAccessException }, "复制失败被提示边界截获");
             UninstallChain.Launch(paths, paths.Uninstaller, root, Capture, copy: (_, _) => { },
                 start: _ => throw new System.ComponentModel.Win32Exception(5));
             Check(step == "start-helper" && failure is System.ComponentModel.Win32Exception, "助手被拦被提示边界截获");
@@ -43,7 +43,7 @@ internal static class UninstallTests
             });
             Check(step == null && failure == null, "窗口已出现后取消不算失败");
             string log = File.ReadAllText(UninstallChain.LogPath);
-            Check(log.Contains("step=copy-helper\tresult=failed") && log.Contains("exception=System.UnauthorizedAccessException"), "复制失败日志");
+            Check(log.Contains("step=copy-helper\tresult=failed") && log.Contains("System.UnauthorizedAccessException"), "复制失败日志");
             Check(log.Contains("step=start-helper\tresult=failed") && log.Contains("code=0x80004005\tnative=5"), "启动失败日志有 HRESULT 及原生错误码");
             Check(log.Contains("step=wait-window\tresult=failed") && log.Contains("exception=System.TimeoutException"), "超时日志");
             for (int i = 0; i < 80; i++) UninstallChain.Log("bounded-test", path: new string('x', 1024));

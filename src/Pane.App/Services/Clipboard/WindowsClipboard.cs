@@ -88,7 +88,20 @@ internal sealed class WindowsClipboardCapture(SettingsStore settings):IClipboard
             if(p==0)throw new InvalidDataException();
             try{int chars=checked((int)(NativeClip.GlobalSize(handle)/2));text=Marshal.PtrToStringUni(p,chars)?.TrimEnd('\0');}finally{NativeClip.GlobalUnlock(handle);}
         }
-        return metadata with{Text=text,Files=files,Png=png};
+        return metadata with{Text=text,Files=files,Png=png,Formats=text==null?null:ReadFormats()};
+    }
+    static RichFormats? ReadFormats()
+    {
+        nint Handle(string name)=>Has(name)?NativeClip.GetClipboardData(NativeClip.RegisterClipboardFormatW(name)):0;
+        var html=Handle("HTML Format");var rtf=Handle("Rich Text Format");
+        nuint h=NativeClip.GlobalSize(html),r=NativeClip.GlobalSize(rtf);
+        if(h>RichFormats.Limit||r>RichFormats.Limit||h+r>RichFormats.Limit||h+r==0)return null;
+        static byte[] Bytes(nint handle,int size){
+            if(size==0)return [];
+            var ptr=NativeClip.GlobalLock(handle);if(ptr==0)throw new InvalidDataException();
+            try{var bytes=new byte[size];Marshal.Copy(ptr,bytes,0,size);return bytes;}finally{NativeClip.GlobalUnlock(handle);}
+        }
+        return new(Bytes(html,(int)h),Bytes(rtf,(int)r));
     }
     public ClipboardContent Complete(ClipboardContent content){
         string? icon=null;
@@ -135,19 +148,22 @@ internal sealed class WindowsClipboardImages:IClipboardImages
 }
 internal sealed class WindowsClipboardWriter(Action<ClipEntry,ClipboardWriteMode,bool>? write=null,Func<IPastePlatform>? paste=null):IClipboardWriter
 {
-    public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)
+    public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)=>PasteAsync(entry,plainText,target,token,null);
+    public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token,RichFormats? formats)
     {
         long started=Environment.TickCount64; var platform=paste?.Invoke()??new WindowsPastePlatform();
-        return Sta.Run(()=>{new PasteTransfer(platform,PasteTransfer.WriteLog).Run(target,()=>(write??Write)(entry,ClipboardWriteMode.HistoryPaste,plainText),token,started);return true;});
+        return Sta.Run(()=>{new PasteTransfer(platform,PasteTransfer.WriteLog).Run(target,()=>{if(write!=null)write(entry,ClipboardWriteMode.HistoryPaste,plainText);else WriteFormats(entry,ClipboardWriteMode.HistoryPaste,plainText,formats);},token,started);return true;});
     }
-    internal static void Write(ClipEntry entry,ClipboardWriteMode mode,bool plainText=false)
+    internal static void Write(ClipEntry entry,ClipboardWriteMode mode,bool plainText=false)=>WriteFormats(entry,mode,plainText,null);
+    internal static void WriteFormats(ClipEntry entry,ClipboardWriteMode mode,bool plainText,RichFormats? formats)
     {
         string? files=null,image=null,text=entry.Text;
         // TODO(design): 图片没有文本时，纯文本粘贴保守地报告不支持；由设计决定是否禁用该入口。
         if(plainText){text=entry.Kind==ClipKind.Files?string.Join(Environment.NewLine,entry.Files??[]):entry.Text;if(text==null)throw new NotSupportedException(Strings.Clipboard_NoPlainText);}
         else if(entry.Kind==ClipKind.Image){image=entry.ContentPath??throw new InvalidDataException(Strings.Clipboard_ImageMissing);text=null;}
         else if(entry.Kind==ClipKind.Files){files=string.Join('\0',entry.Files??[])+"\0\0";text=null;}
-        if(NativeClip.PaneClipWrite(text,image,files,files?.Length??0,mode)!=1)throw new TimeoutException(Strings.Clipboard_WriteFailed);
+        if(plainText)formats=null;
+        if(NativeClip.PaneClipWriteFormats(text,image,files,files?.Length??0,mode,formats?.Html,formats?.Html.Length??0,formats?.Rtf,formats?.Rtf.Length??0)!=1)throw new TimeoutException(Strings.Clipboard_WriteFailed);
     }
 }
 internal sealed class ClipboardAttachmentActions(ILauncherAttachmentActions other,Action<ClipEntry,ClipboardWriteMode,bool>? write=null):ILauncherAttachmentActions
@@ -174,6 +190,7 @@ internal static class NativeClip
     [DllImport(Dll)] internal static extern int PaneClipImageAlloc(out nint output,out int length);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveImage(string input,string? full,string thumb,out int width,out int height);
     [DllImport(Dll,CharSet=CharSet.Unicode,SetLastError=true)] internal static extern int PaneClipWrite(string? text,string? image,string? files,int chars,ClipboardWriteMode mode);
+    [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipWriteFormats(string? text,string? image,string? files,int chars,ClipboardWriteMode mode,byte[]? html,int htmlSize,byte[]? rtf,int rtfSize);
     [DllImport(Dll,CharSet=CharSet.Unicode)] internal static extern int PaneClipSaveDialog(string source,string name);
     [DllImport("user32.dll")] internal static extern bool OpenClipboard(nint owner);
     [DllImport("user32.dll")] internal static extern bool CloseClipboard();

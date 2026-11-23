@@ -96,6 +96,13 @@
     <Color x:Key="PaneSuccessColor">#FF2F9E5B</Color>
     <Color x:Key="PaneWarningColor">#FFF5A524</Color>
     <SolidColorBrush x:Key="PaneDangerBrush" Color="{StaticResource PaneDangerColor}"/>
+    <!-- 剪贴板标签色点（2026-11-23，原型 tokens.css 的 tag-1～6）：只画小圆点，不做底色；深浅色通用 -->
+    <SolidColorBrush x:Key="PaneTag1Brush" Color="#FF5874C9"/>
+    <SolidColorBrush x:Key="PaneTag2Brush" Color="#FF17958B"/>
+    <SolidColorBrush x:Key="PaneTag3Brush" Color="#FF5F8F4E"/>
+    <SolidColorBrush x:Key="PaneTag4Brush" Color="#FFC08A3E"/>
+    <SolidColorBrush x:Key="PaneTag5Brush" Color="#FFC2607A"/>
+    <SolidColorBrush x:Key="PaneTag6Brush" Color="#FF8A6CC0"/>
     <SolidColorBrush x:Key="PaneSuccessBrush" Color="{StaticResource PaneSuccessColor}"/>
     <SolidColorBrush x:Key="PaneWarningBrush" Color="{StaticResource PaneWarningColor}"/>
 

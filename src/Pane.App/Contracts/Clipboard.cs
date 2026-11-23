@@ -24,7 +24,31 @@ public sealed record ClipEntry(
     LauncherIcon? SourceIcon,             // 来源程序的小图标；没有就不显示
     DateTimeOffset CopiedAt,
     bool Pinned,
-    string? ContentPath = null);           // Image：完整图片（PNG）的本机路径，粘贴、另存为、复制图片用；界面显示只用 Thumbnail
+    string? ContentPath = null)            // Image：完整图片（PNG）的本机路径，粘贴、另存为、复制图片用；界面显示只用 Thumbnail
+{
+    /// <summary>标签名（2026-11-23，106）：顺序 = 打上的先后。有标签的条目长期保存：不受条数上限、不被「清空历史」清掉，和固定一样。</summary>
+    public IReadOnlyList<string> Tags { get; init; } = [];
+    /// <summary>带格式（106）：复制时同时存下了 HTML 或 RTF。Enter 粘贴时一并写回，Shift+Enter 只写文字。</summary>
+    public bool Rich { get; init; }
+}
+
+/// <summary>标签定义（106）。Color：1～6 对应令牌 PaneTag1～6，null 不带色点。名字不分大小写唯一，顺序就是筛选条上的顺序（新建的排最后）。</summary>
+public sealed record ClipTag(string Name, int? Color);
+
+/// <summary>操作列表里的「粘贴为…」（106）。都写成文字（ImageFile 除外），写法同 PasteAsync（自身标记、切回原窗口、等松开修饰键再 Ctrl+V）。</summary>
+public enum ClipPasteAs
+{
+    /// <summary>Files：完整路径，多个按行（CRLF）分开。</summary>
+    Paths,
+    /// <summary>Files：文件名（含扩展名），多个按行分开。</summary>
+    FileNames,
+    /// <summary>Image：把完整图片存成临时目录里的 PNG 文件（文件名照 Strings.Clipboard_ImageFileName），按文件（CF_HDROP）粘贴。</summary>
+    ImageFile,
+    /// <summary>Color：「#RRGGBB」大写。</summary>
+    Hex,
+    /// <summary>Color：「rgb(88, 116, 201)」。</summary>
+    Rgb,
+}
 
 public interface IClipboardHistory
 {
@@ -43,8 +67,34 @@ public interface IClipboardHistory
 
     void SetPinned(string id, bool pinned);
     void Delete(string id);
-    /// <summary>清空未固定的条目（设置页「清空历史」）。已固定的保留。</summary>
+    /// <summary>清空未固定、也没有标签的条目（设置页「清空历史」）。已固定的、有标签的保留。</summary>
     void ClearUnpinned();
+
+    // ---------------- 2026-11-23（106）：操作列表、标签、编辑，规则见 docs/design.md「剪贴板操作列表、富文本、标签、编辑、高度」 ----------------
+
+    /// <summary>按指定方式粘贴（见 <see cref="ClipPasteAs"/>）。条目类型不适用时抛 NotSupportedException。成功后同 PasteAsync 处理「粘贴后移到最前」。</summary>
+    Task PasteAsAsync(string id, ClipPasteAs kind, nint targetWindow, CancellationToken cancellationToken) => throw new NotSupportedException();
+
+    /// <summary>
+    /// 编辑文字类条目（Text / Code / Link / Color）：换成新文字，按内容重新判断类型，去掉保存的格式（Rich 变 false）；
+    /// 复制时间、固定、标签不变。新文字为空时什么也不做。其他类型抛 NotSupportedException。
+    /// </summary>
+    void UpdateText(string id, string text) { }
+
+    /// <summary>全部标签定义。</summary>
+    IReadOnlyList<ClipTag> Tags() => [];
+
+    /// <summary>
+    /// 整体替换这一条的标签。名字两端去空白、去重（不分大小写，以定义里的写法为准）；还没有定义的名字自动新建（Color = null，排最后）。
+    /// 去掉最后一个标签后变回普通条目：面板开着时不立刻淘汰，下次有新复制或面板收起后再按上限处理。
+    /// </summary>
+    void SetTags(string id, IReadOnlyList<string> tags) { }
+
+    /// <summary>改名、改色点（设置 → 剪贴板 →「标签」）。新名字和别的标签重名时抛 ArgumentException（Message 给用户看）；条目上的名字跟着改。</summary>
+    void UpdateTag(string name, string newName, int? color) { }
+
+    /// <summary>删除标签：只从所有条目上去掉这个名字，内容不删（之后按普通条目处理）。</summary>
+    void DeleteTag(string name) { }
 
     /// <summary>
     /// 历史存不进硬盘时的原因（045）：一句给用户看的中文，如「保存失败：文件被占用（已重试 12 次）」；正常时为 null。

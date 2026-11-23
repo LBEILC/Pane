@@ -30,10 +30,13 @@
                     <TextBlock Text="{x:Bind loc:Strings.Settings_Title}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
                                Foreground="{ThemeResource PaneText1Brush}"/>
                 </StackPanel>
-                <Grid Grid.Row="1">
-                    <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
-                    <StackPanel x:Name="Nav" Spacing="2"/>
-                </Grid>
+                <!-- 2026-11-23：分组后项多了，放不下时导航自己滚动（不显示滚动条） -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollMode="Disabled">
+                    <Grid>
+                        <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
+                        <StackPanel x:Name="Nav" Spacing="2"/>
+                    </Grid>
+                </ScrollViewer>
                 <TextBlock Grid.Row="2" Padding="8,12,8,0" TextWrapping="Wrap" LineHeight="19"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"
                            Text="{x:Bind loc:Strings.Settings_SaveDescription}"/>

@@ -105,6 +105,7 @@ public sealed partial class App
             case "files":ShowFiles(q??"报价",null);break; // 不翻译：演示数据
             case "clipboard":Command("show-clipboard");break;
             case "settings":Command("show-settings");break;   /* 配合 PANE_DESIGN_SETTINGS 选分区 */
+            case "dialog":ShowDialogBarDemo();break;   /* 对话框搜索框（2026-11-23），PANE_DESIGN_DIALOG=save 看另存为 */
             case "launcher":Command("show-launcher");break;   /* 带上 PANE_DESIGN_QUERY 看启动器结果 */
             case "translate":ShowTranslate(q??"Glassmorphism relies on background blur, translucency and a subtle highlight border.");break;
             case "tray":{var m=GlassPanel.MonitorFromPoint(new GlassPanel.Point(),1);var info=new GlassPanel.MonitorInfo{Size=System.Runtime.InteropServices.Marshal.SizeOf<GlassPanel.MonitorInfo>()};GlassPanel.GetMonitorInfoW(m,ref info);ShowTrayMenu($"{info.Monitor.Right-140},{info.Monitor.Bottom-24}");break;}/* 演示：模拟任务栏右下角的托盘图标 */

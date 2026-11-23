@@ -208,6 +208,7 @@ public sealed partial class App
             view.SendToLauncher += (_, entry) => { if (a.AllowModule(ModuleIds.Launcher)) { a.launcherView?.AttachNext(entry); a.Command("show-launcher"); } };
             a.AddModulePanel("clipboard", Strings.Common_Clipboard, view, view, PanelPlacement.Pointer);
             a.WireClipboardLauncher(a.panels["clipboard"], view);
+            a.WireClipboardActions(a.panels["clipboard"], view);
         }
         public override async Task StopAsync(CancellationToken token)
         {
@@ -254,12 +255,24 @@ public sealed partial class App
         public override Task StartAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(true); return Task.CompletedTask; }
         public override Task StopAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(false); App.RemoveSecondary(SecondaryId.Translate, SecondaryId.Chat); return Task.CompletedTask; }
     }
+    public IDialogSearch? DialogSearch { get; set; }
     sealed class FolderJumpModule(App app) : Capability(app, ModuleIds.FolderJump, ModuleCategory.Files, "folder-input")
     {
-        public override Task StartAsync(CancellationToken token) { if (!App.demo) App.FolderJump = new Pane.Services.FolderJumpService(); return Task.CompletedTask; }
+        public override Task StartAsync(CancellationToken token)
+        {
+            if (!App.demo)
+            {
+                var folders = new Pane.Services.FolderJumpService();
+                App.DialogSearch = new Pane.Services.DialogSearchService(new Pane.Services.Launcher.EverythingIpc(), folders);
+                App.FolderJump = folders;
+                App.AttachDialogSearch(App.DialogSearch);
+            }
+            return Task.CompletedTask;
+        }
         public override Task StopAsync(CancellationToken token)
         {
-            (App.folderJump as IDisposable)?.Dispose(); App.FolderJump = null;
+            (App.folderJump as IDisposable)?.Dispose(); App.FolderJump = null; App.DialogSearch = null;
+            App.AttachDialogSearch(null);
             App.RemoveModulePanel("folder-jump"); App.jumpPanel = null; App.jumpView = null; return Task.CompletedTask;
         }
     }

@@ -1,5 +1,7 @@
 #define NOMINMAX
 #include <windows.h>
+#include <dwmapi.h>
+#pragma comment(lib,"dwmapi.lib")
 #include <exdisp.h>
 #include <shlobj.h>
 #include <shlwapi.h>
@@ -18,9 +20,22 @@ namespace {
 struct Apartment { HRESULT hr=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);~Apartment(){if(SUCCEEDED(hr))CoUninitialize();} };
 std::wstring Class(HWND h){wchar_t text[128]{};GetClassNameW(h,text,128);return text;}
 HWND Filename(HWND h){
+    if(Class(h)!=L"#32770")return nullptr;
     std::vector<Control> children;
     EnumChildWindows(h,[](HWND child,LPARAM data)->BOOL{auto& list=*reinterpret_cast<std::vector<Control>*>(data);list.push_back({child,GetParent(child),Class(child),GetDlgCtrlID(child),IsWindowVisible(child)!=FALSE});return TRUE;},reinterpret_cast<LPARAM>(&children));
     return pane::folderjump::Filename(Class(h),children);
+}
+bool ViewReady(HWND dialog){
+    HWND view=nullptr;
+    EnumChildWindows(dialog,[](HWND child,LPARAM data)->BOOL{
+        auto type=Class(child);
+        if((type!=L"DirectUIHWND"&&type!=L"SysListView32")||!IsWindowVisible(child))return TRUE;
+        for(HWND parent=GetParent(child);parent;parent=GetParent(parent)){
+            if(Class(parent)==L"SHELLDLL_DefView"){*reinterpret_cast<HWND*>(data)=child;return FALSE;}
+        }
+        return TRUE;
+    },reinterpret_cast<LPARAM>(&view));
+    return view!=nullptr;
 }
 DWORD Integrity(HANDLE process){
     HANDLE token=nullptr;if(!OpenProcessToken(process,TOKEN_QUERY,&token))return MAXDWORD;
@@ -47,7 +62,8 @@ bool WriteFilename(HWND edit,const wchar_t* text){
     return Class(combo)!=L"ComboBox"||Send(GetParent(combo),WM_COMMAND,MAKEWPARAM(GetDlgCtrlID(combo),CBN_EDITCHANGE),reinterpret_cast<LPARAM>(combo),result);
 }
 struct InitialFilename {HWND edit=nullptr;std::wstring text;};
-bool Jump(HWND dialog,const wchar_t* path,bool automatic=false,HWND (WINAPI *foreground)()=GetForegroundWindow,const InitialFilename* initial=nullptr){
+struct Navigation {const wchar_t* name;bool confirm;HANDLE cancel;};
+bool Jump(HWND dialog,const wchar_t* path,bool automatic=false,HWND (WINAPI *foreground)()=GetForegroundWindow,const InitialFilename* initial=nullptr,const Navigation* navigation=nullptr){
     if(!path||!PathIsDirectoryW(path)||!Accessible(dialog))return false;
     HWND edit=Filename(dialog);if(!edit||!IsWindowEnabled(dialog))return false;
     DWORD pid=0;DWORD thread=GetWindowThreadProcessId(dialog,&pid);
@@ -59,15 +75,19 @@ bool Jump(HWND dialog,const wchar_t* path,bool automatic=false,HWND (WINAPI *for
     std::wstring folder(path);if(folder.back()!=L'\\')folder+=L'\\';
     std::wstring latest;
     if(automatic&&(!ReadFilename(edit,latest)||latest!=initial->text||foreground()!=dialog))return false;
+    auto cancelled=[&]{return navigation&&WaitForSingleObject(navigation->cancel,0)==WAIT_OBJECT_0;};
+    if(cancelled())return false;
     bool written=WriteFilename(edit,folder.c_str());
     bool sent=written&&Send(dialog,WM_COMMAND,MAKEWPARAM(IDOK,BN_CLICKED),reinterpret_cast<LPARAM>(GetDlgItem(dialog,IDOK)),result);
     // 系统对话框会把目录导航排入自己的消息队列；等它消费输入后再还原。
     // 仅在本次跳转期间短暂等待，空闲时没有定时器或周期唤醒。
+    bool ready=false;
     if(sent){
         auto deadline=GetTickCount64()+2000;
         while(IsWindow(edit)&&GetTickCount64()<deadline){
             wchar_t text[32768]{};
-            if(!Send(edit,WM_GETTEXT,32768,reinterpret_cast<LPARAM>(text),result)||folder!=text)break;
+            if(cancelled()||!Send(edit,WM_GETTEXT,32768,reinterpret_cast<LPARAM>(text),result))break;
+            if(folder!=text&&(!navigation||ViewReady(dialog))){ready=true;break;}
             Sleep(20);
         }
     }
@@ -78,8 +98,13 @@ bool Jump(HWND dialog,const wchar_t* path,bool automatic=false,HWND (WINAPI *for
         if(!Send(edit,WM_GETTEXT,32768,reinterpret_cast<LPARAM>(text),result))return false;
         if(text[0]&&folder!=text)return sent;
     }
-    bool restored=alive&&WriteFilename(edit,original.data());
+    bool complete=sent&&ready&&!cancelled();
+    bool restored=alive&&WriteFilename(edit,complete&&navigation&&navigation->name?navigation->name:original.data());
     if(sent&&restored&&(!automatic||foreground()==dialog))SetForegroundWindow(dialog);
+    if(navigation){
+        if(!complete||!restored||cancelled())return false;
+        return !navigation->confirm||PostMessageW(dialog,WM_COMMAND,MAKEWPARAM(IDOK,BN_CLICKED),reinterpret_cast<LPARAM>(GetDlgItem(dialog,IDOK)));
+    }
     return sent&&restored;
 }
 using Trigger=void(__stdcall*)(HWND,int,int,int);
@@ -106,12 +131,15 @@ bool RegisterKey(int id,KeyBinding key={}){
     if(key.key>='A'&&key.key<='Z')name+=static_cast<wchar_t>(key.key);else name+=L"VK"+std::to_wstring(key.key);
     Diagnostic(L"RegisterHotKey failed key="+name+L" error="+std::to_wstring(error));return false;
 }
-struct Configuration {bool enabled=true,automatic=false;KeyBinding jump{},menu{MOD_CONTROL|MOD_SHIFT,'G'};};
+using DialogCallback=void(__stdcall*)(HWND,RECT,int,const wchar_t*);
+struct Configuration {bool enabled=true,automatic=false;KeyBinding jump{},menu{MOD_CONTROL|MOD_SHIFT,'G'};DialogCallback dialogChanged=nullptr;bool filter=false;};
 struct ApplyRequest {Configuration config;HANDLE done;};
 struct DiagnosticRequest { HANDLE done; int bits=0; };
 struct Service;
 thread_local Service* current=nullptr;
+#include "DialogTracker.h"
 struct Service {
+    DialogTracker tracker;
     Trigger trigger;std::thread worker;DWORD thread=0;HANDLE ready=CreateEventW(nullptr,TRUE,FALSE,nullptr);HWINEVENTHOOK hook=nullptr,destroyHook=nullptr;
     Hotkeys keys;std::mutex mutex;std::map<HWND,unsigned long long> activated;unsigned long long sequence=0;
     std::function<bool(int,KeyBinding)> registerKey=RegisterKey;
@@ -140,16 +168,19 @@ struct Service {
     }
     void TryPending(){
         if(!pending)return;HWND window=pending;
-        if(!config.enabled||foreground()!=window||!IsWindow(window)||GetTickCount64()>=deadline){CancelPending();return;}
+        if(!config.enabled||foreground()!=window||!IsWindow(window)){CancelPending();return;}
+        if(GetTickCount64()>=deadline){if(pendingAutomatic)Diagnostic(L"automatic readiness timeout");CancelPending();return;}
         auto edit=Filename(window);if(!edit)return;
         if(waitingRecognition){
             Diagnostic(L"delayed recognition succeeded elapsedMs="+std::to_wstring(GetTickCount64()-started));
             waitingRecognition=false;
         }
         Register(window);
+        tracker.Track(config,window,foreground());
         if(!pendingAutomatic||!config.automatic){CancelPending();return;}
         std::wstring text;if(!ReadFilename(edit,text))return;
         {std::lock_guard<std::mutex> lock(mutex);initialFilenames.emplace(window,InitialFilename{edit,text});}
+        if(!ViewReady(window))return;
         CancelPending();
         trigger(window,3,0,0);
     }
@@ -165,6 +196,7 @@ struct Service {
         auto dialog=Filename(window)?window:nullptr;
         if(dialog!=keys.dialog||(!dialog&&name==L"#32770"))Diagnostic(dialog?L"foreground recognized=1":L"foreground recognized=0");
         Register(dialog);
+        tracker.Track(config,dialog,window);
         bool automatic=config.automatic&&name==L"#32770"&&seen.insert(window).second;
         // 设置变化沿用当前识别窗口期，不增加第二个计时器或延长截止时间。
         if(pending&&automatic)pendingAutomatic=true;
@@ -175,8 +207,10 @@ struct Service {
             if(pending){timer=SetTimer(nullptr,0,40,nullptr);if(!timer)CancelPending();}
         }
     }
-    void Destroyed(HWND window){seen.erase(window);{std::lock_guard<std::mutex> lock(mutex);initialFilenames.erase(window);}if(pending==window)CancelPending();if(keys.dialog==window)Register(nullptr);if(observedForeground==window)observedForeground=nullptr;}
+    void Destroyed(HWND window){if(window&&window==tracker.dialog)tracker.Stop(true);seen.erase(window);{std::lock_guard<std::mutex> lock(mutex);initialFilenames.erase(window);}if(pending==window)CancelPending();if(keys.dialog==window)Register(nullptr);if(observedForeground==window)observedForeground=nullptr;}
     void Apply(Configuration next){
+        if(!next.enabled||!next.dialogChanged)tracker.Stop(false);
+        tracker.Configure(next);
         bool changed=!(config.jump==next.jump)||!(config.menu==next.menu);
         if(changed||!next.enabled)Register(nullptr);
         if(changed||!next.enabled)Problem(0);config=next;
@@ -201,6 +235,8 @@ struct Service {
             if(msg.message==WM_APP+46){auto request=reinterpret_cast<ApplyRequest*>(msg.lParam);Apply(request->config);SetEvent(request->done);}
             else if(msg.message==WM_APP+55){auto r=reinterpret_cast<DiagnosticRequest*>(msg.lParam);r->bits=(hook?1:0)|(destroyHook?2:0)|(timer?4:0)|(keys.direct?8:0)|(keys.menu?16:0);SetEvent(r->done);}
             else if(msg.message==WM_TIMER&&timer&&msg.wParam==timer)TryPending();
+            else if(msg.message==WM_TIMER&&tracker.timer&&msg.wParam==tracker.timer)tracker.Flush(foreground());
+            else if(msg.message==WM_TIMER&&tracker.typeTimer&&msg.wParam==tracker.typeTimer)tracker.CheckType(foreground());
             else if(msg.message==WM_HOTKEY&&config.enabled&&keys.dialog&&foreground()==keys.dialog){
                 auto edit=Filename(keys.dialog);RECT r{};
                 if(edit&&GetWindowRect(edit,&r))trigger(keys.dialog,static_cast<int>(msg.wParam),r.left,r.bottom);
@@ -256,12 +292,19 @@ API void PaneFolderJumpStop(void* value){delete static_cast<Service*>(value);}
 using EntryCallback=void(__stdcall*)(const wchar_t*,const wchar_t*,int);
 API void PaneFolderJumpEntries(void* value,EntryCallback callback){try{for(const auto& e:Entries(static_cast<Service*>(value)))callback(e.path.c_str(),e.name.c_str(),e.recent?1:0);}catch(...){}}
 API int PaneFolderJumpTo(HWND dialog,const wchar_t* path){try{return Jump(dialog,path)?1:0;}catch(...){return 0;}}
+API int PaneDialogNavigate(HWND dialog,const wchar_t* path,const wchar_t* name,int confirm,HANDLE cancel){
+    Navigation navigation{name,confirm!=0,cancel};
+    try{return Jump(dialog,path,false,GetForegroundWindow,nullptr,&navigation)?1:0;}catch(...){return 0;}
+}
 
-API void PaneFolderJumpApply(void* value,int enabled,UINT jumpMods,UINT jumpKey,UINT menuMods,UINT menuKey,int automatic){
+API void PaneFolderJumpApplySearch(void* value,int enabled,UINT jumpMods,UINT jumpKey,UINT menuMods,UINT menuKey,int automatic,DialogCallback callback,int filter){
     auto service=static_cast<Service*>(value);if(!service)return;
-    ApplyRequest request{{enabled!=0,automatic!=0,{jumpMods,jumpKey},{menuMods,menuKey}},CreateEventW(nullptr,TRUE,FALSE,nullptr)};
+    ApplyRequest request{{enabled!=0,automatic!=0,{jumpMods,jumpKey},{menuMods,menuKey},callback,filter!=0},CreateEventW(nullptr,TRUE,FALSE,nullptr)};
     if(request.done&&PostThreadMessageW(service->thread,WM_APP+46,0,reinterpret_cast<LPARAM>(&request)))WaitForSingleObject(request.done,INFINITE);
     if(request.done)CloseHandle(request.done);
+}
+API void PaneFolderJumpApply(void* value,int enabled,UINT jumpMods,UINT jumpKey,UINT menuMods,UINT menuKey,int automatic){
+    PaneFolderJumpApplySearch(value,enabled,jumpMods,jumpKey,menuMods,menuKey,automatic,nullptr,0);
 }
 API void PaneFolderJumpEntriesFiltered(void* value,EntryCallback callback,int recent){try{for(const auto& e:Entries(static_cast<Service*>(value),recent!=0))callback(e.path.c_str(),e.name.c_str(),e.recent?1:0);}catch(...){}}
 API int PaneFolderJumpAutoTo(void* value,HWND dialog,const wchar_t* path){try{return value&&static_cast<Service*>(value)->AutomaticTo(dialog,path)?1:0;}catch(...){return 0;}}

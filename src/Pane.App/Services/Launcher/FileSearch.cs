@@ -6,15 +6,34 @@ namespace Pane.Services.Launcher;
 internal sealed record EverythingPage(IReadOnlyList<FileHit> Items,int Total);
 internal interface IEverythingIpc
 {
-    Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token);
+    Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token,int timeoutMs=3000);
 }
 internal sealed class EverythingIpc:IEverythingIpc
 {
     [UnmanagedFunctionPointer(CallingConvention.Cdecl,CharSet=CharSet.Unicode)]
-    delegate void Row([MarshalAs(UnmanagedType.LPWStr)]string name,[MarshalAs(UnmanagedType.LPWStr)]string folder,int isFolder,long size,long modified);
+    internal delegate void Row([MarshalAs(UnmanagedType.LPWStr)]string name,[MarshalAs(UnmanagedType.LPWStr)]string folder,int isFolder,long size,long modified);
     [DllImport("Pane.Native.dll",CharSet=CharSet.Unicode,CallingConvention=CallingConvention.Cdecl)]
-    static extern int PaneEverythingPage(string query,int offset,int count,int sort,Row row,out int total);
-    public async Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token)
+    static extern int PaneEverythingPage(string query,int offset,int count,int sort,Row row,out int total,int timeoutMs,Microsoft.Win32.SafeHandles.SafeWaitHandle cancel,[Out]int[] info);
+    internal delegate int PageEndpoint(string query,int offset,int count,int sort,Row row,out int total,int timeoutMs,Microsoft.Win32.SafeHandles.SafeWaitHandle cancel,int[] info);
+    readonly PageEndpoint endpoint;
+    internal EverythingIpc(PageEndpoint? endpoint=null){this.endpoint=endpoint??PaneEverythingPage;}
+    static void CheckResult(int result){
+        if(result==-2)throw new TimeoutException(Strings.Launcher_EverythingTimeout);
+        if(result!=1)throw new FileSearchUnavailableException(result==0?Strings.Launcher_EverythingNotRunning:Strings.Launcher_EverythingUnavailable);
+    }
+    static readonly object logLock=new();
+    static void Log(int[] info,int result,long elapsed){
+        string name=info[0] switch{1=>"EVERYTHING_TASKBAR_NOTIFICATION",2=>"EVERYTHING_TASKBAR_NOTIFICATION_(1.5a)",_=>"-"};
+        string status=result switch{1=>"success",0=>"not-running",-2=>"timeout",_=>"rejected"};
+        try{lock(logLock){
+            var directory=Path.Combine(Environment.GetEnvironmentVariable("PANE_DATA_DIR")??Pane.Settings.SettingsStore.ProductionDirectory,"logs");
+            Directory.CreateDirectory(directory);
+            var file=Path.Combine(directory,"everything.log");
+            if(File.Exists(file)&&new FileInfo(file).Length>=65536)File.Move(file,file+".old",true);
+            File.AppendAllText(file,$"{DateTime.UtcNow:O} class={name} version={string.Join(".",info[1..])} result={status} elapsedMs={elapsed}\n");
+        }}catch(IOException){}catch(UnauthorizedAccessException){}
+    }
+    public async Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token,int timeoutMs=3000)
     {
         var work=Task.Run(()=>{
             token.ThrowIfCancellationRequested();
@@ -24,9 +43,12 @@ internal sealed class EverythingIpc:IEverythingIpc
                 if(date>0&&date<=2650467743999999999)modified=DateTimeOffset.FromFileTime(date);
                 items.Add(new(Path.Combine(folder,name),name,FileSearch.Category(name,isFolder!=0),isFolder!=0||size<0?null:size,modified));
             };
-            int result=PaneEverythingPage(query,offset,count,sort,row,out int total);GC.KeepAlive(row);
-            // TODO(design): 确认 Everything 不可用时的两条提示文案。
-            if(result!=1)throw new FileSearchUnavailableException(result==0?Strings.Launcher_EverythingNotRunning:Strings.Launcher_EverythingUnavailable);
+            var clock=System.Diagnostics.Stopwatch.StartNew();
+            int[] info=new int[5];
+            int result=endpoint(query,offset,count,sort,row,out int total,timeoutMs,token.WaitHandle.SafeWaitHandle,info);GC.KeepAlive(row);
+            token.ThrowIfCancellationRequested();
+            Log(info,result,clock.ElapsedMilliseconds);
+            CheckResult(result);
             return new EverythingPage(items,total);
         },token);
         return await work.WaitAsync(token).ConfigureAwait(false);
@@ -64,7 +86,9 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
         ArgumentOutOfRangeException.ThrowIfNegative(offset);ArgumentOutOfRangeException.ThrowIfNegative(count);
         if(string.IsNullOrWhiteSpace(query.Text))return new([],0,null);
         var text=query.Text.Trim();
-        var page=await ipc.QueryAsync(Filter(text,query.Category),offset,count,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);
+        EverythingPage page;
+        try{page=await ipc.QueryAsync(Filter(text,query.Category),offset,count,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);}
+        catch(TimeoutException){throw new FileSearchUnavailableException(Strings.Launcher_EverythingTimeout);}
         IReadOnlyDictionary<FileCategory,int>? counts=null;
         if(offset==0){
             var pending=CountsAsync(text,query.Category,page.Total);
@@ -90,8 +114,13 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
         
         try{
             var result=new Dictionary<FileCategory,int>();
-            foreach(var category in Enum.GetValues<FileCategory>())
-                result[category]=category==selected?total:(await ipc.QueryAsync(Filter(text,category),0,0,1,budget.Token).ConfigureAwait(false)).Total;
+            result[selected]=total;
+            foreach(var category in Enum.GetValues<FileCategory>()){
+                if(category==selected)continue;
+                try{result[category]=(await ipc.QueryAsync(Filter(text,category),0,0,1,budget.Token,150).ConfigureAwait(false)).Total;}
+                catch(TimeoutException){}
+                catch(OperationCanceledException) when(budget.IsCancellationRequested){break;}
+            }
             return result;
         }catch(Exception e) when(e is OperationCanceledException or FileSearchUnavailableException){return null;}
         finally{lock(countsLock){if(ReferenceEquals(countsBudget,budget))countsBudget=null;}budget.Dispose();}

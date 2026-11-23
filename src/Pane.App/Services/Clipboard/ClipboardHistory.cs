@@ -10,7 +10,7 @@ namespace Pane.Services.Clipboard;
 
 internal sealed record ClipboardContent(string? Text=null, string[]? Files=null, byte[]? Png=null,
     string Program="", string Source="", string? Icon=null, bool Exclude=false,
-    int? History=null, int? Cloud=null, bool Own=false);
+    int? History=null, int? Cloud=null, bool Own=false, RichFormats? Formats=null);
 internal interface IClipboardSource : IDisposable
 {
     event Action<ClipboardContent>? Captured;
@@ -20,13 +20,16 @@ internal interface IClipboardSource : IDisposable
 internal interface IClipboardWriter
 {
     Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token);
+    Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token,RichFormats? formats)=>PasteAsync(entry,plainText,target,token);
 }
 internal interface IClipboardImages
 {
     (int Width,int Height) Save(byte[] png,string full,string thumbnail);
     (int Width,int Height)? Thumbnail(string path,string thumbnail)=>null;
 }
-internal sealed record StoredClip(ClipEntry Entry,string Fingerprint);
+internal sealed record StoredClip(ClipEntry Entry,string Fingerprint,string? FormatId=null);
+internal sealed record ClipboardIndex(int Version,ClipTag[] Tags,StoredClip[] Entries);
+[JsonSerializable(typeof(ClipboardIndex))]
 [JsonSerializable(typeof(StoredClip[]))]
 internal partial class ClipboardJson:JsonSerializerContext { }
 
@@ -89,7 +92,7 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
                 lock(settings.StorageSync){
                 Directory.CreateDirectory(directory);
                 StoredClip[] loaded;
-                lock(sync){loaded=this.storage.Load(index);entries.AddRange(loaded);imageDirectory=StorageLocation.Resolve(settings).Path;Trim();if(entries.Count!=loaded.Length)Schedule();}
+                lock(sync){var state=this.storage.LoadIndex(index);tags.AddRange(state.Tags);loaded=state.Entries;entries.AddRange(loaded);imageDirectory=StorageLocation.Resolve(settings).Path;Trim();if(entries.Count!=loaded.Length)Schedule();}
                 log.Write("loaded",count:loaded.Length);
                 try{Cleanup(loaded,true);}catch(Exception e){log.Write("cleanup-failed",e,"startup-cleanup");}
                 source.Captured+=Capture;settings.Changed+=SettingsChanged;SettingsChanged(this,EventArgs.Empty);
@@ -122,12 +125,13 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
         lock(sync){
             if(stopping||!settings.Current.Clipboard.Enabled)return;
             var now=DateTimeOffset.UtcNow;var latest=entries.MaxBy(e=>e.Entry.CopiedAt);
-            if(s.Dedupe&&latest?.Fingerprint==fingerprint){entries[entries.IndexOf(latest)]=latest with{Entry=latest.Entry with{CopiedAt=now}};}
+            var formatId=fingerprint.StartsWith("t:",StringComparison.Ordinal)?content.Formats?.Save(directory):null;
+            if(s.Dedupe&&latest?.Fingerprint==fingerprint){entries[entries.IndexOf(latest)]=latest with{FormatId=formatId,Entry=latest.Entry with{CopiedAt=now,Rich=formatId!=null}};Trim();}
             else {
                 string id=Guid.NewGuid().ToString("N");string? full=null,thumb=null;int? width=null,height=null;
                 if(kind==ClipKind.Image){Directory.CreateDirectory(imageDirectory);full=Path.Combine(imageDirectory,id+".png");thumb=Path.Combine(imageDirectory,id+".thumb.png");var size=images.Save(content.Png!,full,thumb);width=size.Width;height=size.Height;}
                 entries.Add(new(new(id,kind,kind==ClipKind.Image?null:content.Text,kind==ClipKind.Files?content.Files?.ToArray():null,
-                    thumb==null?null:new(thumb),width,height,content.Source,content.Icon==null?null:new("app",content.Icon),now,false,full),fingerprint));
+                    thumb==null?null:new(thumb),width,height,content.Source,content.Icon==null?null:new("app",content.Icon),now,false,full){Rich=formatId!=null},fingerprint,formatId));
                 Trim();
                 if(kind==ClipKind.Files){
                     string thumbnail=Path.Combine(imageDirectory,id+".thumb.png");
@@ -141,16 +145,25 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
         Changed?.Invoke(this,EventArgs.Empty);
     }
     static string Hash(byte[] bytes)=>Convert.ToHexString(SHA256.HashData(bytes));
-    void Trim(){var remove=entries.Where(e=>!e.Entry.Pinned).OrderByDescending(e=>e.Entry.CopiedAt).Skip(settings.Current.Clipboard.Limit).ToHashSet();entries.RemoveAll(remove.Contains);TrimImages();}
+    void Trim(){var remove=entries.Where(e=>!e.Entry.Pinned&&e.Entry.Tags.Count==0).OrderByDescending(e=>e.Entry.CopiedAt).Skip(settings.Current.Clipboard.Limit).ToHashSet();entries.RemoveAll(remove.Contains);TrimImages();}
     void Schedule(){dirty=true;signal.Set();}
     public void SetPinned(string id,bool pinned)=>Change(id,e=>e with{Pinned=pinned});
     void Change(string id,Func<ClipEntry,ClipEntry> update){lock(sync){int i=entries.FindIndex(e=>e.Entry.Id==id);if(i<0)return;entries[i]=entries[i] with{Entry=update(entries[i].Entry)};Trim();Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
     public void Delete(string id){lock(sync){entries.RemoveAll(e=>e.Entry.Id==id);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
-    public void ClearUnpinned(){lock(sync){entries.RemoveAll(e=>!e.Entry.Pinned);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
-    public async Task PasteAsync(string id,bool plainText,nint targetWindow,CancellationToken cancellationToken)
+    public void ClearUnpinned(){lock(sync){entries.RemoveAll(e=>!e.Entry.Pinned&&e.Entry.Tags.Count==0);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
+    public Task PasteAsync(string id,bool plainText,nint targetWindow,CancellationToken cancellationToken)=>Paste(id,plainText,null,targetWindow,cancellationToken);
+    public Task PasteAsAsync(string id,ClipPasteAs kind,nint targetWindow,CancellationToken cancellationToken)=>Paste(id,false,kind,targetWindow,cancellationToken);
+    async Task Paste(string id,bool plainText,ClipPasteAs? kind,nint targetWindow,CancellationToken cancellationToken)
     {
-        await Ready.ConfigureAwait(false);ClipEntry entry;lock(sync)entry=entries.First(e=>e.Entry.Id==id).Entry;
-        await writer.PasteAsync(entry,plainText,targetWindow,cancellationToken).ConfigureAwait(false);
+        await Ready.ConfigureAwait(false);
+        ClipEntry entry;RichFormats? formats=null;
+        lock(sync){
+            var clip=entries.First(e=>e.Entry.Id==id);entry=clip.Entry;
+            if(kind==null&&!plainText&&clip.FormatId!=null)formats=RichFormats.Read(directory,clip.FormatId);
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        if(kind.HasValue)entry=PasteRepresentation(entry,kind.Value);
+        await writer.PasteAsync(entry,plainText,targetWindow,cancellationToken,formats).ConfigureAwait(false);
         if(settings.Current.Clipboard.MoveToTopAfterPaste)Change(id,e=>e with{CopiedAt=DateTimeOffset.UtcNow});
     }
     void CreateFileThumbnail(string id,string[] files,string thumbnail)
@@ -183,6 +196,9 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
             var keep=entries.Concat(snapshot).SelectMany(e=>new[]{e.Entry.ContentPath,e.Entry.Thumbnail?.Path,e.Entry.SourceIcon?.ImagePath})
                 .Where(p=>p!=null).ToHashSet(StringComparer.OrdinalIgnoreCase);
             keep.UnionWith(pendingThumbnails);
+            var formatIds=entries.Concat(snapshot).Select(c=>c.FormatId).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach(var path in Directory.EnumerateFiles(directory,"*.rich"))
+                if(Guid.TryParseExact(Path.GetFileNameWithoutExtension(path),"N",out _)&&!formatIds.Contains(Path.GetFileNameWithoutExtension(path)))File.Delete(path);
             foreach(var path in new[]{directory,imageDirectory}.Distinct(StringComparer.OrdinalIgnoreCase).Where(Directory.Exists).SelectMany(Directory.EnumerateFiles)){
                 string extension=Path.GetExtension(path);
                 // 用户指定的 Pane 目录可能已放了其他文件，只清理本服务生成的名称。
@@ -206,12 +222,12 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
                 if(failures==0){signal.WaitOne();shutdown.WaitOne(200);}
                 else shutdown.WaitOne(RetryDelay(failures));
                 step="snapshot";
-                StoredClip[]? snapshot;
+                ClipboardIndex? snapshot;
                 lock(settings.StorageSync){
-                lock(sync){snapshot=dirty?entries.ToArray():null;dirty=false;}
+                lock(sync){snapshot=dirty?StorageIndex():null;dirty=false;}
                 if(snapshot!=null){
-                    storage.Save(index,snapshot,value=>step=value);
-                    step="cleanup";Cleanup(snapshot);
+                    storage.SaveIndex(index,snapshot,value=>step=value);
+                    step="cleanup";Cleanup(snapshot.Entries);
                     if(failures>0)log.Write("save-recovered",count:failures);
                     failures=0;bool changed;
                     lock(sync){changed=storageProblem!=null;storageProblem=null;}

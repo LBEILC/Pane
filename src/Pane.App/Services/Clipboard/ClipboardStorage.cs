@@ -4,25 +4,33 @@ namespace Pane.Services.Clipboard;
 // 服务内部的存储替身入口，不改变界面契约。
 internal interface IClipboardStorage
 {
-    StoredClip[] Load(string index);
-    void Save(string index,StoredClip[] entries,Action<string> step);
+    ClipboardIndex LoadIndex(string index);
+    void SaveIndex(string index,ClipboardIndex state,Action<string> step);
 }
 internal sealed class ClipboardStorage:IClipboardStorage
 {
-    public StoredClip[] Load(string index)
+    public StoredClip[] Load(string index)=>LoadIndex(index).Entries;
+    public ClipboardIndex LoadIndex(string index)
     {
         // File.Exists 会将部分访问失败当成不存在；不能因此把原图误当孤立文件清理。
         try{
             using var file=File.OpenRead(index);
-            return JsonSerializer.Deserialize(file,ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException("历史索引为空"); // 不翻译：日志异常
-        }catch(FileNotFoundException){return [];}catch(DirectoryNotFoundException){return [];}
+            using var doc=JsonDocument.Parse(file);
+            if(doc.RootElement.ValueKind==JsonValueKind.Array){
+                var legacy=doc.RootElement.Deserialize(ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException();
+                return new(2,[],legacy.Select(c=>c with{FormatId=null,Entry=c.Entry with{Tags=[],Rich=false}}).ToArray());
+            }
+            var state=doc.RootElement.Deserialize(ClipboardJson.Default.ClipboardIndex);
+            return state is {Version:2,Entries:not null,Tags:not null}?state:throw new InvalidDataException("历史索引版本或内容无效");
+        }catch(FileNotFoundException){return new(2,[],[]);}catch(DirectoryNotFoundException){return new(2,[],[]);}
     }
-    public void Save(string index,StoredClip[] entries,Action<string> step)
+    public void Save(string index,StoredClip[] entries,Action<string> step)=>SaveIndex(index,new(2,[],entries),step);
+    public void SaveIndex(string index,ClipboardIndex state,Action<string> step)
     {
         step("create-directory");Directory.CreateDirectory(Path.GetDirectoryName(index)!);
         string temp=index+".tmp";step("open-temp");
         using(var file=new FileStream(temp,FileMode.Create,FileAccess.Write,FileShare.None)){
-            step("serialize");JsonSerializer.Serialize(file,entries,ClipboardJson.Default.StoredClipArray);
+            step("serialize");JsonSerializer.Serialize(file,state,ClipboardJson.Default.ClipboardIndex);
             step("flush");file.Flush(true);
         }
         step("replace-index");File.Move(temp,index,true);

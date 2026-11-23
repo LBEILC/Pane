@@ -82,12 +82,12 @@ static partial class Program
         public bool Faults=true;
         public readonly ManualResetEventSlim Success=new();
         public readonly List<DateTimeOffset> Times=[];
-        public StoredClip[] Load(string index)=>new ClipboardStorage().Load(index);
-        public void Save(string index,StoredClip[] entries,Action<string> step)
+        public ClipboardIndex LoadIndex(string index)=>new ClipboardStorage().LoadIndex(index);
+        public void SaveIndex(string index,ClipboardIndex state,Action<string> step)
         {
             Times.Add(DateTimeOffset.UtcNow);step("serialize");
             if(Faults)switch(Times.Count){case 1:throw new IOException("private-fixture-name.png");case 2:throw new UnauthorizedAccessException("private-fixture-name.png");case 3:throw new InvalidOperationException("private-fixture-name.png");case 4:throw new NotSupportedException("private-fixture-name.png");}
-            new ClipboardStorage().Save(index,entries,step);Success.Set();
+            new ClipboardStorage().SaveIndex(index,state,step);Success.Set();
         }
     }
 }

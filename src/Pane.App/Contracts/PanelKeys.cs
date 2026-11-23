@@ -35,6 +35,12 @@ public enum PanelKey
     Retry,
     /// <summary>Ctrl+B（093 分词，设计加）：剪贴板模式下、分词能力开着时才拦，界面打开分词窗口；原生侧的路由由工程照 Ctrl+P 加</summary>
     Words,
+    /// <summary>Ctrl+K（106）：剪贴板模式下拦，界面切到激活方式、打开这一条的操作列表</summary>
+    More,
+    /// <summary>Ctrl+T（106）：剪贴板模式下拦，界面切到激活方式、打开标签选择</summary>
+    Tags,
+    /// <summary>Ctrl+E（106）：剪贴板模式下拦，界面切到激活方式、原地编辑</summary>
+    Edit,
 }
 
 /// <summary>接管哪一组键。</summary>

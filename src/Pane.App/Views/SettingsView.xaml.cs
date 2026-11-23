@@ -21,7 +21,8 @@ namespace Pane.Views;
 public sealed partial class SettingsView : UserControl, IPanelView
 {
     // Mod：这个分区属于哪块能力（055），能力停用时分区从导航里收起；null = 不属于任何能力，总在
-    sealed record Section(string Id, string Name, string Glyph, string Desc, Action Render, string? Mod = null);
+    // Group：导航分组（2026-11-23）。top / end 不写组名只留间距，input / mouse 有组名；一组里的分区都停用时组名也不出
+    sealed record Section(string Id, string Name, string Glyph, string Desc, Action Render, string? Mod = null, string Group = "top");
 
     readonly App app = (App)Application.Current;
     readonly List<Section> sections;
@@ -38,18 +39,20 @@ public sealed partial class SettingsView : UserControl, IPanelView
         InitializeComponent();
         sections =
         [
+            // 2026-11-23 用户定：按关联分四组（docs/design.md「设置页」导航分组）；通用拆出外观，原「图标」并进外观；加快捷键总览
             new("general", Strings.Settings_General, "gear", Strings.Settings_General_Description, RenderGeneral),
+            new("appearance", Strings.Settings_Appearance, "palette", Strings.Settings_Appearance_Description, RenderAppearance),
+            new("hotkeys", Strings.Settings_Hotkeys, "keyboard", Strings.Settings_Hotkeys_Description, RenderHotkeys),
             new("modules", Strings.Settings_Modules, "blocks", Strings.Settings_Modules_Description, RenderModules),
-            new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher, ModuleIds.Launcher),
-            new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard, ModuleIds.Clipboard),
-            new("words", Strings.Module_Words_Name, "words", Strings.Settings_Words_Description, RenderWords, ModuleIds.Words),
-            new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures),
-            new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel),
-            new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump),
-            new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi, ModuleIds.Ai),
-            new("icons", Strings.Settings_Icons, "app", Strings.Settings_Icons_Description, RenderIcons),
-            new("data", Strings.Settings_Data, "database", Strings.Settings_Data_Description, RenderData),
-            new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout),
+            new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher, ModuleIds.Launcher, "input"),
+            new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard, ModuleIds.Clipboard, "input"),
+            new("words", Strings.Module_Words_Name, "words", Strings.Settings_Words_Description, RenderWords, ModuleIds.Words, "input"),
+            new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi, ModuleIds.Ai, "input"),
+            new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures, "mouse"),
+            new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel, "mouse"),
+            new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump, "mouse"),
+            new("data", Strings.Settings_Data, "database", Strings.Settings_Data_Description, RenderData, null, "end"),
+            new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout, null, "end"),
         ];
         current = sections[0];
         // 设计预览（只在演示模式）：PANE_DESIGN_TOOLTIP=1 打开后直接显示关闭按钮的提示气泡，截图核对 Controls.xaml 的 ToolTip 样式
@@ -200,7 +203,19 @@ public sealed partial class SettingsView : UserControl, IPanelView
         navItems.Clear();
         if (!Visible(current)) current = sections.First(s => s.Id == "modules");
         navPlaced = false;
-        foreach (var s in sections.Where(Visible)) Nav.Children.Add(NavItem(s));
+        string? last = null;
+        foreach (var s in sections.Where(Visible))
+        {
+            if (last != null && s.Group != last)
+            {
+                // 组名同启动器的组名（xs、次要文字色）；top / end 不写组名，只留 12 的间距
+                var label = s.Group switch { "input" => Strings.Settings_NavGroup_Input, "mouse" => Strings.Settings_NavGroup_Mouse, _ => null };
+                Nav.Children.Add(label is null ? new Border { Height = 6 }
+                    : new TextBlock { Text = label, Margin = new Thickness(10, 6, 10, 2), FontFamily = DescProto.FontFamily, FontSize = DescProto.FontSize, Foreground = DescProto.Foreground, CharacterSpacing = 20 });
+            }
+            last = s.Group;
+            Nav.Children.Add(NavItem(s));
+        }
     }
 
     Grid NavItem(Section s)
@@ -209,7 +224,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, VerticalAlignment = VerticalAlignment.Center };
         row.Children.Add(new PaneIcon { Glyph = s.Glyph, Width = 17, Height = 17, VerticalAlignment = VerticalAlignment.Center });
         row.Children.Add(text);
-        var item = new Grid { Height = 36, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Tag = s };
+        var item = new Grid { Height = 32, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Tag = s };
         item.Children.Add(row);
         item.Tapped += (_, _) => Show(s);
         item.SizeChanged += (_, _) => { if (!navPlaced && ReferenceEquals(item.Tag, current)) { navPlaced = true; navHighlight.MoveTo(item, false); } };

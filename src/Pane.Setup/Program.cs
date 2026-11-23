@@ -18,10 +18,11 @@ internal static class Program
         try
         {
             // 外壳等待期间不能持有待替换目录；卸载中转也走此入口。
-            Environment.CurrentDirectory = Path.GetTempPath();
-            UninstallChain.Log("wrapper-entry", path: Environment.ProcessPath);
+            Environment.CurrentDirectory = Environment.SystemDirectory;
             int isolatedIndex = Array.IndexOf(args, "--self-test-root");
             if (isolatedIndex >= 0 && isolatedIndex + 1 < args.Length) isolated = SetupPaths.Isolated(args[isolatedIndex + 1]).Root;
+            UninstallChain.IsolatedLogRoot=isolated;
+            UninstallChain.Log("wrapper-entry", path: Environment.ProcessPath);
             var values = args.ToList();
             int launcherIndex = values.IndexOf("--launcher-pid");
             if (launcherIndex >= 0)
@@ -51,6 +52,7 @@ internal static class Program
                 UninstallChain.Launch(paths, Environment.ProcessPath!, isolated, (where, error) => { step = where; throw error; });
                 return 0;
             }
+            step = "prepare-temp";
             if (relay) helperLease = UninstallChain.Lease(Environment.ProcessPath!, isolated);
             step = "cleanup-stale";
             UninstallChain.Cleanup(isolated);
@@ -61,18 +63,35 @@ internal static class Program
                 string expected = (isolated == null ? SetupPaths.Production : SetupPaths.Isolated(isolated)).ResolveInstalled(isolated).App;
                 if (!SetupFiles.Full(args[1]).Equals(SetupFiles.Full(expected), StringComparison.OrdinalIgnoreCase)) throw new IOException("卸载目录无效");
             }
-            temporary = Path.Combine(Path.GetTempPath(), "Pane-Setup-" + Guid.NewGuid().ToString("N"));
-            temporaryLease = UninstallChain.Lease(temporary, isolated);
-            step = relay ? "copy-app" : "extract-package";
-            UninstallChain.Log(step, "begin", path: temporary);
-            if (relay) SetupFiles.Copy(args[1], temporary);
-            else
+            (temporary,temporaryLease)=UninstallChain.WithTemporaryRoot(isolated,root=>
             {
-                using var payload = Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip") ?? throw new IOException("安装包缺少程序文件");
-                using var zip = new ZipArchive(payload, ZipArchiveMode.Read);
-                zip.ExtractToDirectory(temporary);
-            }
-            UninstallChain.Log(step, path: temporary);
+                step="prepare-temp";
+                string directory=Path.Combine(root,"Pane-Setup-"+Guid.NewGuid().ToString("N"));
+                SetupFiles.Check(directory);
+                var lease=UninstallChain.Lease(directory,isolated);
+                try
+                {
+                    Directory.CreateDirectory(directory);
+                    step=relay?"copy-app":"extract-package";
+                    UninstallChain.Log(step,"begin",path:directory);
+                    if(relay)SetupFiles.Copy(args[1],directory);
+                    else
+                    {
+                        using var payload=Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip") ?? throw new IOException("安装包缺少程序文件");
+                        using var zip=new ZipArchive(payload,ZipArchiveMode.Read);
+                        zip.ExtractToDirectory(directory);
+                    }
+                    UninstallChain.Log(step,path:directory);
+                    return (directory,lease);
+                }
+                catch
+                {
+                    bool removed=UninstallChain.DeleteTemporary(directory,"cleanup-app",0);
+                    lease.Dispose();
+                    if(removed)UninstallChain.DeleteTemporary(directory+".lease","cleanup-lease",0);
+                    throw;
+                }
+            });
             Pane.Diagnostics.SetupFailureProbe.Extracted(isolated, temporary);
             UninstallChain.WaitReadable(temporary);
             var start = new ProcessStartInfo(Path.Combine(temporary, "Pane.App.exe")) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = temporary };
@@ -114,10 +133,10 @@ internal static class Program
         }
         catch (Exception error)
         {
-            UninstallChain.Log(step, "failed", error);
+            var log=UninstallChain.Log(step, "failed", error);
             UninstallChain.Signal(readyEvent);
-            string description = step switch { "extract-package" => "解压安装文件", "cleanup-stale" => "清理旧的临时文件", "start-worker" => "启动安装界面", "worker-exit" => "安装界面意外退出", _ => step }; // 不翻译：安装外壳没有资源
-            string message = $"没有装上：{description}出错。\n{UninstallChain.Reason(error)}\n日志：{UninstallChain.LogPath}"; // 不翻译：安装外壳没有资源
+            string description = step switch { "prepare-temp" => "准备临时文件", "extract-package" => "解压安装文件", "cleanup-stale" => "清理旧的临时文件", "start-worker" => "启动安装界面", "worker-exit" => "安装界面意外退出", _ => step }; // 不翻译：安装外壳没有资源
+            string message = $"没有装上：{description}出错。\n{UninstallChain.Reason(error)}" + (log==null?"":$"\n日志：{log}"); // 不翻译：安装外壳没有资源
             if (isolated != null) { Directory.CreateDirectory(isolated); File.WriteAllText(Path.Combine(isolated, "wrapper-error.txt"), message + "\n" + error); }
             else MessageBoxW(0, message, "Pane 安装程序", 0x10); // 不翻译：安装外壳没有资源
             return 1;

@@ -184,7 +184,7 @@ void Lifecycle(){
 }
 void AutomaticDialog(int mode,const std::wstring& start,const std::wstring& target){
     // 5/6 验证另存为预填与延迟出现；2/7 在捕获初始值后模拟用户修改。
-    bool save=mode>=5;changeBeforeJump=mode==2||mode==7;
+    bool legacy=mode==9, early=mode>=8, save=mode>=5&&!early;changeBeforeJump=mode==2||mode==7;
     fileOk=0;overwrite=0;HRESULT shown=E_ABORT;
     autoRequests=autoJumps=menus=0;fixtureExplorers.clear();
     if(mode!=1){fixtureExplorers.push_back({H(1),start,L"",false,1});fixtureExplorers.push_back({H(2),target,L"",false,2});}
@@ -197,8 +197,9 @@ void AutomaticDialog(int mode,const std::wstring& start,const std::wstring& targ
         }
         if(!window){PostThreadMessageW(mainThread,WM_QUIT,0,0);return;}
         // 等测试对话框完成 Show 初始化，再模拟首次前台；与手动跳转夹具一致。
-        Sleep(500);found=true;auto edit=Filename(window);DWORD_PTR result=0;
-        if(!save)Send(edit,WM_SETTEXT,0,reinterpret_cast<LPARAM>(L""),result);
+        if(!early)Sleep(500);
+        found=true;auto edit=Filename(window);DWORD_PTR result=0;
+        if(!save&&!early)Send(edit,WM_SETTEXT,0,reinterpret_cast<LPARAM>(L""),result);
         std::wstring initialText;Check(ReadFilename(edit,initialText),"fixture reads initial displayed filename");
         if(save)Check(!initialText.empty(),"save fixture starts with prefilled filename");
         Service service(AutomaticTrigger);service.foreground=FixtureForeground;fixtureForeground=window;
@@ -215,22 +216,31 @@ void AutomaticDialog(int mode,const std::wstring& start,const std::wstring& targ
         repeats=autoJumps;
         config.jump={MOD_ALT,'J'};service.Apply(config);
         Check(service.keys.dialog==window&&service.keys.direct,"foreground dialog immediately uses custom binding");
-        {std::lock_guard<std::mutex> lock(folderMutex);navigated=Key(observed)==Key(target);}
+        if(legacy){wchar_t folder[32768]{};Send(window,CDM_GETFOLDERPATH,32768,reinterpret_cast<LPARAM>(folder),result);navigated=Key(folder)==Key(target);}
+        else{std::lock_guard<std::mutex> lock(folderMutex);navigated=Key(observed)==Key(target);}
+        if(early)Check(IsWindow(window),"early navigation leaves dialog open");
         wchar_t text[256]{};Send(edit,WM_GETTEXT,256,reinterpret_cast<LPARAM>(text),result);inputPreserved=std::wstring(text)==(changeBeforeJump?L"user-input.txt":initialText);
         Check(service.seen.count(window)==1&&!service.pending&&!service.timer,"attempt remembered and retry timer removed");
         service.Destroyed(window);Check(service.seen.count(window)==0,"destroy notification forgets HWND");
         Check(service.initialFilenames.count(window)==0,"destroy notification forgets initial filename");
         config.enabled=false;service.Apply(config);fixtureForeground=nullptr;PostMessageW(window,WM_CLOSE,0,0);
     });
+    if(legacy){
+        wchar_t file[1024]{};OPENFILENAMEW ofn{};ofn.lStructSize=sizeof(ofn);ofn.lpstrFile=file;ofn.nMaxFile=1024;
+        ofn.lpstrInitialDir=start.c_str();ofn.lpstrFilter=L"All\0*.*\0\0";ofn.Flags=OFN_EXPLORER|OFN_NOCHANGEDIR|OFN_DONTADDTORECENT|OFN_ENABLEHOOK;
+        ofn.lpfnHook=[](HWND,UINT,WPARAM,LPARAM)->UINT_PTR{return 0;};
+        Check(!GetOpenFileNameW(&ofn),"legacy dialog cancelled by fixture");
+    }else{
     ComPtr<IFileDialog> dialog;Check(SUCCEEDED(CoCreateInstance(save?CLSID_FileSaveDialog:CLSID_FileOpenDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&dialog))),"create auto fixture dialog");
     if(dialog){ComPtr<IShellItem> folder;SHCreateItemFromParsingName(start.c_str(),nullptr,IID_PPV_ARGS(&folder));dialog->SetFolder(folder.Get());dialog->SetOptions(FOS_DONTADDTORECENT|FOS_NOCHANGEDIR|FOS_FORCEFILESYSTEM);
         if(save)dialog->SetFileName(L"预填文件名.txt");
         auto events=new Events;DWORD cookie=0;dialog->Advise(events,&cookie);events->Release();shown=dialog->Show(nullptr);dialog->Unadvise(cookie);
         if(save&&SUCCEEDED(shown)){std::ofstream file(std::filesystem::path(target)/L"unexpected-auto-save.txt");file<<"unexpected";}}
+    }
     driver.join();Check(found,"automatic real dialog recognized");
     Check(autoRequests==(mode==4?0:1),"automatic request reaches Explorer substitute when initial text captured");
     Check(autoJumps==(mode==1||mode==2||mode==4||mode==7?0:1)&&repeats==autoJumps,"new dialog jumps once and never on return");
-    Check(navigated==(mode==0||mode==3||mode==5||mode==6),"automatic selects most recently activated fixture folder");
+    Check(navigated==(mode==0||mode==3||mode==5||mode==6||early),"automatic selects most recently activated fixture folder");
     Check(menus==0,"automatic never falls back to menu");Check(inputPreserved,"automatic preserves user text");
     if(save){Check(fileOk==0&&overwrite==0,"automatic save navigation never submits or overwrites");Check(shown==HRESULT_FROM_WIN32(ERROR_CANCELLED),"automatic save stays open until cancelled");Check(std::filesystem::is_empty(target),"automatic save creates no files");}
     logFile<<"auto mode="<<mode<<" requests="<<autoRequests<<" jumps="<<autoJumps<<" navigated="<<navigated<<std::endl;
@@ -263,6 +273,10 @@ void DelayedRecognition(const std::wstring& root){
             auto accept=CreateWindowExW(0,L"Button",L"",WS_CHILD|WS_VISIBLE,0,60,40,20,window,reinterpret_cast<HMENU>(IDOK),wc.hInstance,nullptr);
             auto edit=CreateWindowExW(0,L"Edit",L"",WS_CHILD|WS_VISIBLE,0,90,100,20,window,reinterpret_cast<HMENU>(0x480),wc.hInstance,nullptr);
             Check(shell&&accept&&edit,"fixture creates delayed child controls");
+            if(mode==1){
+                pump(80);Check(autoRequests==requests,"filename alone cannot trigger automatic jump");
+                CreateWindowExW(0,L"SysListView32",L"",WS_CHILD|WS_VISIBLE,0,0,30,30,shell,nullptr,wc.hInstance,nullptr);
+            }
             pump(150);
             bool recognized=mode==0||mode==1||mode==5;
             Check((service.keys.dialog==window)==recognized,"only active bounded wait recognizes delayed controls");
@@ -314,15 +328,23 @@ void Idle(){
     logFile<<"idle baselineCpuMs="<<baseline/10000.0<<" enabledCpuMs="<<enabled/10000.0<<" wallMs=5000 each"<<std::endl;
     Check(enabled<=baseline+156250,"idle CPU within one scheduler accounting tick");
 }
+#include "DialogSearch107.h"
 }
 int wmain(int argc,wchar_t** argv){
-    if(argc!=2)return 2;wchar_t desktop[256]{};DWORD needed=0;
+    if(argc!=2&&argc!=3)return 2;wchar_t desktop[256]{};DWORD needed=0;
     if(!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,desktop,sizeof(desktop),&needed)||wcsncmp(desktop,L"Pane027-",8)!=0)return 2;
-    logFile.open(argv[1]);Apartment apartment;Policy();
+    logFile.open(argv[1]);Apartment apartment;
+    if(argc==3)return std::wstring(argv[2])==L"--107"?SearchSuite():2;
+    Policy();
     wchar_t temp[MAX_PATH]{};GetTempPathW(MAX_PATH,temp);auto root=std::wstring(temp)+L"Pane038-"+std::to_wstring(GetCurrentProcessId());auto target=root+L"\\目标目录";
     CreateDirectoryW(root.c_str(),nullptr);CreateDirectoryW(target.c_str(),nullptr);
     for(int kind=0;kind<8;kind++)RealDialog(kind,root,target);
     Check(!PaneFolderJumpTo(nullptr,target.c_str()),"closed dialog ignored");
-    Lifecycle();for(int mode=0;mode<8;mode++)AutomaticDialog(mode,root,target);DelayedRecognition(root);Conflict(root);Idle();RemoveDirectoryW(target.c_str());RemoveDirectoryW(root.c_str());
+    Lifecycle();for(int mode=0;mode<8;mode++)AutomaticDialog(mode,root,target);DelayedRecognition(root);Conflict(root);Idle();
+    auto busy=std::filesystem::path(root)/L"busy";std::filesystem::create_directory(busy);
+    for(int i=0;i<1200;++i)std::ofstream(busy/std::to_wstring(i));
+    for(auto& start:std::vector<std::wstring>{root,busy.wstring()})
+        for(int i=0;i<20;++i){AutomaticDialog(8,start,target);AutomaticDialog(9,start,target);}
+    std::filesystem::remove_all(busy);RemoveDirectoryW(target.c_str());RemoveDirectoryW(root.c_str());
     logFile<<"assertions="<<assertions<<" failures="<<failures<<std::endl;return failures?1:0;
 }

@@ -20,21 +20,28 @@ public sealed partial class SettingsView
 {
     // ================= 剪贴板 =================
 
+    // 呼出热键这一行：剪贴板分区和快捷键页共用
+    FrameworkElement ClipboardHotkeyRow(string label)
+    {
+        var s = app.Store.Current;
+        var c = s.Clipboard;
+        var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
+        var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }), doubleTap: true);
+        var winv = app.WinV;
+        return conflict != null ? Row(label, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
+            : Row(label, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? (c.KeepHotkeyWithWinV ? Strings.Settings_Clipboard_WinVActive : Strings.Settings_Clipboard_WinVOnly) : c.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null), hotkey);
+    }
+
     void RenderClipboard()
     {
         var s = app.Store.Current;
         var c = s.Clipboard;
         // 总开关（033）挪到「能力」页（055）；停用时宿主先把 Win+V 还给系统
-        var conflict = app.HotkeyConflicts.FirstOrDefault(x => x.Target == "clipboard");
-        var hotkey = Hotkey(c.Hotkey, s.Launcher.Hotkey, h => SaveClipboard(x => x with { Hotkey = h }), doubleTap: true);
         var winv = app.WinV;
-        var call = new List<FrameworkElement>
-        {
-            conflict != null ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
-                             : Row(Strings.Settings_Hotkey, DevHotkey("clipboard") ?? (winv?.State == WinVState.On ? (c.KeepHotkeyWithWinV ? Strings.Settings_Clipboard_WinVActive : Strings.Settings_Clipboard_WinVOnly) :c.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null), hotkey),
-        };
+        var call = new List<FrameworkElement> { ClipboardHotkeyRow(Strings.Settings_Hotkey) };
         if (winv != null) call.AddRange(WinVRows(winv));
         Group(Strings.Settings_Clipboard_Activation, call.ToArray());
+        RenderClipboardLook(c);   // 2026-11-23：按键提示、面板高度
 
         // 三种类型至少留一种（设置模型要求）：只剩一种时点它不响应，说明里写清楚
         int kinds = (c.RecordText ? 1 : 0) + (c.RecordImages ? 1 : 0) + (c.RecordFiles ? 1 : 0);
@@ -49,6 +56,8 @@ public sealed partial class SettingsView
                     v => SaveClipboard(x => x with { Limit = int.Parse(v) }))),
             Row(Strings.Settings_Clipboard_Deduplicate, Strings.Settings_Clipboard_DeduplicateDescription, Switch(c.Dedupe, v => SaveClipboard(x => x with { Dedupe = v }))),
             Row(Strings.Settings_Clipboard_MovePastedFirst, Strings.Settings_Clipboard_MovePastedFirstDescription, Switch(c.MoveToTopAfterPaste, v => SaveClipboard(x => x with { MoveToTopAfterPaste = v }))));
+
+        RenderClipboardTags();   // 2026-11-23：标签管理
 
         var excluded = c.ExcludedPrograms.Select(name => ListRow("shield", name, Strings.Settings_Clipboard_ExcludedProgram, false,
             IconButton("close", Strings.Common_Remove, () => { SaveClipboard(x => x with { ExcludedPrograms = x.ExcludedPrograms.Where(v => !string.Equals(v, name, StringComparison.OrdinalIgnoreCase)).ToArray() }); Render(); }))).ToList();

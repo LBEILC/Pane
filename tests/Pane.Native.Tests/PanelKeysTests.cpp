@@ -58,6 +58,15 @@ LRESULT key(unsigned vk,bool down,ULONG_PTR tag=0,DWORD flags=0){KBDLLHOOKSTRUCT
 void unit(){
  using namespace pane;
  std::array<bool,256> held{};
+ for(auto [vk,action]:std::array<std::pair<unsigned,PanelAction>,3>{{{'K',PanelMore},{'T',PanelTags},{'E',PanelEdit}}}){
+  for(auto mode:{PanelMode::Clipboard,PanelMode::ClipboardWithSend,PanelMode::Super}){
+   for(auto mods:{PanelModifiers{true},PanelModifiers{true,true},PanelModifiers{true,false,true},PanelModifiers{true,false,false,true}}){
+    PanelKeys panel;panel.begin(mode,held);auto event=panel.feed({vk,0,true},mods,0);
+    bool take=mode!=PanelMode::Super&&!mods.alt&&!mods.win&&!mods.shift;
+    check(event.swallow==take&&event.action==(take?action:PanelNone),"106 clipboard shortcuts");
+   }
+  }
+ }
  struct Row {unsigned vk;PanelModifiers mods;PanelAction action;};
  const Row rows[]={
   {0x26,{},PanelUp},{0x28,{},PanelDown},{13,{},PanelEnter},{13,{false,false,false,true},PanelShiftEnter},

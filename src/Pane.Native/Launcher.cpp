@@ -125,32 +125,60 @@ static int shellIcon(const wchar_t* parsing,const wchar_t* output,int size){
 API int PaneLauncherIcon(const wchar_t* parsing,const wchar_t* output){return shellIcon(parsing,output,256);}
 API int PaneFileIcon(const wchar_t* path,const wchar_t* output){return shellIcon(path,output,64);}
 API int PaneEverythingVersion(int* version){auto h=endpoint();if(!h)return 0;for(int i=0;i<4;i++){DWORD_PTR v=0;if(!SendMessageTimeoutW(h,WM_USER,static_cast<WPARAM>(i),0,SMTO_ABORTIFHUNG,30,&v))return -1;version[i]=static_cast<int>(v);}return version[0]>1||(version[0]==1&&version[1]>=4)?1:-1;}
+static int waitReply(Query& q,ULONGLONG start,DWORD timeout,HANDLE cancel){
+ for(;;){
+  if(cancel&&WaitForSingleObject(cancel,0)==WAIT_OBJECT_0)return -3;
+  if(q.done)return 1;
+  auto elapsed=GetTickCount64()-start;if(elapsed>=timeout)return -2;
+  auto result=MsgWaitForMultipleObjects(cancel?1:0,cancel?&cancel:nullptr,FALSE,static_cast<DWORD>(timeout-elapsed),QS_ALLINPUT);
+  if(result==WAIT_FAILED)return -1;
+  MSG msg;while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}
+ }
+}
+static int sendQuery(Query& q,HWND receiver,COPYDATASTRUCT& packet,DWORD timeout,HANDLE cancel){
+ DWORD_PTR accepted=0;
+ auto start=GetTickCount64();
+ SetLastError(ERROR_SUCCESS);
+ auto sent=SendMessageTimeoutW(q.target,WM_COPYDATA,reinterpret_cast<WPARAM>(receiver),
+     reinterpret_cast<LPARAM>(&packet),SMTO_ABORTIFHUNG,timeout,&accepted);
+ // 对方可能在处理请求期间同步回包，此时查询已经完成。
+ if(q.done)return 1;
+ if(!sent)return GetLastError()==ERROR_TIMEOUT?-2:-1;
+ if(!accepted)return -1;
+ return waitReply(q,start,timeout,cancel);
+}
 using FileCallback=void(__cdecl*)(const wchar_t*,const wchar_t*,int);
 API int PaneEverythingQuery(const wchar_t* query,int limit,FileCallback callback){
- auto start=GetTickCount64();Query q;q.target=endpoint();if(!q.target)return 0;static std::atomic<DWORD> serial=0;q.serial=++serial;q.limit=static_cast<DWORD>(limit);
+ Query q;q.target=endpoint();if(!q.target)return 0;static std::atomic<DWORD> serial=0;q.serial=++serial;q.limit=static_cast<DWORD>(limit);
  WNDCLASSW wc{};wc.lpfnWndProc=replyProc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"PaneLauncherReply";RegisterClassW(&wc);
  HWND h=CreateWindowW(wc.lpszClassName,L"",0,0,0,0,0,HWND_MESSAGE,nullptr,wc.hInstance,&q);if(!h)return -1;
  size_t bytes=(wcslen(query)+1)*2;std::vector<BYTE> payload(20+bytes);DWORD header[5]={static_cast<DWORD>(reinterpret_cast<ULONG_PTR>(h)),q.serial,0,0,q.limit};memcpy(payload.data(),header,20);memcpy(payload.data()+20,query,bytes);
- COPYDATASTRUCT c{2,static_cast<DWORD>(payload.size()),payload.data()};DWORD_PTR accepted=0;
- bool sent=SendMessageTimeoutW(q.target,WM_COPYDATA,reinterpret_cast<WPARAM>(h),reinterpret_cast<LPARAM>(&c),SMTO_ABORTIFHUNG,150,&accepted)!=0;
- while(sent&&accepted&&!q.done&&GetTickCount64()-start<150){MSG msg;while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}if(!q.done)MsgWaitForMultipleObjects(0,nullptr,FALSE,1,QS_ALLINPUT);}
- DestroyWindow(h);if(!q.done)return -1;for(size_t i=0;i<q.names.size();i++)callback(q.names[i].c_str(),q.folders[i].c_str(),q.kinds[i]);return static_cast<int>(q.names.size());
+ COPYDATASTRUCT c{2,static_cast<DWORD>(payload.size()),payload.data()};
+ int result=sendQuery(q,h,c,150,nullptr);
+ DestroyWindow(h);if(result!=1)return result;for(size_t i=0;i<q.names.size();i++)callback(q.names[i].c_str(),q.folders[i].c_str(),q.kinds[i]);return static_cast<int>(q.names.size());
 }
 // QUERY2 字段与布局依据 Everything SDK 的 everything_ipc.h。
 using FilePageCallback=void(__cdecl*)(const wchar_t*,const wchar_t*,int,long long,long long);
-API int PaneEverythingPage(const wchar_t* query,int offset,int limit,int sort,FilePageCallback callback,int* total){
- Query q;q.extended=true;q.target=endpoint();if(!q.target)return 0;
+static int queryPage(HWND target,const wchar_t* query,int offset,int limit,int sort,FilePageCallback callback,int* total,DWORD timeout,HANDLE cancel,int* info){
+ Query q;q.extended=true;q.target=target;if(!q.target)return 0;
+ wchar_t name[80]{};GetClassNameW(q.target,name,80);info[0]=wcscmp(name,L"EVERYTHING_TASKBAR_NOTIFICATION")==0?1:2;
  static std::atomic<DWORD> serial=100000;q.serial=++serial;q.limit=static_cast<DWORD>(limit);
  WNDCLASSW wc{};wc.lpfnWndProc=replyProc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"PaneFilesReply";RegisterClassW(&wc);
  HWND h=CreateWindowW(wc.lpszClassName,L"",0,0,0,0,0,HWND_MESSAGE,nullptr,wc.hInstance,&q);if(!h)return -1;
  size_t bytes=(wcslen(query)+1)*2;std::vector<BYTE> payload(28+bytes);
  DWORD header[7]={static_cast<DWORD>(reinterpret_cast<ULONG_PTR>(h)),q.serial,0,static_cast<DWORD>(offset),q.limit,0x53,static_cast<DWORD>(sort)};
  memcpy(payload.data(),header,28);memcpy(payload.data()+28,query,bytes);
- COPYDATASTRUCT c{18,static_cast<DWORD>(payload.size()),payload.data()};DWORD_PTR accepted=0;auto start=GetTickCount64();
- bool sent=SendMessageTimeoutW(q.target,WM_COPYDATA,reinterpret_cast<WPARAM>(h),reinterpret_cast<LPARAM>(&c),SMTO_ABORTIFHUNG,150,&accepted)!=0;
- while(sent&&accepted&&!q.done&&GetTickCount64()-start<150){MSG msg;while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}if(!q.done)MsgWaitForMultipleObjects(0,nullptr,FALSE,1,QS_ALLINPUT);}
- DestroyWindow(h);if(!q.done)return -1;*total=static_cast<int>((std::min)(q.total,static_cast<DWORD>(INT_MAX)));
+ COPYDATASTRUCT c{18,static_cast<DWORD>(payload.size()),payload.data()};
+ int result=sendQuery(q,h,c,timeout,cancel);
+ DestroyWindow(h);
+ if(result!=-3){
+  for(int i=0;i<4;++i){DWORD_PTR part=0;if(!SendMessageTimeoutW(q.target,WM_USER,i,0,SMTO_ABORTIFHUNG,10,&part))break;info[i+1]=static_cast<int>(part);}
+ }
+ if(result!=1)return result;*total=static_cast<int>((std::min)(q.total,static_cast<DWORD>(INT_MAX)));
  for(size_t i=0;i<q.names.size();i++)callback(q.names[i].c_str(),q.folders[i].c_str(),q.kinds[i],q.sizes[i],q.dates[i]);return 1;
+}
+API int PaneEverythingPage(const wchar_t* query,int offset,int limit,int sort,FilePageCallback callback,int* total,DWORD timeout,HANDLE cancel,int* info){
+ return queryPage(endpoint(),query,offset,limit,sort,callback,total,timeout,cancel,info);
 }
 namespace {
 int launcherOpen(const wchar_t* target,int packaged){

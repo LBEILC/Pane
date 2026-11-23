@@ -110,6 +110,7 @@ public sealed partial class App : Application
         if(!Pane.Services.Clipboard.ClipboardAccess.Allow(command,Store.Current.Clipboard.Enabled,text=>shell?.NotifyOnce(text)))return;
         WakeFrames();
         if(command.StartsWith("tray-menu ",StringComparison.Ordinal)){ShowTrayMenu(command[10..]);return;}/* 设计：托盘菜单 */
+        if(command=="show-launcher"&&FocusDialogBar())return;   /* 对话框在前台：启动器热键改为聚焦对话框搜索框（2026-11-23） */
         if(command=="show-launcher"&&!demo){launcherSearch?.RefreshIndex();_ = FileSearchStatus.RefreshAsync(cancellation.Token);}
         if(command=="pause-gestures"){if(gestureService!=null)gestureService.SetPaused(!gestureService.IsPaused);return;}
         if(command=="exit"){Shutdown();return;}

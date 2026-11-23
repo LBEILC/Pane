@@ -43,7 +43,7 @@ static partial class Program
             Check(settingsNode["Clipboard"]!["KeepHotkeyWithWinV"]!.GetValue<bool>()==false,"084 exported preference");
             Check(settingsNode["Words"]!["Hotkey"]!["DoubleTap"]!.GetValue<bool>()&&settingsNode["Words"]!["Join"]!.GetValue<string>()=="Line","093 exported words");
             var preview=await Transfer(source).InspectAsync(zip,default);Check(preview.HasSettings&&preview.HasUsage&&preview.ClipboardEntries==(option==ClipboardExport.None?0:option==ClipboardExport.TextOnly?2:3)&&preview.ClipboardImages==(option==ClipboardExport.WithImages?1:0),"preview counts");
-            if(option!=ClipboardExport.None){var clips=JsonSerializer.Deserialize(ZipText(zip,"clipboard/history.json"),ClipboardJson.Default.StoredClipArray)!;Check(clips.All(c=>c.Entry.Kind!=ClipKind.Files),"no files");Check(clips[0].Entry.Pinned&&clips[0].Entry.CopiedAt==text.Entry.CopiedAt&&clips[0].Entry.Source=="fixture","metadata");}
+            if(option!=ClipboardExport.None){var clips=JsonSerializer.Deserialize(ZipText(zip,"clipboard/history.json"),ClipboardJson.Default.ClipboardIndex)!.Entries;Check(clips.All(c=>c.Entry.Kind!=ClipKind.Files),"no files");Check(clips[0].Entry.Pinned&&clips[0].Entry.CopiedAt==text.Entry.CopiedAt&&clips[0].Entry.Source=="fixture","metadata");}
             Check(names.Count(n=>n.StartsWith("clipboard/images/"))==(option==ClipboardExport.WithImages?2:0),"image entries");if(option==ClipboardExport.WithImages)full=zip;
         }
         string destination=Path.Combine(root,"failed.zip");Put(destination,"previous");
@@ -56,7 +56,7 @@ static partial class Program
         await Reject(()=>Transfer(source).StageImportAsync(none,new(true,true,true,DataImportMode.Replace),null,default),Strings.Data_ImportNothing);
         string plain=Path.Combine(root,"plain");Put(plain,"plain");
         foreach(string bad in new[]{plain,Bad("no-manifest",_=>{}),Bad("broken",z=>Entry(z,"manifest.json","{"))})await Reject(()=>Transfer(source).InspectAsync(bad,default),Strings.Data_ImportInvalid);
-        var newer=manifest.DeepClone();newer["format"]=2;await Reject(()=>Transfer(source).InspectAsync(Bad("newer",z=>Entry(z,"manifest.json",newer.ToJsonString())),default),Strings.Data_ImportNewerFormat);
+        var newer=manifest.DeepClone();newer["format"]=3;await Reject(()=>Transfer(source).InspectAsync(Bad("newer",z=>Entry(z,"manifest.json",newer.ToJsonString())),default),Strings.Data_ImportNewerFormat);
         foreach(string name in new[]{"../escape.txt","/absolute.txt","C:/absolute.txt","clipboard/../../escape.txt"}){
             string bad=Bad("slip"+Guid.NewGuid().ToString("N"),z=>{Entry(z,"manifest.json",manifest.ToJsonString());Entry(z,name,"bad");});
             await Reject(()=>Transfer(source).StageImportAsync(bad,new(true,true,true,DataImportMode.Replace),null,default),Strings.Data_ImportInvalid);
@@ -127,7 +127,7 @@ static partial class Program
         both.Load();Check(Transfer(both).LastImport?.Error==null&&both.Current.Storage.LargeFilesDirectory==null&&File.Exists(bothImage.Entry.ContentPath)&&!File.Exists(movedImage),"082 before 083");
         var empty=new SettingsStore(Path.Combine(root,"roundtrip"),Defaults());await Apply(empty,new(true,true,true,DataImportMode.Replace));string again=Path.Combine(root,"again.zip");await Transfer(empty).ExportAsync(again,new(true,true,ClipboardExport.WithImages),null,default);
         foreach(string name in new[]{"settings/settings.json","usage/launcher-usage.json","usage/terminal-history.json","usage/web-search-history.json"})Check(JsonNode.DeepEquals(JsonNode.Parse(ZipText(full,name)),JsonNode.Parse(ZipText(again,name))),"roundtrip "+name);
-        var round=JsonSerializer.Deserialize(ZipText(again,"clipboard/history.json"),ClipboardJson.Default.StoredClipArray)!;
+        var round=JsonSerializer.Deserialize(ZipText(again,"clipboard/history.json"),ClipboardJson.Default.ClipboardIndex)!.Entries;
         Check(round.Length==3&&round.Where(c=>c.Entry.Kind!=ClipKind.Image).Select(c=>c.Entry.Text).ToHashSet().SetEquals(["hello","code"]),"roundtrip clips");
         // 活跃服务尚未落盘的条目也必须出现在导出快照中。
         var webLive=Store("web-live");using(var web=new Pane.Services.Launcher.WebSearchHistory(webLive)){

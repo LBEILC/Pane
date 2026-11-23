@@ -58,7 +58,23 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     readonly ManualResetEventSlim ready=new();
     Exception? error;
     NotifyIcon data;
-    bool tray;
+    volatile bool tray;
+    readonly Func<bool> createTray;
+    static readonly uint[] retryDelays=[1000,3000,10000];
+    int retryIndex;
+    nuint retryTimer;
+    void CancelTrayRetry(){
+        if(retryTimer!=0)KillTimer(shellWindow,retryTimer);
+        retryTimer=0;
+    }
+    void TryTray(){
+        if(tray||currentSettings?.General.ShowTrayIcon!=true)return;
+        tray=createTray();
+        if(tray){retryIndex=0;return;}
+        lock(diagnostics)diagnostics.Add("tray=create-failed");
+        if(retryIndex<retryDelays.Length)
+            retryTimer=SetTimer(shellWindow,(nuint)(100+retryIndex),retryDelays[retryIndex++],0);
+    }
     volatile bool suspended;
     public bool GesturesPaused {get;set;}
     PaneSettings? currentSettings;
@@ -80,7 +96,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     void StopKeyboardHook(){if(keyboardStarted){PaneKeyboardStop();keyboardStarted=false;}}
     public bool CleanupSucceeded {get;private set;}=true;
     const uint Callback=0x8001;
-    public ShellHost(Action<string> command,PaneSettings settings) {
+    public ShellHost(Action<string> command,PaneSettings settings,Func<bool>? createTray=null) {
+        this.createTray=createTray??(()=>Shell_NotifyIconW(0,ref data));
         this.command=command;queue=Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();proc=WndProc;
         thread=new Thread(()=>{try{
             var wc=new Native.WndClass{size=(uint)Marshal.SizeOf<Native.WndClass>(),proc=proc,name="Pane011Shell",instance=Native.GetModuleHandleW(null)};Native.RegisterClassExW(ref wc);
@@ -122,7 +139,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         }
         lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
         WinVRegistrationChanged?.Invoke(active);
-        if(settings.General.ShowTrayIcon&&!tray){tray=Shell_NotifyIconW(0,ref data);if(!tray)throw new InvalidOperationException("托盘创建失败");} // 不翻译：日志异常
+        if(settings.General.ShowTrayIcon){if(retryTimer==0)TryTray();}
+        else{CancelTrayRetry();retryIndex=0;}
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
     }
     void Register(int id,string name,Hotkey key){
@@ -145,12 +163,13 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         if(m==0x1e || m==0x218 && w==0x12){PowerTimeChanged?.Invoke();return m==0x218?1:0;}
         if(m==0x8006){while(barriers.TryDequeue(out var done))done.TrySetResult();return 0;}
         // 资源管理器重启后重新登记已有图标，不改变菜单或通知行为。
-        if(taskbarCreated!=0&&m==taskbarCreated){tray=false;if(currentSettings?.General.ShowTrayIcon==true)tray=Shell_NotifyIconW(0,ref data);return 0;}
+        if(taskbarCreated!=0&&m==taskbarCreated){CancelTrayRetry();retryIndex=0;tray=false;TryTray();return 0;}
+        if(m==0x113&&retryTimer!=0&&w==retryTimer){CancelTrayRetry();TryTray();return 0;}
         if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;if(currentSettings is {} settings)ApplyCore(settings);request.Done.TrySetResult(winVActive);}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
         if(m==0x312){if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8005){if(!suspended&&w==keyboardGeneration&&ShellHotkeyBindings.Command((nuint)l) is {} hotkey)Dispatch(hotkey);return 0;}
-        if(m==0x8003){while(notifications.TryDequeue(out var text)){data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
-        if(m==0x8002){if(pending is {} s)ApplyCore(s);return 0;}
+        if(m==0x8003){while(notifications.TryDequeue(out var text)){if(!tray)continue;data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
+        if(m==0x8002){try{if(pending is {} s)ApplyCore(s);}catch(Exception ex){lock(diagnostics)diagnostics.Add($"apply-settings=failed;code={ex.HResult:X8}");}return 0;}
         // 设计改（2026-10-30）：右键弹 Pane 自己的玻璃菜单（App.Tray.cs），不再用系统菜单。
         // 位置在这里、右键那一刻取：图标在任务栏折叠区里时，焦点一换折叠区就收起，之后再取就不准了
         if(m==Callback){if((uint)l==0x202)Dispatch("show-launcher");if((uint)l==0x205){
@@ -162,7 +181,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     }
     void Dispatch(string value)=>queue.TryEnqueue(()=>command(value));
     void Cleanup(){
-        stopping=true;
+        stopping=true;CancelTrayRetry();
         while(barriers.TryDequeue(out var done))done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
         keyboardGeneration++;StopKeyboardHook();
         while(winVRequests.TryDequeue(out var request))request.Done.TrySetException(new IOException(Strings.Common_HotkeyHostStopped));
@@ -182,6 +201,8 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         public uint InfoFlags;public Guid Guid;public nint Balloon;
     }
     [StructLayout(LayoutKind.Sequential)] struct Message {public nint H;public uint M;public nuint W;public nint L;public uint Time;public Native.Point Point;public uint Private;}
+    [DllImport("user32.dll")] static extern nuint SetTimer(nint hwnd,nuint id,uint delay,nint callback);
+    [DllImport("user32.dll")] static extern bool KillTimer(nint hwnd,nuint id);
     [DllImport("shell32.dll",CharSet=CharSet.Unicode)] static extern bool Shell_NotifyIconW(uint m,ref NotifyIcon data);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern nint LoadImageW(nint h,string file,uint type,int x,int y,uint flags);
     [DllImport("user32.dll")] static extern bool DestroyIcon(nint icon);

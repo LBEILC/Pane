@@ -65,6 +65,7 @@ public sealed partial class GlassPanel
             if(Placement==PanelPlacement.BottomCenter)y=m.Work.Bottom-Height*dpi-8*dpi;
             if(Placement==PanelPlacement.Center){var c=Centered(m);x=c.X;y=c.Y;}
             if(Placement==PanelPlacement.Tray){var t=TrayPlace(m,px,py);x=t.X;y=t.Y;}
+            if(Placement==PanelPlacement.Exact){x=px;y=py;}
         }
         var p=ClampPosition(m,x,y);
         if(PositionStore!=null){anchorX=(x-m.Work.Left)/dpi;anchorY=(y-m.Work.Top)/dpi;}else SetAnchor(m,p);
@@ -99,6 +100,32 @@ public sealed partial class GlassPanel
         if(Placement==PanelPlacement.Center){var c=Centered(m);SetAnchor(m,ClampPosition(m,c.X,c.Y));}
         var p=ClampPosition(m,m.Work.Left+anchorX*dpi,m.Work.Top+anchorY*dpi);
         Layout(p.X-(int)(48*dpi),p.Y-(int)(48*dpi));
+    }
+    /// <summary>
+    /// 拖动边缘改高度（设计加，2026-11-23，剪贴板）：立即改（不走弹簧），最矮视图要求的 360、最高所在屏幕工作区的 90%。
+    /// keepBottom：拖上边缘，面板下边不动（锚点跟着上移）。返回实际高度（DIP）。
+    /// </summary>
+    public double ResizeTo(double height,bool keepBottom)
+    {
+        if(activeMonitor is not {} m||disposing)return Height;
+        double max=(m.Work.Bottom-m.Work.Top)/dpi*0.9;
+        height=Math.Round(Math.Clamp(height,Math.Min(360,max),max));
+        if(keepBottom)anchorY=Math.Max(8,anchorY-(height-Height));
+        resizing=false;targetWidth=Width;targetHeight=height;Height=height;
+        LayoutAtAnchor();
+        return Height;
+    }
+    /// <summary>
+    /// 立即改位置和尺寸（不走弹簧，设计加，2026-11-23，对话框搜索框跟着对话框走）。x / y：玻璃左上角的物理像素；宽高是 DIP。
+    /// 照常夹进所在屏幕的工作区（四周留 8）。
+    /// </summary>
+    public void SetBounds(int x,int y,double width,double height)
+    {
+        if(disposing)return;
+        var m=At(x+1,y+1);dpi=m.Dpi;activeMonitor=m;
+        resizing=false;Width=targetWidth=Math.Max(minWidth,width);Height=targetHeight=Math.Max(minHeight,height);
+        anchorX=(x-m.Work.Left)/dpi;anchorY=(y-m.Work.Top)/dpi;
+        LayoutAtAnchor();
     }
     void MovePanel(int x,int y,MonitorArea m)
     {

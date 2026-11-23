@@ -102,7 +102,14 @@ public sealed partial class App
             var left=Pane.Hosting.ShellHotkeyBindings.ParseOverride("2xLCtrl");
             var right=Pane.Hosting.ShellHotkeyBindings.ParseOverride("2xRCtrl");
             var settings=Store.Current with{Modules=null,General=Store.Current.General with{ShowTrayIcon=false},Launcher=Store.Current.Launcher with{Hotkey=chord},Clipboard=Store.Current.Clipboard with{Enabled=true,Hotkey=clipChord}};
-            shell=new Pane.Hosting.ShellHost(_=>{},settings);
+            int attempts=0;
+            var withTray=settings with{General=settings.General with{ShowTrayIcon=true}};
+            shell=new Pane.Hosting.ShellHost(_=>{},withTray,()=>++attempts==2);
+            Check(!shell.TrayCreated&&shell.Diagnostics.Contains("tray=create-failed"),"首次创建托盘失败后宿主仍可用");
+            long deadline=Environment.TickCount64+4000;
+            while(!shell.TrayCreated&&Environment.TickCount64<deadline)await Task.Delay(30);
+            Check(shell.TrayCreated&&attempts==2,"窗口计时器重试成功");
+            shell.Apply(settings);await shell.FlushAsync();
             Check(!shell.KeyboardHookActive&&shell.RegisteredCount==2,"组合键不挂键盘钩子："+string.Join(";",shell.Diagnostics));
             async Task Applied(Pane.Settings.PaneSettings next,bool hook,int registered){
                 shell.Apply(next);

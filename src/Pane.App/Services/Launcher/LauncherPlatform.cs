@@ -123,7 +123,7 @@ internal sealed class WindowsLauncherExecutor(Action<string> showPanel,Func<stri
 }
 internal sealed class LauncherFileRows(IReadOnlyList<LauncherItem> rows,int total):List<LauncherItem>(rows) { public int Total {get;}=total; }
 internal interface ILauncherFiles { Task<IReadOnlyList<LauncherItem>> SearchAsync(string query,int limit,CancellationToken token); }
-internal sealed class EverythingSearch:ILauncherFiles,IFileSearchStatus
+internal sealed class EverythingSearch(IEverythingIpc? ipc=null):ILauncherFiles,IFileSearchStatus
 {
     readonly SemaphoreSlim gate=new(1);readonly object sync=new();
     public FileSearchState State {get;private set;}=FileSearchState.NotRunning;
@@ -139,9 +139,10 @@ internal sealed class EverythingSearch:ILauncherFiles,IFileSearchStatus
     {
         token.ThrowIfCancellationRequested();if(query.Length<2||!await gate.WaitAsync(0,token))return [];
         try{
-            var page=await new EverythingIpc().QueryAsync(query,0,limit,1,token).ConfigureAwait(false);
+            var page=await (ipc??new EverythingIpc()).QueryAsync(query,0,limit,1,token,150).ConfigureAwait(false);
             return new LauncherFileRows(page.Items.Select(hit=>new LauncherItem("file:"+hit.Path,hit.Category==FileCategory.Folder?LauncherItemKind.Folder:LauncherItemKind.File,LauncherGroups.Files,hit.Name,Path.GetDirectoryName(hit.Path)??"",new(hit.Category==FileCategory.Folder?"folder":"doc"),FileSearch.Highlights(hit.Name,query))).ToArray(),page.Total);
-        }catch(FileSearchUnavailableException){Set(FileSearchState.Unsupported,null);return [];}
+        }catch(TimeoutException){return [];}
+        catch(FileSearchUnavailableException){Set(FileSearchState.Unsupported,null);return [];}
         finally{gate.Release();}
     }
 }

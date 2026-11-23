@@ -137,7 +137,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                 if(active?.Ready.IsCompletedSuccessfully!=true)active=null;
                 lock(active?.StorageGate??settings.StorageSync){
                 string index=Path.Combine(settings.DirectoryPath,"clipboard","history.json");
-                var disk=new ClipboardStorage();var old=active?.StorageSnapshot()??disk.Load(index);
+                var disk=new ClipboardStorage();var state=active?.StorageIndex()??disk.LoadIndex(index);var old=state.Entries;
                 var referenced=old.SelectMany(c=>new[]{c.Entry.ContentPath,c.Entry.Thumbnail?.Path}).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var roots=new[]{Path.Combine(settings.DirectoryPath,"clipboard"),LargeFiles.Path,LargeFiles.Configured}.OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
                 var sources=roots.Where(Directory.Exists).SelectMany(root=>Directory.GetFiles(root,"*.png")).Distinct(StringComparer.OrdinalIgnoreCase)
@@ -162,7 +162,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                                 if(source.Length!=destination.Length||!SHA256.HashData(source).SequenceEqual(SHA256.HashData(destination)))throw new IOException();
                                 progress?.Report((i+1d)/(files.Length+1));
                             }
-                            token.ThrowIfCancellationRequested();disk.Save(index,moved,_=>{});saveSettings();
+                            token.ThrowIfCancellationRequested();disk.SaveIndex(index,state with{Entries=moved},_=>{});saveSettings();
                             foreach(var file in files)File.Delete(file.Source);
                             StorageRecovery.Complete(settings.DirectoryPath);
                         }catch{StorageRecovery.Recover(settings.DirectoryPath);throw;}

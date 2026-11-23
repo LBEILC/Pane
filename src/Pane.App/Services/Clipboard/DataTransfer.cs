@@ -48,11 +48,11 @@ internal sealed partial class DataStorage
             lock(settings.StorageSync){
                 var active=history();if(active?.Ready.IsCompletedSuccessfully!=true)active=null;
                 lock(active?.StorageGate??settings.StorageSync)
-                    return ExportCore(settings.DirectoryPath,path,options,active?.StorageSnapshot(),progress,cancellationToken);
+                    return ExportCore(settings.DirectoryPath,path,options,active?.StorageIndex(),progress,cancellationToken);
             }
         }finally{operation.Release();}
     },cancellationToken);
-    static DataExportResult ExportCore(string data,string path,DataExportOptions options,StoredClip[]? snapshot,IProgress<double>? progress,CancellationToken token)
+    static DataExportResult ExportCore(string data,string path,DataExportOptions options,ClipboardIndex? snapshot,IProgress<double>? progress,CancellationToken token)
     {
         string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
         try{
@@ -66,16 +66,23 @@ internal sealed partial class DataStorage
             if(options.Usage)foreach(string name in TransferFiles.Where(n=>n.StartsWith("usage/",StringComparison.Ordinal))){string source=LocalFile(data,name);if(File.Exists(source))contents.Add(name,File.ReadAllBytes(source));}
             StoredClip[] clips=[];
             if(options.Clipboard!=ClipboardExport.None){
-                clips=(snapshot??new ClipboardStorage().Load(LocalFile(data,"clipboard/history.json"))).Where(c=>c.Entry.Kind is ClipKind.Text or ClipKind.Code or ClipKind.Link or ClipKind.Color||options.Clipboard==ClipboardExport.WithImages&&c.Entry.Kind==ClipKind.Image).Select(c=>{
-                    if(c.Entry.Kind!=ClipKind.Image)return c;
+                var state=snapshot??new ClipboardStorage().LoadIndex(LocalFile(data,"clipboard/history.json"));
+                clips=state.Entries.Where(c=>c.Entry.Kind is ClipKind.Text or ClipKind.Code or ClipKind.Link or ClipKind.Color||options.Clipboard==ClipboardExport.WithImages&&c.Entry.Kind==ClipKind.Image).Select(c=>{
+                    if(c.Entry.Kind!=ClipKind.Image){
+                        if(options.Clipboard==ClipboardExport.WithImages&&c.FormatId is {} formatId){
+                            images.TryAdd("clipboard/"+formatId+".rich",RichFormats.PathFor(Path.Combine(data,"clipboard"),formatId));
+                            return c;
+                        }
+                        return c with{FormatId=null,Entry=c.Entry with{Rich=false}};
+                    }
                     string id=Guid.NewGuid().ToString("N"),full="clipboard/images/"+id+".png",thumb="clipboard/images/"+id+".thumb.png";
                     images.Add(full,c.Entry.ContentPath??throw new InvalidDataException());
                     if(c.Entry.Thumbnail?.Path is {} p)images.Add(thumb,p);
                     return c with{Entry=c.Entry with{ContentPath=full,Thumbnail=c.Entry.Thumbnail?.Path==null?null:new(thumb)}};
                 }).ToArray();
-                contents.Add("clipboard/history.json",JsonSerializer.SerializeToUtf8Bytes(clips,ClipboardJson.Default.StoredClipArray));
+                contents.Add("clipboard/history.json",JsonSerializer.SerializeToUtf8Bytes(state with{Entries=clips},ClipboardJson.Default.ClipboardIndex));
             }
-            var manifest=new JsonObject{["format"]=1,["app"]=SettingsStore.CurrentVersion(),["exportedAt"]=DateTimeOffset.UtcNow.ToString("O"),["settings"]=contents.ContainsKey("settings/settings.json"),["usage"]=contents.Keys.Any(n=>n.StartsWith("usage/",StringComparison.Ordinal)),["clipboard"]=options.Clipboard!=ClipboardExport.None,["clipboardEntries"]=clips.Length,["clipboardImages"]=clips.Count(c=>c.Entry.Kind==ClipKind.Image)};
+            var manifest=new JsonObject{["format"]=options.Clipboard==ClipboardExport.None?1:2,["app"]=SettingsStore.CurrentVersion(),["exportedAt"]=DateTimeOffset.UtcNow.ToString("O"),["settings"]=contents.ContainsKey("settings/settings.json"),["usage"]=contents.Keys.Any(n=>n.StartsWith("usage/",StringComparison.Ordinal)),["clipboard"]=options.Clipboard!=ClipboardExport.None,["clipboardEntries"]=clips.Length,["clipboardImages"]=clips.Count(c=>c.Entry.Kind==ClipKind.Image)};
             contents.Add("manifest.json",Encoding.UTF8.GetBytes(manifest.ToJsonString()));
             int done=0,total=contents.Count+images.Count;progress?.Report(0);
             using(var output=new FileStream(temp,FileMode.CreateNew,FileAccess.Write,FileShare.None)){
@@ -100,7 +107,8 @@ internal sealed partial class DataStorage
         if(!name.StartsWith("clipboard/images/",StringComparison.Ordinal))return false;
         string leaf=name[17..];return leaf.EndsWith(".png",StringComparison.Ordinal)&&Guid.TryParseExact(leaf.EndsWith(".thumb.png",StringComparison.Ordinal)?leaf[..^10]:leaf[..^4],"N",out _);
     }
-    static bool Allowed(string name)=>TransferFiles.Contains(name)||ImageName(name);
+    static bool Allowed(string name)=>TransferFiles.Contains(name)||ImageName(name)||RichName(name);
+    static bool RichName(string name)=>name.StartsWith("clipboard/",StringComparison.Ordinal)&&name.EndsWith(".rich",StringComparison.Ordinal)&&name.Length==47&&Guid.TryParseExact(name.AsSpan(10,32),"N",out _);
     static JsonObject ValidateArchive(ZipArchive zip)
     {
         if(zip.Entries.Count>ImportEntryLimit)throw new DataStorageException(Strings.Data_ImportTooLarge);
@@ -113,7 +121,7 @@ internal sealed partial class DataStorage
         var manifest=zip.GetEntry("manifest.json")??throw Invalid();if(manifest.Length>1024*1024)throw new DataStorageException(Strings.Data_ImportTooLarge);
         using var source=manifest.Open();using var buffer=new MemoryStream();CopyBounded(source,buffer,1024*1024,default);
         var obj=Object(Encoding.UTF8.GetString(buffer.ToArray()));
-        int format=obj["format"]!.GetValue<int>();if(format>1)throw new DataStorageException(Strings.Data_ImportNewerFormat);if(format!=1)throw Invalid();
+        int format=obj["format"]!.GetValue<int>();if(format>2)throw new DataStorageException(Strings.Data_ImportNewerFormat);if(format<1)throw Invalid();
         if(string.IsNullOrWhiteSpace(obj["app"]!.GetValue<string>())||!DateTimeOffset.TryParse(obj["exportedAt"]!.GetValue<string>(),out _))throw Invalid();
         bool s=obj["settings"]!.GetValue<bool>(),u=obj["usage"]!.GetValue<bool>(),c=obj["clipboard"]!.GetValue<bool>();
         int count=obj["clipboardEntries"]!.GetValue<int>(),pictures=obj["clipboardImages"]!.GetValue<int>();
@@ -136,7 +144,7 @@ internal sealed partial class DataStorage
             foreach(var entry in entries){
                 cancellationToken.ThrowIfCancellationRequested();string target=Path.Combine(root,entry.FullName.Replace('/',Path.DirectorySeparatorChar));Directory.CreateDirectory(Path.GetDirectoryName(target)!);
                 using var source=entry.Open();using var output=new FileStream(target,FileMode.CreateNew,FileAccess.Write,FileShare.None);
-                CopyBounded(source,output,Math.Min(entry.Length,entry.FullName.EndsWith(".json",StringComparison.Ordinal)?ImportJsonLimit:ImportFileLimit),cancellationToken);
+                CopyBounded(source,output,Math.Min(entry.Length,RichName(entry.FullName)?RichFormats.Limit+4:entry.FullName.EndsWith(".json",StringComparison.Ordinal)?ImportJsonLimit:ImportFileLimit),cancellationToken);
                 if(output.Length!=entry.Length)throw Invalid();output.Flush(true);progress?.Report(++done/(double)entries.Length);
             }
             ValidatePayload(root);
@@ -162,8 +170,17 @@ internal sealed partial class DataStorage
         string terminal=Path.Combine(root,"usage/terminal-history.json");
         if(File.Exists(terminal))foreach(var value in JsonNode.Parse(File.ReadAllText(terminal))!.AsArray())if(value?.GetValue<string>()==null)throw Invalid();
         string index=Path.Combine(root,"clipboard/history.json");if(!File.Exists(index))return;
-        foreach(var clip in new ClipboardStorage().Load(index)){
+        var state=new ClipboardStorage().LoadIndex(index);
+        var names=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach(var tag in state.Tags)
+            if(tag==null||string.IsNullOrWhiteSpace(tag.Name)||tag.Name!=tag.Name.Trim()||tag.Color is <1 or >6||!names.Add(tag.Name))throw Invalid();
+        foreach(var clip in state.Entries){
             if(clip?.Entry is not {} e||!Enum.IsDefined(e.Kind)||e.Kind==ClipKind.Files||e.Kind!=ClipKind.Image&&e.Text==null)throw Invalid();
+            if(e.Tags==null||e.Tags.Any(n=>!names.Contains(n))||e.Rich!=(clip.FormatId!=null))throw Invalid();
+            if(clip.FormatId!=null){
+                if(e.Kind==ClipKind.Image)throw Invalid();
+                RichFormats.Read(Path.GetDirectoryName(index)!,clip.FormatId);
+            }
             if(e.Kind==ClipKind.Image){
                 foreach(string? image in new[]{e.ContentPath,e.Thumbnail?.Path}.Where((_,i)=>i==0||e.Thumbnail!=null))
                     if(image==null||!ImageName(image)||!File.Exists(Path.Combine(root,image)))throw Invalid();

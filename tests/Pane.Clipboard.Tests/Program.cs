@@ -21,6 +21,7 @@ static partial class Program
         if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}
         string native=Path.GetFullPath(args[0]);
         NativeLibrary.SetDllImportResolver(Assembly.GetExecutingAssembly(),(name,_,_)=>name=="Pane.Native.dll"?NativeLibrary.Load(native):0);
+        if(args is [_,"--106"]){Clipboard106();TestResults.Pass();return;}
         if(args is [_,"production-fixture",var fixture]){
             string directory=Path.GetFullPath(fixture);if(Directory.Exists(directory))throw new InvalidOperationException("夹具目标已存在");
             Directory.CreateDirectory(directory);var store=new SettingsStore(directory,Defaults());

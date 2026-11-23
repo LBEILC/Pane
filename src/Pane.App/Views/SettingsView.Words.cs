@@ -22,9 +22,9 @@ public sealed partial class SettingsView
     }
 
     // 热键可以不设（默认）；设了之后能改、能清除。照手势的暂停热键
-    FrameworkElement WordsHotkeyRow(Settings.Hotkey? hotkey, Settings.Hotkey launcher)
+    FrameworkElement WordsHotkeyRow(Settings.Hotkey? hotkey, Settings.Hotkey launcher, string? title = null)
     {
-        var label = Strings.Settings_Hotkey;
+        var label = title ?? Strings.Settings_Hotkey;
         if (hotkey is null)
             return Row(label, Strings.Settings_Gestures_HotkeyUnset, Button(Strings.Common_Settings, "plus", () => { SaveWords(x => x with { Hotkey = new(KeyModifiers.Alt, (ushort)'Q') }); Render(); }));
         var box = Hotkey(hotkey, launcher, h => SaveWords(x => x with { Hotkey = h }), doubleTap: true);

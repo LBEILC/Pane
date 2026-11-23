@@ -38,7 +38,14 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         if (SourcePicture is null && entry.SourceIcon is { GradientFrom: { } from, GradientTo: { } to }) SourceBrush = Gradient(from, to);
         var dims = entry.Kind == ClipKind.Image && entry.ImageWidth is { } w && entry.ImageHeight is { } h ? $"{entry.Text} {w}×{h} · " : "";
         MetaText = $"{entry.Source} · {dims}{Ago(entry.CopiedAt)}";
+        // 「带格式」和标签小片（2026-11-23）：标签最多露 2 个，其余写 +N
+        if (entry.Rich) MetaChips.Add(ClipTagChip.Rich());
+        foreach (var name in entry.Tags.Take(2)) MetaChips.Add(ClipTagChip.Tag(name, actions.TagDot(name)));
+        if (entry.Tags.Count > 2) MetaChips.Add(ClipTagChip.More(entry.Tags.Count - 2));
     }
+
+    /// <summary>元信息行上的「带格式」和标签小片。</summary>
+    public List<ClipTagChip> MetaChips { get; } = [];
 
     public ClipEntry Entry { get; }
     public int Index { get; }
@@ -208,6 +215,68 @@ public interface IClipRowActions
     void Words(ClipRow row);
     void TogglePin(ClipRow row);
     void Delete(ClipRow row);
+    /// <summary>标签的色点；不带色点为 null。</summary>
+    Brush? TagDot(string name);
+}
+
+/// <summary>标签色点（令牌 PaneTag1～6）。</summary>
+public static class TagColors
+{
+    public static Brush? Dot(int? color) => color is >= 1 and <= 6 && Application.Current.Resources.TryGetValue($"PaneTag{color}Brush", out var b) ? (Brush)b : null;
+}
+
+/// <summary>元信息行上的一个小片：标签（可带色点）、「带格式」（透明底、次要色）、「+N」。</summary>
+public sealed partial class ClipTagChip
+{
+    ClipTagChip(string name, Brush? dot, bool filled, double opacity) { Label = name; Dot = dot; Fill = filled ? Res("PaneFillControlBrush") : null; Stroke = filled ? Res("PaneStrokeBrush") : null; TextOpacity = opacity; }
+    public static ClipTagChip Tag(string name, Brush? dot) => new(name, dot, true, 1);
+    public static ClipTagChip Rich() => new(Strings.Clipboard_RichMark, null, false, 0.68);
+    public static ClipTagChip More(int n) => new("+" + n, null, true, 0.68);
+    public string Label { get; }
+    public Brush? Dot { get; }
+    public double TextOpacity { get; }
+    public Visibility DotVisibility => Dot is null ? Visibility.Collapsed : Visibility.Visible;
+    public Brush? Fill { get; }
+    public Brush? Stroke { get; }
+    static Brush? Res(string key) => Application.Current.Resources.TryGetValue(key, out var b) ? b as Brush : null;
+}
+
+/// <summary>
+/// 就地操作行（2026-11-23，原型 .clip-op）：操作列表的一项，或标签选择的一个标签 / 「新建标签」。
+/// Id：操作 Id（paste、paste-path…），标签行为 null。
+/// </summary>
+public sealed partial class ClipOp : INotifyPropertyChanged
+{
+    public ClipOp(string? id, string title, string glyph, string keyText = "", int number = 0, bool danger = false)
+    {
+        Id = id; Title = title; Glyph = glyph; KeyText = keyText; Danger = danger;
+        Number = number is >= 1 and <= 9 ? number.ToString() : "";
+    }
+    public string? Id { get; }
+    public string Title { get; }
+    public string Glyph { get; }
+    public string KeyText { get; }
+    public string Number { get; }
+    public bool Danger { get; }
+    /// <summary>标签行：标签名；「新建标签」行：要新建的名字。</summary>
+    public string? Tag { get; set; }
+    public bool Create { get; set; }
+    public string Sub { get; set; } = "";
+    public Brush? Dot { get; set; }
+    public Visibility DotVisibility => Dot is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility GlyphVisibility => Dot is null ? Visibility.Visible : Visibility.Collapsed;
+    public Brush? Foreground => Danger && Application.Current.Resources.TryGetValue("PaneDangerBrush", out var d) ? (Brush)d
+        : Application.Current.Resources.TryGetValue("PaneText1Brush", out var t) ? (Brush)t : null;
+    bool on;
+    /// <summary>标签行：这一条已经打上这个标签（右侧打勾、文字加粗）。</summary>
+    public bool On
+    {
+        get => on;
+        set { if (on == value) return; on = value; PropertyChanged?.Invoke(this, new(nameof(CheckVisibility))); PropertyChanged?.Invoke(this, new(nameof(Weight))); }
+    }
+    public Visibility CheckVisibility => on ? Visibility.Visible : Visibility.Collapsed;
+    public Windows.UI.Text.FontWeight Weight => on ? FontWeights.SemiBold : FontWeights.Normal;
+    public event PropertyChangedEventHandler? PropertyChanged;
 }
 
 /// <summary>
@@ -245,6 +314,35 @@ public sealed partial class ClipSection
     public Visibility MoreVisibility => More is null ? Visibility.Collapsed : Visibility.Visible;
     /// <summary>可追加：列表往下滚时分批补条目，不重建已有的行。</summary>
     public System.Collections.ObjectModel.ObservableCollection<ClipRow> Rows { get; } = [];
+}
+
+/// <summary>
+/// 元信息行上的小片（2026-11-23）：用附加属性在代码里生成，不在条目模板里再套一层 DataTemplate
+/// （嵌套模板里放 ItemsPanel 时 XAML 编译器会内部出错）。16 高、圆角 8、左右 6；色点 5；字 10.5 次要文字色。
+/// </summary>
+public static class ClipChips
+{
+    public static readonly DependencyProperty SourceProperty = DependencyProperty.RegisterAttached(
+        "Source", typeof(object), typeof(ClipChips), new PropertyMetadata(null, Changed));
+    public static object? GetSource(StackPanel target) => target.GetValue(SourceProperty);
+    public static void SetSource(StackPanel target, object? value) => target.SetValue(SourceProperty, value);
+
+    static void Changed(DependencyObject d, DependencyPropertyChangedEventArgs e)
+    {
+        var panel = (StackPanel)d;
+        panel.Children.Clear();
+        if (e.NewValue is not IEnumerable<ClipTagChip> chips) return;
+        var text2 = Application.Current.Resources.TryGetValue("PaneText2Brush", out var t) ? (Brush)t : null;
+        var font = (FontFamily)Application.Current.Resources["PaneFontUi"];
+        foreach (var c in chips)
+        {
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+            if (c.Dot is { } dot) row.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Width = 5, Height = 5, Fill = dot, VerticalAlignment = VerticalAlignment.Center });
+            row.Children.Add(new TextBlock { Text = c.Label, FontFamily = font, FontSize = 10.5, LineHeight = 14, Foreground = text2, Opacity = c.TextOpacity, VerticalAlignment = VerticalAlignment.Center });
+            panel.Children.Add(new Border { Height = 16, Padding = new Thickness(6, 0, 6, 0), CornerRadius = new CornerRadius(8), Background = c.Fill, BorderBrush = c.Stroke,
+                BorderThickness = new Thickness(c.Stroke is null ? 0 : 1), Child = row });
+        }
+    }
 }
 
 /// <summary>剪贴板的搜索命中：加粗 + 中性浅底（docs/design.md「主题色」：命中不用主题色）。</summary>
@@ -291,12 +389,18 @@ public static class ClipMatch
     }
 }
 
-/// <summary>类型筛选的小标签。</summary>
+/// <summary>类型筛选的小标签；2026-11-23 起也放标签（Key 为「tag:名字」，可带色点）和类型与标签之间的分隔（Key 为「sep」）。</summary>
 public sealed partial class ChipItem : INotifyPropertyChanged
 {
-    public ChipItem(string key, string label) { Key = key; Label = label; }
+    public ChipItem(string key, string label, Brush? dot = null) { Key = key; Label = label; Dot = dot; }
     public string Key { get; }
     public string Label { get; }
+    public Brush? Dot { get; }
+    bool Separator => Key == "sep";
+    public Visibility DotVisibility => Dot is null ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility SeparatorVisibility => Separator ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility LabelVisibility => Separator ? Visibility.Collapsed : Visibility.Visible;
+    public Thickness ChipPadding => Separator ? new Thickness(6, 0, 6, 0) : new Thickness(12, 0, 12, 0);
     bool selected;
     public bool IsSelected
     {

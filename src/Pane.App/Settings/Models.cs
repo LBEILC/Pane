@@ -9,7 +9,10 @@ public sealed record PaneSettings(int Version, GeneralSettings General, Launcher
     Dictionary<string,bool>? modules; public Dictionary<string,bool>? Modules { get=>modules; init=>modules=value; } }
 // 文件对话框跳转（设计加，2026-11-01，046）：用户要能在设置里调。Ctrl+G / Ctrl+Shift+G 可改（null = 默认组合）；
 // AutoJump = 对话框刚打开时自动跳到最近用过的资源管理器文件夹（只跳一次）；ShowRecent = 菜单里列出最近用过的文件夹；MenuWhenMany（047）= 开着多个资源管理器时 Ctrl+G 改为弹菜单让用户选
-public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=null, Hotkey? MenuHotkey=null, bool AutoJump=false, bool ShowRecent=true, bool MenuWhenMany=false)
+// 设计加（2026-11-23，107）：对话框下方的搜索框——SearchBar 总开关（默认开）；OpenOnEnter：「打开」对话框里选中文件按 Enter 直接打开（默认），false = 仅填入文件名；
+// FilterByType：对话框限定了文件类型时只给这些类型的文件
+public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=null, Hotkey? MenuHotkey=null, bool AutoJump=false, bool ShowRecent=true, bool MenuWhenMany=false,
+    bool SearchBar=true, bool OpenOnEnter=true, bool FilterByType=true)
 {
     public static readonly Hotkey DefaultJump=new(KeyModifiers.Ctrl,(ushort)'G'), DefaultMenu=new(KeyModifiers.Ctrl|KeyModifiers.Shift,(ushort)'G');
     [System.Text.Json.Serialization.JsonIgnore] public Hotkey Jump=>JumpHotkey??DefaultJump;
@@ -70,7 +73,7 @@ public sealed record SearchEngine(string Name, string Keyword, string UrlTemplat
 public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing, RecentOnly }
 public enum LauncherWidth { Compact, Standard, Wide }
 public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=null,
-    bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.Clear,
+    bool HideOnBlur=true, KeepInputMode KeepInput=KeepInputMode.OneMinute,   // 2026-11-19 用户定（issue 58）：默认 1 分钟内保留
     int AutoAttachSeconds=3, int FileResultCount=8, LauncherHome Home=LauncherHome.RecentAndPinned,
     // 设计加（2026-10-31，037）：RememberCommands = 记住 > 运行过的最近 20 条命令用来补全（空格开头的不记）；
     // WebSuggestions = 用搜索关键字搜网页时（如「bd 天气」）向那个站点取搜索建议，平时打字不联网
@@ -136,11 +139,14 @@ public sealed record PortableEntry(string Path, PortableKind Kind, DateTimeOffse
 public sealed record LauncherPosition(string MonitorId, double X, double Y);
 // 本机专属位置；083 导出时跳过，不能随配置迁移到其他电脑。
 public sealed record StorageSettings(string? LargeFilesDirectory=null);
+public enum ClipKeyHints { Button, Always, Off }
 public sealed record ClipboardSettings(Hotkey Hotkey,
     bool RecordText=true,bool RecordImages=true,bool RecordFiles=true,int Limit=500,
     bool Dedupe=true,bool MoveToTopAfterPaste=true,bool HonorExcludeMarker=true,
     // 设计加（2026-10-31，033）：整个剪贴板功能的开关。关掉 = 不监听、不记录、不注册呼出热键、面板打不开、Win+V 替换先恢复；已有记录保留
-    bool Enabled=true,long ImageLimitMegabytes=0,bool KeepHotkeyWithWinV=true)
+    bool Enabled=true,long ImageLimitMegabytes=0,bool KeepHotkeyWithWinV=true,
+    // 设计加（2026-11-23）：按键提示（默认收起为按钮）；面板高度（DIP，0 = 默认 640；拖动上下边缘时写入，换屏放不下时界面自己压低）；本机专属，083 导出时跳过
+    ClipKeyHints KeyHints=ClipKeyHints.Button,double PanelHeight=0)
 {
     string[] excludedPrograms=[];
     public string[] ExcludedPrograms {get=>excludedPrograms;init=>excludedPrograms=value??[];}

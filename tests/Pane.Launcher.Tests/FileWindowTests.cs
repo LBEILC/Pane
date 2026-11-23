@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Text;
 using Pane.Contracts;
 using Pane.Services.Launcher;
@@ -7,13 +7,14 @@ static partial class Program
     sealed class FakeIpc:IEverythingIpc{
         internal List<(string Text,int Offset,int Count,int Sort)> Calls=[];
         internal bool Unavailable;
-        public Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token){
+        public Task<EverythingPage> QueryAsync(string query,int offset,int count,int sort,CancellationToken token,int timeoutMs=3000){
             token.ThrowIfCancellationRequested();Calls.Add((query,offset,count,sort));
             if(Unavailable)throw new FileSearchUnavailableException("fixture unavailable");
             return Task.FromResult(new EverythingPage(count==0?[]:[new(@"C:\fixture\Test.TXT","Test.TXT",FileCategory.Text,12,DateTimeOffset.UnixEpoch)],123));
         }
     }
     static async Task FileWindowTests(){
+        await TimeoutTests();
         int before=checks;var ipc=new FakeIpc();var executor=new FakeExecutor();var service=new FileSearch(ipc,executor);
         foreach(var pair in FileSearch.Extensions)foreach(var ext in pair.Value.Split(' '))Check(FileSearch.Category("x."+ext.ToUpperInvariant(),false)==pair.Key,"extension "+ext);
         Check(FileSearch.Category("x.txt",true)==FileCategory.Folder&&FileSearch.Category("x.unknown",false)==FileCategory.All,"folder/unknown");
@@ -58,6 +59,37 @@ static partial class Program
             timer.Restart();Check((await service.PreviewAsync(new(dir,"folder",FileCategory.Folder,null,null),default)).FolderItems==7,"folder");Console.WriteLine($"preview folder ms={timer.Elapsed.TotalMilliseconds:F3}");
             Console.WriteLine($"file-window assertions={checks-before}");
         }finally{Directory.Delete(dir,true);}
+    }
+    static async Task TimeoutTests(){
+        int code=0;
+        var budgets=new List<int>();
+        int Endpoint(string query,int offset,int count,int sort,EverythingIpc.Row row,out int total,int timeout,Microsoft.Win32.SafeHandles.SafeWaitHandle cancel,int[] info){
+            budgets.Add(timeout);total=5;
+            if(code==-2)Thread.Sleep(timeout==3000?200:timeout);
+            return code;
+        }
+        var ipc=new EverythingIpc(Endpoint);
+        var service=new FileSearch(ipc,new FakeExecutor());
+        foreach(var pair in new[]{(0,Pane.Localization.Strings.Launcher_EverythingNotRunning),(-1,Pane.Localization.Strings.Launcher_EverythingUnavailable),(-2,Pane.Localization.Strings.Launcher_EverythingTimeout)}){
+            code=pair.Item1;
+            try{await service.SearchAsync(new("fixture",FileCategory.All,FileSort.Modified),1,10,default);Check(false,"missing IPC error");}
+            catch(FileSearchUnavailableException error){Check(error.Message==pair.Item2&&budgets.Last()==3000,"page failure and timeout budget");}
+        }
+        var launcher=new EverythingSearch(ipc);
+        Check((await launcher.SearchAsync("fixture",10,default)).Count==0&&budgets.Last()==150,"launcher silent timeout");
+        var counts=await service.CountsAsync("fixture",FileCategory.All,5);
+        Check(counts?.Count==1&&counts[FileCategory.All]==5&&budgets.Skip(3).All(b=>b==150),"category timeout preserves other counts");
+    }
+    static async Task BroadQuery(bool filesOnly){
+        var version=new int[4];int status=LauncherNative.PaneEverythingVersion(version);
+        Console.WriteLine($"version={string.Join('.',version)} status={status}");
+        if(status!=1)throw new Exception("Everything endpoint unavailable");
+        var ipc=new EverythingIpc();
+        for(int i=0;i<20;++i){
+            var watch=Stopwatch.StartNew();
+            try{await ipc.QueryAsync(filesOnly?"file:":"",0,50,14,default);Console.WriteLine($"query={i+1} elapsedMs={watch.Elapsed.TotalMilliseconds:F1}");}
+            catch(TimeoutException){Console.WriteLine($"query={i+1} timeoutMs={watch.Elapsed.TotalMilliseconds:F1}");}
+        }
     }
     static async Task FilePerformance(){
         string dir=Path.Combine(Path.GetTempPath(),"pane021-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dir);

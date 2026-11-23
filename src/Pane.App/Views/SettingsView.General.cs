@@ -28,11 +28,16 @@ public sealed partial class SettingsView
             Row(Strings.Settings_ShowTrayIcon, Strings.Settings_ShowTrayIcon_Description,
                 Switch(g.ShowTrayIcon, v => SaveGeneral(x => x with { ShowTrayIcon = v }))));
         RenderLanguage(g);
+    }
 
+    // 外观（2026-11-23 从通用拆出）：主题与玻璃、字体、玻璃参数（高级），下面接原「图标」页
+    void RenderAppearance()
+    {
+        var g = app.Store.Current.General;
         var swatches = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         foreach (var (color, name) in new[] { ("#FF5874C9", Strings.Settings_Accent_MistBlue), ("#FF17958B", Strings.Settings_Accent_Teal), ("#FF5F8F4E", Strings.Settings_Accent_Moss), ("#FF4A505C", Strings.Settings_Accent_Graphite) })
             swatches.Children.Add(Swatch(color, name, string.Equals(g.AccentColor, color, StringComparison.OrdinalIgnoreCase)));
-        Group(Strings.Settings_Appearance,
+        Group(Strings.Settings_Appearance_Theme,
             Row(Strings.Settings_Theme, null, Seg([("System", Strings.Settings_FollowSystem), ("Light", Strings.Settings_Theme_Light), ("Dark", Strings.Settings_Theme_Dark)], g.Theme.ToString(),
                 v => SaveGeneral(x => x with { Theme = Enum.Parse<ThemeMode>(v) }))),
             Row(Strings.Settings_AccentColor, Strings.Settings_AccentColor_Description, swatches),
@@ -46,6 +51,7 @@ public sealed partial class SettingsView
                 v => SaveGeneral(x => x with { MotionSpeed = v switch { "reduced" => 0.5, "off" => 0.01, _ => 1 } }))));
         RenderFonts(g);
         RenderGlassAdvanced();
+        RenderIcons();
     }
 
     // 界面语言（2026-11-02，048）：语言名用各自的写法；跟随系统时按系统语言换算后和这次启动用的比较，不同才提示重启

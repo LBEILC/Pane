@@ -16,6 +16,7 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--104-broad")){await BroadQuery(args.Contains("--files-only"));return;}
         if(args.Contains("--101-real")){await TerminalProbe101();return;}
         if(args.Contains("--098")){await DirectHidden098Tests();return;}
         if(args.Contains("--089")){await Web089Tests(args.Contains("--live"));return;}
@@ -52,7 +53,7 @@ static partial class Program
             File.WriteAllText(Path.Combine(directory,"settings.json"),old);
         }
         store.Load();var l=store.Current.Launcher;
-        Check(corrupt==0&&l.HideOnBlur&&l.KeepInput==KeepInputMode.Clear&&l.AutoAttachSeconds==3&&l.FileResultCount==8&&l.Favorites.Length==0&&l.PinnedApps.Length==0&&l.SearchEngines.Length==5&&l.SearchEngines[1].Keyword=="g"&&l.DefaultEngine=="bing","old settings defaults without recovery");
+        Check(corrupt==0&&l.HideOnBlur&&l.KeepInput==KeepInputMode.OneMinute&&l.AutoAttachSeconds==3&&l.FileResultCount==8&&l.Favorites.Length==0&&l.PinnedApps.Length==0&&l.SearchEngines.Length==5&&l.SearchEngines[1].Keyword=="g"&&l.DefaultEngine=="bing","old settings defaults without recovery");
         // issue 8：存过的搜索站点和旧默认（4 个）完全一样 → 补上 Google；改过的不动
         SearchEngine[] oldDefault=[new("必应","bing","https://www.bing.com/search?q={query}"),new("百度","bd","https://www.baidu.com/s?wd={query}"),new("GitHub","gh","https://github.com/search?q={query}"),new("哔哩哔哩","b","https://search.bilibili.com/all?keyword={query}")];
         Check((l with{SearchEngines=oldDefault}).SearchEngines.Length==5&&(l with{SearchEngines=oldDefault[..3]}).SearchEngines.Length==3,"old default engines gain Google, custom lists kept");
@@ -65,6 +66,7 @@ static partial class Program
         await OriginalFavoriteTests(service);
         await OriginalWebTests(service);
         await FileWindowTests();
+        await DialogSearchTests();
         await OriginalCalculationTests(service,fake);
         await OriginalAiTests(service);
         await OriginalCommandTests(service,fake);

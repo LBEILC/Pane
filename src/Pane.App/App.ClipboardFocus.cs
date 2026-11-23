@@ -55,6 +55,8 @@ public sealed partial class App
     {
         if(SuperPanelKey(press))return;   // 超级面板不激活打开时（079）
         if(!panels.TryGetValue("clipboard",out var panel)||!panel.Shown||!panel.Passive||panel.View is not ClipboardView view){panelKeys?.End();return;}
+        // 操作列表、标签、编辑（2026-11-23，106）：先切到激活方式，模式里要用到搜索框、数字键和编辑框
+        if(press.Key is PanelKey.More or PanelKey.Tags or PanelKey.Edit){panelKeys?.End();EngageClipboard(panel,view);view.HandleKey(press);return;}
         if(press.Key==PanelKey.Type)
         {
             // 先激活、聚焦搜索框，再让服务把排队的键重放进来（输入法照常组字）

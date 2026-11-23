@@ -95,7 +95,7 @@ API int PaneClipSaveImage(const wchar_t* input,const wchar_t* full,const wchar_t
  if(SUCCEEDED(hr))hr=scale->Initialize(source.Get(),std::max(1u,static_cast<UINT>(w*k)),std::max(1u,static_cast<UINT>(h*k)),WICBitmapInterpolationModeFant);
  if(SUCCEEDED(hr))hr=Save(f.Get(),scale.Get(),thumb);return SUCCEEDED(hr);
 }
-API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars,int mode){
+API int PaneClipWriteFormats(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars,int mode,const BYTE* html,int htmlSize,const BYTE* rtf,int rtfSize){
  Apartment apartment;HGLOBAL data=nullptr,png=nullptr,dib=nullptr;UINT format=CF_UNICODETEXT;
  if(image){
   auto f=Factory();if(!f)return 0;ComPtr<IWICBitmapDecoder> decoder;ComPtr<IWICBitmapFrameDecode> frame;ComPtr<IWICFormatConverter> convert;
@@ -131,7 +131,19 @@ API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* fi
  if(ok&&png)ok=Put(RegisterClipboardFormatW(L"PNG"),png);
  if(ok)ok=Put(format,data);
  if(ok&&dib)ok=Put(CF_DIB,dib);
- if(opened&&!ok&&image&&!marker)EmptyClipboard();if(opened)CloseClipboard();if(owner)DestroyWindow(owner);if(marker)GlobalFree(marker);if(data)GlobalFree(data);if(png)GlobalFree(png);if(dib)GlobalFree(dib);return ok;
+ auto extra=[&](const wchar_t* name,const void* bytes,size_t size){
+  HGLOBAL handle=Memory(bytes,size);
+  bool success=handle&&Put(RegisterClipboardFormatW(name),handle);
+  if(handle)GlobalFree(handle);
+  return success;
+ };
+ if(ok&&html&&htmlSize>0)ok=extra(L"HTML Format",html,htmlSize);
+ if(ok&&rtf&&rtfSize>0)ok=extra(L"Rich Text Format",rtf,rtfSize);
+ if(ok&&files)ok=extra(L"Preferred DropEffect",&one,sizeof(one));
+ if(opened&&!ok&&!marker)EmptyClipboard();if(opened)CloseClipboard();if(owner)DestroyWindow(owner);if(marker)GlobalFree(marker);if(data)GlobalFree(data);if(png)GlobalFree(png);if(dib)GlobalFree(dib);return ok;
+}
+API int PaneClipWrite(const wchar_t* text,const wchar_t* image,const wchar_t* files,int fileChars,int mode){
+ return PaneClipWriteFormats(text,image,files,fileChars,mode,nullptr,0,nullptr,0);
 }
 API int PaneClipSaveDialog(const wchar_t* source,const wchar_t* name){
  Apartment apartment;ComPtr<IFileSaveDialog> dialog;HRESULT hr=CoCreateInstance(CLSID_FileSaveDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&dialog));

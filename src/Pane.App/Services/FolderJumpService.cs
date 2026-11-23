@@ -10,6 +10,8 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
 {
     readonly object gate = new();
     readonly Trigger trigger;
+    internal DialogCallback? DialogObserver { get; set; }
+    bool applied;
     readonly SemaphoreSlim jumping = new(1);
     nint service;
     bool disposed;
@@ -34,12 +36,14 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
         {
             if (disposed) return;
             value = SettingsStore.NormalizeFolderJump(value);
-            if (settings == value) return;
+            if (applied && settings == value) return;
+            applied = true;
             bool keysChanged = settings.Jump != value.Jump || settings.Menu != value.Menu;
             settings = value; generation++;
             if (keysChanged || !value.Enabled) SetHotkeyProblem(0);
-            PaneFolderJumpApply(service, value.Enabled ? 1 : 0, Modifiers(value.Jump), value.Jump.VirtualKey,
-                Modifiers(value.Menu), value.Menu.VirtualKey, value.AutoJump ? 1 : 0);
+            PaneFolderJumpApplySearch(service, value.Enabled ? 1 : 0, Modifiers(value.Jump), value.Jump.VirtualKey,
+                Modifiers(value.Menu), value.Menu.VirtualKey, value.AutoJump ? 1 : 0,
+                value.Enabled && value.SearchBar ? DialogObserver : null, value.FilterByType ? 1 : 0);
         }
     }
     static uint Modifiers(Hotkey key) =>
@@ -110,7 +114,10 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
     bool Active(long version) { lock (gate) return !disposed && settings.Enabled && generation == version; }
     public Task JumpAsync(nint dialog, string path, CancellationToken cancellationToken) =>
         JumpCore(dialog, path, cancellationToken, false, Interlocked.Read(ref generation));
-    async Task JumpCore(nint dialog, string path, CancellationToken cancellationToken, bool automatic, long version)
+    internal Task NavigateAsync(nint dialog, string path, string? name, bool confirm, CancellationToken token) =>
+        JumpCore(dialog, path, token, false, Interlocked.Read(ref generation), true, name, confirm);
+    async Task JumpCore(nint dialog, string path, CancellationToken cancellationToken, bool automatic, long version,
+        bool search = false, string? name = null, bool confirm = false)
     {
         await jumping.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -121,7 +128,12 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
                 {
                     if (disposed || !settings.Enabled || generation != version || cancellationToken.IsCancellationRequested) return;
                     // 开始改文本以后必须完成恢复，取消不能把目标路径留在文件名框。
-                    if (automatic) PaneFolderJumpAutoTo(service, dialog, path); else PaneFolderJumpTo(dialog, path);
+                    if (search)
+                    {
+                        if (settings.SearchBar) PaneDialogNavigate(dialog, path, name, confirm ? 1 : 0, cancellationToken.WaitHandle.SafeWaitHandle);
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+                    else if (automatic) PaneFolderJumpAutoTo(service, dialog, path); else PaneFolderJumpTo(dialog, path);
                 }
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -160,7 +172,11 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
         _ => string.Format(Strings.FolderJump_KeyCode, (object?)(vk)),
     };
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern int PaneFolderJumpDiagnostics(nint service);
-    [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpApply(nint service, int enabled, uint jumpMods, uint jumpKey, uint menuMods, uint menuKey, int automatic);
+    [StructLayout(LayoutKind.Sequential)] internal struct Bounds { public int Left, Top, Right, Bottom; }
+    [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
+    internal delegate void DialogCallback(nint dialog, Bounds bounds, int flags, [MarshalAs(UnmanagedType.LPWStr)] string type);
+    [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpApplySearch(nint service, int enabled, uint jumpMods, uint jumpKey, uint menuMods, uint menuKey, int automatic, DialogCallback? callback, int filter);
+    [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)] static extern int PaneDialogNavigate(nint dialog, string folder, string? name, int confirm, Microsoft.Win32.SafeHandles.SafeWaitHandle cancel);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpEntriesFiltered(nint service, EntryCallback callback, int recent);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)] static extern int PaneFolderJumpAutoTo(nint service, nint dialog, string path);
     [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate void Trigger(nint dialog, int command, int x, int y);

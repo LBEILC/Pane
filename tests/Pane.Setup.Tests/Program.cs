@@ -76,16 +76,18 @@ internal static class Program
                 // 0.1.294 真包：完整执行其隔离安装与登记卸载链路，不读真实登记或数据。
                 await Run(args[1], "--self-test-root", root);
                 string installed = InstallRoot(root), command = Registered(root);
-                Check(command == $"\"{Path.Combine(installed, "app", "Pane.App.exe")}\" --uninstall", "旧版登记");
+                bool modernBaseline=args.Length==4&&args[3]=="--modern-baseline";
+                if(modernBaseline)Check(command==$"\"{Path.Combine(installed,"Uninstall Pane.exe")}\"","旧版独立卸载登记");
+                else Check(command == $"\"{Path.Combine(installed, "app", "Pane.App.exe")}\" --uninstall", "旧版登记");
                 await Run(Environment.ProcessPath!, "--launch", Path.Combine(root, "background.txt"), Path.Combine(installed, "app", "Pane.App.exe"), "--uninstall", "--self-test-root", root);
                 await WaitHelper(root);
                 Check(!Directory.Exists(installed), "旧版隔离卸载完成");
                 Check(File.ReadAllText(Path.Combine(root, "background.txt")).Contains("background=True"), "旧版从非前台进程启动");
-                rows.Add("baseline 0.1.294: registered app -> temporary helper -> temporary worker -> uninstall completed; background=True; headless isolation bypasses window by design");
+                rows.Add($"baseline={FileVersionInfo.GetVersionInfo(args[1]).FileVersion}; background=True; uninstall completed");
                 // 从真实旧版布局升级，并保留自测数据。
                 await Run(args[1], "--self-test-root", root);
                 installed = InstallRoot(root);
-                Check(!File.Exists(Path.Combine(installed, "Uninstall Pane.exe")), "旧布局无卸载程序");
+                Check(File.Exists(Path.Combine(installed, "Uninstall Pane.exe"))==modernBaseline, "升级前布局符合测试基线");
                 await Run(args[2], "--auto-update", "--self-test-root", root);
                 string uninstaller = Path.Combine(installed, "Uninstall Pane.exe");
                 Check(File.Exists(uninstaller), "升级补齐卸载程序");

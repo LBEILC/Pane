@@ -107,37 +107,56 @@ internal sealed partial class DataStorage
             string staged=Path.Combine(output,Path.GetFileName(target));WriteAtomic(staged,value.ToJsonString());writes[target]=staged;
         }
         string clipSource=Path.Combine(root,"clipboard/history.json");if(!File.Exists(clipSource))return writes;
-        var disk=new ClipboardStorage();string index=LocalFile(data,"clipboard/history.json");var old=disk.Load(index);
+        var disk=new ClipboardStorage();string index=LocalFile(data,"clipboard/history.json");var localIndex=disk.LoadIndex(index);var old=localIndex.Entries;
+        var incomingIndex=disk.LoadIndex(clipSource);bool merge=options["merge"]!.GetValue<bool>();
+        var tagMap=(merge?localIndex.Tags:[]).Concat(incomingIndex.Tags).DistinctBy(t=>t.Name,StringComparer.OrdinalIgnoreCase).ToDictionary(t=>t.Name,StringComparer.OrdinalIgnoreCase);
         string? configured=local?["Storage"]?["LargeFilesDirectory"]?.GetValue<string>();
         string imageRoot=configured!=null&&StorageLocation.Available(configured)?configured:Path.Combine(data,"clipboard");
         var result=options["merge"]!.GetValue<bool>()?old.ToList():new List<StoredClip>();
         string Key(StoredClip c,bool incoming)=>c.Entry.Kind==ClipKind.Image?"i:"+ImageHash(incoming?Path.Combine(root,c.Entry.ContentPath!):c.Entry.ContentPath!):c.Entry.Kind==ClipKind.Files?"f:"+c.Fingerprint:"t:"+c.Entry.Text;
-        var keys=new HashSet<string>(result.Select(c=>Key(c,false)),StringComparer.Ordinal);
-        foreach(var c in disk.Load(clipSource)){
-            string key=Key(c,true);if(options["merge"]!.GetValue<bool>()&&!keys.Add(key))continue;
-            var entry=c.Entry;string id=Guid.NewGuid().ToString("N");
+        var keys=new Dictionary<string,int>(StringComparer.Ordinal);
+        for(int i=0;i<result.Count;i++)keys.TryAdd(Key(result[i],false),i);
+        foreach(var c in incomingIndex.Entries){
+            string key=Key(c,true);var entry=c.Entry with{Tags=c.Entry.Tags.Select(n=>tagMap[n].Name).Distinct(StringComparer.OrdinalIgnoreCase).ToArray()};
+            int duplicate;
+            bool exists=keys.TryGetValue(key,out duplicate)&&merge;
+            string? formatId=null;
+            if(c.FormatId!=null&&(!exists||result[duplicate].FormatId==null)){
+                formatId=Guid.NewGuid().ToString("N");
+                writes[RichFormats.PathFor(Path.GetDirectoryName(index)!,formatId)]=RichFormats.PathFor(Path.GetDirectoryName(clipSource)!,c.FormatId);
+            }
+            if(exists){
+                var prior=result[duplicate];
+                result[duplicate]=prior with{FormatId=prior.FormatId??formatId,Entry=prior.Entry with{Rich=prior.Entry.Rich||formatId!=null,Tags=prior.Entry.Tags.Union(entry.Tags,StringComparer.OrdinalIgnoreCase).ToArray()}};
+                continue;
+            }
+            keys.TryAdd(key,result.Count);
+            string id=Guid.NewGuid().ToString("N");
             if(entry.Kind==ClipKind.Image){
                 string full=Path.Combine(imageRoot,id+".png");writes[full]=Path.Combine(root,entry.ContentPath!);
                 string? thumb=null;if(entry.Thumbnail?.Path is {} p){thumb=Path.Combine(imageRoot,id+".thumb.png");writes[thumb]=Path.Combine(root,p);}
                 entry=entry with{ContentPath=full,Thumbnail=thumb==null?null:new(thumb)};
             }else entry=entry with{ContentPath=null,Thumbnail=null,Files=null};
             string fingerprint=entry.Kind==ClipKind.Image?key:"t:"+Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(entry.Text??"")));
-            result.Add(new(entry with{Id=id},fingerprint));
+            result.Add(new(entry with{Id=id},fingerprint,formatId));
         }
         int limit=finalSettings?["Clipboard"]?["Limit"]?.GetValue<int>()??500;
-        var remove=result.Where(c=>!c.Entry.Pinned).OrderByDescending(c=>c.Entry.CopiedAt).Skip(limit).ToHashSet();result.RemoveAll(remove.Contains);
+        var remove=result.Where(c=>!c.Entry.Pinned&&c.Entry.Tags.Count==0).OrderByDescending(c=>c.Entry.CopiedAt).Skip(limit).ToHashSet();result.RemoveAll(remove.Contains);
         long mb=finalSettings?["Clipboard"]?["ImageLimitMegabytes"]?.GetValue<long>()??0;
         if(mb>0){
             long max=mb>long.MaxValue/(1024*1024)?long.MaxValue:mb*1024*1024;
             long Size(string? p)=>p==null?0:File.Exists(writes.GetValueOrDefault(p)??p)?new FileInfo(writes.GetValueOrDefault(p)??p).Length:0;
-            var images=result.Where(c=>c.Entry.Kind==ClipKind.Image&&!c.Entry.Pinned).OrderBy(c=>c.Entry.CopiedAt).Select(c=>(Clip:c,Size:Size(c.Entry.ContentPath)+Size(c.Entry.Thumbnail?.Path))).ToArray();
+            var images=result.Where(c=>c.Entry.Kind==ClipKind.Image&&!c.Entry.Pinned&&c.Entry.Tags.Count==0).OrderBy(c=>c.Entry.CopiedAt).Select(c=>(Clip:c,Size:Size(c.Entry.ContentPath)+Size(c.Entry.Thumbnail?.Path))).ToArray();
             long bytes=images.Sum(c=>c.Size);foreach(var c in images){if(bytes<=max)break;result.Remove(c.Clip);bytes-=c.Size;}
         }
         var keep=result.SelectMany(c=>new[]{c.Entry.ContentPath,c.Entry.Thumbnail?.Path}).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach(string target in writes.Keys.Where(p=>p.EndsWith(".png",StringComparison.OrdinalIgnoreCase)&&!keep.Contains(p)).ToArray())writes.Remove(target);
         foreach(string path in old.SelectMany(c=>new[]{c.Entry.ContentPath,c.Entry.Thumbnail?.Path}).OfType<string>().Where(p=>!keep.Contains(p)).Distinct(StringComparer.OrdinalIgnoreCase))
             if(StorageLocation.Within(Path.GetFullPath(path),Path.GetFullPath(imageRoot))||StorageLocation.Within(Path.GetFullPath(path),Path.Combine(Path.GetFullPath(data),"clipboard")))writes[path]=null;
-        string stagedIndex=Path.Combine(output,"history.json");disk.Save(stagedIndex,result.OrderByDescending(c=>c.Entry.CopiedAt).ToArray(),_=>{});writes[index]=stagedIndex;return writes;
+        var richKeep=result.Select(c=>c.FormatId).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach(string path in writes.Keys.Where(p=>p.EndsWith(".rich")&&!richKeep.Contains(Path.GetFileNameWithoutExtension(p))).ToArray())writes.Remove(path);
+        foreach(string removed in old.Select(c=>c.FormatId).OfType<string>().Except(richKeep))writes[RichFormats.PathFor(Path.GetDirectoryName(index)!,removed)]=null;
+        string stagedIndex=Path.Combine(output,"history.json");disk.SaveIndex(stagedIndex,new(2,tagMap.Values.ToArray(),result.OrderByDescending(c=>c.Entry.CopiedAt).ToArray()),_=>{});writes[index]=stagedIndex;return writes;
     }
     static string ImageHash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file));}
 }

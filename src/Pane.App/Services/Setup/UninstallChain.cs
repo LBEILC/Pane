@@ -7,7 +7,34 @@ namespace Pane.Services.Setup;
 // 应用和无资源的安装外壳共享的卸载进程边界。
 internal static class UninstallChain
 {
-    public static string LogPath => Path.Combine(Path.GetTempPath(), "Pane-uninstall.log");
+    internal static string? IsolatedLogRoot { get; set; }
+    public static string LogPath { get; private set; } = "";
+    internal static string Fallback(string? isolated) => Path.Combine(isolated ??
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Pane", "Setup-Temp");
+    static void CheckFallback(string root)
+    {
+        SetupFiles.Check(Path.GetDirectoryName(root)!);
+        SetupFiles.Check(root);
+    }
+    internal static T WithTemporaryRoot<T>(string? isolated, Func<string,T> operation)
+    {
+        string primary=Path.GetTempPath(), fallback=Fallback(isolated);
+        try { return operation(primary); }
+        catch(Exception first) when(first is IOException or UnauthorizedAccessException)
+        {
+            try
+            {
+                CheckFallback(fallback);
+                Directory.CreateDirectory(fallback);
+                CheckFallback(fallback);
+                return operation(fallback);
+            }
+            catch(Exception second) when(second is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException($"临时目录 {primary}：{Reason(first)}\n备用目录 {fallback}：{Reason(second)}", second);
+            }
+        }
+    }
     static string Escape(string? value) => (value ?? "-").Replace("\\", "\\\\").Replace("\r", "\\r").Replace("\n", "\\n").Replace("\t", "\\t");
     static string Limit(string? value, int length) => value == null ? "-" : value[..Math.Min(value.Length, length)];
     public static string Reason(Exception error)
@@ -22,14 +49,14 @@ internal static class UninstallChain
         }; // 不翻译：外壳没有资源文件
         return $"{error.Message} (0x{code:X8})" + (hint.Length == 0 ? "" : "；" + hint);
     }
-    public static void Log(string step, string result = "ok", Exception? error = null, string? path = null, string? details = null)
+    public static string? Log(string step, string result = "ok", Exception? error = null, string? path = null, string? details = null)
     {
         try
         {
             using var mutex = new Mutex(false, @"Local\Pane-Uninstall-Log");
             bool owned;
             try { owned = mutex.WaitOne(2000); } catch (AbandonedMutexException) { owned = true; }
-            if (!owned) return;
+            if (!owned) return null;
             try
             {
                 int nativeCode = error is System.ComponentModel.Win32Exception native ? native.NativeErrorCode
@@ -45,15 +72,20 @@ internal static class UninstallChain
                 if (error is AggregateException aggregate) foreach (var child in aggregate.InnerExceptions) Describe(child, 0);
                 else if (error?.InnerException != null) Describe(error.InnerException, 0);
                 string line = $"{DateTimeOffset.UtcNow:O}\tpid={Environment.ProcessId}\tstep={Escape(step)}\tresult={Escape(result)}\tcode=0x{(error?.HResult ?? 0):X8}\tnative={nativeCode}\texception={error?.GetType().FullName ?? "-"}\tpath={Escape(path)}\tmessage={Escape(Limit(error?.Message, 2048))}\tinner={Escape(Limit(inner.ToString(), 4096))}\tstack={Escape(Limit(error?.StackTrace, 2048))}\tdetails={Escape(Limit(details, 4096))}\n";
-                string text = (File.Exists(LogPath) ? File.ReadAllText(LogPath) : "") + line;
-                while (Encoding.UTF8.GetByteCount(text) > 65536)
-                { int end = text.IndexOf('\n'); text = end < 0 ? "" : text[(end + 1)..]; }
-                SetupFiles.Check(LogPath);
-                File.WriteAllText(LogPath, text, new UTF8Encoding(false));
+                return LogPath = WithTemporaryRoot(IsolatedLogRoot, root =>
+                {
+                    string file=Path.Combine(root,"Pane-uninstall.log");
+                    SetupFiles.Check(file);
+                    string text = (File.Exists(file) ? File.ReadAllText(file) : "") + line;
+                    while (Encoding.UTF8.GetByteCount(text) > 65536)
+                    { int end = text.IndexOf('\n'); text = end < 0 ? "" : text[(end + 1)..]; }
+                    File.WriteAllText(file, text, new UTF8Encoding(false));
+                    return file;
+                });
             }
             finally { mutex.ReleaseMutex(); }
         }
-        catch (Exception) { /* 诊断失败不能遮盖原始故障。 */ }
+        catch (Exception) { return null; }
     }
     public static void WaitReadable(string directory, int timeout = 15000)
     {
@@ -145,12 +177,18 @@ internal static class UninstallChain
         try
         {
             Cleanup(isolated);
-            helper = Path.Combine(Path.GetTempPath(), "Pane-Cleanup-" + Guid.NewGuid().ToString("N") + ".exe");
-            SetupFiles.Check(helper); (copy ?? ((a, b) => File.Copy(a, b)))(executable, helper);
+            helper = WithTemporaryRoot(isolated, root =>
+            {
+                string target=Path.Combine(root,"Pane-Cleanup-"+Guid.NewGuid().ToString("N")+".exe");
+                SetupFiles.Check(target);
+                try { (copy ?? ((a,b)=>File.Copy(a,b)))(executable,target); }
+                catch { DeleteTemporary(target,"cleanup-unstarted-helper",0); throw; }
+                return target;
+            });
             Log(step, path: helper);
             string name = @"Local\Pane-Uninstall-" + Guid.NewGuid().ToString("N");
             using var ready = new EventWaitHandle(false, EventResetMode.ManualReset, name);
-            var info = new ProcessStartInfo(helper) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetTempPath() };
+            var info = new ProcessStartInfo(helper) { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(helper)! };
             foreach (string arg in new[] { "--relocate", paths.App, "-1", "--ready-event", name, "--launcher-pid", Environment.ProcessId.ToString() }) info.ArgumentList.Add(arg);
             if (isolated != null) { info.ArgumentList.Add("--self-test-root"); info.ArgumentList.Add(isolated); }
             step = "start-helper";
@@ -179,9 +217,12 @@ internal static class UninstallChain
         // 没有 lease 的旧版残留保留一天，避免干扰正在运行的旧安装器。
         // 所有旧残留共享十秒退避预算，避免多份残留逐项叠加等待。
         var watch = Stopwatch.StartNew();
+        string fallback=Fallback(isolated);
+        foreach(string directory in new[]{Path.GetTempPath(),fallback})
         try
         {
-            foreach (string path in Directory.EnumerateFileSystemEntries(Path.GetTempPath(), "Pane-*"))
+            if(directory==fallback){CheckFallback(directory);if(!Directory.Exists(directory))continue;}
+            foreach (string path in Directory.EnumerateFileSystemEntries(directory, "Pane-*"))
             {
                 try
                 {
@@ -201,7 +242,7 @@ internal static class UninstallChain
                 catch (Exception e) { Log("cleanup-stale", "retained", e, path); }
             }
         }
-        catch (Exception e) { Log("cleanup-stale", "retained", e, Path.GetTempPath()); }
+        catch (Exception e) { Log("cleanup-stale", "retained", e, directory); }
     }
     static bool InUse(string path)
     {
@@ -231,7 +272,8 @@ internal static class UninstallChain
     {
         SetupFiles.Check(path + ".lease");
         var stream = new FileStream(path + ".lease", FileMode.Create, FileAccess.ReadWrite, FileShare.None);
-        stream.Write(Encoding.UTF8.GetBytes(isolated ?? "")); stream.Flush(); return stream;
+        try { stream.Write(Encoding.UTF8.GetBytes(isolated ?? "")); stream.Flush(); return stream; }
+        catch { stream.Dispose(); throw; }
     }
     public static void WaitLauncher(int pid)
     {

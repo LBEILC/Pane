@@ -375,6 +375,7 @@
   <data name="Launcher_DefaultSearchEngine" xml:space="preserve"><value>默认搜索引擎</value></data>
   <data name="Launcher_EverythingNotRunning" xml:space="preserve"><value>Everything 未运行，启动后即可搜索文件</value></data>
   <data name="Launcher_EverythingUnavailable" xml:space="preserve"><value>无法连接 Everything（需要 1.4 或更高版本），可在 设置 → 启动器 中重新检测</value></data>
+  <data name="Launcher_EverythingTimeout" xml:space="preserve"><value>Everything 没有及时响应，请稍后再试</value></data>
   <data name="Launcher_Explorer" xml:space="preserve"><value>文件资源管理器</value></data>
   <data name="Launcher_FileCount" xml:space="preserve"><value>{0} 个文件</value></data>
   <data name="Launcher_FillInput" xml:space="preserve"><value>填入输入框</value></data>
@@ -871,9 +872,9 @@
   <data name="Settings_Clipboard_Activation" xml:space="preserve"><value>呼出</value></data>
   <data name="Settings_Clipboard_AddExcludedProgram" xml:space="preserve"><value>添加排除的程序</value></data>
   <data name="Settings_Clipboard_Basic" xml:space="preserve"><value>基本</value></data>
-  <data name="Settings_Clipboard_Cleared" xml:space="preserve"><value>已清空，固定的条目已保留</value></data>
+  <data name="Settings_Clipboard_Cleared" xml:space="preserve"><value>已清空，已固定和带标签的条目已保留</value></data>
   <data name="Settings_Clipboard_ClearHistory" xml:space="preserve"><value>清空剪贴板历史</value></data>
-  <data name="Settings_Clipboard_ClearWarning" xml:space="preserve"><value>未固定的记录会全部删除，不能撤销</value></data>
+  <data name="Settings_Clipboard_ClearWarning" xml:space="preserve"><value>未固定、也没有标签的记录会全部删除，不能撤销</value></data>
   <data name="Settings_Clipboard_ConfirmClear" xml:space="preserve"><value>再点一次清空</value></data>
   <data name="Settings_Clipboard_Data" xml:space="preserve"><value>数据</value></data>
   <data name="Settings_Clipboard_Deduplicate" xml:space="preserve"><value>连续重复时只保留一条</value></data>
@@ -893,11 +894,11 @@
   <data name="Settings_Clipboard_LimitThousand" xml:space="preserve"><value>1000 条</value></data>
   <data name="Settings_Clipboard_LimitTwoHundred" xml:space="preserve"><value>200 条</value></data>
   <data name="Settings_Clipboard_MaxItems" xml:space="preserve"><value>最多保留</value></data>
-  <data name="Settings_Clipboard_MaxItemsDescription" xml:space="preserve"><value>已固定的条目不计入，也不会被自动清理</value></data>
+  <data name="Settings_Clipboard_MaxItemsDescription" xml:space="preserve"><value>已固定和带标签的条目不计入，也不会被自动清理</value></data>
   <data name="Settings_Clipboard_MovePastedFirst" xml:space="preserve"><value>粘贴后移到最前</value></data>
   <data name="Settings_Clipboard_MovePastedFirstDescription" xml:space="preserve"><value>下次打开剪贴板时生效；面板打开期间条目位置不变</value></data>
   <data name="Settings_Clipboard_OneFormatRequired" xml:space="preserve"><value>至少选择一种</value></data>
-  <data name="Settings_Clipboard_PinnedRemain" xml:space="preserve"><value>已固定的条目会保留</value></data>
+  <data name="Settings_Clipboard_PinnedRemain" xml:space="preserve"><value>已固定和带标签的条目会保留</value></data>
   <data name="Settings_Clipboard_Privacy" xml:space="preserve"><value>隐私</value></data>
   <data name="Settings_Clipboard_Recording" xml:space="preserve"><value>记录</value></data>
   <data name="Settings_Clipboard_RespectHistoryFlag" xml:space="preserve"><value>遵守「不进历史」标记</value></data>
@@ -954,7 +955,7 @@
   <data name="Settings_Font_Ui" xml:space="preserve"><value>界面字体</value></data>
   <data name="Settings_Font_YaHei" xml:space="preserve"><value>微软雅黑</value></data>
   <data name="Settings_General" xml:space="preserve"><value>通用</value></data>
-  <data name="Settings_General_Description" xml:space="preserve"><value>启动方式、外观和动效</value></data>
+  <data name="Settings_General_Description" xml:space="preserve"><value>开机启动、托盘图标和界面语言</value></data>
   <data name="Settings_Gestures" xml:space="preserve"><value>鼠标手势</value></data>
   <data name="Settings_Gestures_Action" xml:space="preserve"><value>动作</value></data>
   <data name="Settings_Gestures_Add" xml:space="preserve"><value>添加手势</value></data>
@@ -1132,7 +1133,7 @@
   <data name="Settings_Icons_FullBleed" xml:space="preserve"><value>满幅，裁成圆角方形</value></data>
   <data name="Settings_Icons_Generating" xml:space="preserve"><value>生成中</value></data>
   <data name="Settings_Icons_Invalid" xml:space="preserve"><value>图标设置无效</value></data>
-  <data name="Settings_Icons_Mask" xml:space="preserve"><value>遮罩</value></data>
+  <data name="Settings_Icons_Mask" xml:space="preserve"><value>应用图标</value></data>
   <data name="Settings_Icons_NeutralPlate" xml:space="preserve"><value>放在中性底板上</value></data>
   <data name="Settings_Icons_NotGenerated" xml:space="preserve"><value>图标尚未生成</value></data>
   <data name="Settings_Icons_Original" xml:space="preserve"><value>原样显示</value></data>
@@ -1664,4 +1665,81 @@
   <data name="Launcher_DirectOpenUrl" xml:space="preserve"><value>打开网址</value></data>
   <data name="Launcher_DirectOpenFolder" xml:space="preserve"><value>打开文件夹</value></data>
   <data name="Launcher_DirectOpenFile" xml:space="preserve"><value>打开文件</value></data>
+  <data name="Settings_Appearance_Description" xml:space="preserve"><value>主题、颜色、玻璃效果、字体和应用图标</value></data>
+  <data name="Settings_Appearance_Theme" xml:space="preserve"><value>主题与玻璃</value></data>
+  <data name="Settings_NavGroup_Input" xml:space="preserve"><value>搜索与输入</value></data>
+  <data name="Settings_NavGroup_Mouse" xml:space="preserve"><value>鼠标与窗口</value></data>
+  <data name="Settings_Hotkeys" xml:space="preserve"><value>快捷键</value></data>
+  <data name="Settings_Hotkeys_Description" xml:space="preserve"><value>集中管理全部快捷键，可直接修改；重复或被占用时显示提示</value></data>
+  <data name="Settings_Hotkeys_Activation" xml:space="preserve"><value>全局</value></data>
+  <data name="Settings_Hotkeys_ActivationNote" xml:space="preserve"><value>在任意程序中均可使用；与其他程序的快捷键冲突时显示占用情况</value></data>
+  <data name="Settings_Hotkeys_Dialog" xml:space="preserve"><value>文件对话框</value></data>
+  <data name="Settings_Hotkeys_DialogNote" xml:space="preserve"><value>仅在「打开 / 另存为」对话框位于前台时生效，可与全局快捷键相同</value></data>
+  <data name="Clipboard_FilesSummary" xml:space="preserve"><value>{0} 等 {1} 个文件</value></data>
+  <data name="Clipboard_PasteFiles" xml:space="preserve"><value>粘贴文件</value></data>
+  <data name="Clipboard_PastePath" xml:space="preserve"><value>粘贴路径</value></data>
+  <data name="Clipboard_PasteFileName" xml:space="preserve"><value>粘贴文件名</value></data>
+  <data name="Clipboard_PastePlain" xml:space="preserve"><value>粘贴为纯文本</value></data>
+  <data name="Clipboard_PasteAsFile" xml:space="preserve"><value>粘贴为文件</value></data>
+  <data name="Clipboard_PasteHex" xml:space="preserve"><value>粘贴为 HEX</value></data>
+  <data name="Clipboard_PasteRgb" xml:space="preserve"><value>粘贴为 RGB</value></data>
+  <data name="Clipboard_OpenLink" xml:space="preserve"><value>打开网址</value></data>
+  <data name="Clipboard_OpenFolder" xml:space="preserve"><value>打开文件夹</value></data>
+  <data name="Clipboard_RevealInExplorer" xml:space="preserve"><value>在资源管理器中显示</value></data>
+  <data name="Clipboard_Unpin" xml:space="preserve"><value>取消固定</value></data>
+  <data name="Clipboard_RunNumber" xml:space="preserve"><value>直接执行</value></data>
+  <data name="Clipboard_Tags" xml:space="preserve"><value>标签</value></data>
+  <data name="Clipboard_TagsAction" xml:space="preserve"><value>标签…</value></data>
+  <data name="Clipboard_TagTarget" xml:space="preserve"><value>标签：{0}</value></data>
+  <data name="Clipboard_TagSearchPlaceholder" xml:space="preserve"><value>搜索或新建标签</value></data>
+  <data name="Clipboard_NewTag" xml:space="preserve"><value>新建标签「{0}」</value></data>
+  <data name="Clipboard_TagCount" xml:space="preserve"><value>{0} 条</value></data>
+  <data name="Clipboard_TagToggle" xml:space="preserve"><value>添加 / 移除</value></data>
+  <data name="Clipboard_NoTags" xml:space="preserve"><value>尚无标签，输入名称即可新建</value></data>
+  <data name="Clipboard_TagKeepHint" xml:space="preserve"><value>带标签的内容将长期保存，不受条数上限和「清空剪贴板历史」影响</value></data>
+  <data name="Clipboard_TagEmpty" xml:space="preserve"><value>此标签下暂无内容</value></data>
+  <data name="Clipboard_RichMark" xml:space="preserve"><value>带格式</value></data>
+  <data name="Clipboard_RichHint" xml:space="preserve"><value>粘贴时保留原有格式；按 Shift+Enter 粘贴为纯文本</value></data>
+  <data name="Clipboard_EditRichNote" xml:space="preserve"><value>编辑后仅保留文字</value></data>
+  <data name="Clipboard_SaveAndPaste" xml:space="preserve"><value>保存并粘贴</value></data>
+  <data name="Clipboard_Discard" xml:space="preserve"><value>放弃</value></data>
+  <data name="Clipboard_ResizeHint" xml:space="preserve"><value>拖动调整高度，双击恢复默认</value></data>
+  <data name="Clipboard_KeyHints" xml:space="preserve"><value>按键提示</value></data>
+  <data name="Settings_Clipboard_KeyHints" xml:space="preserve"><value>按键提示</value></data>
+  <data name="Settings_Clipboard_KeyHintsDescription" xml:space="preserve"><value>收起为按钮时，悬停搜索框右侧的键盘按钮查看全部快捷键</value></data>
+  <data name="Settings_Clipboard_HintsAlways" xml:space="preserve"><value>常驻显示</value></data>
+  <data name="Settings_Clipboard_HintsButton" xml:space="preserve"><value>收起为按钮</value></data>
+  <data name="Settings_Clipboard_HintsOff" xml:space="preserve"><value>不显示</value></data>
+  <data name="Settings_Clipboard_PanelHeight" xml:space="preserve"><value>面板高度</value></data>
+  <data name="Settings_Clipboard_PanelHeightDescription" xml:space="preserve"><value>拖动面板上下边缘调整；当前为 {0}</value></data>
+  <data name="Settings_Clipboard_PanelHeightDefault" xml:space="preserve"><value>拖动面板上下边缘调整；当前为默认高度 640</value></data>
+  <data name="Settings_Clipboard_Tags" xml:space="preserve"><value>标签</value></data>
+  <data name="Settings_Clipboard_TagsNote" xml:space="preserve"><value>在剪贴板中按 Ctrl+T 给条目添加标签。删除标签只移除标签，不删除内容</value></data>
+  <data name="Settings_Clipboard_TagsEmpty" xml:space="preserve"><value>尚无标签</value></data>
+  <data name="Settings_Clipboard_TagColor" xml:space="preserve"><value>色点</value></data>
+  <data name="Settings_Clipboard_TagNoColor" xml:space="preserve"><value>无</value></data>
+  <data name="Settings_Clipboard_TagRenameFailed" xml:space="preserve"><value>已有同名标签</value></data>
+  <data name="Settings_Clipboard_TagInvalid" xml:space="preserve"><value>标签名称不能为空</value></data>
+  <data name="DialogSearch_Title" xml:space="preserve"><value>对话框搜索</value></data>
+  <data name="DialogSearch_Placeholder" xml:space="preserve"><value>搜索文件和文件夹</value></data>
+  <data name="DialogSearch_ExplorerHint" xml:space="preserve"><value>跳转到资源管理器当前文件夹（Ctrl+G）</value></data>
+  <data name="DialogSearch_RecentHint" xml:space="preserve"><value>已打开和最近使用的文件夹（Ctrl+Shift+G）</value></data>
+  <data name="DialogSearch_FilterChip" xml:space="preserve"><value>仅显示{0}</value></data>
+  <data name="DialogSearch_Folders" xml:space="preserve"><value>文件夹</value></data>
+  <data name="DialogSearch_Files" xml:space="preserve"><value>文件</value></data>
+  <data name="DialogSearch_NoMatches" xml:space="preserve"><value>没有匹配的文件或文件夹</value></data>
+  <data name="DialogSearch_Jump" xml:space="preserve"><value>跳转</value></data>
+  <data name="DialogSearch_OpenNow" xml:space="preserve"><value>打开</value></data>
+  <data name="DialogSearch_FillName" xml:space="preserve"><value>填入文件名</value></data>
+  <data name="DialogSearch_SaveHere" xml:space="preserve"><value>保存到此处</value></data>
+  <data name="DialogSearch_UseName" xml:space="preserve"><value>使用此文件名</value></data>
+  <data name="Settings_DialogSearch" xml:space="preserve"><value>搜索</value></data>
+  <data name="Settings_DialogSearch_Show" xml:space="preserve"><value>在对话框下方显示搜索框</value></data>
+  <data name="Settings_DialogSearch_ShowDescription" xml:space="preserve"><value>「打开 / 另存为」对话框出现时在其下方显示搜索框；对话框位于前台时，按启动器热键可直接开始搜索</value></data>
+  <data name="Settings_DialogSearch_Enter" xml:space="preserve"><value>Enter 键的操作</value></data>
+  <data name="Settings_DialogSearch_EnterDescription" xml:space="preserve"><value>在「打开」对话框的搜索结果中选中文件时生效；另一项操作改用 Shift+Enter</value></data>
+  <data name="Settings_DialogSearch_EnterOpen" xml:space="preserve"><value>直接打开</value></data>
+  <data name="Settings_DialogSearch_EnterFill" xml:space="preserve"><value>仅填入文件名</value></data>
+  <data name="Settings_DialogSearch_Filter" xml:space="preserve"><value>按对话框的文件类型筛选</value></data>
+  <data name="Settings_DialogSearch_FilterDescription" xml:space="preserve"><value>对话框限定了文件类型时，搜索结果中仅显示这些类型的文件</value></data>
 </root>

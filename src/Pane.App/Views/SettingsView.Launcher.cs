@@ -20,15 +20,22 @@ public sealed partial class SettingsView
 {
     // ================= 启动器 =================
 
-    void RenderLauncher()
+    // 呼出热键这一行：启动器分区和快捷键页共用（label 不同）
+    FrameworkElement LauncherHotkeyRow(string label)
     {
         var s = app.Store.Current;
         var conflict = app.HotkeyConflicts.FirstOrDefault(c => c.Target == "launcher");
         var hotkey = Hotkey(s.Launcher.Hotkey, s.Clipboard.Hotkey, h => app.Store.Save(app.Store.Current with { Launcher = app.Store.Current.Launcher with { Hotkey = h } }), doubleTap: true);
         string? hotkeyDesc = conflict != null ? null : DevHotkey("launcher") ?? (s.Launcher.Hotkey.DoubleTap ? Strings.Settings_Hotkey_DoubleTapHint : null);
-        var hotkeyRow = conflict != null
-            ? Row(Strings.Settings_Hotkey, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
-            : Row(Strings.Settings_Hotkey, hotkeyDesc, hotkey);
+        return conflict != null
+            ? Row(label, Strings.Settings_Hotkey_ConflictDescription, Status(false, ConflictText(conflict)), hotkey)
+            : Row(label, hotkeyDesc, hotkey);
+    }
+
+    void RenderLauncher()
+    {
+        var s = app.Store.Current;
+        var hotkeyRow = LauncherHotkeyRow(Strings.Settings_Hotkey);
         bool moved = s.Launcher.Position != null;
         var l = s.Launcher;
         var reset = Button(Strings.Settings_Launcher_ResetPosition, "refresh", () => { SaveLauncher(x => x with { Position = null }); Render(); });

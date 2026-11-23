@@ -6,6 +6,10 @@
     <Compile Include="../../src/Pane.App/DesignData/LauncherSampleSearch.cs" Link="DesignData/LauncherSampleSearch.cs" />
     <Compile Include="../../src/Pane.App/Contracts/FileIcons.cs" Link="Contracts/FileIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Files.cs" Link="Contracts/Files.cs" />
+    <Compile Include="../../src/Pane.App/Contracts/DialogSearch.cs" Link="Contracts/DialogSearch.cs" />
+    <Compile Include="../../src/Pane.App/Contracts/FolderJump.cs" Link="Contracts/FolderJump.cs" />
+    <Compile Include="../../src/Pane.App/Services/DialogSearchService.cs" Link="DialogSearchService.cs" />
+    <Compile Include="../../src/Pane.App/Services/FolderJumpService.cs" Link="FolderJumpService.cs" />
     <Compile Include="../../src/Pane.App/Services/Icons/*.cs" Link="Icons/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Services/Launcher/*.cs" Link="Launcher/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" /><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>

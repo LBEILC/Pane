@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   剪贴板（设计负责人）。照原型 prototype/index.html #clipboard 和 style.css「剪贴板」一节。
   宽 372、高 640：搜索框 → 类型筛选 → 分组列表（已固定 / 今天 / 更早）→ 底部快捷键提示。
@@ -64,6 +64,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <c:PaneIcon Glyph="pin" IsFilled="True" Width="12" Height="12" VerticalAlignment="Center"
                                     Foreground="{ThemeResource PaneText2Brush}" Visibility="{x:Bind PinVisibility}"/>
@@ -77,7 +78,9 @@
                         <TextBlock Grid.Column="2" Text="{x:Bind MetaText}" VerticalAlignment="Center"
                                    FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
                                    Foreground="{ThemeResource PaneText3Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
-                        <Grid Grid.Column="3" VerticalAlignment="Center">
+                        <!-- 「带格式」和标签小片（2026-11-23）：中性浅底、xs；最多露 2 个标签，其余 +N -->
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" clip:ClipChips.Source="{x:Bind MetaChips}"/>
+                        <Grid Grid.Column="4" VerticalAlignment="Center">
                             <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" c:KeyCombo.Text="{x:Bind Hotkey}"
                                         Visibility="{x:Bind HotkeyVisibility}" Opacity="{x:Bind HotkeyOpacity, Mode=OneWay}"/>
                             <StackPanel Orientation="Horizontal" Spacing="2" Opacity="{x:Bind ActionsOpacity, Mode=OneWay}"
@@ -131,11 +134,45 @@
 
         <!-- 筛选小标签：选中用正文色加粗，未选中用次要文字色（透明度近似 text-2 / text-1） -->
         <DataTemplate x:Key="ChipTemplate" x:DataType="clip:ChipItem">
-            <Grid Height="28" Padding="12,0,12,0" Background="Transparent">
-                <TextBlock Text="{x:Bind Label}" VerticalAlignment="Center"
-                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"
-                           Foreground="{ThemeResource PaneText1Brush}"
-                           FontWeight="{x:Bind Weight, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}"/>
+            <Grid Height="28" Padding="{x:Bind ChipPadding}" Background="Transparent">
+                <!-- 类型筛选和标签之间的细分隔（2026-11-23） -->
+                <Border Width="1" Height="14" Background="{ThemeResource PaneStrokeBrush}" Visibility="{x:Bind SeparatorVisibility}"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" Visibility="{x:Bind LabelVisibility}">
+                    <Ellipse Width="6" Height="6" Fill="{x:Bind Dot}" Visibility="{x:Bind DotVisibility}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{x:Bind Label}" VerticalAlignment="Center"
+                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"
+                               Foreground="{ThemeResource PaneText1Brush}"
+                               FontWeight="{x:Bind Weight, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}"/>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+
+        <!-- 就地操作行（Ctrl+K 操作列表、Ctrl+T 标签选择，原型 .clip-op）：28 图标格、文字、右侧快捷键小字 + 数字键帽 / 勾 -->
+        <DataTemplate x:Key="OpTemplate" x:DataType="clip:ClipOp">
+            <Grid Height="40" Padding="12,0,12,0" ColumnSpacing="10" Background="Transparent">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="28" Height="28" CornerRadius="8" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <Grid>
+                        <c:PaneIcon Glyph="{x:Bind Glyph}" Width="15" Height="15" Foreground="{x:Bind Foreground}" Visibility="{x:Bind GlyphVisibility}"/>
+                        <Ellipse Width="10" Height="10" Fill="{x:Bind Dot}" Visibility="{x:Bind DotVisibility}"/>
+                    </Grid>
+                </Border>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind Title}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}"
+                               FontWeight="{x:Bind Weight, Mode=OneWay}" Foreground="{x:Bind Foreground}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                    <TextBlock Text="{x:Bind Sub}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
+                               Foreground="{ThemeResource PaneText3Brush}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind KeyText}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
+                               Foreground="{ThemeResource PaneText3Brush}" VerticalAlignment="Center"/>
+                    <StackPanel c:KeyCombo.Text="{x:Bind Number}" VerticalAlignment="Center"/>
+                    <c:PaneIcon Glyph="check" Width="16" Height="16" Foreground="{ThemeResource PaneText2Brush}" Visibility="{x:Bind CheckVisibility, Mode=OneWay}"/>
+                </StackPanel>
             </Grid>
         </DataTemplate>
 
@@ -147,7 +184,7 @@
         </Style>
     </UserControl.Resources>
 
-    <Grid x:Name="Root" Width="372" Height="640">
+    <Grid x:Name="Root" Width="372">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -160,7 +197,16 @@
         <c:NoticeStrip x:Name="Notice"/>
 
         <!-- 搜索框：聚焦时外圈一道主题色光环（主题色只用于焦点） -->
-        <Grid Grid.Row="1" Padding="16,16,16,8">
+        <Grid Grid.Row="1" Padding="16,16,16,8" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <!-- 按键提示收起为按钮（默认，2026-11-23）：悬停 200 ms 浮出全部快捷键 -->
+            <Button x:Name="HintsButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" VerticalAlignment="Center" Visibility="Collapsed"
+                    AutomationProperties.Name="{x:Bind loc:Strings.Clipboard_KeyHints}" Click="OnHintsClick" PointerEntered="OnHintsEnter" PointerExited="OnHintsExit">
+                <c:PaneIcon Glyph="keyboard" Width="15" Height="15" Foreground="{ThemeResource PaneText2Brush}"/>
+            </Button>
             <Border x:Name="FocusRing" Margin="-2" CornerRadius="12" BorderThickness="2" BorderBrush="{StaticResource PaneAccentBrush}" Opacity="0"/>
             <Border Height="32" Padding="10,0,10,0" CornerRadius="{StaticResource PaneRadiusControl}"
                     Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
@@ -180,16 +226,19 @@
         </Grid>
 
         <!-- 类型筛选：选中项高亮滑动 -->
-        <Grid Grid.Row="2" Padding="16,0,16,8">
-            <Canvas x:Name="ChipHighlightLayer" IsHitTestVisible="False"/>
-            <ItemsControl x:Name="Chips" ItemTemplate="{StaticResource ChipTemplate}" IsTabStop="False">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" Spacing="2"/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-            </ItemsControl>
-        </Grid>
+        <!-- 类型筛选 + 标签（2026-11-23）：多了横向滚动，不出滚动条 -->
+        <ScrollViewer x:Name="ChipScroller" Grid.Row="2" HorizontalScrollBarVisibility="Hidden" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled" VerticalScrollBarVisibility="Disabled" IsTabStop="False">
+            <Grid x:Name="ChipBox" Padding="16,0,16,8">
+                <Canvas x:Name="ChipHighlightLayer" IsHitTestVisible="False"/>
+                <ItemsControl x:Name="Chips" ItemTemplate="{StaticResource ChipTemplate}" IsTabStop="False">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="2"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </Grid>
+        </ScrollViewer>
 
         <!-- 列表 -->
         <Grid Grid.Row="3">
@@ -200,17 +249,65 @@
                     <ItemsControl x:Name="Sections" ItemTemplate="{StaticResource SectionTemplate}" IsTabStop="False"/>
                     <TextBlock x:Name="Empty" Text="{x:Bind loc:Strings.Clipboard_NoMatches}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,24,0,24"
                                FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                    <!-- 就地模式（2026-11-23）：操作列表、标签选择、编辑。进来时列表收起，这一块出来 -->
+                    <StackPanel x:Name="ModePanel" Visibility="Collapsed">
+                        <TextBlock x:Name="ModeLabel" Style="{StaticResource PaneGroupLabel}" TextTrimming="CharacterEllipsis"/>
+                        <ItemsControl x:Name="OpList" ItemTemplate="{StaticResource OpTemplate}" IsTabStop="False"/>
+                        <TextBlock x:Name="ModeEmpty" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,18,0,18"
+                                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                        <!-- 标签选择下面一句：有标签的内容长期保存 -->
+                        <Grid x:Name="ModeNote" Visibility="Collapsed" Margin="12,8,12,0" Padding="0,8,0,0" ColumnSpacing="6" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <c:PaneIcon Glyph="info" Width="13" Height="13" Margin="0,2,0,0" VerticalAlignment="Top" Foreground="{ThemeResource PaneText3Brush}"/>
+                            <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Clipboard_TagKeepHint}" TextWrapping="Wrap" LineHeight="17"
+                                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                        </Grid>
+                        <!-- 编辑：这一条的文字放进编辑框（最高 240 后框内滚动），下面说明 + 放弃 / 保存 / 保存并粘贴 -->
+                        <StackPanel x:Name="EditPanel" Visibility="Collapsed" Padding="12,4,12,0" Spacing="8">
+                            <TextBox x:Name="Editor" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="240"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
+                                     FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" PreviewKeyDown="OnEditorKeyDown"/>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="EditNote" Text="{x:Bind loc:Strings.Clipboard_EditRichNote}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                    <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Clipboard_Discard}" Click="OnEditCancel"/>
+                                    <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Common_Save}" Click="OnEditSave"/>
+                                    <Button Style="{StaticResource PanePrimaryButton}" Height="28" Content="{x:Bind loc:Strings.Clipboard_SaveAndPaste}" Click="OnEditPaste"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
                 </Grid>
             </ScrollViewer>
         </Grid>
 
-        <!-- 快捷键提示 -->
-        <Grid Grid.Row="4">
+        <!-- 快捷键提示：只在「常驻显示」时出现（2026-11-23，默认收起为按钮） -->
+        <Grid x:Name="FootBar" Grid.Row="4">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
             <c:WrapPanel x:Name="Foot" Margin="16,9,16,9" HorizontalSpacing="12" VerticalSpacing="4"/>
             <!-- 快捷键提示的样板（隐藏），代码照它的样式生成 -->
             <TextBlock x:Name="HintLabelProto" Visibility="Collapsed" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
             <Border x:Name="KbdProto" Visibility="Collapsed" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
         </Grid>
+
+        <!-- 按键提示浮层：键盘按钮下方，竖着列全部快捷键 -->
+        <Border x:Name="HintsPop" Grid.Row="2" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,12,0" Padding="12,10,12,10"
+                CornerRadius="12" Background="{ThemeResource PaneToolTipBackgroundBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
+                Opacity="0" IsHitTestVisible="False" PointerEntered="OnHintsEnter" PointerExited="OnHintsExit">
+            <Border.OpacityTransition><ScalarTransition Duration="0:0:0.12"/></Border.OpacityTransition>
+            <c:WrapPanel x:Name="HintsList" Width="170" HorizontalSpacing="12" VerticalSpacing="6"/>
+        </Border>
+
+        <!-- 拖动上下边缘调整高度（2026-11-23）：8 高的拖动区，靠近时浮出居中细线；双击恢复默认 -->
+        <c:ResizeGrip x:Name="TopGrip" Grid.RowSpan="5" VerticalAlignment="Top" Margin="24,0,24,0" FromTop="True"/>
+        <c:ResizeGrip x:Name="BottomGrip" Grid.RowSpan="5" VerticalAlignment="Bottom" Margin="24,0,24,0"/>
     </Grid>
 </UserControl>

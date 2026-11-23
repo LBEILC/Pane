@@ -150,7 +150,7 @@ public sealed partial class GlassPanel : IDisposable
             }
         }
         // 托盘菜单要按最终尺寸算位置，弹出前直接定尺寸，不走改尺寸的弹簧
-        if(Placement==PanelPlacement.Tray&&!Shown){var s=view.PreferredSize;Width=targetWidth=Math.Max(minWidth,s.Width);Height=targetHeight=Math.Max(minHeight,s.Height);resizing=false;}
+        if(Placement is PanelPlacement.Tray or PanelPlacement.Exact&&!Shown){var s=view.PreferredSize;Width=targetWidth=Math.Max(minWidth,s.Width);Height=targetHeight=Math.Max(minHeight,s.Height);resizing=false;}
         var point=PlaceForShow(px,py,near);int x=point.X,y=point.Y;
         if(!Shown&&!animating){scale=(float)GlassParameters.Token("PaneEnterScale");opacity=0;}
         // 设计改（2026-10-31，issue 3）：设置窗口和二级窗口每次打开都是新建的，页面重，从打开到第一次画上屏幕要一两百毫秒（慢机器更久）；

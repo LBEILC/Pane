@@ -88,20 +88,35 @@ public sealed partial class SettingsView
 
     // 文件对话框跳转（2026-11-01，046，用户：Ctrl+G 也要能在设置里调）。两个组合键只在「打开 / 另存为」对话框在前台时注册，
     // 所以不和启动器、剪贴板的全局热键比较，只防两个互相重复；被占用的提示来自服务上次注册的结果。关掉总开关时其余各项变灰（同超级面板）
-    void RenderFolderJump()
+    // 两个快捷键行：文件对话框分区和快捷键页共用。总开关（046）挪到「能力」页（055）
+    FrameworkElement[] FolderJumpHotkeyRows()
     {
         var f = app.Store.Current.FolderJump;
         var jump = Hotkey(f.Jump, f.Menu, h => SaveFolderJump(x => x with { JumpHotkey = h == FolderJumpSettings.DefaultJump ? null : h }));
         var menu = Hotkey(f.Menu, f.Jump, h => SaveFolderJump(x => x with { MenuHotkey = h == FolderJumpSettings.DefaultMenu ? null : h }));
+        var problem = app.FolderJump?.HotkeyProblem;
+        return [problem != null ? Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_Hotkey_ConflictDescription, Status(false, problem), jump)
+                                : Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_FolderJump_CurrentFolderDescription, jump),
+                Row(Strings.Common_ChooseFolder, Strings.Settings_FolderJump_ChooseFolderDescription, menu)];
+    }
+
+    void RenderFolderJump()
+    {
+        var f = app.Store.Current.FolderJump;
         var auto = Switch(f.AutoJump, v => SaveFolderJump(x => x with { AutoJump = v }));
         var recent = Switch(f.ShowRecent, v => SaveFolderJump(x => x with { ShowRecent = v }));
         // 047（用户：开了三个资源管理器，Ctrl+G 只跳其中一个）：默认跳最近用过的那个（同 Listary），想自己挑的改成弹菜单
         var many = Seg([("recent", Strings.Settings_FolderJump_Recent), ("menu", Strings.Settings_FolderJump_Menu)], f.MenuWhenMany ? "menu" : "recent", v => SaveFolderJump(x => x with { MenuWhenMany = v == "menu" }));
-        var problem = app.FolderJump?.HotkeyProblem;   // 总开关（046）挪到「能力」页（055）
-        Group(Strings.Settings_FolderJump_Hotkeys,
-            problem != null ? Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_Hotkey_ConflictDescription, Status(false, problem), jump)
-                            : Row(Strings.Settings_FolderJump_CurrentFolder, Strings.Settings_FolderJump_CurrentFolderDescription, jump),
-            Row(Strings.Common_ChooseFolder, Strings.Settings_FolderJump_ChooseFolderDescription, menu));
+        Group(Strings.Settings_FolderJump_Hotkeys, FolderJumpHotkeyRows());
+        // 对话框搜索（2026-11-23，issue 81）：总开关关掉时下面两行变灰
+        var bar = Switch(f.SearchBar, v => { SaveFolderJump(x => x with { SearchBar = v }); Later(); });
+        var enter = Seg([("open", Strings.Settings_DialogSearch_EnterOpen), ("fill", Strings.Settings_DialogSearch_EnterFill)], f.OpenOnEnter ? "open" : "fill", v => SaveFolderJump(x => x with { OpenOnEnter = v == "open" }));
+        var byType = Switch(f.FilterByType, v => SaveFolderJump(x => x with { FilterByType = v }));
+        Enable(enter, f.SearchBar); Enable(byType, f.SearchBar);
+        Group(Strings.Settings_DialogSearch,
+            Row(Strings.Settings_DialogSearch_Show, Strings.Settings_DialogSearch_ShowDescription, bar),
+            Row(Strings.Settings_DialogSearch_Enter, Strings.Settings_DialogSearch_EnterDescription, enter),
+            Row(Strings.Settings_DialogSearch_Filter, Strings.Settings_DialogSearch_FilterDescription, byType));
         Group(Strings.Settings_FolderJump_Behavior,
             Row(Strings.Settings_FolderJump_MultipleWindows, f.MenuWhenMany ? Strings.Settings_FolderJump_MultipleMenuDescription : Strings.Settings_FolderJump_MultipleRecentDescription, many),
             Row(Strings.Settings_FolderJump_Automatic, Strings.Settings_FolderJump_AutomaticDescription, auto),
