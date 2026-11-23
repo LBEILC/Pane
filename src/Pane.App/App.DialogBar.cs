@@ -59,6 +59,8 @@ public sealed partial class App
             if (dialogBarService is not { } service || dialogBarInfo is not { } i) return;
             try { await service.NavigateAsync(i.Dialog, x.Folder, x.FileName, x.Confirm, CancellationToken.None); }
             catch (Exception e) { ReportFailure(Strings.FolderJump_JumpAction, e); }
+            // 保险（第三十一次发布核对时，新式「另存为」跳完后对话框没回到前台）：这时前台是 Pane 的搜索框，系统允许 Pane 把前台交还给对话框
+            if (!x.Confirm && Native.GetForegroundWindow() != i.Dialog) Native.SetForegroundWindow(i.Dialog);
         };
         dialogBarPanel = new GlassPanel(Strings.DialogSearch_Title, view, view, Glass) { Placement = PanelPlacement.Exact, EscapeHides = false };
         // 焦点回到对话框不收起；切到别的程序才收起
