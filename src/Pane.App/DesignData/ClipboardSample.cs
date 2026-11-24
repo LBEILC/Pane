@@ -51,7 +51,17 @@ public sealed class ClipboardSample : IClipboardHistory
             T(ClipKind.Text, "快递单号 SF1402 8873 6650", "微信", 1600),
             T(ClipKind.Link, "https://www.example.com/blog/acrylic-material-deep-dive", "Edge", 2900),
             T(ClipKind.Text, "WiFi：Pane-Studio-5G", "记事本", 4300),
+            I("截图", 1280, 720, "#f8b195", "#6c5b7b", "截图工具", 12000) with { Original = ClipOriginal.Expired, SourceDevice = "笔记本" },
+            I("照片", 4032, 3024, "#a1c4fd", "#1b4332", "微信", 4800) with { Original = ClipOriginal.NotSynced, SourceDevice = "笔记本" },
         ];
+        // 截图核对用（Pane 云）：设了 PANE_DESIGN_SYNC 时，最上面多几条另一台电脑「笔记本」刚同步来的，含正在下载原图的图片
+        if (Environment.GetEnvironmentVariable("PANE_DESIGN_SYNC") is { Length: > 0 } and not "off")
+            entries.InsertRange(7,
+            [
+                T(ClipKind.Text, "周五的评审改到 10 点，会议室 B", "微信", 1) with { SourceDevice = "笔记本" },
+                I("截图", 1920, 1080, "#43cea2", "#185a9d", "截图工具", 3) with { SourceDevice = "笔记本", Original = ClipOriginal.Downloading },
+                I("照片", 4000, 3000, "#f6d365", "#fda085", "微信", 5) with { SourceDevice = "笔记本", Original = ClipOriginal.NotSynced },
+            ]);
         // 截图核对用：PANE_DESIGN_CLIP_PINS=N 只保留前 N 条固定（看没有固定、固定很少时的已固定区；默认 7 条）
         if (int.TryParse(Environment.GetEnvironmentVariable("PANE_DESIGN_CLIP_PINS"), out var keepPins))
             for (var i = 0; i < entries.Count; i++)

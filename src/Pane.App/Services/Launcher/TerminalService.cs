@@ -52,10 +52,16 @@ internal sealed class TerminalHistory:ITerminalHistory
     public TerminalHistory(SettingsStore store)
     {
         this.store=store;path=Path.Combine(store.DirectoryPath,"terminal-history.json");
-        try{if(File.Exists(path))history=(JsonSerializer.Deserialize(File.ReadAllText(path),TerminalJson.Default.ListString)??[]).Where(s=>!string.IsNullOrWhiteSpace(s)&&!char.IsWhiteSpace(s[0])).Distinct(StringComparer.Ordinal).Take(20).ToList();}
+        store.LocalUsageReplaced += Reload;
+        Reload();
+    }
+    internal void Dispose() => store.LocalUsageReplaced -= Reload;
+    void Reload()
+    {
+        lock(sync) try{history=[];if(File.Exists(path))history=(JsonSerializer.Deserialize(File.ReadAllText(path),TerminalJson.Default.ListString)??[]).Where(s=>!string.IsNullOrWhiteSpace(s)&&!char.IsWhiteSpace(s[0])).Distinct(StringComparer.Ordinal).Take(20).ToList();}
         catch(Exception e) when(e is IOException or UnauthorizedAccessException or JsonException){}
     }
-    public string[] Match(string prefix){lock(sync)return store.Current.Launcher.RememberCommands?history.Where(s=>s.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)).ToArray():[];}
+    public string[] Match(string prefix){lock(sync)return store.Current.Launcher.RememberCommands?history.Concat(store.OtherCommands).Distinct(StringComparer.Ordinal).Where(s=>s.StartsWith(prefix,StringComparison.OrdinalIgnoreCase)).ToArray():[];}
     public void Record(string raw)
     {
         // > 后首字符为空白时，执行可去掉前导空白，但整条命令不进入历史。
@@ -63,7 +69,7 @@ internal sealed class TerminalHistory:ITerminalHistory
         lock(sync){history.RemoveAll(s=>s==raw);history.Insert(0,raw);if(history.Count>20)history.RemoveRange(20,history.Count-20);Save();}
     }
     public void Clear(){lock(sync){history.Clear();Save();}}
-    void Save(){Directory.CreateDirectory(store.DirectoryPath);File.WriteAllText(path+".tmp",JsonSerializer.Serialize(history,TerminalJson.Default.ListString));File.Move(path+".tmp",path,true);}
+    void Save(){Directory.CreateDirectory(store.DirectoryPath);File.WriteAllText(path+".tmp",JsonSerializer.Serialize(history,TerminalJson.Default.ListString));File.Move(path+".tmp",path,true);store.NotifyUsageChanged();}
 }
 
 internal sealed class TerminalPrograms:IDisposable
@@ -180,5 +186,5 @@ internal sealed class TerminalService:IDisposable
         await process.StartAsync(request,token).ConfigureAwait(false);
         History.Record(raw);
     }
-    public void Dispose()=>programs.Dispose();
+    public void Dispose(){History.Dispose();programs.Dispose();}
 }

@@ -147,6 +147,205 @@
   <data name="Common_Copy" xml:space="preserve"><value>复制</value></data>
   <data name="Common_CopyPath" xml:space="preserve"><value>复制路径</value></data>
   <data name="Common_CrashLog" xml:space="preserve"><value>Pane 上次意外退出，日志已保存到 {0}</value></data>
+  <data name="Settings_Account" xml:space="preserve"><value>账号</value></data>
+  <data name="Settings_Account_NeedsSignIn" xml:space="preserve"><value>登录已失效，请重新登录</value></data>
+  <data name="Settings_Account_NeedsSignInDescription" xml:space="preserve"><value>密码或邮箱在别处改过，或这台电脑已被移除。重新登录后同步接着进行</value></data>
+  <data name="Settings_Account_DeviceLimit" xml:space="preserve"><value>登录的设备已达上限（{0} 台），请移除一台后继续</value></data>
+  <data name="Settings_Account_RemoveAndLogin" xml:space="preserve"><value>移除并登录</value></data>
+  <data name="Settings_Account_FounderPublicOn" xml:space="preserve"><value>已在创始会员页公开昵称</value></data>
+  <data name="Settings_Account_FounderPublicOff" xml:space="preserve"><value>已不再公开昵称</value></data>
+  <data name="Settings_Account_PayExpired" xml:space="preserve"><value>订单已失效，请重新购买</value></data>
+  <data name="Settings_Account_PayUnderpaid" xml:space="preserve"><value>付款金额不足，请联系我们处理</value></data>
+  <data name="Settings_Account_PayTimeout" xml:space="preserve"><value>暂未查到付款结果。已付款的订单会自动开通，请稍后再看</value></data>
+  <data name="Settings_Account_ResetFreshConfirm" xml:space="preserve"><value>没有恢复码时重设，云端已同步的数据会被清空</value></data>
+  <data name="Cloud_Error_Network" xml:space="preserve"><value>无法连接服务器，请检查网络</value></data>
+  <data name="Cloud_Error_RateLimited" xml:space="preserve"><value>操作太频繁，请 {0} 后重试</value></data>
+  <data name="Cloud_Error_RateLimitedShort" xml:space="preserve"><value>操作太频繁，请稍后重试</value></data>
+  <data name="Cloud_Error_Locked" xml:space="preserve"><value>密码错误次数过多，请 {0} 后重试</value></data>
+  <data name="Cloud_Error_BadCodeLeft" xml:space="preserve"><value>验证码不正确，还可以尝试 {0} 次</value></data>
+  <data name="Cloud_Error_CodeExpired" xml:space="preserve"><value>验证码已失效，请重新获取</value></data>
+  <data name="Cloud_Error_EmailTaken" xml:space="preserve"><value>这个邮箱已被注册</value></data>
+  <data name="Cloud_Error_MailQuota" xml:space="preserve"><value>今天的验证码发送量已达上限，请明天再试</value></data>
+  <data name="Cloud_Error_Banned" xml:space="preserve"><value>这个账号已被停用</value></data>
+  <data name="Cloud_Error_BadNickname" xml:space="preserve"><value>昵称须为 2～16 个字符</value></data>
+  <data name="Cloud_Error_AlreadyLifetime" xml:space="preserve"><value>你已经是永久会员，无须再购买</value></data>
+  <data name="Cloud_Error_CodeUsed" xml:space="preserve"><value>这个兑换码已被使用</value></data>
+  <data name="Cloud_Error_TrialUsedAccount" xml:space="preserve"><value>这个账号已领取过试用</value></data>
+  <data name="Cloud_Error_TrialUsedDevice" xml:space="preserve"><value>这台电脑已领取过试用，购买后即可使用</value></data>
+  <data name="Cloud_Error_TrialClosed" xml:space="preserve"><value>免费试用暂不开放</value></data>
+  <data name="Cloud_Error_KeyMismatch" xml:space="preserve"><value>数据密钥与账号不符，云端数据未做任何改动。请重试</value></data>
+  <data name="Cloud_Error_NoRecovery" xml:space="preserve"><value>这个账号没有设置恢复码</value></data>
+  <data name="Cloud_Error_BadRecovery" xml:space="preserve"><value>恢复码不正确</value></data>
+  <data name="Cloud_Error_ClientOutdated" xml:space="preserve"><value>Pane 版本过旧，请更新后再试</value></data>
+  <data name="Cloud_Error_Unavailable" xml:space="preserve"><value>服务暂不可用，请稍后重试</value></data>
+  <data name="Cloud_Error_Other" xml:space="preserve"><value>操作失败（{0}），请稍后重试</value></data>
+  <data name="Settings_Account_Description" xml:space="preserve"><value>Pane 账号、云同步订阅、设备和账号安全</value></data>
+  <data name="Settings_Account_SignedOutTitle" xml:space="preserve"><value>登录 Pane 账号</value></data>
+  <data name="Settings_Account_SignedOutDescription" xml:space="preserve"><value>登录后可使用 Pane 云同步，在多台电脑之间同步设置、使用记录和剪贴板。本机功能无须登录</value></data>
+  <data name="Settings_Account_Login" xml:space="preserve"><value>登录</value></data>
+  <data name="Settings_Account_Register" xml:space="preserve"><value>注册</value></data>
+  <data name="Settings_Account_Email" xml:space="preserve"><value>邮箱</value></data>
+  <data name="Settings_Account_Password" xml:space="preserve"><value>密码</value></data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve"><value>忘记密码</value></data>
+  <data name="Settings_Account_LoggingIn" xml:space="preserve"><value>正在登录…</value></data>
+  <data name="Settings_Account_BadCredentials" xml:space="preserve"><value>邮箱或密码不正确</value></data>
+  <data name="Settings_Account_BadEmail" xml:space="preserve"><value>邮箱格式不正确</value></data>
+  <data name="Settings_Account_RegisterStep" xml:space="preserve"><value>第 {0} 步，共 2 步</value></data>
+  <data name="Settings_Account_AgreeTerms" xml:space="preserve"><value>我已阅读并同意用户协议和隐私政策</value></data>
+  <data name="Settings_Account_AgreeCrossBorder" xml:space="preserve"><value>同意将我的个人信息传输至中国香港等境外地区保存和处理（见隐私政策第 4 节）</value></data>
+  <data name="Settings_Account_AgreeRequired" xml:space="preserve"><value>请先勾选上面两项</value></data>
+  <data name="Settings_Account_ReadTerms" xml:space="preserve"><value>查看协议</value></data>
+  <data name="Settings_Account_SendCode" xml:space="preserve"><value>发送验证码</value></data>
+  <data name="Settings_Account_CodeSent" xml:space="preserve"><value>验证码已发送至 {0}，10 分钟内有效。未收到时请检查垃圾邮件</value></data>
+  <data name="Settings_Account_Code" xml:space="preserve"><value>验证码</value></data>
+  <data name="Settings_Account_Resend" xml:space="preserve"><value>重新发送</value></data>
+  <data name="Settings_Account_ResendIn" xml:space="preserve"><value>{0} 秒后可重新发送</value></data>
+  <data name="Settings_Account_Nickname" xml:space="preserve"><value>昵称</value></data>
+  <data name="Settings_Account_NicknamePlaceholder" xml:space="preserve"><value>可选，2～16 个字符</value></data>
+  <data name="Settings_Account_PasswordPlaceholder" xml:space="preserve"><value>8～64 个字符</value></data>
+  <data name="Settings_Account_ConfirmPassword" xml:space="preserve"><value>确认密码</value></data>
+  <data name="Settings_Account_PasswordMismatch" xml:space="preserve"><value>两次输入的密码不一致</value></data>
+  <data name="Settings_Account_PasswordRule" xml:space="preserve"><value>密码须为 8～64 个字符</value></data>
+  <data name="Settings_Account_CodeRule" xml:space="preserve"><value>请输入 6 位验证码</value></data>
+  <data name="Settings_Account_BadCode" xml:space="preserve"><value>验证码不正确</value></data>
+  <data name="Settings_Account_PasswordNote" xml:space="preserve"><value>云同步的内容用这个密码在本机加密，服务器无法读取。注册后可生成恢复码，忘记密码时用它保留云端数据</value></data>
+  <data name="Settings_Account_ChangeEmail" xml:space="preserve"><value>更换邮箱</value></data>
+  <data name="Settings_Account_Registered" xml:space="preserve"><value>注册完成</value></data>
+  <data name="Settings_Account_ForgotOutDescription" xml:space="preserve"><value>填写恢复码可保留云端数据。不填时，云端已同步的数据会被清空，之后由各台电脑上的 Pane 用本机数据重新上传</value></data>
+  <data name="Settings_Account_RecoveryCodeOptional" xml:space="preserve"><value>可选，32 个字符</value></data>
+  <data name="Settings_Account_RecoveryCodeInvalid" xml:space="preserve"><value>恢复码格式不正确，应为 32 个字符</value></data>
+  <data name="Settings_Account_ResetPassword" xml:space="preserve"><value>重设密码</value></data>
+  <data name="Settings_Account_ResetDone" xml:space="preserve"><value>密码已重设</value></data>
+  <data name="Settings_Account_ResetKept" xml:space="preserve"><value>密码已重设，云端数据已保留</value></data>
+  <data name="Settings_Account_Founder" xml:space="preserve"><value>创始会员</value></data>
+  <data name="Settings_Account_FounderTip" xml:space="preserve"><value>创始会员 No.{0} · 前 100 位永久会员</value></data>
+  <data name="Settings_Account_FounderPublic" xml:space="preserve"><value>在创始会员页显示昵称</value></data>
+  <data name="Settings_Account_FounderPublicDescription" xml:space="preserve"><value>打开后，你的昵称和加入年月会显示在官网创始会员页，任何人都能看到。头像和邮箱不会公开</value></data>
+  <data name="Settings_Account_FounderPublicConfirm" xml:space="preserve"><value>你的昵称「{0}」和加入年月将显示在创始会员页，任何人都能看到，他人看到后可能自行保存。关闭后 1 分钟内从页面上消失</value></data>
+  <data name="Settings_Account_FounderPublicConfirmButton" xml:space="preserve"><value>同意并公开</value></data>
+  <data name="Settings_Account_FounderHidden" xml:space="preserve"><value>你的昵称不符合用户协议第 5.3 条，已被隐藏，目前只显示编号</value></data>
+  <data name="Settings_Account_MemberGroup" xml:space="preserve"><value>会员 QQ 群</value></data>
+  <data name="Settings_Account_MemberGroupDescription" xml:space="preserve"><value>和其他会员交流，直接向开发者反馈问题。申请加群时填写入群码</value></data>
+  <data name="Settings_Account_MemberGroupNumber" xml:space="preserve"><value>群号 {0}</value></data>
+  <data name="Settings_Account_MemberGroupCode" xml:space="preserve"><value>入群码 {0}</value></data>
+  <data name="Settings_Account_MemberGroupCopyCode" xml:space="preserve"><value>复制入群码</value></data>
+  <data name="Settings_Account_MemberGroupJoin" xml:space="preserve"><value>加入群聊</value></data>
+  <data name="Settings_Account_MemberGroupLocked" xml:space="preserve"><value>开通月卡、年卡或永久后可以加入</value></data>
+  <data name="Settings_Account_EditProfile" xml:space="preserve"><value>编辑资料</value></data>
+  <data name="Settings_Account_EditProfileDescription" xml:space="preserve"><value>昵称和头像在官网账号中心修改</value></data>
+  <data name="Settings_Account_Subscription" xml:space="preserve"><value>订阅</value></data>
+  <data name="Settings_Account_TierYear" xml:space="preserve"><value>年卡</value></data>
+  <data name="Settings_Account_TierMonth" xml:space="preserve"><value>月卡</value></data>
+  <data name="Settings_Account_TierLifetime" xml:space="preserve"><value>永久</value></data>
+  <data name="Settings_Account_TierTrial" xml:space="preserve"><value>试用</value></data>
+  <data name="Settings_Account_ExpiresAt" xml:space="preserve"><value>有效期至 {0}，不会自动续费</value></data>
+  <data name="Settings_Account_LifetimeNote" xml:space="preserve"><value>Pane 云同步服务存续期间有效</value></data>
+  <data name="Settings_Account_NoSubscription" xml:space="preserve"><value>未开通云同步</value></data>
+  <data name="Settings_Account_NoSubscriptionDescription" xml:space="preserve"><value>开通后即可在多台电脑之间同步设置、使用记录和剪贴板</value></data>
+  <data name="Settings_Account_Expired" xml:space="preserve"><value>云同步已到期</value></data>
+  <data name="Settings_Account_ExpiredDescription" xml:space="preserve"><value>同步已停止，云端数据保留到 {0}，期间续费可接着使用</value></data>
+  <data name="Settings_Account_Renew" xml:space="preserve"><value>续费</value></data>
+  <data name="Settings_Account_Buy" xml:space="preserve"><value>购买</value></data>
+  <data name="Settings_Account_Traffic" xml:space="preserve"><value>本月流量</value></data>
+  <data name="Settings_Account_TrafficDescription" xml:space="preserve"><value>同步和从「Pane 云」下载更新共用，{0} 重置</value></data>
+  <data name="Settings_Account_Storage" xml:space="preserve"><value>云端图片</value></data>
+  <data name="Settings_Account_StorageDescription" xml:space="preserve"><value>已固定或加了标签的图片原图</value></data>
+  <data name="Settings_Account_Redeem" xml:space="preserve"><value>兑换码</value></data>
+  <data name="Settings_Account_RedeemDescription" xml:space="preserve"><value>直接在爱发电购买、获赠时使用</value></data>
+  <data name="Settings_Account_RedeemButton" xml:space="preserve"><value>兑换</value></data>
+  <data name="Settings_Account_RedeemBad" xml:space="preserve"><value>兑换码不正确</value></data>
+  <data name="Settings_Account_RedeemDone" xml:space="preserve"><value>已兑换，月卡 31 天</value></data>
+  <data name="Settings_Account_Trial" xml:space="preserve"><value>免费试用 7 天</value></data>
+  <data name="Settings_Account_TrialDescription" xml:space="preserve"><value>每个账号、每台电脑可领取一次，含 200 MB 流量</value></data>
+  <data name="Settings_Account_TrialGet" xml:space="preserve"><value>领取</value></data>
+  <data name="Settings_Account_TrialDone" xml:space="preserve"><value>已领取 7 天免费试用</value></data>
+  <data name="Settings_Account_ChoosePlan" xml:space="preserve"><value>选择档位</value></data>
+  <data name="Settings_Account_ChoosePlanNote" xml:space="preserve"><value>通过爱发电付款，不会自动续费；新买的时长接在原到期时间之后。爱发电目前不支持退款，建议先领取免费试用</value></data>
+  <data name="Settings_Account_PlanMonth" xml:space="preserve"><value>31 天，每月流量 1 GB</value></data>
+  <data name="Settings_Account_PlanYear" xml:space="preserve"><value>366 天，每月流量 2 GB，相当于每月 5.8 元</value></data>
+  <data name="Settings_Account_PlanLifetime" xml:space="preserve"><value>服务存续期间有效，每月流量 2 GB；前 100 位赠「创始会员」铭牌</value></data>
+  <data name="Settings_Account_PayTitle" xml:space="preserve"><value>扫码付款 ¥{0}</value></data>
+  <data name="Settings_Account_PayDescription" xml:space="preserve"><value>用手机扫描二维码，在爱发电付款。付款后自动开通，无须返回此页；订单 1 小时内有效</value></data>
+  <data name="Settings_Account_PayWaiting" xml:space="preserve"><value>正在等待付款…</value></data>
+  <data name="Settings_Account_PayInBrowser" xml:space="preserve"><value>在浏览器中付款</value></data>
+  <data name="Settings_Account_PayDone" xml:space="preserve"><value>付款成功，已开通{0}</value></data>
+  <data name="Settings_Account_Devices" xml:space="preserve"><value>设备</value></data>
+  <data name="Settings_Account_DevicesNote" xml:space="preserve"><value>{1} 台中已用 {0} 台。移除后，那台电脑会退出登录</value></data>
+  <data name="Settings_Account_ThisDevice" xml:space="preserve"><value>本机</value></data>
+  <data name="Settings_Account_LastSeen" xml:space="preserve"><value>最近使用：{0}</value></data>
+  <data name="Settings_Account_RemoveDevice" xml:space="preserve"><value>移除设备</value></data>
+  <data name="Settings_Account_Security" xml:space="preserve"><value>安全</value></data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve"><value>修改密码</value></data>
+  <data name="Settings_Account_ChangePasswordDescription" xml:space="preserve"><value>修改后，其他设备须重新登录；云端数据保留，不必重新上传</value></data>
+  <data name="Settings_Account_CurrentPassword" xml:space="preserve"><value>当前密码</value></data>
+  <data name="Settings_Account_NewPassword" xml:space="preserve"><value>新密码</value></data>
+  <data name="Settings_Account_ConfirmNewPassword" xml:space="preserve"><value>确认新密码</value></data>
+  <data name="Settings_Account_PasswordChanged" xml:space="preserve"><value>密码已修改</value></data>
+  <data name="Settings_Account_BadCurrentPassword" xml:space="preserve"><value>当前密码不正确</value></data>
+  <data name="Settings_Account_ForgotInDescription" xml:space="preserve"><value>用邮箱验证码设置新密码。这台电脑保存着数据密钥，重设后云端数据全部保留，其他设备须用新密码重新登录</value></data>
+  <data name="Settings_Account_RecoveryCode" xml:space="preserve"><value>恢复码</value></data>
+  <data name="Settings_Account_RecoveryNone" xml:space="preserve"><value>尚未设置。忘记密码、又没有保持登录的 Pane 时，用恢复码重设可保留云端数据</value></data>
+  <data name="Settings_Account_RecoverySet" xml:space="preserve"><value>已于 {0} 生成。忘记密码、又没有保持登录的 Pane 时，用恢复码重设可保留云端数据</value></data>
+  <data name="Settings_Account_RecoveryGenerate" xml:space="preserve"><value>生成恢复码</value></data>
+  <data name="Settings_Account_RecoveryConfirmRegenerate" xml:space="preserve"><value>确认重新生成</value></data>
+  <data name="Settings_Account_RecoveryRegenerateWarning" xml:space="preserve"><value>旧的恢复码将立即失效</value></data>
+  <data name="Settings_Account_RecoveryDelete" xml:space="preserve"><value>删除恢复码</value></data>
+  <data name="Settings_Account_RecoveryConfirmDelete" xml:space="preserve"><value>确认删除</value></data>
+  <data name="Settings_Account_RecoveryDeleteWarning" xml:space="preserve"><value>删除后，忘记密码时只能在保持登录的 Pane 里重设才能保留云端数据</value></data>
+  <data name="Settings_Account_RecoveryDeleted" xml:space="preserve"><value>恢复码已删除</value></data>
+  <data name="Settings_Account_RecoveryShowTitle" xml:space="preserve"><value>这是你的恢复码，只显示这一次</value></data>
+  <data name="Settings_Account_RecoveryShowDescription" xml:space="preserve"><value>请存进密码管理器或抄在纸上，不要发给任何人</value></data>
+  <data name="Settings_Account_RecoverySaveFile" xml:space="preserve"><value>保存为文本文件</value></data>
+  <data name="Settings_Account_RecoverySaved" xml:space="preserve"><value>我已妥善保存恢复码</value></data>
+  <data name="Settings_Account_RecoveryCreated" xml:space="preserve"><value>恢复码已生成</value></data>
+  <data name="Settings_Account_Copied" xml:space="preserve"><value>已复制</value></data>
+  <data name="Settings_Account_Logout" xml:space="preserve"><value>退出登录</value></data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve"><value>退出后，在这台电脑上重设密码将无法保留云端数据；本机数据不受影响</value></data>
+  <data name="Settings_Account_ConfirmLogout" xml:space="preserve"><value>确认退出</value></data>
+  <data name="Settings_Account_Delete" xml:space="preserve"><value>注销账号</value></data>
+  <data name="Settings_Account_DeleteDescription" xml:space="preserve"><value>账号、云端数据和头像将立即删除，无法恢复；尚未用完的付费时长同时作废，不予退款</value></data>
+  <data name="Settings_Account_ConfirmDelete" xml:space="preserve"><value>确认注销</value></data>
+  <data name="Settings_Account_DeleteNeedPassword" xml:space="preserve"><value>请输入当前密码</value></data>
+  <data name="Settings_Account_Deleted" xml:space="preserve"><value>账号已注销</value></data>
+  <data name="Settings_Sync" xml:space="preserve"><value>同步</value></data>
+  <data name="Settings_Sync_Cloud" xml:space="preserve"><value>Pane 云同步</value></data>
+  <data name="Settings_Sync_SignedOut" xml:space="preserve"><value>登录 Pane 账号后，可以在多台电脑之间同步设置、使用记录和剪贴板</value></data>
+  <data name="Settings_Sync_OffDescription" xml:space="preserve"><value>未开启。开启后，内容在本机加密后才上传，服务器无法读取</value></data>
+  <data name="Settings_Sync_LastSuccess" xml:space="preserve"><value>已开启，上次同步：{0}</value></data>
+  <data name="Settings_Sync_Syncing" xml:space="preserve"><value>正在同步…</value></data>
+  <data name="Settings_Sync_ErrorRetry" xml:space="preserve"><value>同步失败：{0}。稍后自动重试</value></data>
+  <data name="Settings_Sync_Waiting" xml:space="preserve"><value>已开启，正在等待第一次同步</value></data>
+  <data name="Settings_Sync_ExcludedItem" xml:space="preserve"><value>复制的内容只记录在本机，不上传</value></data>
+  <data name="Settings_Sync_PausedExpired" xml:space="preserve"><value>云同步已到期，同步已暂停。云端数据保留到 {0}，期间续费可接着使用</value></data>
+  <data name="Settings_Sync_PausedSignIn" xml:space="preserve"><value>登录已失效，同步已暂停</value></data>
+  <data name="Settings_Sync_PausedOutdated" xml:space="preserve"><value>Pane 版本过旧，请更新后再同步</value></data>
+  <data name="Settings_Sync_PausedMerge" xml:space="preserve"><value>等待选择合并方式，同步已暂停</value></data>
+  <data name="Settings_Sync_Now" xml:space="preserve"><value>立即同步</value></data>
+  <data name="Settings_Sync_MergeTitle" xml:space="preserve"><value>本机和云端都有数据</value></data>
+  <data name="Settings_Sync_MergeDescription" xml:space="preserve"><value>这台电脑上有其他账号同步过的数据。合并会把两边都保留；也可以只保留一边</value></data>
+  <data name="Settings_Sync_MergeMerge" xml:space="preserve"><value>合并</value></data>
+  <data name="Settings_Sync_MergeUseCloud" xml:space="preserve"><value>用云端覆盖本机</value></data>
+  <data name="Settings_Sync_MergeUseLocal" xml:space="preserve"><value>用本机覆盖云端</value></data>
+  <data name="Settings_Sync_Settings" xml:space="preserve"><value>设置</value></data>
+  <data name="Settings_Sync_SettingsDescription" xml:space="preserve"><value>快捷键、外观和各项功能的设置；本机路径、窗口位置、密钥等不同步</value></data>
+  <data name="Settings_Sync_Usage" xml:space="preserve"><value>使用记录</value></data>
+  <data name="Settings_Sync_UsageDescription" xml:space="preserve"><value>启动器的使用次数和终端历史，各台电脑的次数合并计算</value></data>
+  <data name="Settings_Sync_Clipboard" xml:space="preserve"><value>剪贴板</value></data>
+  <data name="Settings_Sync_ClipboardDescription" xml:space="preserve"><value>之后复制的文字和图片会加密上传，几秒内出现在其他电脑上；以前的历史不上传</value></data>
+  <data name="Settings_Sync_ClipScope" xml:space="preserve"><value>同步范围</value></data>
+  <data name="Settings_Sync_ClipScopeText" xml:space="preserve"><value>文字</value></data>
+  <data name="Settings_Sync_ClipScopeImages" xml:space="preserve"><value>文字和图片</value></data>
+  <data name="Settings_Sync_Excluded" xml:space="preserve"><value>不同步的程序</value></data>
+  <data name="Settings_Sync_ExcludedDescription" xml:space="preserve"><value>这些程序里复制的内容照常记录在本机，只是不上传</value></data>
+  <data name="Settings_Sync_ExcludedAdd" xml:space="preserve"><value>添加程序</value></data>
+  <data name="Settings_Sync_ExcludedNone" xml:space="preserve"><value>全部同步。可以添加不想上传的程序，如密码管理器</value></data>
+  <data name="Settings_Sync_WriteSystem" xml:space="preserve"><value>其他电脑复制时，同时放进本机剪贴板</value></data>
+  <data name="Settings_Sync_WriteSystemDescription" xml:space="preserve"><value>开启后可以直接 Ctrl+V 粘贴其他电脑刚复制的内容</value></data>
+  <data name="Settings_Sync_DeviceView" xml:space="preserve"><value>其他电脑的条目</value></data>
+  <data name="Settings_Sync_DeviceViewDescription" xml:space="preserve"><value>在剪贴板面板里怎么显示其他电脑同步来的条目</value></data>
+  <data name="Settings_Sync_DeviceViewMixed" xml:space="preserve"><value>混在时间线里</value></data>
+  <data name="Settings_Sync_DeviceViewFilter" xml:space="preserve"><value>只在设备筛选里</value></data>
+  <data name="Settings_Sync_Note" xml:space="preserve"><value>同步不是备份：在一台电脑上删除的内容，其他电脑上也会删除。重要数据请用下方的「导出」另存</value></data>
   <data name="Settings_Data" xml:space="preserve"><value>数据</value></data>
   <data name="Settings_Data_Description" xml:space="preserve"><value>存储占用、剪贴板图片上限和大文件位置</value></data>
   <data name="Settings_Data_Usage" xml:space="preserve"><value>存储占用</value></data>
@@ -1172,6 +1371,12 @@
   <data name="Settings_Launcher_CommandsCleared" xml:space="preserve"><value>已清空</value></data>
   <data name="Settings_Launcher_CommandsDescription" xml:space="preserve"><value>保留最近 20 条，用于补全；以空格开头的命令不记录</value></data>
   <data name="Settings_Launcher_DefaultEngineCannotDelete" xml:space="preserve"><value>默认站点不能删除</value></data>
+  <data name="Settings_Launcher_Capsule" xml:space="preserve"><value>右侧显示</value></data>
+  <data name="Settings_Launcher_CapsuleDescription" xml:space="preserve"><value>搜索框右边的小按钮，点击打开设置；未登录时显示 Pane 标志</value></data>
+  <data name="Settings_Launcher_CapsuleLogo" xml:space="preserve"><value>Pane 标志</value></data>
+  <data name="Settings_Launcher_CapsuleAvatar" xml:space="preserve"><value>头像</value></data>
+  <data name="Settings_Launcher_FounderRing" xml:space="preserve"><value>创始会员头像环</value></data>
+  <data name="Settings_Launcher_FounderRingDescription" xml:space="preserve"><value>头像外圈一道细的金属环</value></data>
   <data name="Settings_Launcher_Description" xml:space="preserve"><value>呼出、搜索范围、常用入口和网页搜索</value></data>
   <data name="Settings_Launcher_EngineAddress" xml:space="preserve"><value>地址，用 {query} 代表搜索词</value></data>
   <data name="Settings_Launcher_EngineKeyword" xml:space="preserve"><value>关键字</value></data>
@@ -1332,6 +1537,8 @@
   <data name="Settings_WinV_StateSaveError" xml:space="preserve"><value>Win+V 状态保存失败：{0}</value></data>
   <data name="Settings_WinV_Working" xml:space="preserve"><value>正在处理…（重启资源管理器时任务栏会短暂闪烁）</value></data>
   <data name="Setup_Autostart" xml:space="preserve"><value>开机时启动</value></data>
+  <data name="Setup_AccessDenied" xml:space="preserve"><value>没有权限完成此操作，可能被安全软件拦截，请放行 Pane 后重试</value></data>
+  <data name="Setup_AutostartBlocked" xml:space="preserve"><value>开机启动未能开启，可能被安全软件拦截；可在 设置 → 通用 中重新打开</value></data>
   <data name="Setup_Bytes" xml:space="preserve"><value>{0} 字节</value></data>
   <data name="Setup_CannotStart" xml:space="preserve"><value>无法开始安装或卸载，请检查目录权限以及是否已有安装程序正在运行</value></data>
   <data name="Setup_CopyingFiles" xml:space="preserve"><value>正在复制文件</value></data>
@@ -1502,6 +1709,11 @@
   <data name="Module_Gestures_Name" xml:space="preserve"><value>鼠标手势</value></data>
   <data name="Module_FolderJump_Name" xml:space="preserve"><value>文件对话框跳转</value></data>
   <data name="Module_Launcher_Description" xml:space="preserve"><value>通过热键呼出，搜索应用和文件、计算算式、搜索网页</value></data>
+  <data name="Module_Cloud_Name" xml:space="preserve"><value>Pane 云</value></data>
+  <data name="Module_Cloud_Description" xml:space="preserve"><value>登录 Pane 账号，在多台电脑之间加密同步设置、使用记录和剪贴板；会员更新走国内线路。不登录时不联网</value></data>
+  <data name="Module_Cloud_WithClipboard" xml:space="preserve"><value>其他电脑复制的文字和图片会出现在剪贴板历史里</value></data>
+  <data name="Module_Cloud_WithLauncher" xml:space="preserve"><value>启动器右侧可以显示账号头像</value></data>
+  <data name="Module_CloudDisableNote" xml:space="preserve"><value>停用后停止同步、不再联网。这台电脑上的登录状态保留，重新启用后接着同步；要彻底清除，请先在「账号」中退出登录</value></data>
   <data name="Module_Clipboard_Description" xml:space="preserve"><value>记录复制过的文字、图片和文件，可随时查找并重新粘贴</value></data>
   <data name="Module_Gestures_Description" xml:space="preserve"><value>按住右键画方向，执行快捷键、窗口操作等动作</value></data>
   <data name="Module_SuperPanel_Description" xml:space="preserve"><value>选中文字或文件后长按鼠标侧键，就地处理；短按侧键照常后退 / 前进</value></data>
@@ -1617,6 +1829,15 @@
   <data name="Update_ViewOnGitHub" xml:space="preserve"><value>在 GitHub 上查看</value></data>
   <data name="Update_InstallOnStartup" xml:space="preserve"><value>下次启动时自动安装</value></data>
   <data name="Update_InstallOnStartupDescription" xml:space="preserve"><value>已下载的更新将在下次启动 Pane 时（例如开机）自动安装，不再询问</value></data>
+  <data name="Update_SourceCloud" xml:space="preserve"><value>Pane 云</value></data>
+  <data name="Update_SourceCloudDescription" xml:space="preserve"><value>会员从国内线路下载，优先增量更新，计入每月流量</value></data>
+  <data name="Update_SourceCloudLocked" xml:space="preserve"><value>开通云同步后可用，现在从 GitHub 下载</value></data>
+  <data name="Update_CloudFallbackLowQuota" xml:space="preserve"><value>本月流量不多，这次从 GitHub 下载</value></data>
+  <data name="Update_CloudFallbackExpired" xml:space="preserve"><value>云同步已到期，这次从 GitHub 下载</value></data>
+  <data name="Update_CloudFallbackSignedOut" xml:space="preserve"><value>登录已失效，这次从 GitHub 下载</value></data>
+  <data name="Update_CloudFallbackNetwork" xml:space="preserve"><value>暂时无法连接 Pane 云，这次从 GitHub 下载</value></data>
+  <data name="Update_FromCloud" xml:space="preserve"><value>从 Pane 云下载</value></data>
+  <data name="Update_IncrementalSize" xml:space="preserve"><value>{0}（增量）</value></data>
   <data name="Update_Source" xml:space="preserve"><value>更新源</value></data>
   <data name="Update_SourceGitHubDescription" xml:space="preserve"><value>从 GitHub 检查和下载更新</value></data>
   <data name="Update_SourceMirrorDescription" xml:space="preserve"><value>从 Mirror酱 检查更新；填写 CDK 后也从 Mirror酱 下载，国内速度更快</value></data>
@@ -1742,4 +1963,10 @@
   <data name="Settings_DialogSearch_EnterFill" xml:space="preserve"><value>仅填入文件名</value></data>
   <data name="Settings_DialogSearch_Filter" xml:space="preserve"><value>按对话框的文件类型筛选</value></data>
   <data name="Settings_DialogSearch_FilterDescription" xml:space="preserve"><value>对话框限定了文件类型时，搜索结果中仅显示这些类型的文件</value></data>
+  <data name="Clipboard_ThisDevice" xml:space="preserve"><value>本机</value></data>
+  <data name="Clipboard_OriginalDownloading" xml:space="preserve"><value>正在下载原图 {0}</value></data>
+  <data name="Clipboard_OriginalExpired" xml:space="preserve"><value>原图已过期，只剩缩略图</value></data>
+  <data name="Clipboard_OriginalNotSynced" xml:space="preserve"><value>原图未同步，只能在{0}上粘贴</value></data>
+  <data name="Clipboard_OriginalQuota" xml:space="preserve"><value>本月流量已用完，下月 1 日后可下载原图</value></data>
+  <data name="Clipboard_OtherDevice" xml:space="preserve"><value>其他设备</value></data>
 </root>

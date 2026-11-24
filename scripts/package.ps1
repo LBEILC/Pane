@@ -1,4 +1,4 @@
-﻿param([switch]$NoBuild,[string]$PolicyPath)
+﻿param([switch]$NoBuild,[string]$PolicyPath,[switch]$SkipPatchHistory)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'forbidden-scan.ps1')
@@ -18,6 +18,11 @@ trap {
     }
     break
 }
+$previousCl=$env:CL
+$previousLink=$env:_LINK_
+try {
+$env:CL=("$previousCl /Brepro").Trim()
+$env:_LINK_=("$previousLink /Brepro").Trim()
 if($NoBuild){
     $last=Join-Path $repo 'dist/package.json'
     $source=if(Test-Path -LiteralPath $last){(Get-Content -LiteralPath $last -Encoding UTF8 -Raw | ConvertFrom-Json).source}else{Join-Path $repo 'src/Pane.App/bin/aot'}
@@ -64,12 +69,18 @@ $installer=Join-Path $dist "Pane 安装 $version.exe"
 Copy-Item -LiteralPath "$work/wrapper/Pane.Setup.exe" -Destination $installer -Force
 $releaseInstaller=Join-Path $dist "Pane-Setup-$version.exe"
 Copy-Item -LiteralPath $installer -Destination $releaseInstaller -Force
-$checksum=(Get-FileHash -LiteralPath $releaseInstaller -Algorithm SHA256).Hash.ToLowerInvariant()
-[IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'),"$checksum  Pane-Setup-$version.exe`n",[Text.UTF8Encoding]::new($false))
+$attachments=@($releaseInstaller)+@(& "$PSScriptRoot/release-patches.ps1" -Stage $stage -Dist $dist -Version $version -SkipHistory:$SkipPatchHistory)
+$checksums=foreach($file in $attachments){
+    $checksum=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
+    "$checksum  $([IO.Path]::GetFileName($file))"
+}
+$sums=Join-Path $dist 'SHA256SUMS.txt'
+[IO.File]::WriteAllText($sums,($checksums -join "`n")+"`n",[Text.UTF8Encoding]::new($false))
 $raw=Get-ChildItem -LiteralPath $source -Recurse -File | Measure-Object Length -Sum
 Assert-ForbiddenFiles -Files @($installer,$releaseInstaller,(Join-Path $dist 'SHA256SUMS.txt')) -Rules $rules
 $payload=Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object Length -Sum
 $result=[ordered]@{version=$version;source=$source;stage=$stage;installer=$installer;rawFiles=$raw.Count;rawBytes=$raw.Sum;files=$payload.Count;bytes=$payload.Sum;compressedBytes=(Get-Item -LiteralPath $zip).Length;installerBytes=(Get-Item -LiteralPath $installer).Length}
+$result.attachments=$attachments+@($sums)
 $result | ConvertTo-Json | Set-Content -LiteralPath "$dist/package.json" -Encoding UTF8
 # 成功后删掉其他打包临时目录（每个约 0.2～0.3 GB）。保留本次（package.json 指向它）、-NoBuild 用到的来源、
 # 最近 3 次失败的现场，以及 2 小时内新建的（可能有另一次打包正在跑）。
@@ -83,3 +94,5 @@ foreach($old in $packages){
 }
 $result | ConvertTo-Json
 # 017 将仓库外可执行文件统一认作正式版；未扩展该身份规则前不输出会误用正式数据的绿色版。
+
+} finally { $env:CL=$previousCl; $env:_LINK_=$previousLink }

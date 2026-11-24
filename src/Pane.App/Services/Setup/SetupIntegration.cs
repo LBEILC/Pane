@@ -5,10 +5,10 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 namespace Pane.Services.Setup;
 
-internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, string? isolatedRoot = null) : ISetupIntegration
+internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, string? isolatedRoot = null, IStartupRegistry? registry = null) : ISetupIntegration
 {
     const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pane";
-    readonly IStartupRegistry startup = isolatedRoot == null ? new WindowsStartupRegistry() : new FileStartupRegistry(isolatedRoot);
+    readonly IStartupRegistry startup = registry ?? (isolatedRoot == null ? new WindowsStartupRegistry() : new FileStartupRegistry(isolatedRoot));
     string Menu => Path.Combine(isolatedRoot == null ? Environment.GetFolderPath(Environment.SpecialFolder.Programs) : Path.Combine(isolatedRoot, "menu"), "Pane.lnk");
     string Desktop => Path.Combine(isolatedRoot == null ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) : Path.Combine(isolatedRoot, "desktop"), "Pane.lnk");
     string SettingsFile => Path.Combine(paths.Data, "settings.json");
@@ -45,7 +45,8 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
     public void Restore(object snapshot)
     {
         var value = (Snapshot)snapshot;
-        if (value.Startup == null) startup.Delete(); else startup.Write(value.Startup);
+        try { if (value.Startup == null) startup.Delete(); else startup.Write(value.Startup); }
+        catch (Exception error) when (AutostartService.AccessDenied(error)) { UninstallChain.Log("restore-startup", "skipped", error); }
         WriteRegistration(value.Registration);
         foreach (var item in value.Files)
         {
@@ -54,16 +55,22 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
             else { Directory.CreateDirectory(Path.GetDirectoryName(item.Key)!); File.WriteAllBytes(item.Key, item.Value); }
         }
     }
-    public void Apply(string version, long bytes, SetupOptions options)
+    public bool Apply(string version, long bytes, SetupOptions options)
     {
         // 不调用 Load：读取设置时不得重命名损坏文件或创建用户数据目录。
         PaneSettings settings = ReadSettings(paths.Data, defaults);
         SetupFiles.Check(SettingsFile); SetupFiles.Check(SettingsFile + ".tmp");
         var store = new SettingsStore(paths.Data, settings);
-        new AutostartService(true, paths.Exe, store, startup).Set(options.StartWithWindows);
+        bool blocked = false;
+        new AutostartService(true, paths.Exe, store, startup).Set(options.StartWithWindows, error =>
+        {
+            blocked = options.StartWithWindows;
+            UninstallChain.Log(blocked ? "write-startup" : "delete-startup", "skipped", error);
+        });
         WriteRegistration(Registration(paths, version, bytes));
         Shortcut(Menu);
         if (options.DesktopShortcut) Shortcut(Desktop); else { SetupFiles.Check(Desktop); File.Delete(Desktop); }
+        return blocked;
     }
     public void Remove()
     {

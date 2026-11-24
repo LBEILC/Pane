@@ -19,6 +19,9 @@ internal sealed class AutostartLog(string directory,Func<DateTimeOffset> clock,D
         (error!=null?"early-failure":existingInstance?"existing-instance":"started")+
         (error==null?"":$"\ttype={Clean(error.GetType().FullName)}\tmessage={Clean(SafeMessage(error))}")));
 
+    internal void AlignDenied(Exception error)=>Safely(()=>Append(
+        $"event=align\tresult=skipped\tcode=0x{error.HResult:X8}\ttype={Clean(error.GetType().FullName)}\tmessage={Clean(SafeMessage(error))}"));
+
     internal void Manual(bool enabled,bool production,string executable,IStartupRegistry registry)=>Safely(()=>{
         if(!enabled||HasAutomatic())return;
         // 在 Align 修复旧路径或缺失项之前取证；此处只读，不修改注册表。

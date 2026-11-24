@@ -38,6 +38,14 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         var tags = history.Tags();
         chips.Clear();
         foreach (var f in Filters) chips.Add(new ChipItem(f.key, f.label));
+        // Pane 云：同一账号两台以上电脑（含本机）时，类型后面加一组「本机 + 各电脑」（docs/cloud.md「剪贴板同步 → 区分设备」）
+        var devices = OtherDevices();
+        if (devices.Count > 0)
+        {
+            chips.Add(new ChipItem("sep", ""));
+            chips.Add(new ChipItem("dev:", Strings.Clipboard_ThisDevice));
+            foreach (var d in devices) chips.Add(new ChipItem("dev:" + d, d));
+        }
         if (tags.Count > 0)
         {
             chips.Add(new ChipItem("sep", ""));
@@ -46,6 +54,12 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         if (!chips.Any(c => c.Key == filter)) filter = "all";
     }
     string? TagFilter => filter.StartsWith("tag:", StringComparison.Ordinal) ? filter[4..] : null;
+    /// <summary>设备筛选：null = 不按设备筛；"" = 本机；其余是电脑名。</summary>
+    string? DeviceFilter => filter.StartsWith("dev:", StringComparison.Ordinal) ? filter[4..] : null;
+
+    static ISyncService? Sync => (Application.Current as App)?.Sync;
+    static List<string> OtherDevices() => Sync is { Options: { Enabled: true, Clipboard: true } } sync ? sync.OtherDevices.Select(d => d.Name).Distinct().ToList() : [];
+    static bool DevicesOnlyInFilter => Sync?.Options.DeviceView == ClipDeviceView.FilterOnly;
 
     // 一次只建一批行（含缩略图），往下滚或用方向键走到底时再补一批；历史可能有几千条
     const int Batch = 40;
@@ -184,7 +198,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     void Render(bool keepSelection)
     {
         if (InMode) return;
-        var (q, qTags) = ParseQuery(Input.Text);
+        var (q, qTags, qDevs) = ParseQuery(Input.Text);
         var keep = keepSelection ? SelectedRow?.Entry.Id : null;
         var keepMore = keepSelection && more is not null && selected == more.Index;
         var count = keepSelection ? Math.Max(Batch, rows.Count) : Batch;
@@ -193,12 +207,12 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         if (!keepSelection) frozen = [];
         List<ClipEntry> found;
         if (TagFilter is not null) all = all.OrderByDescending(e => e.CopiedAt).ToList();   // 按标签筛选：不分已固定区，按时间排
-        if (frozen.Count == 0) found = all.Where(e => Matches(e, q, qTags, ignorePin: false)).ToList();
+        if (frozen.Count == 0) found = all.Where(e => Matches(e, q, qTags, qDevs, ignorePin: false)).ToList();
         else
         {
             // 已显示过的按原顺序和原分组留着（「已固定」筛选下取消固定的也先留着），新来的放在已固定区之后
-            var known = all.Where(e => frozen.ContainsKey(e.Id) && Matches(e, q, qTags, ignorePin: true)).OrderBy(e => frozen[e.Id].Order).ToList();
-            var fresh = all.Where(e => !frozen.ContainsKey(e.Id) && Matches(e, q, qTags, ignorePin: false));
+            var known = all.Where(e => frozen.ContainsKey(e.Id) && Matches(e, q, qTags, qDevs, ignorePin: true)).OrderBy(e => frozen[e.Id].Order).ToList();
+            var fresh = all.Where(e => !frozen.ContainsKey(e.Id) && Matches(e, q, qTags, qDevs, ignorePin: false));
             found = [.. known.Where(e => frozen[e.Id].Group == ClipGroup.Pinned), .. fresh, .. known.Where(e => frozen[e.Id].Group != ClipGroup.Pinned)];
         }
         // 冻结的是全部命中（含收起时藏着的固定条目），展开后它们按原位置出来
@@ -206,7 +220,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         var pins = found.Where(e => GroupOf(e) == ClipGroup.Pinned).ToList();
         var line = found.Where(e => GroupOf(e) != ClipGroup.Pinned).ToList();
         // 搜索时全部展开（不藏命中）；「已固定」筛选下只有这一区，不折叠
-        var searching = q.Length > 0 || qTags.Count > 0;
+        var searching = q.Length > 0 || qTags.Count > 0 || qDevs.Count > 0;
         var fold = !searching && filter != "pinned" && pins.Count > PinPeek;
         var shown = fold && !pinsOpen ? pins.Take(PinPeek).ToList() : pins;
         matched = [.. shown, .. line];
@@ -236,19 +250,25 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         Select(Math.Min(index, Count - 1), scroll: keepSelection || index > 0);
     }
 
-    // 搜索框里的「#标签」（2026-11-23）：拆成标签条件（按开头匹配）和普通关键词
-    static (string Query, List<string> Tags) ParseQuery(string raw)
+    // 搜索框里的「#标签」（2026-11-23）、「@电脑名」（2026-11-24，Pane 云）：拆成标签、电脑条件（都按开头匹配）和普通关键词，可以连用
+    static (string Query, List<string> Tags, List<string> Devices) ParseQuery(string raw)
     {
         var tags = new List<string>();
+        var devices = new List<string>();
         var words = new List<string>();
         foreach (var w in raw.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            if (w.Length > 1 && w[0] == '#') tags.Add(w[1..]); else words.Add(w);
-        return (string.Join(' ', words), tags);
+            if (w.Length > 1 && w[0] == '#') tags.Add(w[1..]);
+            else if (w.Length > 1 && w[0] == '@') devices.Add(w[1..]);
+            else words.Add(w);
+        return (string.Join(' ', words), tags, devices);
     }
 
-    bool Matches(ClipEntry e, string q, List<string> qTags, bool ignorePin)
+    bool Matches(ClipEntry e, string q, List<string> qTags, List<string> qDevs, bool ignorePin)
     {
         if (TagFilter is { } tag && !e.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase)) return false;
+        // 设备：「只在设备筛选里显示」时，没选设备就不出别的电脑的条目
+        if (DeviceFilter is { } device ? !string.Equals(e.SourceDevice ?? "", device, StringComparison.OrdinalIgnoreCase) : e.SourceDevice is not null && DevicesOnlyInFilter) return false;
+        if (qDevs.Any(d => !(e.SourceDevice ?? Strings.Clipboard_ThisDevice).StartsWith(d, StringComparison.OrdinalIgnoreCase))) return false;
         if (qTags.Any(t => !e.Tags.Any(n => n.StartsWith(t, StringComparison.OrdinalIgnoreCase)))) return false;
         switch (filter)
         {

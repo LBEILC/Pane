@@ -1,0 +1,50 @@
+[
+  {
+    "password": "Pane-demo-001",
+    "salt": "AAECAwQFBgcICQoLDA0ODw",
+    "kdf_iterations": 1000,
+    "master": "tcnLI2SbgB1hyN6VBIbrSFcaM9I43UjfHBmnlpihS0c",
+    "auth_key": "FMnoO0T0ILqJkI-xU7SBxDkZjHPSYWRYAFh_Q-u0Sbg",
+    "wrap_key": "pWwJiDXk4DVSgotBtNUuJLlva7XUga_6NUspjUmJk7c",
+    "data_key": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+    "nonce": "MDEyMzQ1Njc4OTo7",
+    "wrapped_key": "MDEyMzQ1Njc4OTo7vekTEMhbXJkQ7W5SQ1m8zD42FweQjXrxsQ9gjap5rSgajD5JZBdZrE-a6KOFzok6",
+    "key_check": "6lsfmsGaJFguk0HdqYJhvScry0uM3xqupM8JgKwT5ng",
+    "recovery": {
+      "code_bytes": "PD0-P0BBQkNERUZHSElKS0xNTk8",
+      "code_display": "7GYK-WFT0-8514-6H25-8S3M-GJAA-9D64-TKJF",
+      "nonce": "UFFSU1RVVldYWVpb",
+      "recovery_wrapped_key": "UFFSU1RVVldYWVpbvyrfNZdMIBUQxmD6SfAb7Rz66W1NEPf_-OLl1VK05q006zfItZY4E6aQQSRQjoMw"
+    }
+  },
+  {
+    "password": "剪贴板与云同步",
+    "salt": "QEFCQ0RFRkdISUpLTE1OTw",
+    "kdf_iterations": 1000,
+    "master": "01HmvbFJzlP0BQqaz_kd5E9HQP1PekWBSNMiPpUL_nM",
+    "auth_key": "-cLYoxme4SqwYO5hAvKYdxJT2bebmC1t-eM-fihYDm8",
+    "wrap_key": "LVEgDwsiYI6jxKoigTiCzQHex1egLEt-u9C42ZyaqxQ",
+    "data_key": "UFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGlqa2xtbm8",
+    "nonce": "cHFyc3R1dnd4eXp7",
+    "wrapped_key": "cHFyc3R1dnd4eXp70zOOGe56Tos1o6XhleLL0Azk1Mtv4Sits5Kp-4cfcg4bb2bHq_aNLhOqXu8zGSg_",
+    "key_check": "h_zJ8qNUV2c0CQCABiiU19e5uTHuXyEFRX8b2nqAFag",
+    "recovery": {
+      "code_bytes": "fH1-f4CBgoOEhYaHiImKi4yNjo8",
+      "code_display": "FHYQ-WZW0-G618-7145-GT3R-H2CA-HE68-V3MF",
+      "nonce": "kJGSk5SVlpeYmZqb",
+      "recovery_wrapped_key": "kJGSk5SVlpeYmZqbNikiI3QVIAECX-dVytJ0ZpnUzhe8ywx8td_IKihUNWM-1wSM4oLyipq03Bb1qftA"
+    }
+  },
+  {
+    "password": "päne🔑组合",
+    "salt": "gIGCg4SFhoeIiYqLjI2Ojw",
+    "kdf_iterations": 1000,
+    "master": "WmKbIEqIpGekr4gxoCTYdelI04lT54BOyFU4EFlN3ec",
+    "auth_key": "SgfePZUkmRIdoQ17irot1M_6XL2mpN9p8d35bUEITWk",
+    "wrap_key": "hJImUtNEa-xHB-OUs6G6T4_053ngMIXGgeMb7UnqIeE",
+    "data_key": "kJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq8",
+    "nonce": "sLGys7S1tre4ubq7",
+    "wrapped_key": "sLGys7S1tre4ubq74aRvWHY7tZNXSRsNUCOqCTD43loqY4-DW4CCA43TNPS3kdwgCnlri7NV5VsjGTaW",
+    "key_check": "gsuc6Ho6V_hmu64geG2kJWRi8Q7J75tfEHMuiMh6Ils"
+  }
+]

@@ -49,13 +49,18 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
         actions=new(portablePlatform,executor,process);
         sources=[new DirectSource(executor),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
-        var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
-        try{if(File.Exists(path))uses=JsonSerializer.Deserialize(File.ReadAllText(path),LauncherJson.Default.DictionaryStringAppUse)??[];}
+        store.LocalUsageReplaced += ReloadUsage;
+        try{ReloadUsage();}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
         try{if(index.Load() is {} saved){Publish(saved);CachedApps=saved.Snapshot.Apps.Length;CachedQuery=saved.Snapshot.Apps.FirstOrDefault()?.Name.Name;CachedReadyMilliseconds=started.Elapsed.TotalMilliseconds;}}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException or InvalidDataException){IndexError="snapshot:"+e.GetType().Name;}
         lastIcons=IconsStamp();if(index is ProcessLauncherIndex processIndex){processIndex.PortableProvider=()=>store.Current.Launcher.Portable.ToArray();processIndex.IconSettingsProvider=()=>store.Current.Icons;processIndex.OriginalsReady+=PublishOriginals;}
         store.Changed+=SettingsChanged;RefreshIndex();
+    }
+    void ReloadUsage()
+    {
+        string path = Path.Combine(store.DirectoryPath, "launcher-usage.json");
+        lock(sync) uses = File.Exists(path) ? JsonSerializer.Deserialize(File.ReadAllText(path), LauncherJson.Default.DictionaryStringAppUse) ?? [] : [];
     }
     string IconsStamp()=>Pane.Services.Icons.IconProcessing.SettingsKey(store.Current.Icons);
     void PublishOriginals(PersistedIndex value){if(Volatile.Read(ref snapshot).Apps.Length==0)Publish(value);}
@@ -127,7 +132,13 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         try{k=File.Exists(dark+".kind")&&Enum.TryParse<AppIconKind>(File.ReadAllText(dark+".kind").Trim(),out var v)?v:AppIconKind.Unknown;}catch(IOException){k=AppIconKind.Unknown;}
         lock(kinds){if(kinds.Count>2000)kinds.Clear();kinds[dark]=k;}return k;
     }
-    SourceContext Context(string query){Dictionary<string,AppUse> usage;lock(sync)usage=new(uses);return new(query.Trim(),Volatile.Read(ref snapshot),store.Current.Launcher,usage);}
+    SourceContext Context(string query){Dictionary<string,AppUse> usage;lock(sync)usage=new(uses);
+        foreach(var (id,count) in store.OtherCounts)
+        {
+            var own = usage.GetValueOrDefault(id);
+            usage[id] = new((int)Math.Min(int.MaxValue,(long)(own?.Count ?? 0) + count), own?.LastUsed ?? DateTimeOffset.MinValue);
+        }
+        return new(query.Trim(),Volatile.Read(ref snapshot),store.Current.Launcher,usage);}
     public Task<LauncherResult> SearchAsync(string query,CancellationToken cancellationToken)=>SearchCoreAsync(query,null,cancellationToken);
     public Task<LauncherResult> SearchAsync(string query,Action<LauncherResult> partial,CancellationToken cancellationToken)=>SearchCoreAsync(query,partial,cancellationToken);
     async Task<LauncherResult> SearchCoreAsync(string query,Action<LauncherResult>? partial,CancellationToken cancellationToken)
@@ -179,6 +190,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
             Directory.CreateDirectory(store.DirectoryPath);var path=Path.Combine(store.DirectoryPath,"launcher-usage.json");
             File.WriteAllText(path+".tmp",JsonSerializer.Serialize(current,LauncherJson.Default.DictionaryStringAppUse));File.Move(path+".tmp",path,true);
         }finally{usageWriter.Release();}
+        store.NotifyUsageChanged();
     }
     public async Task RunAsync(string actionId,ClipEntry attachment,CancellationToken cancellationToken)
     {
@@ -194,5 +206,5 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         if(actionId=="web-search"&&attachment.Text!=null){var engine=DefaultEngine(store.Current.Launcher);await executor.OpenAsync(BuildUrl(engine,attachment.Text),false,cancellationToken);WebSearchHistory.Record(engine,attachment.Text);return;}
         throw new NotSupportedException(actionId);
     }
-    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();WebSearchHistory.Dispose();lifetime.Dispose();}
+    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.LocalUsageReplaced-=ReloadUsage;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();WebSearchHistory.Dispose();lifetime.Dispose();}
 }

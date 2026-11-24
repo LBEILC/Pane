@@ -14,10 +14,11 @@ public static class ModuleIds
     public const string Rename = "rename";
     public const string PowerTimer = "power-timer";   // 定时关机（2026-11-05，058）
     public const string Words = "words";   // 分词（2026-11-09，093）
+    public const string Cloud = "cloud";   // Pane 云：账号、云同步、会员下载（2026-11-24，docs/cloud.md「总体」，Contracts/Cloud.cs）
 }
 
 /// <summary>「能力」页的分组。</summary>
-public enum ModuleCategory { Search, Clipboard, Mouse, Ai, Files, System }
+public enum ModuleCategory { Search, Clipboard, Mouse, Ai, Files, System, Sync }
 
 /// <summary>
 /// Required = 硬依赖：对方没启用就不能启用自己（启用时界面问一句「同时启用 X？」）。
@@ -33,6 +34,10 @@ public enum ModuleSource { BuiltIn, Community }
 /// <param name="Glyph">Lucide 图标名。</param>
 /// <param name="DefaultEnabled">新装用户的默认值。</param>
 /// <param name="Author">Community 才有：GitHub 用户名。</param>
+/// <param name="Hidden">
+/// 还没正式放出的能力（2026-11-24，Pane 云开卖前）：不出现在「能力」页，各处联动照常按 IsActive 判断；
+/// 默认停用，只能用隐藏的设置项打开（内部测试用，键名由工程定、写进 docs/design.md）。放出时把它改回 false。
+/// </param>
 public sealed record ModuleInfo(
     string Id,
     ModuleCategory Category,
@@ -40,7 +45,8 @@ public sealed record ModuleInfo(
     bool DefaultEnabled,
     IReadOnlyList<ModuleDependency> Dependencies,
     ModuleSource Source = ModuleSource.BuiltIn,
-    string? Author = null);
+    string? Author = null,
+    bool Hidden = false);
 
 public enum ModuleStatus
 {

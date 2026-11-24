@@ -37,9 +37,10 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
 
     // 测试源只由测试宿主显式注入；产品接线不读取任何更新源环境变量。
     public UpdateService(string version, string data, Func<bool> automatic, Action<string> install, Uri? testSource = null,
-        Func<UpdateSource>? selectedSource = null, Uri? testMirrorSource = null)
+        Func<UpdateSource>? selectedSource = null, Uri? testMirrorSource = null, string? testBaseline = null)
     {
         CurrentVersion = version; directory = Path.Combine(data, "updates");
+        baseline = testBaseline ?? AppContext.BaseDirectory;
         this.automatic = automatic; this.install = install; source = testSource ?? ProductionSource;
         if (testSource != null && (testSource.Scheme != "http" || testSource.Host != "127.0.0.1"))
             throw new ArgumentException("测试源必须是本机 HTTP 服务"); // 不翻译：测试异常
@@ -60,16 +61,24 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
             activeStep = UpdateStep.Check;
             Set(UpdateState.Checking); LastChecked = DateTimeOffset.UtcNow;
             Latest = null; readyPath = null; asset = sums = null; mirrorTicket = null; DownloadFrom = null;
+            incremental = null;
+            cloudFiles = null;
+            CloudFallbackReason = null;
+            CheckedFrom = null;
             bool allowAutomatic = true;
             if (selection == UpdateSource.MirrorChyan && await CheckMirror(token).ConfigureAwait(false))
                 allowAutomatic = CdkStatus is not (MirrorCdkStatus.Invalid or MirrorCdkStatus.Mismatched or MirrorCdkStatus.Blocked);
-            else
+            else if (selection != UpdateSource.PaneCloud || !await CheckCloud(token).ConfigureAwait(false))
                 await CheckGitHub(token).ConfigureAwait(false);
             token.ThrowIfCancellationRequested();
             if (Latest == null) { if (State != UpdateState.Failed) Set(UpdateState.UpToDate); return; }
             Set(UpdateState.Available);
             if (TryReuseReady()) return;
-            if (automatic() && allowAutomatic) await DownloadCore(token).ConfigureAwait(false);
+            if (!automatic() || !allowAutomatic) return;
+            var delay = availableAt - DateTimeOffset.UtcNow;
+            if (cloudFiles != null && delay > TimeSpan.Zero)
+                timer.Change(delay, TimeSpan.FromHours(24));
+            else await DownloadCore(token).ConfigureAwait(false);
     }
     async Task CheckGitHub(CancellationToken token)
     {
@@ -92,6 +101,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
             Latest = new(version, PlainNotes(body), published, package.GetProperty("size").GetInt64(),
                 ValidateUrl(root.GetProperty("html_url").GetString()!).AbsoluteUri, ReleaseNotesCatalog.ParseMarkdown(body, version, published));
             DownloadFrom = UpdateOrigin.GitHub;
+            if (selectedSource() != UpdateSource.MirrorChyan) SelectIncremental(files, version);
     }
     public async Task DownloadAsync(CancellationToken cancellationToken)
     {
@@ -106,6 +116,17 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
     {
         activeStep = UpdateStep.Download;
         if (TryReuseReady()) return;
+        if (cloudFiles != null)
+        {
+            try { await DownloadCloud(token).ConfigureAwait(false); return; }
+            catch (CloudUnavailable failure)
+            {
+                CloudFallbackReason = failure.Message;
+                cloudFiles = null; incremental = null; Latest = null;
+                await CheckGitHub(token).ConfigureAwait(false);
+                if (Latest == null) return;
+            }
+        }
         if (DownloadFrom == UpdateOrigin.MirrorChyan) { await DownloadMirror(token).ConfigureAwait(false); return; }
         if (DateTimeOffset.UtcNow < retryAfter) { Set(UpdateState.Failed, Strings.Update_RateLimited); return; }
         if (asset == null || sums == null) await LoadGitHubAssets(token).ConfigureAwait(false);
@@ -116,10 +137,20 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
         {
             using var checksum = await GetAsync(sums!, token).ConfigureAwait(false);
             string text = await checksum.Content.ReadAsStringAsync(token).ConfigureAwait(false);
-            var entries = text.Split('\n').Select(line => Regex.Match(line.Trim(), @"^([a-fA-F0-9]{64})\s+\*?(.+)$"))
-                .Where(m => m.Success && m.Groups[2].Value == name).ToArray();
-            if (entries.Length != 1) throw new InvalidDataException();
-            string hash = entries[0].Groups[1].Value;
+            if (incremental is {} assets)
+            {
+                try { await PrepareIncremental(assets, text, token).ConfigureAwait(false); return; }
+                catch (Exception e) when (Expected(e) || e is OperationCanceledException && !token.IsCancellationRequested)
+                {
+                    token.ThrowIfCancellationRequested();
+                    LogPatchFailure(e);
+                    incremental = null;
+                    Latest = Latest with { SizeBytes = assets.InstallerSize, Incremental = false };
+                    DownloadProgress = 0;
+                    Set(UpdateState.Downloading);
+                }
+            }
+            string hash = Checksum(text, name);
             if (File.Exists(target) && await Valid(target, hash, token).ConfigureAwait(false)) { CacheReady(target, hash); return; }
             File.Delete(target);
             using var response = await GetAsync(asset!, token).ConfigureAwait(false);
@@ -160,10 +191,11 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
         if (!allowed || url.UserInfo.Length != 0) throw new InvalidDataException();
         return url;
     }
-    void CacheReady(string path, string hash)
+    void CacheReady(string path, string hash, Guid? directoryId = null)
     {
         string record = Path.Combine(directory, "ready.json"), temporary = record + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new CachedUpdate(Latest!, hash, DownloadFrom ?? UpdateOrigin.GitHub), ReleaseNotesJson.Default.CachedUpdate));
+        File.WriteAllText(temporary, JsonSerializer.Serialize(new CachedUpdate(Latest!, hash, DownloadFrom,
+            directoryId, directoryId.HasValue ? CurrentVersion : null), ReleaseNotesJson.Default.CachedUpdate));
         File.Move(temporary, record, true);
         Ready(path);
     }
@@ -174,11 +206,26 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
             string record = Path.Combine(directory, "ready.json");
             if (!File.Exists(record)) return;
             var cache = JsonSerializer.Deserialize(File.ReadAllText(record), ReleaseNotesJson.Default.CachedUpdate);
-            if (cache?.Release is not {} release || !Regex.IsMatch(release.Version, @"^\d+\.\d+\.\d+(\.\d+)?$") || SetupFiles.CompareVersions(release.Version, CurrentVersion) <= 0) return;
-            string path = Path.Combine(directory, $"Pane-Setup-{release.Version}.exe");
-            if (!File.Exists(path) || new FileInfo(path).Length != release.SizeBytes) return;
-            using var stream = File.OpenRead(path);
-            if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(cache.Hash, StringComparison.OrdinalIgnoreCase)) return;
+            if (cache?.Release is not {} release || !Regex.IsMatch(release.Version, @"^\d+\.\d+\.\d+(\.\d+)?$")) return;
+            if (SetupFiles.CompareVersions(release.Version, CurrentVersion) <= 0)
+            {
+                if (cache.DirectoryId is Guid id)
+                    SetupFiles.Delete(Path.Combine(directory, "patch-" + id.ToString("N")));
+                return;
+            }
+            string path;
+            if (release.Incremental)
+            {
+                if (selectedSource() == UpdateSource.MirrorChyan) return;
+                path = RestoreIncremental(cache);
+            }
+            else
+            {
+                path = Path.Combine(directory, $"Pane-Setup-{release.Version}.exe");
+                if (!File.Exists(path) || new FileInfo(path).Length != release.SizeBytes) return;
+                using var stream = File.OpenRead(path);
+                if (!Convert.ToHexString(SHA256.HashData(stream)).Equals(cache.Hash, StringComparison.OrdinalIgnoreCase)) return;
+            }
             Latest = release; readyPath = path; DownloadProgress = 1; State = UpdateState.Ready; DownloadFrom = cache.Origin;
         }
         catch (Exception e) when (Expected(e)) { new SelectionLog(Path.GetDirectoryName(directory)!).Write("update-cache skipped: " + e.GetType().Name); }

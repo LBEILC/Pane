@@ -11,7 +11,7 @@ internal interface ISetupIntegration
     bool StartWithWindows { get; }
     object Capture();
     void Restore(object snapshot);
-    void Apply(string version, long bytes, SetupOptions options);
+    bool Apply(string version, long bytes, SetupOptions options);
     void Remove();
 }
 internal interface ISetupProcesses
@@ -52,7 +52,12 @@ internal sealed class SetupService : ISetupService, IUninstallService
         processes.Running, paths.Data, SetupFiles.Size(paths.Data));
     public void LaunchInstalled() => processes.Launch();
     internal Task Operation { get; private set; } = Task.CompletedTask;
-    public Task InstallAsync(SetupOptions options, IProgress<SetupProgress> progress) => Operation = Task.Run(() => Install(options, progress));
+    public bool AutostartBlocked { get; private set; }
+    public Task InstallAsync(SetupOptions options, IProgress<SetupProgress> progress)
+    {
+        AutostartBlocked = false;
+        return Operation = Task.Run(() => Install(options, progress));
+    }
     void Install(SetupOptions options, IProgress<SetupProgress> progress)
     {
         uninstalling = false;
@@ -97,7 +102,7 @@ internal sealed class SetupService : ISetupService, IUninstallService
             SetupFiles.Check(paths.Uninstaller);
             uninstallerChanged = true;
             File.Copy(Path.Combine(paths.App, "Uninstall Pane.exe"), paths.Uninstaller, true);
-            integration.Apply(version, SetupFiles.Size(paths.App), options);
+            AutostartBlocked = integration.Apply(version, SetupFiles.Size(paths.App), options);
         }
         catch (Exception error)
         {
@@ -175,7 +180,9 @@ internal sealed class SetupService : ISetupService, IUninstallService
     SetupException Failure(Exception error)
     {
         var failure = error as SetupException ?? new SetupException(
-            (error.HResult & 0xffff) is 112 or 39 ? Strings.Setup_DiskFull : SetupDiagnostics.Busy(error) ? Strings.Setup_DirectoryBusy : Strings.Setup_OperationFailed, error);
+            AutostartService.AccessDenied(error) ? Strings.Setup_AccessDenied :
+            (uint)error.HResult is 0x80070020 or 0x80070021 ? Strings.Setup_DirectoryBusy :
+            (error.HResult & 0xffff) is 112 or 39 ? Strings.Setup_DiskFull : Strings.Setup_OperationFailed, error);
         // Step / Reason 经 Data 给出，SetupException.Step / Reason 读取，安装界面失败页显示（设计接，061）
         var result = uninstalling ? new SetupException(string.Format(Strings.Setup_UninstallOperationFailed, failure.Message, step, UninstallChain.LogPath), error) : failure;
         result.Data["Step"] = step;

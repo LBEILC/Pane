@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <AppSource>../../src/Pane.App</AppSource>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(AppSource)/Services/QrCode.cs" />
+    <Compile Include="$(AppSource)/Services/Updates/*.cs;$(AppSource)/Services/Setup/SetupFiles.cs;$(AppSource)/Services/Setup/PayloadPatch.cs" />
+    <Compile Include="../Pane.App.Tests/UpdateServer.cs" />
+    <None Update="qr-matrices.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="$(AppSource)/Services/Cloud/**/*.cs;$(AppSource)/Contracts/Cloud.cs;$(AppSource)/DesignData/CloudSample.cs" />
+    <Compile Include="$(AppSource)/Services/Modules/ModuleHost.cs;$(AppSource)/Contracts/Modules.cs" />
+    <ProjectReference Include="../../src/Pane.Gestures/Pane.Gestures.csproj" />
+    <Compile Include="$(AppSource)/Services/Ai/SecretStore.cs;$(AppSource)/Contracts/Ai.cs" />
+    <!-- 用产品的导出白名单验证隔离目录中的实际归档。 -->
+    <Compile Include="$(AppSource)/Services/Clipboard/*.cs;$(AppSource)/Settings/*.cs" />
+    <Compile Include="$(AppSource)/Services/Launcher/WebSearchHistory.cs;$(AppSource)/Services/SelectionService.cs;$(AppSource)/Services/SelectionLog.cs" />
+    <Compile Include="$(AppSource)/Services/PasteTransfer.cs;$(AppSource)/Services/FileSelection.cs" />
+    <Compile Include="$(AppSource)/Hosting/RuntimeMode.cs;$(AppSource)/Hosting/ShellHotkeyBindings.cs" />
+    <Compile Include="$(AppSource)/Contracts/Clipboard.cs;$(AppSource)/Contracts/DataStorage.cs;$(AppSource)/Contracts/Launcher.cs;$(AppSource)/Contracts/Selection.cs;$(AppSource)/Contracts/Rename.cs;$(AppSource)/Contracts/Update.cs;$(AppSource)/Contracts/ReleaseNotes.cs" />
+    <Content Include="$(AppSource)/bin/native/Pane.Native.dll" Link="Pane.Native.dll" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 服务端的密钥派生测试向量（与 Pane 云服务端同一份），原样复制。 -->
+    <!-- 服务端的同步加密测试向量（与 Pane 云服务端同一份），原样复制。 -->
+    <None Update="sync-vectors.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="kdf-vectors.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="../Localization.targets" />
+</Project>

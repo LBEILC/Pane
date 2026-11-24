@@ -52,9 +52,12 @@ internal static class ReleaseVerification
             var release = json.RootElement;
             Require(release.GetProperty("tag_name").GetString() == "v" + version && !release.GetProperty("draft").GetBoolean() && !release.GetProperty("prerelease").GetBoolean(), "最新正式版本不符");
             var assets = release.GetProperty("assets").EnumerateArray().ToArray();
-            Require(assets.Length == 2, "应恰有两个附件");
-            foreach (string file in new[] { name, "SHA256SUMS.txt" })
+            var expectedNames = File.ReadLines(Path.Combine(artifacts, "SHA256SUMS.txt"))
+                .Select(line => line.Split((char[]?)null, 2, StringSplitOptions.RemoveEmptyEntries)[1].TrimStart('*')).Append("SHA256SUMS.txt").ToArray();
+            Require(expectedNames.Contains(name) && assets.Length == expectedNames.Length, "附件列表与本地校验表不符");
+            foreach (string file in expectedNames)
             {
+                Require(file == Path.GetFileName(file), "附件名称无效");
                 var asset = assets.Single(a => a.GetProperty("name").GetString() == file);
                 string expected = Path.Combine(artifacts, file);
                 long size = asset.GetProperty("size").GetInt64();

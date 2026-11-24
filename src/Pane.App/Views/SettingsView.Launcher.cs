@@ -73,6 +73,19 @@ public sealed partial class SettingsView
             Row(Strings.Settings_Launcher_FileRows, Strings.Settings_Launcher_FileRowsDescription,
                 Seg([.. new[] { 3, 5, 8, 10 }.Select(n => (n.ToString(), string.Format(Strings.Settings_Launcher_ItemsCount, (object?)n)))], l.FileRows.ToString(),
                     v => SaveLauncher(x => x with { FileRows = int.Parse(v) }))));
+        // Pane 云（2026-11-24，docs/cloud.md「个人资料、头像、铭牌」）：搜索行右侧显示 Pane 标志还是账号头像；创始会员的头像外圈金属环可以关
+        if (app.Modules.IsActive(ModuleIds.Cloud))
+        {
+            var capsule = new List<FrameworkElement>
+            {
+                Row(Strings.Settings_Launcher_Capsule, Strings.Settings_Launcher_CapsuleDescription,
+                    Seg([("logo", Strings.Settings_Launcher_CapsuleLogo), ("avatar", Strings.Settings_Launcher_CapsuleAvatar)], l.CapsuleAvatar ? "avatar" : "logo",
+                        v => { SaveLauncher(x => x with { CapsuleAvatar = v == "avatar" }); Later(); })),
+            };
+            if (l.CapsuleAvatar && app.Account?.Profile?.Badges.Any(b => b.Id == "founder") == true)
+                capsule.Add(Row(Strings.Settings_Launcher_FounderRing, Strings.Settings_Launcher_FounderRingDescription, Switch(l.FounderRing, v => SaveLauncher(x => x with { FounderRing = v }))));
+            Group(null, capsule.ToArray());
+        }
 
         // 演示模式没有真实服务（FileSearchStatus 为 null），状态用假数据
         var fs = app.FileSearchStatus;

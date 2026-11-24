@@ -113,7 +113,7 @@ internal sealed partial class DataStorage
         string? configured=local?["Storage"]?["LargeFilesDirectory"]?.GetValue<string>();
         string imageRoot=configured!=null&&StorageLocation.Available(configured)?configured:Path.Combine(data,"clipboard");
         var result=options["merge"]!.GetValue<bool>()?old.ToList():new List<StoredClip>();
-        string Key(StoredClip c,bool incoming)=>c.Entry.Kind==ClipKind.Image?"i:"+ImageHash(incoming?Path.Combine(root,c.Entry.ContentPath!):c.Entry.ContentPath!):c.Entry.Kind==ClipKind.Files?"f:"+c.Fingerprint:"t:"+c.Entry.Text;
+        string Key(StoredClip c,bool incoming)=>c.Entry.Kind==ClipKind.Image?c.Entry.ContentPath==null?"remote:"+c.Entry.Id:"i:"+ImageHash(incoming?Path.Combine(root,c.Entry.ContentPath!):c.Entry.ContentPath!):c.Entry.Kind==ClipKind.Files?"f:"+c.Fingerprint:"t:"+c.Entry.Text;
         var keys=new Dictionary<string,int>(StringComparer.Ordinal);
         for(int i=0;i<result.Count;i++)keys.TryAdd(Key(result[i],false),i);
         foreach(var c in incomingIndex.Entries){
@@ -156,7 +156,7 @@ internal sealed partial class DataStorage
         var richKeep=result.Select(c=>c.FormatId).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach(string path in writes.Keys.Where(p=>p.EndsWith(".rich")&&!richKeep.Contains(Path.GetFileNameWithoutExtension(p))).ToArray())writes.Remove(path);
         foreach(string removed in old.Select(c=>c.FormatId).OfType<string>().Except(richKeep))writes[RichFormats.PathFor(Path.GetDirectoryName(index)!,removed)]=null;
-        string stagedIndex=Path.Combine(output,"history.json");disk.SaveIndex(stagedIndex,new(2,tagMap.Values.ToArray(),result.OrderByDescending(c=>c.Entry.CopiedAt).ToArray()),_=>{});writes[index]=stagedIndex;return writes;
+        string stagedIndex=Path.Combine(output,"history.json");disk.SaveIndex(stagedIndex,new(2,tagMap.Values.ToArray(),result.OrderByDescending(c=>c.Entry.CopiedAt).ToArray(),merge?localIndex.Ledger:null),_=>{});writes[index]=stagedIndex;return writes;
     }
     static string ImageHash(string path){using var file=File.OpenRead(path);return Convert.ToHexString(SHA256.HashData(file));}
 }

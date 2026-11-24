@@ -5,7 +5,7 @@ namespace Pane.Settings;
 // 导出时剔除，导入时从当前文件取回；新增本机专属设置只维护这里。
 internal static class LocalSettingsFields
 {
-    internal static readonly string[][] Paths=[["Storage"],["General","StartWithWindows"],["Launcher","Position"],["Clipboard","PanelHeight"]];
+    internal static readonly string[][] Paths=[["SyncOptions"],["Storage"],["General","StartWithWindows"],["Launcher","Position"],["Clipboard","PanelHeight"]];
     internal static void Apply(JsonObject target,JsonObject? local)
     {
         foreach(var path in Paths){

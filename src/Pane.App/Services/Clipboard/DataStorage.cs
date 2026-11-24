@@ -45,7 +45,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
     {
         string data=settings.DirectoryPath;
         IEnumerable<string> roots=category switch{
-            StorageCategory.Settings=>new[]{"settings.json","gestures.json"}.Select(p=>Path.Combine(data,p)),
+            StorageCategory.Settings=>new[]{"settings.json","gestures.json",Path.Combine("cloud","sync.json")}.Select(p=>Path.Combine(data,p)),
             StorageCategory.Usage=>new[]{"launcher-usage.json","terminal-history.json","web-search-history.json"}.Select(p=>Path.Combine(data,p)),
             StorageCategory.Clipboard=>new[]{Path.Combine(data,"clipboard")},
             StorageCategory.Cache=>CacheFiles.Concat(["launcher-icons","masked-icons","file-icons","engine-icons","updates"]).Select(p=>Path.Combine(data,p)),

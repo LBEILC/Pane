@@ -4,7 +4,8 @@ using Pane.Settings;
 
 namespace Pane.Services.Updates;
 
-internal sealed record CachedUpdate(UpdateRelease Release, string Hash, UpdateOrigin Origin = UpdateOrigin.GitHub);
+internal sealed record CachedUpdate(UpdateRelease Release, string Hash, UpdateOrigin? Origin = UpdateOrigin.GitHub,
+    Guid? DirectoryId = null, string? BaseVersion = null);
 internal static class StartupUpdate
 {
     // 先写失败闩锁再交出进程：崩溃、安装失败或新版没启动都不会反复自动装。

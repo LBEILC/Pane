@@ -209,6 +209,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
     public void OnShown()
     {
+        UpdateCapsule();
         if (activate) Input.Focus(FocusState.Programmatic);
         // 设计预览：PANE_DESIGN_LAUNCHER_RUN 指定一呼出就执行的条目 Id（如 act:ai:translate）
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_LAUNCHER_RUN") is { Length: > 0 } id
@@ -293,6 +294,39 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         fade.Duration = duration;
         v.StartAnimation("Scale", scale);
         v.StartAnimation("Opacity", fade);
+    }
+
+    // 右边胶囊换成账号头像（Pane 云，2026-11-24）：设置里选了「头像」且已登录时，22 × 22 圆形头像（没上传时昵称首字 + 主题色底），
+    // 创始会员外隔 1.5 一道 1.5 宽的金属环（可在设置里关）；悬停提示昵称。没登录、没选时照旧是「Pane」字样
+    object? capsuleDefault;
+    void UpdateCapsule()
+    {
+        var app = (App)Application.Current;
+        capsuleDefault ??= SettingsBadge.Content;
+        var profile = app.Store.Current.Launcher.CapsuleAvatar && app.Account is { State: AccountState.SignedIn } account ? account.Profile : null;
+        if (profile is null)
+        {
+            SettingsBadge.Content = capsuleDefault;
+            SettingsBadge.Padding = new Thickness(9, 0, 9, 0);
+            ToolTipService.SetToolTip(SettingsBadge, Strings.Launcher_OpenSettingsHint);
+            return;
+        }
+        const double size = 22;
+        var face = new Border { Width = size, Height = size, CornerRadius = new CornerRadius(size / 2), Background = (Brush)Application.Current.Resources["PaneAccentBrush"] };
+        if (profile.AvatarPath is { } path && System.IO.File.Exists(path))
+            face.Child = new Image { Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(path)) { DecodePixelWidth = 44 }, Stretch = Stretch.UniformToFill };
+        else
+            face.Child = new TextBlock { Text = profile.Nickname.Length > 0 ? char.IsSurrogate(profile.Nickname[0]) ? profile.Nickname[..2] : profile.Nickname[..1] : "?",
+                Foreground = new SolidColorBrush(Microsoft.UI.Colors.White), FontSize = 11, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var host = new Grid { Width = size, Height = size };
+        host.Children.Add(face);
+        if (app.Store.Current.Launcher.FounderRing && profile.Badges.Any(b => b.Id == "founder"))
+            host.Children.Add(new Microsoft.UI.Xaml.Shapes.Ellipse { Width = size + 6, Height = size + 6, Margin = new Thickness(-3), StrokeThickness = 1.5,
+                Stroke = (Brush)Application.Current.Resources["PaneFounderRingBrush"], IsHitTestVisible = false });
+        SettingsBadge.Content = host;
+        SettingsBadge.Padding = new Thickness(0);
+        ToolTipService.SetToolTip(SettingsBadge, profile.Nickname);
     }
 
     // 右边「Pane」胶囊：收起启动器、打开设置（停在上次看的那一页）

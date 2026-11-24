@@ -188,6 +188,6 @@ internal static class WinVTests
     sealed class FakeIntegration : ISetupIntegration
     {
         public bool Removed; public string? InstalledVersion => null; public string? InstallLocation => null; public bool StartWithWindows => false;
-        public void SetPaths(SetupPaths paths) { } public object Capture() => new(); public void Restore(object snapshot) { } public void Apply(string version, long bytes, SetupOptions options) { } public void Remove() => Removed = true;
+        public void SetPaths(SetupPaths paths) { } public object Capture() => new(); public void Restore(object snapshot) { } public bool Apply(string version, long bytes, SetupOptions options) => false; public void Remove() => Removed = true;
     }
 }

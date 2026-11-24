@@ -30,7 +30,23 @@ public sealed record ClipEntry(
     public IReadOnlyList<string> Tags { get; init; } = [];
     /// <summary>带格式（106）：复制时同时存下了 HTML 或 RTF。Enter 粘贴时一并写回，Shift+Enter 只写文字。</summary>
     public bool Rich { get; init; }
+    /// <summary>
+    /// 别的设备同步来的条目（Pane 云，Contracts/Cloud.cs）：那台设备的名字，说明行写「微信 · 💻 书房台式机 · 3 分钟前」。
+    /// 本机复制的为 null。设备改名后跟着变（由同步服务按设备 id 查当前名字）。
+    /// </summary>
+    public string? SourceDevice { get; init; }
+    /// <summary>别的设备来的图片：原图在不在本机（docs/cloud.md「剪贴板同步」→ 图片）。本机复制的永远是 Local。</summary>
+    public ClipOriginal Original { get; init; } = ClipOriginal.Local;
 }
+
+/// <summary>
+/// Local：原图在本机（ContentPath 可用）。Remote：只有缩略图，粘贴、打开、另存时才下载。
+/// Downloading：正在下载（界面写「正在下载原图 1.2 MB」，大小在 IClipboardCloud.OriginalSize）。
+/// Expired：云端原图已过期（不保留的 7 天后），只剩缩略图，不能粘贴原图。
+/// NotSynced：原图没有同步到云端（超过 10 MB，或复制时云端空间已满），只剩缩略图；只能在复制它的那台电脑上粘贴原图。
+/// QuotaExceeded：本月流量用完，下月 1 日后才能下载。
+/// </summary>
+public enum ClipOriginal { Local, Remote, Downloading, Expired, QuotaExceeded, NotSynced }   // 按数字存进本机索引：只往后加，不插队（2026-11-24 NotSynced 放最后）
 
 /// <summary>标签定义（106）。Color：1～6 对应令牌 PaneTag1～6，null 不带色点。名字不分大小写唯一，顺序就是筛选条上的顺序（新建的排最后）。</summary>
 public sealed record ClipTag(string Name, int? Color);

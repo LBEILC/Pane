@@ -2,6 +2,8 @@ namespace Pane.Settings;
 [Flags] public enum KeyModifiers { None=0, Ctrl=1, Alt=2, Shift=4, Win=8 }
 public enum ThemeMode { System, Light, Dark }
 public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); }
+    Pane.Contracts.SyncOptions syncOptions = new();
+    public Pane.Contracts.SyncOptions SyncOptions { get => syncOptions; init => syncOptions = value ?? new(); }
     WordsSettings words=new(); public WordsSettings Words { get=>words; init=>words=value??new(); }
     StorageSettings storage=new(); public StorageSettings Storage { get=>storage; init=>storage=value??new(); }
     // 能力模块的启用状态（设计加，2026-11-04，055）：键是 Pane.Contracts.ModuleIds，没写的用 ModuleInfo.DefaultEnabled。
@@ -79,7 +81,9 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     // WebSuggestions = 用搜索关键字搜网页时（如「bd 天气」）向那个站点取搜索建议，平时打字不联网
     bool RememberCommands=true, bool WebSuggestions=true,
     // 设计加（2026-11-05，issue 24、062）：宽度三档（510 / 592 / 756，一行 6 / 7 / 9 个应用）、应用最多几行（1～4）、文件最多几个（3 / 5 / 8 / 10）
-    LauncherWidth Width=LauncherWidth.Standard, int AppRows=2, int FileRows=3)
+    LauncherWidth Width=LauncherWidth.Standard, int AppRows=2, int FileRows=3,
+    // 设计加（2026-11-24，Pane 云）：搜索行右侧显示 Pane 标志还是账号头像（没登录时照旧显示标志）；创始会员头像外圈的金属环
+    bool CapsuleAvatar=false, bool FounderRing=true)
 {
     // 设计加（2026-11-09，issue 38）：呼出时先只出搜索栏，再向下展开首页内容；默认关。「未输入时显示」为「都不显示」时不起作用
     public bool ExpandOnOpen { get; init; }

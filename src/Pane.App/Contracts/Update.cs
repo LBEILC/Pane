@@ -18,7 +18,11 @@ public enum UpdateStep { Check, Download, Install }
 /// <param name="SizeBytes">安装包大小；不知道时为 0（Mirror酱 不带 CDK 时不返回，界面不显示大小）。</param>
 /// <param name="PageUrl">这个版本的 Release 网页（「查看详情」打开它）；从 Mirror酱 查到时拼成 GitHub 的 releases/tag/v&lt;版本&gt;。</param>
 /// <param name="Details">从 Release 正文解析出的结构化更新说明（## 新增 / ## 改进 / ## 修复，062）；正文不是这个格式时为 null，界面退回显示 Notes。Mirror酱 的 release_note 就是同一份正文。</param>
-public sealed record UpdateRelease(string Version, string Notes, DateTimeOffset? PublishedAt, long SizeBytes, string PageUrl, ReleaseNotes? Details = null);
+public sealed record UpdateRelease(string Version, string Notes, DateTimeOffset? PublishedAt, long SizeBytes, string PageUrl, ReleaseNotes? Details = null)
+{
+    /// <summary>这次下载的是增量补丁（111）：SizeBytes 是补丁大小。界面在大小旁边写「增量」。</summary>
+    public bool Incremental { get; init; }
+}
 
 /// <summary>
 /// 更新源（2026-11-12 用户定，照 MAA / StrongholdAssistant 接入 Mirror酱，见 docs/design.md「Mirror酱 更新源」）。
@@ -26,7 +30,8 @@ public sealed record UpdateRelease(string Version, string Notes, DateTimeOffset?
 /// MirrorChyan：检查走 Mirror酱；CDK 有效时也从 Mirror酱 下载，没填或出错时下载退回 GitHub（规则见 MirrorCdkStatus）。
 /// 存在 UpdateSettings.Source；界面改了设置之后调 CheckAsync。
 /// </summary>
-public enum UpdateSource { GitHub, MirrorChyan }
+// 按数字存进 settings.json：只往后加
+public enum UpdateSource { GitHub, MirrorChyan, PaneCloud }
 
 /// <summary>
 /// Mirror酱 CDK 的状态（更新源是 MirrorChyan 时有意义）。
@@ -64,6 +69,13 @@ public interface IUpdateService
     /// 界面据此在更新源那一行说一句「这次从 GitHub 检查」。还没查过为 null。
     /// </summary>
     UpdateOrigin? CheckedFrom => null;
+    /// <summary>
+    /// 选了「Pane 云」但这次没有从 Pane 云下（本月剩余流量不到 20%、会员到期、没登录、服务器连不上），改从 GitHub 下载时为 true。
+    /// 关于页在更新源旁边写一句说明（文案由界面按原因取）。
+    /// </summary>
+    bool CloudFallback => false;
+    /// <summary>CloudFallback 的原因：low_quota / subscription_required / signed_out / network。</summary>
+    string? CloudFallbackReason => null;
     /// <summary>Latest 会从 / 正在从 / 已经从哪里下载；没有 Latest 时为 null。</summary>
     UpdateOrigin? DownloadFrom => Latest == null ? null : UpdateOrigin.GitHub;
     /// <summary>

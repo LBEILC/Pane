@@ -38,6 +38,9 @@ public sealed partial class SettingsView
             [(ModuleIds.Launcher, Strings.Module_PowerTimer_WithLauncher)]),
         ModuleIds.Words => (Strings.Module_Words_Name, "words", Strings.Module_Words_Description,
             [(ModuleIds.Clipboard, Strings.Module_Words_WithClipboard), (ModuleIds.Launcher, Strings.Module_Words_WithLauncher)]),
+        // Pane 云（2026-11-24 开卖放出）：账号、云同步、会员下载算一项，规则见 docs/cloud.md「总体」
+        ModuleIds.Cloud => (Strings.Module_Cloud_Name, "cloud", Strings.Module_Cloud_Description,
+            [(ModuleIds.Clipboard, Strings.Module_Cloud_WithClipboard), (ModuleIds.Launcher, Strings.Module_Cloud_WithLauncher)]),
         _ => (id, "app", "", []),   // 以后加的能力还没配文案时：至少能开关
     };
 
@@ -57,7 +60,7 @@ public sealed partial class SettingsView
         var grid = new Grid { ColumnSpacing = 12, RowSpacing = 12, Margin = new Thickness(0, 8, 0, 0) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var list = catalog.Modules;
+        var list = catalog.Modules.Where(m => !m.Hidden).ToList();
         for (int i = 0; i < list.Count; i++)
         {
             if (i % 2 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -115,9 +118,10 @@ public sealed partial class SettingsView
         }
         if (moduleConfirm == info.Id)
         {
-            body.Children.Add(CapLine("warn", Strings.Module_ClipboardRestoresWinV, true));
+            bool cloud = info.Id == ModuleIds.Cloud;
+            body.Children.Add(CapLine("warn", cloud ? Strings.Module_CloudDisableNote : Strings.Module_ClipboardRestoresWinV, true));
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 2, 0, 0) };
-            buttons.Children.Add(Button(Strings.Module_DisableAndRestore, null, () => { moduleConfirm = null; _ = ApplyModule(app.Modules.Preview(info.Id, false)); }));
+            buttons.Children.Add(Button(cloud ? Strings.Common_Disable : Strings.Module_DisableAndRestore, null, () => { moduleConfirm = null; _ = ApplyModule(app.Modules.Preview(info.Id, false)); }));
             buttons.Children.Add(Button(Strings.Common_Cancel, null, () => { moduleConfirm = null; Render(); }));
             body.Children.Add(buttons);
         }
@@ -148,6 +152,8 @@ public sealed partial class SettingsView
         var change = app.Modules.Preview(id, enable);
         // 停用会先恢复系统设置（剪贴板替换着 Win+V）：卡片里先说明，用户点「停用并恢复」才执行；开关弹回去
         if (change.RestoresSystemSetting) { moduleConfirm = id; Later(); return; }
+        // 登录状态下停用 Pane 云：说明停止同步、登录和数据密钥保留（docs/cloud.md「总体」）
+        if (!enable && id == ModuleIds.Cloud && app.Account?.State == AccountState.SignedIn) { moduleConfirm = id; Later(); return; }
         moduleConfirm = null;
         _ = ApplyModule(change);
     }

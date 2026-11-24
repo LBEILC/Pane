@@ -66,11 +66,29 @@ public sealed partial class App
         selectionReader = new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),
             () => Store.Current.SuperPanel.ClipboardFallback, files: FileSelection as Pane.Services.FileSelection);
         // 新能力只需新增一个类，在此登记；显示顺序由这个列表决定。
+        cloudModule = new(() => demo ? new DesignData.CloudSample() : new Services.Cloud.AccountService(Store.DirectoryPath, Settings.SettingsStore.CurrentVersion()), Store);
         var host = new ModuleHost([new LauncherModule(this), new ClipboardModule(this), new GesturesModule(this),
-            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this), new WordsModule(this)], Store,
+            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this), new WordsModule(this), cloudModule], Store,
             () => WinVService?.State is WinVState.On or WinVState.Pending, OnUi);
         Modules = host;
+        Store.DispatchSyncNotification = notify => queue.TryEnqueue(() => { if (!closing) notify(); });
+        Store.SyncedModulesChanged += async () =>
+        {
+            foreach (var info in host.Modules.Where(m => m.Id != ModuleIds.Cloud))
+            {
+                bool enabled = Store.Current.Modules?.GetValueOrDefault(info.Id,info.DefaultEnabled) ?? info.DefaultEnabled;
+                if (!closing && enabled != host.IsActive(info.Id))
+                    try { await host.ApplyAsync(host.Preview(info.Id,enabled),cancellation.Token); }
+                    catch (OperationCanceledException) when (closing) { return; }
+            }
+        };
         host.Changed += (_, _) => { shell?.Apply(ModuleShellSettings()); WakeFrames(); };
+        // 设计预览（只在演示模式）：设了 PANE_DESIGN_ACCOUNT 时打开隐藏的「Pane 云」能力，截图核对设置「账号」分区
+        if (demo && Environment.GetEnvironmentVariable("PANE_DESIGN_ACCOUNT") is { Length: > 0 } && Store.Current.Modules?.ContainsKey(ModuleIds.Cloud) != true)
+            Store.Save(Store.Current with { Modules = new(Store.Current.Modules ?? []) { [ModuleIds.Cloud] = true } });
+        // 设计预览：PANE_DESIGN_CAPSULE=1 时启动器右侧显示账号头像（核对头像胶囊和创始会员金属环）
+        if (demo && Environment.GetEnvironmentVariable("PANE_DESIGN_CAPSULE") == "1" && !Store.Current.Launcher.CapsuleAvatar)
+            Store.Save(Store.Current with { Launcher = Store.Current.Launcher with { CapsuleAvatar = true } });
         await host.InitializeAsync(cancellation.Token);
     }
     Pane.Settings.PaneSettings ModuleShellSettings()
@@ -149,6 +167,9 @@ public sealed partial class App
         public abstract Task StartAsync(CancellationToken token);
         public abstract Task StopAsync(CancellationToken token);
     }
+    Services.Cloud.CloudModule? cloudModule;
+    public IAccountService? Account => cloudModule?.Account;
+    public ISyncService? Sync => cloudModule?.Sync;
     sealed class LauncherModule(App app) : Capability(app, ModuleIds.Launcher, ModuleCategory.Search, "search", ModuleIds.Ai, ModuleIds.Clipboard, ModuleIds.Rename)
     {
         public override Task StartAsync(CancellationToken token)

@@ -148,6 +148,7 @@ internal sealed class WindowsClipboardImages:IClipboardImages
 }
 internal sealed class WindowsClipboardWriter(Action<ClipEntry,ClipboardWriteMode,bool>? write=null,Func<IPastePlatform>? paste=null):IClipboardWriter
 {
+    public Task WriteReceived(ClipEntry entry,RichFormats? formats,CancellationToken ct)=>Sta.Run(()=>{ct.ThrowIfCancellationRequested();WriteFormats(entry,ClipboardWriteMode.HistoryPaste,false,formats);return true;});
     public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token)=>PasteAsync(entry,plainText,target,token,null);
     public Task PasteAsync(ClipEntry entry,bool plainText,nint target,CancellationToken token,RichFormats? formats)
     {

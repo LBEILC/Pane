@@ -36,7 +36,12 @@ public sealed class UpdateSample : IUpdateService
         if (State == UpdateState.Downloading) DownloadProgress = 0.42;
         if (State == UpdateState.Failed) Error = "连不上 GitHub，稍后再试";
         if (State != UpdateState.Idle) LastChecked = DateTimeOffset.Now.AddMinutes(-3);
-        if (Environment.GetEnvironmentVariable("PANE_DESIGN_CDK") is { Length: > 0 } preset)
+        if (Environment.GetEnvironmentVariable("PANE_DESIGN_UPDATE_SOURCE") == "cloud")
+        {
+            var store = ((App)Microsoft.UI.Xaml.Application.Current).Store;
+            store.Update(s => s with { Update = s.Update with { Source = UpdateSource.PaneCloud } });
+        }
+        else if (Environment.GetEnvironmentVariable("PANE_DESIGN_CDK") is { Length: > 0 } preset)
         {
             // 截图脚本每次用新的演示数据目录：预设 CDK 时顺带把更新源切到 Mirror酱，关于页才会展开 CDK 一行
             var store = ((App)Microsoft.UI.Xaml.Application.Current).Store;
@@ -50,8 +55,12 @@ public sealed class UpdateSample : IUpdateService
 
     static bool Mirror => ((App)Microsoft.UI.Xaml.Application.Current).Store.Current.Update.Source == UpdateSource.MirrorChyan;
     public UpdateOrigin? CheckedFrom { get; private set; }
-    public UpdateOrigin? DownloadFrom => Latest == null ? null
+    public UpdateOrigin? DownloadFrom => Latest == null || (Cloud && !CloudFallback) ? null
         : Mirror && CdkStatus == MirrorCdkStatus.Valid ? UpdateOrigin.MirrorChyan : UpdateOrigin.GitHub;
+    static bool Cloud => ((App)Microsoft.UI.Xaml.Application.Current).Store.Current.Update.Source == UpdateSource.PaneCloud;
+    public bool CloudFallback => CloudFallbackReason != null;
+    public string? CloudFallbackReason => Cloud
+        ? Environment.GetEnvironmentVariable("PANE_DESIGN_CLOUD_FALLBACK") : null;
     public string MirrorCdk { get; private set; } = "";
     public MirrorCdkStatus CdkStatus { get; private set; }
     public DateTimeOffset? CdkExpires { get; private set; }
@@ -96,7 +105,7 @@ public sealed class UpdateSample : IUpdateService
         Set(UpdateState.Checking);
         await Task.Delay(900, cancellationToken);
         Judge(mirror);
-        CheckedFrom = mirror && !MirrorCdk.Contains("offline", StringComparison.OrdinalIgnoreCase) ? UpdateOrigin.MirrorChyan : UpdateOrigin.GitHub;
+        CheckedFrom = Cloud && !CloudFallback ? null : mirror && !MirrorCdk.Contains("offline", StringComparison.OrdinalIgnoreCase) ? UpdateOrigin.MirrorChyan : UpdateOrigin.GitHub;
         Latest = Release;
         LastChecked = DateTimeOffset.Now;
         Set(UpdateState.Available);

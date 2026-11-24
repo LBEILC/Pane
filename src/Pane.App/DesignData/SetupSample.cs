@@ -1,6 +1,6 @@
 // 安装 / 卸载界面的假服务（设计负责人，截图和看效果用）。不碰任何文件、注册表和快捷方式。
 // 由 `Pane.App.exe --setup-preview <状态>` 使用；状态：fresh 新装、update 升级（正在运行）、working 停在一半、
-// done 很快装完、failed 装到一半失败；卸载：u-ask、u-working、u-done、u-failed。
+// done 很快装完、done-blocked 装完但开机启动被拦截、failed 装到一半失败；卸载：u-ask、u-working、u-done、u-failed。
 // 环境变量 PANE_DESIGN_SETUP_RUN=1 时界面一出来就自动点主按钮（截安装中 / 装好了 / 失败用）。
 using Pane.Contracts;
 
@@ -33,7 +33,7 @@ public sealed class SetupSample(string state) : ISetupService, IUninstallService
     async Task Steps(IProgress<SetupProgress> progress, string[] steps, string? error)
     {
         bool hold = state is "working" or "u-working";
-        int fast = state is "done" or "u-done" ? 120 : 600;
+        int fast = state is "done" or "done-blocked" or "u-done" ? 120 : 600;
         for (int i = 0; i < steps.Length; i++)
         {
             progress.Report(new((i + 0.5) / steps.Length, steps[i]));
@@ -43,6 +43,8 @@ public sealed class SetupSample(string state) : ISetupService, IUninstallService
         }
         progress.Report(new(1, "完成"));
     }
+
+    public bool AutostartBlocked => state == "done-blocked";
 
     public void LaunchInstalled() { }
 }

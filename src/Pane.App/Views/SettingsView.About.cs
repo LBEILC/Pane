@@ -146,12 +146,31 @@ public sealed partial class SettingsView
     IEnumerable<FrameworkElement> SourceRows(IUpdateService u)
     {
         var source = app.Store.Current.Update.Source;
-        bool mirror = source == UpdateSource.MirrorChyan;
-        string desc = !mirror ? Strings.Update_SourceGitHubDescription
+        // Pane 云（2026-11-24，docs/cloud.md「会员下载加速」）：能力启用时才多这一项；停用了还选着它的按 GitHub 显示（服务也退回 GitHub）
+        bool cloudOn = app.Modules.IsActive(ModuleIds.Cloud);
+        if (source == UpdateSource.PaneCloud && !cloudOn) source = UpdateSource.GitHub;
+        bool mirror = source == UpdateSource.MirrorChyan, cloud = source == UpdateSource.PaneCloud;
+        var member = app.Account?.Profile?.Subscription.Status is SubscriptionStatus.Active or SubscriptionStatus.Trial;
+        string desc = cloud
+            ? !member ? Strings.Update_SourceCloudLocked
+              : u.CloudFallback ? u.CloudFallbackReason switch
+                {
+                    "low_quota" => Strings.Update_CloudFallbackLowQuota,
+                    "subscription_required" => Strings.Update_CloudFallbackExpired,
+                    "signed_out" => Strings.Update_CloudFallbackSignedOut,
+                    _ => Strings.Update_CloudFallbackNetwork,
+                }
+              : Strings.Update_SourceCloudDescription
+            : !mirror ? Strings.Update_SourceGitHubDescription
             : u.CheckedFrom == UpdateOrigin.GitHub && u.State != UpdateState.Checking ? Strings.Update_SourceFellBack : Strings.Update_SourceMirrorDescription;
-        yield return Row(Strings.Update_Source, desc,
-            Seg([(nameof(UpdateSource.GitHub), "GitHub"), (nameof(UpdateSource.MirrorChyan), Strings.Update_SourceMirror)], source.ToString(),
-                v => SaveSource(u, Enum.Parse<UpdateSource>(v))));
+        (string, string)[] options = cloudOn
+            ? [(nameof(UpdateSource.GitHub), "GitHub"), (nameof(UpdateSource.MirrorChyan), Strings.Update_SourceMirror), (nameof(UpdateSource.PaneCloud), Strings.Update_SourceCloud)]
+            : [(nameof(UpdateSource.GitHub), "GitHub"), (nameof(UpdateSource.MirrorChyan), Strings.Update_SourceMirror)];
+        var seg = Seg(options, source.ToString(), v => SaveSource(u, Enum.Parse<UpdateSource>(v)));
+        // 选了 Pane 云但不是会员（或到期、没登录）：给去「账号」的入口
+        yield return cloud && (!member || u.CloudFallbackReason is "subscription_required" or "signed_out")
+            ? Row(Strings.Update_Source, desc, Button(member ? Strings.Settings_Account_Renew : Strings.Settings_Account, null, () => ShowSection("account")), seg)
+            : Row(Strings.Update_Source, desc, seg);
         if (mirror) yield return Reveal("mirror", MirrorRows(u));
     }
 
@@ -237,13 +256,15 @@ public sealed partial class SettingsView
             : DateTimeOffset.Now - v < TimeSpan.FromDays(1) ? string.Format(Strings.Update_CheckedHoursAgo, (object?)((int)(DateTimeOffset.Now - v).TotalHours)) : string.Format(Strings.Update_CheckedOn, (object?)(v.LocalDateTime));
         string Size(long b) => $"{b / 1024.0 / 1024:0.#} MB";
         // 选了 Mirror酱 才说从哪边下载（只用 GitHub 时不用说）
-        string? Origin() => app.Store.Current.Update.Source != UpdateSource.MirrorChyan || u.DownloadFrom is not { } from ? null
+        string? Origin() => app.Store.Current.Update.Source == UpdateSource.PaneCloud && app.Modules.IsActive(ModuleIds.Cloud)
+            ? u.CloudFallback ? Strings.Update_FromGitHub : Strings.Update_FromCloud
+            : app.Store.Current.Update.Source != UpdateSource.MirrorChyan || u.DownloadFrom is not { } from ? null
             : from == UpdateOrigin.MirrorChyan ? Strings.Update_FromMirror : Strings.Update_FromGitHub;
         // 「34.4 MB · 11 月 12 日发布 · 从 Mirror酱 下载」：Mirror酱 查到的没有日期、不带 CDK 时也没有大小，缺哪项不写哪项
         string? ReleaseDetails(UpdateRelease r)
         {
             var parts = new List<string>();
-            if (r.SizeBytes > 0) parts.Add(Size(r.SizeBytes));
+            if (r.SizeBytes > 0) parts.Add(r.Incremental ? string.Format(Strings.Update_IncrementalSize, Size(r.SizeBytes)) : Size(r.SizeBytes));   // 111：补丁写「5.2 MB（增量）」
             if (r.PublishedAt is { } published) parts.Add(string.Format(Strings.Update_ReleasedOn, (object?)(published.LocalDateTime)));
             if (Origin() is { } origin) parts.Add(origin);
             return parts.Count == 0 ? null : string.Join(" · ", parts);

@@ -47,6 +47,13 @@ public interface ISetupService
     /// 只在升级已装的 Pane 时为 true。默认实现只为了在工程实现前能编译。
     /// </summary>
     bool AutoUpdate => false;
+
+    /// <summary>
+    /// 最近一次 InstallAsync 成功完成，但用户要的开机启动没写进去（写启动项被拒绝访问，多半是安全软件拦截，108）。
+    /// 开机启动是可选项，写不进去不让整次安装失败：安装照常完成、自启记为关，界面在完成页提示一句。
+    /// 默认实现只为了在工程实现前能编译。
+    /// </summary>
+    bool AutostartBlocked => false;
 }
 
 /// <param name="DataPath">用户数据目录（设置、剪贴板历史、手势……），卸载时可选一起删。</param>

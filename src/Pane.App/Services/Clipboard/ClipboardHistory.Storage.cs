@@ -6,7 +6,7 @@ internal sealed partial class ClipboardHistory
 {
     string imageDirectory="";
     internal object StorageGate=>sync;
-    internal ClipboardIndex StorageIndex()=>new(2,[..tags],[..entries]);
+    internal ClipboardIndex StorageIndex()=>new(2,[..tags],[..entries],ledger.Copy());
     internal StoredClip[] StorageSnapshot()=>entries.ToArray(); // 调用方持有 StorageGate。
     internal void StorageMoved(StoredClip[] moved,string target)
     {

@@ -1,0 +1,44 @@
+[
+  {
+    "data_key": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "c": "settings",
+    "natural_key": "Launcher.Hotkey",
+    "id": "TH6eBbTL0NpjVla_6YeisA",
+    "plaintext_json": "{\"v\":1,\"k\":\"Launcher.Hotkey\",\"val\":\"Alt+Space\",\"at\":123}",
+    "record_nonce": "CwsLCwsLCwsLCwsL",
+    "deflate": "ADgAx_97InYiOjEsImsiOiJMYXVuY2hlci5Ib3RrZXkiLCJ2YWwiOiJBbHQrU3BhY2UiLCJhdCI6MTIzfQMA",
+    "data": "AQsLCwsLCwsLCwsLC70a067Wc8Fu435MVUMHlXytuMKrxf4j2pFTQ5b_CajIjsSWCbwd1_j2SDGlXb0e5BcyEzAGtKejV-tCcz0--Osre8BKAP-PZnFakJGhx68",
+    "blob_id": "FRUVFRUVFRUVFRUVFRUVFQ",
+    "blob_nonce": "Hx8fHx8fHx8fHx8f",
+    "blob_plaintext": "AAGA_w",
+    "blob_ciphertext": "AR8fHx8fHx8fHx8fH27fyDoFsWha9Jjc6Vwvu0L6ERC-"
+  },
+  {
+    "data_key": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI",
+    "c": "cliptags",
+    "natural_key": "标签-1",
+    "id": "MJfsmGyCIrYZVn9gu2O7uw",
+    "plaintext_json": "{\"v\":1,\"name\":\"收集\",\"at\":456}",
+    "record_nonce": "DAwMDAwMDAwMDAwM",
+    "deflate": "ACAA3_97InYiOjEsIm5hbWUiOiLmlLbpm4YiLCJhdCI6NDU2fQMA",
+    "data": "AQwMDAwMDAwMDAwMDPQulSv-ZB1ca-VLaRkYhxNHLrBTrOdptFnLSDmVaJw7bQMp4JNl5Kron8JKJ8gu1blLfFhgtrQ",
+    "blob_id": "FhYWFhYWFhYWFhYWFhYWFg",
+    "blob_nonce": "ICAgICAgICAgICAg",
+    "blob_plaintext": "AAKA_w",
+    "blob_ciphertext": "ASAgICAgICAgICAgIKXazzd18wTg9r6vJxVvGLXXYpt_"
+  },
+  {
+    "data_key": "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM",
+    "c": "control",
+    "natural_key": "clip-clear",
+    "id": "KYq0L_rgQfnktcqf8gHnbg",
+    "plaintext_json": "{\"v\":1,\"before\":100,\"at\":101}",
+    "record_nonce": "DQ0NDQ0NDQ0NDQ0N",
+    "deflate": "AB0A4v97InYiOjEsImJlZm9yZSI6MTAwLCJhdCI6MTAxfQMA",
+    "data": "AQ0NDQ0NDQ0NDQ0NDVnje-2TNi3M1U2Xt9rQqSyt3fa-lYLkd40fVvWU8GEqMUL7SpvM8-8_izcjlOgSIqWJzKM",
+    "blob_id": "FxcXFxcXFxcXFxcXFxcXFw",
+    "blob_nonce": "ISEhISEhISEhISEh",
+    "blob_plaintext": "AAOA_w",
+    "blob_ciphertext": "ASEhISEhISEhISEhIRqkuTgj2_tg81DqGMCcgrg5D21r"
+  }
+]

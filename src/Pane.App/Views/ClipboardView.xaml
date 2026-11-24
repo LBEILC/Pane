@@ -44,7 +44,13 @@
                     <Border Width="{x:Bind ThumbWidth}" Height="{x:Bind ThumbHeight}" HorizontalAlignment="{x:Bind ThumbAlign}" CornerRadius="8"
                             Background="{x:Bind Thumb}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
                             Visibility="{x:Bind ThumbVisibility}">
-                        <Image Source="{x:Bind ThumbPicture}" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Grid>
+                            <Image Source="{x:Bind ThumbPicture}" Stretch="UniformToFill" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="{x:Bind ThumbDim}"/>
+                            <!-- Pane 云：原图不在本机时的状态（正在下载 / 已过期 / 未同步 / 流量用完），缩略图底部一条半透明深色 -->
+                            <Border Visibility="{x:Bind OriginalVisibility}" VerticalAlignment="Bottom" Margin="6" Padding="8,3" CornerRadius="8" Background="#8C000000">
+                                <TextBlock Text="{x:Bind OriginalNote}" Foreground="White" FontSize="{StaticResource PaneTextXs}" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                        </Grid>
                     </Border>
                     <!-- 文件：每行一个文件名 -->
                     <ItemsControl ItemsSource="{x:Bind FileLines}" Visibility="{x:Bind FilesVisibility}" IsTabStop="False">

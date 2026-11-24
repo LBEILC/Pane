@@ -18,9 +18,10 @@ internal sealed partial class ClipboardHistory
             foreach(var name in names.Select(n=>n.Trim()).Where(n=>n.Length>0).Distinct(Names)){
                 var tag=tags.Find(t=>Names.Equals(t.Name,name));
                 if(tag==null){tag=new(name,null);tags.Add(tag);}
+                TrackTag(tag);
                 selected.Add(tag.Name);
             }
-            var clip=entries[i];entries[i]=clip with{Entry=clip.Entry with{Tags=selected.ToArray()}};
+            var clip=entries[i];entries[i]=clip with{Replica=clip.Replica?.TaggedNow(),Entry=clip.Entry with{Tags=selected.ToArray()}};
             Schedule();
         }
         NotifyChanged();
@@ -43,10 +44,11 @@ internal sealed partial class ClipboardHistory
                     throw new ArgumentException(Strings.Settings_Clipboard_TagRenameFailed);
                 tags[index]=replacement;
             }
+            TrackTagChange(name,replacement);
             for(int i=0;i<entries.Count;i++){
                 var clip=entries[i];if(!clip.Entry.Tags.Contains(name,Names))continue;
                 var names=clip.Entry.Tags.Select(n=>Names.Equals(n,name)?replacement?.Name:n).OfType<string>().ToArray();
-                entries[i]=clip with{Entry=clip.Entry with{Tags=names}};
+                entries[i]=clip with{Replica=clip.Replica?.TaggedNow(),Entry=clip.Entry with{Tags=names}};
             }
             Schedule();
         }
@@ -59,7 +61,7 @@ internal sealed partial class ClipboardHistory
             var clip=entries[i];
             if(clip.Entry.Kind is ClipKind.Files or ClipKind.Image)throw new NotSupportedException();
             if(string.IsNullOrEmpty(text))return;
-            entries[i]=new(clip.Entry with{Text=text,Kind=ClipboardClassifier.Classify(text),Rich=false},"t:"+Hash(Encoding.UTF8.GetBytes(text)));
+            entries[i]=new(clip.Entry with{Text=text,Kind=ClipboardClassifier.Classify(text),Rich=false},"t:"+Hash(Encoding.UTF8.GetBytes(text)),null,clip.Replica?.Edited());
             Schedule();
         }
         NotifyChanged();

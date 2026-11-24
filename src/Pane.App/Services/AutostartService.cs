@@ -49,15 +49,28 @@ internal sealed class AutostartService(bool production,string executable,Setting
     public void Align(){
         if(!production||!store.Current.General.StartWithWindows)return;
         var old=registry.Read();
-        if(old==null?!registry.Disabled:IsPane(old)&&!PointsTo(old,executable))registry.Write(Command);
+        if(old==null?!registry.Disabled:IsPane(old)&&!PointsTo(old,executable)){
+            try { registry.Write(Command); }
+            catch(Exception error) when(AccessDenied(error)){Pane.Hosting.AutostartDiagnostics.OpenLog()?.AlignDenied(error);}
+        }
     }
-    public void Set(bool enabled){
+    internal static bool AccessDenied(Exception error)=>error is UnauthorizedAccessException or System.Security.SecurityException || (uint)error.HResult==0x80070005;
+    public void Set(bool enabled)=>Set(enabled,null);
+    internal void Set(bool enabled,Action<Exception>? onDenied){
         if(!production)throw new InvalidOperationException(UnavailableReason);
         string? old=registry.Read();
         if(old!=null&&!IsPane(old))throw new InvalidOperationException(Strings.Settings_Autostart_TargetConflict);
+        void Restore(){if(old==null)registry.Delete();else registry.Write(old);}
+        try { if(enabled)registry.Write(Command);else if(old!=null)registry.Delete(); }
+        catch(Exception error) when(onDenied!=null&&AccessDenied(error)){
+            // 拒写通常保留原值；仅在写入已生效一部分时才需要还原。
+            if(registry.Read()!=old)Restore();
+            onDenied(error);
+            enabled=false;
+        }
+        catch { if(registry.Read()!=old)Restore();throw; }
         try {
-            if(enabled)registry.Write(Command);else if(old!=null)registry.Delete();
             store.Save(store.Current with {General=store.Current.General with {StartWithWindows=enabled}});
-        }catch {if(old==null)registry.Delete();else registry.Write(old);throw;}
+        }catch {if(registry.Read()!=old)Restore();throw;}
     }
 }

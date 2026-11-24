@@ -1,5 +1,7 @@
 using Pane.Contracts;
+using Pane.Hosting;
 using Pane.Localization;
+using Pane.Services;
 using Pane.Services.Setup;
 using Pane.Settings;
 using System.Text.Json;
@@ -152,10 +154,89 @@ internal static class SetupTests
             Check(SetupFiles.CompareVersions("0.1.9", "0.1.10") < 0, "数字版本比较");
             Check(SetupFiles.CompareVersions("1.2.0", "1.2") == 0 && SetupFiles.CompareVersions("1.2.0.0", "1.2.0+abc") == 0, "规范化版本比较");
             Check(SetupFiles.CompareVersions("2.0.0", "1.99.99") > 0, "主版本比较");
+            await CheckAutostart(root, paths, source, defaults, Check);
         }
         finally { SetupFiles.Delete(root); }
         Console.WriteLine($"PASS setup assertions={count}; realRegistry=0; realShortcuts=0");
         return count;
+    }
+    static async Task CheckAutostart(string root, SetupPaths paths, string source, PaneSettings defaults, Action<bool,string> check)
+    {
+        var registry = new StartupFixture();
+        var integration = new SetupIntegration(paths, defaults, root, registry);
+        var service = new SetupService(paths, source, "0.1.108", integration, new FakeProcesses());
+        var progress = new Steps();
+        Task Install(bool enabled) => service.InstallAsync(new(enabled, true, paths.Root), progress);
+        bool Logged(string step, Exception error) => File.ReadLines(UninstallChain.LogPath).Any(
+            line => line.Contains($"step={step}\tresult=skipped\tcode=0x{error.HResult:X8}"));
+        var denied = new UnauthorizedAccessException("模拟私有消息");
+        registry.Error = _ => denied;
+        await Install(true);
+        check(service.AutostartBlocked && registry.Value == null, "新装拒写启动项");
+        check(File.Exists(paths.Exe) && integration.InstalledVersion == "0.1.108", "拒写后程序及卸载登记完整");
+        check(File.Exists(Path.Combine(root,"menu","Pane.lnk")) && File.Exists(Path.Combine(root,"desktop","Pane.lnk")), "拒写后两种快捷方式完整");
+        var store = new SettingsStore(paths.Data, defaults with { General = defaults.General with { StartWithWindows = true } });
+        store.Load();
+        check(!store.Current.General.StartWithWindows && Logged("write-startup", denied), "拒写后保存关闭及诊断");
+        int writes = registry.Attempts;
+        var autostart = new AutostartService(true, paths.Exe, store, registry);
+        autostart.Align();
+        check(registry.Attempts == writes, "安装后首次启动不再尝试写入");
+
+        const string old = @"C:\old\Pane.App.exe --autostart";
+        registry.Value = old;
+        registry.Error = _ => new System.Security.SecurityException();
+        await Install(true);
+        check(service.AutostartBlocked && registry.Value == old, "升级拒写保留旧启动项");
+        registry.Error = null;
+        await Install(true);
+        check(!service.AutostartBlocked && AutostartService.PointsTo(registry.Value, paths.Exe), "同一个安装服务成功重试后清除标记");
+        registry.Error = _ => denied;
+        await Install(false);
+        check(!service.AutostartBlocked && AutostartService.PointsTo(registry.Value, paths.Exe) && Logged("delete-startup", denied), "删除被拒保留原值且只记日志");
+
+        registry.Value = old;
+        File.WriteAllText(paths.Exe, "旧程序");
+        registry.Error = command => command == old ? denied : new IOException("模拟非权限错误");
+        try { await Install(true); throw new Exception("非权限错误应导致安装失败"); }
+        catch (SetupException failure) { check(failure.Message == Strings.Setup_OperationFailed, "回滚拒写不遮盖原错误"); }
+        check(File.ReadAllText(paths.Exe) == "旧程序" && Logged("restore-startup", denied), "恢复旧程序并记录回滚拒写");
+
+        store.Save(store.Current with { General = store.Current.General with { StartWithWindows = true } });
+        var openLog = AutostartDiagnostics.OpenLog;
+        try
+        {
+            AutostartDiagnostics.OpenLog = () => new(root, () => DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "108", "JIT", false);
+            registry.Error = _ => denied;
+            autostart.Align();
+            string line = File.ReadLines(Path.Combine(root,"logs","autostart.log")).Single();
+            check(line.Contains("event=align\tresult=skipped\tcode=0x80070005") && !line.Contains(denied.Message), "启动对齐被拒后继续并脱敏记录");
+            store.Load();
+            check(store.Current.General.StartWithWindows && registry.Value == old, "对齐拒写保留设置和启动项");
+        }
+        finally { AutostartDiagnostics.OpenLog = openLog; }
+
+        var deniedService = new SetupService(paths, source, "0.1.108", integration, new FakeProcesses(),
+            copy: (_, _) => throw new IOException("拒绝复制", unchecked((int)0x80070005)));
+        try { await deniedService.InstallAsync(new(true,true,paths.Root),progress); throw new Exception("复制应失败"); }
+        catch (SetupException error) { check(error.Message == Strings.Setup_AccessDenied, "拒绝访问显示权限提示"); }
+    }
+    sealed class StartupFixture : IStartupRegistry
+    {
+        public string? Value;
+        public int Attempts;
+        public Func<string?,Exception?>? Error;
+        public bool Disabled => false;
+        public string? ReadCompatibility(string executable, bool allUsers) => null;
+        public string? Read() => Value;
+        public void Write(string command) => Change(command);
+        public void Delete() => Change(null);
+        void Change(string? command)
+        {
+            Attempts++;
+            if (Error?.Invoke(command) is {} error) throw error;
+            Value = command;
+        }
     }
     sealed class FakeProcesses : ISetupProcesses
     {
@@ -175,7 +256,7 @@ internal static class SetupTests
         public bool StartWithWindows => inner.StartWithWindows;
         public object Capture() => inner.Capture();
         public void Restore(object state) => inner.Restore(state);
-        public void Apply(string version, long bytes, SetupOptions options) { inner.Apply(version, bytes, options); throw new IOException("登记写入后失败"); }
+        public bool Apply(string version, long bytes, SetupOptions options) { inner.Apply(version, bytes, options); throw new IOException("登记写入后失败"); }
         public void Remove() => inner.Remove();
     }
 }

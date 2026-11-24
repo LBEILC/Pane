@@ -22,10 +22,16 @@ public sealed class SettingsStore
     public PaneSettings Current { get; private set; }
     // 顺序固定为存储锁 → 设置写锁；历史保存和搬移共用此锁。
     internal object StorageSync { get; }=new();
-    readonly PaneSettings defaults;
+    internal PaneSettings Defaults { get; }
+    internal event Action? UsageChanged;
+    internal void NotifyUsageChanged() => UsageChanged?.Invoke();
+    internal volatile IReadOnlyDictionary<string,int> OtherCounts = new Dictionary<string,int>();
+    internal volatile string[] OtherCommands = [];
+    internal event Action? LocalUsageReplaced;
+    internal void NotifyUsageReplaced() => LocalUsageReplaced?.Invoke();
     public event EventHandler? Changed;
     public event EventHandler<string>? CorruptFile;
-    public SettingsStore(string directory, PaneSettings defaults) { DirectoryPath=directory; this.defaults=defaults; Current=defaults; }
+    public SettingsStore(string directory, PaneSettings defaults) { DirectoryPath=directory; this.Defaults=defaults; Current=defaults; }
     public void Load()
     {
         StorageRecovery.RecoverAll(DirectoryPath);
@@ -45,9 +51,29 @@ public sealed class SettingsStore
             if(migrate)SaveCore(value);
         }
         catch(Exception e) when(e is JsonException or ArgumentException or NotSupportedException) {
-            var backup=path+".bad-"+Guid.NewGuid().ToString("N"); File.Move(path,backup); Current=defaults; CorruptFile?.Invoke(this,backup);
+            var backup=path+".bad-"+Guid.NewGuid().ToString("N"); File.Move(path,backup); Current=Defaults; CorruptFile?.Invoke(this,backup);
         }
         Changed?.Invoke(this,EventArgs.Empty);
+    }
+    internal Action<Action>? DispatchSyncNotification { get; set; }
+    internal event Action? SyncedModulesChanged;
+    // 后台同步写盘后，宿主和视图仍在原来的线程收到变更通知。
+    internal void UpdateFromSync(Func<PaneSettings,PaneSettings> change)
+    {
+        bool modulesChanged;
+        lock(writeLock)
+        {
+            var value = change(Current);
+            if (ReferenceEquals(value,Current)) return;
+            modulesChanged = value.Modules?.Any(p => Current.Modules?.GetValueOrDefault(p.Key) != p.Value) == true;
+            SaveCore(value);
+        }
+        void Notify()
+        {
+            Changed?.Invoke(this,EventArgs.Empty);
+            if (modulesChanged) SyncedModulesChanged?.Invoke();
+        }
+        if (DispatchSyncNotification is {} dispatch) dispatch(Notify); else Notify();
     }
     readonly object writeLock=new();
     internal static string CurrentVersion()=>typeof(SettingsStore).Assembly.GetName().Version is {} v?$"{v.Major}.{v.Minor}.{Math.Max(0,v.Build)}":"0.1.0";

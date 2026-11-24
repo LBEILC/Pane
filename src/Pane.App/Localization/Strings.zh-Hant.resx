@@ -147,6 +147,205 @@
   <data name="Common_Copy" xml:space="preserve"><value>複製</value></data>
   <data name="Common_CopyPath" xml:space="preserve"><value>複製路徑</value></data>
   <data name="Common_CrashLog" xml:space="preserve"><value>Pane 上次意外結束，記錄檔已儲存到 {0}</value></data>
+  <data name="Settings_Account" xml:space="preserve"><value>帳號</value></data>
+  <data name="Settings_Account_NeedsSignIn" xml:space="preserve"><value>登入已失效，請重新登入</value></data>
+  <data name="Settings_Account_NeedsSignInDescription" xml:space="preserve"><value>密碼或電子郵件在別處改過，或這台電腦已被移除。重新登入後同步接著進行</value></data>
+  <data name="Settings_Account_DeviceLimit" xml:space="preserve"><value>登入的裝置已達上限（{0} 台），請移除一台後繼續</value></data>
+  <data name="Settings_Account_RemoveAndLogin" xml:space="preserve"><value>移除並登入</value></data>
+  <data name="Settings_Account_FounderPublicOn" xml:space="preserve"><value>已在創始會員頁公開暱稱</value></data>
+  <data name="Settings_Account_FounderPublicOff" xml:space="preserve"><value>已不再公開暱稱</value></data>
+  <data name="Settings_Account_PayExpired" xml:space="preserve"><value>訂單已失效，請重新購買</value></data>
+  <data name="Settings_Account_PayUnderpaid" xml:space="preserve"><value>付款金額不足，請聯絡我們處理</value></data>
+  <data name="Settings_Account_PayTimeout" xml:space="preserve"><value>暫未查到付款結果。已付款的訂單會自動開通，請稍後再看</value></data>
+  <data name="Settings_Account_ResetFreshConfirm" xml:space="preserve"><value>沒有恢復碼時重設，雲端已同步的資料會被清空</value></data>
+  <data name="Cloud_Error_Network" xml:space="preserve"><value>無法連線伺服器，請檢查網路</value></data>
+  <data name="Cloud_Error_RateLimited" xml:space="preserve"><value>操作太頻繁，請 {0} 後重試</value></data>
+  <data name="Cloud_Error_RateLimitedShort" xml:space="preserve"><value>操作太頻繁，請稍後重試</value></data>
+  <data name="Cloud_Error_Locked" xml:space="preserve"><value>密碼錯誤次數過多，請 {0} 後重試</value></data>
+  <data name="Cloud_Error_BadCodeLeft" xml:space="preserve"><value>驗證碼不正確，還可以嘗試 {0} 次</value></data>
+  <data name="Cloud_Error_CodeExpired" xml:space="preserve"><value>驗證碼已失效，請重新獲取</value></data>
+  <data name="Cloud_Error_EmailTaken" xml:space="preserve"><value>這個電子郵件已被註冊</value></data>
+  <data name="Cloud_Error_MailQuota" xml:space="preserve"><value>今天的驗證碼傳送量已達上限，請明天再試</value></data>
+  <data name="Cloud_Error_Banned" xml:space="preserve"><value>這個帳號已被停用</value></data>
+  <data name="Cloud_Error_BadNickname" xml:space="preserve"><value>暱稱須為 2～16 個字元</value></data>
+  <data name="Cloud_Error_AlreadyLifetime" xml:space="preserve"><value>你已經是永久會員，無須再購買</value></data>
+  <data name="Cloud_Error_CodeUsed" xml:space="preserve"><value>這個兌換碼已被使用</value></data>
+  <data name="Cloud_Error_TrialUsedAccount" xml:space="preserve"><value>這個帳號已領取過試用</value></data>
+  <data name="Cloud_Error_TrialUsedDevice" xml:space="preserve"><value>這台電腦已領取過試用，購買後即可使用</value></data>
+  <data name="Cloud_Error_TrialClosed" xml:space="preserve"><value>免費試用暫不開放</value></data>
+  <data name="Cloud_Error_KeyMismatch" xml:space="preserve"><value>資料金鑰與帳號不符，雲端資料未做任何改動。請重試</value></data>
+  <data name="Cloud_Error_NoRecovery" xml:space="preserve"><value>這個帳號沒有設定恢復碼</value></data>
+  <data name="Cloud_Error_BadRecovery" xml:space="preserve"><value>恢復碼不正確</value></data>
+  <data name="Cloud_Error_ClientOutdated" xml:space="preserve"><value>Pane 版本過舊，請更新後再試</value></data>
+  <data name="Cloud_Error_Unavailable" xml:space="preserve"><value>服務暫不可用，請稍後重試</value></data>
+  <data name="Cloud_Error_Other" xml:space="preserve"><value>操作失敗（{0}），請稍後重試</value></data>
+  <data name="Settings_Account_Description" xml:space="preserve"><value>Pane 帳號、雲同步訂閱、裝置和帳號安全</value></data>
+  <data name="Settings_Account_SignedOutTitle" xml:space="preserve"><value>登入 Pane 帳號</value></data>
+  <data name="Settings_Account_SignedOutDescription" xml:space="preserve"><value>登入後可使用 Pane 雲同步，在多台電腦之間同步設定、使用記錄和剪貼簿。本機功能無須登入</value></data>
+  <data name="Settings_Account_Login" xml:space="preserve"><value>登入</value></data>
+  <data name="Settings_Account_Register" xml:space="preserve"><value>註冊</value></data>
+  <data name="Settings_Account_Email" xml:space="preserve"><value>電子郵件</value></data>
+  <data name="Settings_Account_Password" xml:space="preserve"><value>密碼</value></data>
+  <data name="Settings_Account_ForgotPassword" xml:space="preserve"><value>忘記密碼</value></data>
+  <data name="Settings_Account_LoggingIn" xml:space="preserve"><value>正在登入…</value></data>
+  <data name="Settings_Account_BadCredentials" xml:space="preserve"><value>電子郵件或密碼不正確</value></data>
+  <data name="Settings_Account_BadEmail" xml:space="preserve"><value>電子郵件格式不正確</value></data>
+  <data name="Settings_Account_RegisterStep" xml:space="preserve"><value>第 {0} 步，共 2 步</value></data>
+  <data name="Settings_Account_AgreeTerms" xml:space="preserve"><value>我已閱讀並同意使用者協議和隱私政策</value></data>
+  <data name="Settings_Account_AgreeCrossBorder" xml:space="preserve"><value>同意將我的個人資訊傳輸至中國香港等境外地區儲存和處理（見隱私政策第 4 節）</value></data>
+  <data name="Settings_Account_AgreeRequired" xml:space="preserve"><value>請先勾選上面兩項</value></data>
+  <data name="Settings_Account_ReadTerms" xml:space="preserve"><value>檢視協議</value></data>
+  <data name="Settings_Account_SendCode" xml:space="preserve"><value>傳送驗證碼</value></data>
+  <data name="Settings_Account_CodeSent" xml:space="preserve"><value>驗證碼已傳送至 {0}，10 分鐘內有效。未收到時請檢查垃圾郵件</value></data>
+  <data name="Settings_Account_Code" xml:space="preserve"><value>驗證碼</value></data>
+  <data name="Settings_Account_Resend" xml:space="preserve"><value>重新發送</value></data>
+  <data name="Settings_Account_ResendIn" xml:space="preserve"><value>{0} 秒後可重新發送</value></data>
+  <data name="Settings_Account_Nickname" xml:space="preserve"><value>暱稱</value></data>
+  <data name="Settings_Account_NicknamePlaceholder" xml:space="preserve"><value>可選，2～16 個字元</value></data>
+  <data name="Settings_Account_PasswordPlaceholder" xml:space="preserve"><value>8～64 個字元</value></data>
+  <data name="Settings_Account_ConfirmPassword" xml:space="preserve"><value>確認密碼</value></data>
+  <data name="Settings_Account_PasswordMismatch" xml:space="preserve"><value>兩次輸入的密碼不一致</value></data>
+  <data name="Settings_Account_PasswordRule" xml:space="preserve"><value>密碼須為 8～64 個字元</value></data>
+  <data name="Settings_Account_CodeRule" xml:space="preserve"><value>請輸入 6 位驗證碼</value></data>
+  <data name="Settings_Account_BadCode" xml:space="preserve"><value>驗證碼不正確</value></data>
+  <data name="Settings_Account_PasswordNote" xml:space="preserve"><value>雲同步的內容用這個密碼在本機加密，伺服器無法讀取。註冊後可生成恢復碼，忘記密碼時用它保留雲端資料</value></data>
+  <data name="Settings_Account_ChangeEmail" xml:space="preserve"><value>更換電子郵件</value></data>
+  <data name="Settings_Account_Registered" xml:space="preserve"><value>註冊完成</value></data>
+  <data name="Settings_Account_ForgotOutDescription" xml:space="preserve"><value>填寫恢復碼可保留雲端資料。不填時，雲端已同步的資料會被清空，之後由各台電腦上的 Pane 用本機資料重新上傳</value></data>
+  <data name="Settings_Account_RecoveryCodeOptional" xml:space="preserve"><value>可選，32 個字元</value></data>
+  <data name="Settings_Account_RecoveryCodeInvalid" xml:space="preserve"><value>恢復碼格式不正確，應為 32 個字元</value></data>
+  <data name="Settings_Account_ResetPassword" xml:space="preserve"><value>重設密碼</value></data>
+  <data name="Settings_Account_ResetDone" xml:space="preserve"><value>密碼已重設</value></data>
+  <data name="Settings_Account_ResetKept" xml:space="preserve"><value>密碼已重設，雲端資料已保留</value></data>
+  <data name="Settings_Account_Founder" xml:space="preserve"><value>創始會員</value></data>
+  <data name="Settings_Account_FounderTip" xml:space="preserve"><value>創始會員 No.{0} · 前 100 位永久會員</value></data>
+  <data name="Settings_Account_FounderPublic" xml:space="preserve"><value>在創始會員頁顯示暱稱</value></data>
+  <data name="Settings_Account_FounderPublicDescription" xml:space="preserve"><value>開啟後，你的暱稱和加入年月會顯示在官網創始會員頁，任何人都能看到。頭像和電子郵件不會公開</value></data>
+  <data name="Settings_Account_FounderPublicConfirm" xml:space="preserve"><value>你的暱稱「{0}」和加入年月將顯示在創始會員頁，任何人都能看到，他人看到後可能自行儲存。關閉後 1 分鐘內從頁面上消失</value></data>
+  <data name="Settings_Account_FounderPublicConfirmButton" xml:space="preserve"><value>同意並公開</value></data>
+  <data name="Settings_Account_FounderHidden" xml:space="preserve"><value>你的暱稱不符合使用者協議第 5.3 條，已被隱藏，目前只顯示編號</value></data>
+  <data name="Settings_Account_MemberGroup" xml:space="preserve"><value>會員 QQ 群</value></data>
+  <data name="Settings_Account_MemberGroupDescription" xml:space="preserve"><value>和其他會員交流，直接向開發者回報問題。申請加群時填寫入群碼</value></data>
+  <data name="Settings_Account_MemberGroupNumber" xml:space="preserve"><value>群號 {0}</value></data>
+  <data name="Settings_Account_MemberGroupCode" xml:space="preserve"><value>入群碼 {0}</value></data>
+  <data name="Settings_Account_MemberGroupCopyCode" xml:space="preserve"><value>複製入群碼</value></data>
+  <data name="Settings_Account_MemberGroupJoin" xml:space="preserve"><value>加入群聊</value></data>
+  <data name="Settings_Account_MemberGroupLocked" xml:space="preserve"><value>開通月卡、年卡或永久後可以加入</value></data>
+  <data name="Settings_Account_EditProfile" xml:space="preserve"><value>編輯資料</value></data>
+  <data name="Settings_Account_EditProfileDescription" xml:space="preserve"><value>暱稱和頭像在官網帳號中心修改</value></data>
+  <data name="Settings_Account_Subscription" xml:space="preserve"><value>訂閱</value></data>
+  <data name="Settings_Account_TierYear" xml:space="preserve"><value>年卡</value></data>
+  <data name="Settings_Account_TierMonth" xml:space="preserve"><value>月卡</value></data>
+  <data name="Settings_Account_TierLifetime" xml:space="preserve"><value>永久</value></data>
+  <data name="Settings_Account_TierTrial" xml:space="preserve"><value>試用</value></data>
+  <data name="Settings_Account_ExpiresAt" xml:space="preserve"><value>有效期至 {0}，不會自動續費</value></data>
+  <data name="Settings_Account_LifetimeNote" xml:space="preserve"><value>Pane 雲同步服務存續期間有效</value></data>
+  <data name="Settings_Account_NoSubscription" xml:space="preserve"><value>未開通雲同步</value></data>
+  <data name="Settings_Account_NoSubscriptionDescription" xml:space="preserve"><value>開通後即可在多台電腦之間同步設定、使用記錄和剪貼簿</value></data>
+  <data name="Settings_Account_Expired" xml:space="preserve"><value>雲同步已到期</value></data>
+  <data name="Settings_Account_ExpiredDescription" xml:space="preserve"><value>同步已停止，雲端資料保留到 {0}，期間續費可接著使用</value></data>
+  <data name="Settings_Account_Renew" xml:space="preserve"><value>續費</value></data>
+  <data name="Settings_Account_Buy" xml:space="preserve"><value>購買</value></data>
+  <data name="Settings_Account_Traffic" xml:space="preserve"><value>本月流量</value></data>
+  <data name="Settings_Account_TrafficDescription" xml:space="preserve"><value>同步和從「Pane 雲」下載更新共用，{0} 重置</value></data>
+  <data name="Settings_Account_Storage" xml:space="preserve"><value>雲端圖片</value></data>
+  <data name="Settings_Account_StorageDescription" xml:space="preserve"><value>已固定或加了標籤的圖片原圖</value></data>
+  <data name="Settings_Account_Redeem" xml:space="preserve"><value>兌換碼</value></data>
+  <data name="Settings_Account_RedeemDescription" xml:space="preserve"><value>直接在愛發電購買、獲贈時使用</value></data>
+  <data name="Settings_Account_RedeemButton" xml:space="preserve"><value>兌換</value></data>
+  <data name="Settings_Account_RedeemBad" xml:space="preserve"><value>兌換碼不正確</value></data>
+  <data name="Settings_Account_RedeemDone" xml:space="preserve"><value>已兌換，月卡 31 天</value></data>
+  <data name="Settings_Account_Trial" xml:space="preserve"><value>免費試用 7 天</value></data>
+  <data name="Settings_Account_TrialDescription" xml:space="preserve"><value>每個帳號、每台電腦可領取一次，含 200 MB 流量</value></data>
+  <data name="Settings_Account_TrialGet" xml:space="preserve"><value>領取</value></data>
+  <data name="Settings_Account_TrialDone" xml:space="preserve"><value>已領取 7 天免費試用</value></data>
+  <data name="Settings_Account_ChoosePlan" xml:space="preserve"><value>選擇檔位</value></data>
+  <data name="Settings_Account_ChoosePlanNote" xml:space="preserve"><value>透過愛發電付款，不會自動續費；新買的時長接在原到期時間之後。愛發電目前不支援退款，建議先領取免費試用</value></data>
+  <data name="Settings_Account_PlanMonth" xml:space="preserve"><value>31 天，每月流量 1 GB</value></data>
+  <data name="Settings_Account_PlanYear" xml:space="preserve"><value>366 天，每月流量 2 GB，相當於每月 5.8 元</value></data>
+  <data name="Settings_Account_PlanLifetime" xml:space="preserve"><value>服務存續期間有效，每月流量 2 GB；前 100 位贈「創始會員」銘牌</value></data>
+  <data name="Settings_Account_PayTitle" xml:space="preserve"><value>掃碼付款 ¥{0}</value></data>
+  <data name="Settings_Account_PayDescription" xml:space="preserve"><value>用手機掃描 QR Code，在愛發電付款。付款後自動開通，無須返回此頁；訂單 1 小時內有效</value></data>
+  <data name="Settings_Account_PayWaiting" xml:space="preserve"><value>正在等待付款…</value></data>
+  <data name="Settings_Account_PayInBrowser" xml:space="preserve"><value>在瀏覽器中付款</value></data>
+  <data name="Settings_Account_PayDone" xml:space="preserve"><value>付款成功，已開通{0}</value></data>
+  <data name="Settings_Account_Devices" xml:space="preserve"><value>裝置</value></data>
+  <data name="Settings_Account_DevicesNote" xml:space="preserve"><value>{1} 台中已用 {0} 台。移除後，那台電腦會登出</value></data>
+  <data name="Settings_Account_ThisDevice" xml:space="preserve"><value>本機</value></data>
+  <data name="Settings_Account_LastSeen" xml:space="preserve"><value>最近使用：{0}</value></data>
+  <data name="Settings_Account_RemoveDevice" xml:space="preserve"><value>移除裝置</value></data>
+  <data name="Settings_Account_Security" xml:space="preserve"><value>安全</value></data>
+  <data name="Settings_Account_ChangePassword" xml:space="preserve"><value>修改密碼</value></data>
+  <data name="Settings_Account_ChangePasswordDescription" xml:space="preserve"><value>修改後，其他裝置須重新登入；雲端資料保留，不必重新上傳</value></data>
+  <data name="Settings_Account_CurrentPassword" xml:space="preserve"><value>目前密碼</value></data>
+  <data name="Settings_Account_NewPassword" xml:space="preserve"><value>新密碼</value></data>
+  <data name="Settings_Account_ConfirmNewPassword" xml:space="preserve"><value>確認新密碼</value></data>
+  <data name="Settings_Account_PasswordChanged" xml:space="preserve"><value>密碼已修改</value></data>
+  <data name="Settings_Account_BadCurrentPassword" xml:space="preserve"><value>目前密碼不正確</value></data>
+  <data name="Settings_Account_ForgotInDescription" xml:space="preserve"><value>用電子郵件驗證碼設定新密碼。這台電腦儲存著資料金鑰，重設後雲端資料全部保留，其他裝置須用新密碼重新登入</value></data>
+  <data name="Settings_Account_RecoveryCode" xml:space="preserve"><value>恢復碼</value></data>
+  <data name="Settings_Account_RecoveryNone" xml:space="preserve"><value>尚未設定。忘記密碼、又沒有保持登入的 Pane 時，用恢復碼重設可保留雲端資料</value></data>
+  <data name="Settings_Account_RecoverySet" xml:space="preserve"><value>已於 {0} 生成。忘記密碼、又沒有保持登入的 Pane 時，用恢復碼重設可保留雲端資料</value></data>
+  <data name="Settings_Account_RecoveryGenerate" xml:space="preserve"><value>生成恢復碼</value></data>
+  <data name="Settings_Account_RecoveryConfirmRegenerate" xml:space="preserve"><value>確認重新生成</value></data>
+  <data name="Settings_Account_RecoveryRegenerateWarning" xml:space="preserve"><value>舊的恢復碼將立即失效</value></data>
+  <data name="Settings_Account_RecoveryDelete" xml:space="preserve"><value>刪除恢復碼</value></data>
+  <data name="Settings_Account_RecoveryConfirmDelete" xml:space="preserve"><value>確認刪除</value></data>
+  <data name="Settings_Account_RecoveryDeleteWarning" xml:space="preserve"><value>刪除後，忘記密碼時只能在保持登入的 Pane 裡重設才能保留雲端資料</value></data>
+  <data name="Settings_Account_RecoveryDeleted" xml:space="preserve"><value>恢復碼已刪除</value></data>
+  <data name="Settings_Account_RecoveryShowTitle" xml:space="preserve"><value>這是你的恢復碼，只顯示這一次</value></data>
+  <data name="Settings_Account_RecoveryShowDescription" xml:space="preserve"><value>請存進密碼管理器或抄在紙上，不要發給任何人</value></data>
+  <data name="Settings_Account_RecoverySaveFile" xml:space="preserve"><value>儲存為文字檔案</value></data>
+  <data name="Settings_Account_RecoverySaved" xml:space="preserve"><value>我已妥善儲存恢復碼</value></data>
+  <data name="Settings_Account_RecoveryCreated" xml:space="preserve"><value>恢復碼已生成</value></data>
+  <data name="Settings_Account_Copied" xml:space="preserve"><value>已複製</value></data>
+  <data name="Settings_Account_Logout" xml:space="preserve"><value>登出</value></data>
+  <data name="Settings_Account_LogoutDescription" xml:space="preserve"><value>登出後，在這台電腦上重設密碼將無法保留雲端資料；本機資料不受影響</value></data>
+  <data name="Settings_Account_ConfirmLogout" xml:space="preserve"><value>確認登出</value></data>
+  <data name="Settings_Account_Delete" xml:space="preserve"><value>刪除帳號</value></data>
+  <data name="Settings_Account_DeleteDescription" xml:space="preserve"><value>帳號、雲端資料和頭像將立即刪除，無法恢復；尚未用完的付費時長同時作廢，不予退款</value></data>
+  <data name="Settings_Account_ConfirmDelete" xml:space="preserve"><value>確認刪除</value></data>
+  <data name="Settings_Account_DeleteNeedPassword" xml:space="preserve"><value>請輸入目前密碼</value></data>
+  <data name="Settings_Account_Deleted" xml:space="preserve"><value>帳號已刪除</value></data>
+  <data name="Settings_Sync" xml:space="preserve"><value>同步</value></data>
+  <data name="Settings_Sync_Cloud" xml:space="preserve"><value>Pane 雲同步</value></data>
+  <data name="Settings_Sync_SignedOut" xml:space="preserve"><value>登入 Pane 帳號後，可以在多台電腦之間同步設定、使用記錄和剪貼簿</value></data>
+  <data name="Settings_Sync_OffDescription" xml:space="preserve"><value>未開啟。開啟後，內容在本機加密後才上傳，伺服器無法讀取</value></data>
+  <data name="Settings_Sync_LastSuccess" xml:space="preserve"><value>已開啟，上次同步：{0}</value></data>
+  <data name="Settings_Sync_Syncing" xml:space="preserve"><value>正在同步…</value></data>
+  <data name="Settings_Sync_ErrorRetry" xml:space="preserve"><value>同步失敗：{0}。稍後自動重試</value></data>
+  <data name="Settings_Sync_Waiting" xml:space="preserve"><value>已開啟，正在等待第一次同步</value></data>
+  <data name="Settings_Sync_ExcludedItem" xml:space="preserve"><value>複製的內容只記錄在本機，不上傳</value></data>
+  <data name="Settings_Sync_PausedExpired" xml:space="preserve"><value>雲同步已到期，同步已暫停。雲端資料保留到 {0}，期間續費可接著使用</value></data>
+  <data name="Settings_Sync_PausedSignIn" xml:space="preserve"><value>登入已失效，同步已暫停</value></data>
+  <data name="Settings_Sync_PausedOutdated" xml:space="preserve"><value>Pane 版本過舊，請更新後再同步</value></data>
+  <data name="Settings_Sync_PausedMerge" xml:space="preserve"><value>等待選擇合併方式，同步已暫停</value></data>
+  <data name="Settings_Sync_Now" xml:space="preserve"><value>立即同步</value></data>
+  <data name="Settings_Sync_MergeTitle" xml:space="preserve"><value>本機和雲端都有資料</value></data>
+  <data name="Settings_Sync_MergeDescription" xml:space="preserve"><value>這台電腦上有其他帳號同步過的資料。合併會把兩邊都保留；也可以只保留一邊</value></data>
+  <data name="Settings_Sync_MergeMerge" xml:space="preserve"><value>合併</value></data>
+  <data name="Settings_Sync_MergeUseCloud" xml:space="preserve"><value>用雲端覆蓋本機</value></data>
+  <data name="Settings_Sync_MergeUseLocal" xml:space="preserve"><value>用本機覆蓋雲端</value></data>
+  <data name="Settings_Sync_Settings" xml:space="preserve"><value>設定</value></data>
+  <data name="Settings_Sync_SettingsDescription" xml:space="preserve"><value>快速鍵、外觀和各項功能的設定；本機路徑、視窗位置、金鑰等不同步</value></data>
+  <data name="Settings_Sync_Usage" xml:space="preserve"><value>使用記錄</value></data>
+  <data name="Settings_Sync_UsageDescription" xml:space="preserve"><value>啟動器的使用次數和終端機歷史，各台電腦的次數合併計算</value></data>
+  <data name="Settings_Sync_Clipboard" xml:space="preserve"><value>剪貼簿</value></data>
+  <data name="Settings_Sync_ClipboardDescription" xml:space="preserve"><value>之後複製的文字和圖片會加密上傳，幾秒內出現在其他電腦上；以前的歷史不上傳</value></data>
+  <data name="Settings_Sync_ClipScope" xml:space="preserve"><value>同步範圍</value></data>
+  <data name="Settings_Sync_ClipScopeText" xml:space="preserve"><value>文字</value></data>
+  <data name="Settings_Sync_ClipScopeImages" xml:space="preserve"><value>文字和圖片</value></data>
+  <data name="Settings_Sync_Excluded" xml:space="preserve"><value>不同步的程式</value></data>
+  <data name="Settings_Sync_ExcludedDescription" xml:space="preserve"><value>這些程式裡複製的內容照常記錄在本機，只是不上傳</value></data>
+  <data name="Settings_Sync_ExcludedAdd" xml:space="preserve"><value>新增程式</value></data>
+  <data name="Settings_Sync_ExcludedNone" xml:space="preserve"><value>全部同步。可以新增不想上傳的程式，如密碼管理器</value></data>
+  <data name="Settings_Sync_WriteSystem" xml:space="preserve"><value>其他電腦複製時，同時放進本機剪貼簿</value></data>
+  <data name="Settings_Sync_WriteSystemDescription" xml:space="preserve"><value>開啟後可以直接 Ctrl+V 貼上其他電腦剛複製的內容</value></data>
+  <data name="Settings_Sync_DeviceView" xml:space="preserve"><value>其他電腦的條目</value></data>
+  <data name="Settings_Sync_DeviceViewDescription" xml:space="preserve"><value>在剪貼簿面板裡怎麼顯示其他電腦同步來的條目</value></data>
+  <data name="Settings_Sync_DeviceViewMixed" xml:space="preserve"><value>混在時間線裡</value></data>
+  <data name="Settings_Sync_DeviceViewFilter" xml:space="preserve"><value>只在裝置篩選裡</value></data>
+  <data name="Settings_Sync_Note" xml:space="preserve"><value>同步不是備份：在一台電腦上刪除的內容，其他電腦上也會刪除。重要資料請用下方的「匯出」另存</value></data>
   <data name="Settings_Data" xml:space="preserve"><value>資料</value></data>
   <data name="Settings_Data_Description" xml:space="preserve"><value>儲存空間占用、剪貼簿圖片上限和大型檔案位置</value></data>
   <data name="Settings_Data_Usage" xml:space="preserve"><value>儲存空間占用</value></data>
@@ -1172,6 +1371,12 @@
   <data name="Settings_Launcher_CommandsCleared" xml:space="preserve"><value>已清空</value></data>
   <data name="Settings_Launcher_CommandsDescription" xml:space="preserve"><value>保留最近 20 條，用於補全；以空格開頭的命令不記錄</value></data>
   <data name="Settings_Launcher_DefaultEngineCannotDelete" xml:space="preserve"><value>預設網站不能刪除</value></data>
+  <data name="Settings_Launcher_Capsule" xml:space="preserve"><value>右側顯示</value></data>
+  <data name="Settings_Launcher_CapsuleDescription" xml:space="preserve"><value>搜尋框右邊的小按鈕，點擊開啟設定；未登入時顯示 Pane 標誌</value></data>
+  <data name="Settings_Launcher_CapsuleLogo" xml:space="preserve"><value>Pane 標誌</value></data>
+  <data name="Settings_Launcher_CapsuleAvatar" xml:space="preserve"><value>頭像</value></data>
+  <data name="Settings_Launcher_FounderRing" xml:space="preserve"><value>創始會員頭像環</value></data>
+  <data name="Settings_Launcher_FounderRingDescription" xml:space="preserve"><value>頭像外圈一道細的金屬環</value></data>
   <data name="Settings_Launcher_Description" xml:space="preserve"><value>叫出、搜尋範圍、常用入口和網頁搜尋</value></data>
   <data name="Settings_Launcher_EngineAddress" xml:space="preserve"><value>位址，用 {query} 代表搜尋詞</value></data>
   <data name="Settings_Launcher_EngineKeyword" xml:space="preserve"><value>關鍵字</value></data>
@@ -1332,6 +1537,8 @@
   <data name="Settings_WinV_StateSaveError" xml:space="preserve"><value>Win+V 狀態儲存失敗：{0}</value></data>
   <data name="Settings_WinV_Working" xml:space="preserve"><value>正在處理…（重新啟動檔案總管時工作列會短暫閃爍）</value></data>
   <data name="Setup_Autostart" xml:space="preserve"><value>開機時啟動</value></data>
+  <data name="Setup_AccessDenied" xml:space="preserve"><value>沒有權限完成此操作，可能被安全軟體攔截，請放行 Pane 後重試</value></data>
+  <data name="Setup_AutostartBlocked" xml:space="preserve"><value>開機啟動未能開啟，可能被安全軟體攔截；可在 設定 → 通用 中重新開啟</value></data>
   <data name="Setup_Bytes" xml:space="preserve"><value>{0} 位元組</value></data>
   <data name="Setup_CannotStart" xml:space="preserve"><value>無法開始安裝或解除安裝，請檢查目錄權限以及是否已有安裝程式正在執行</value></data>
   <data name="Setup_CopyingFiles" xml:space="preserve"><value>正在複製檔案</value></data>
@@ -1502,6 +1709,11 @@
   <data name="Module_Gestures_Name" xml:space="preserve"><value>滑鼠手勢</value></data>
   <data name="Module_FolderJump_Name" xml:space="preserve"><value>檔案對話方塊跳轉</value></data>
   <data name="Module_Launcher_Description" xml:space="preserve"><value>透過熱鍵叫出，搜尋應用程式和檔案、計算算式、搜尋網頁</value></data>
+  <data name="Module_Cloud_Name" xml:space="preserve"><value>Pane 雲</value></data>
+  <data name="Module_Cloud_Description" xml:space="preserve"><value>登入 Pane 帳號，在多台電腦之間加密同步設定、使用記錄和剪貼簿；會員更新走國內線路。不登入時不連網</value></data>
+  <data name="Module_Cloud_WithClipboard" xml:space="preserve"><value>其他電腦複製的文字和圖片會出現在剪貼簿歷史裡</value></data>
+  <data name="Module_Cloud_WithLauncher" xml:space="preserve"><value>啟動器右側可以顯示帳號頭像</value></data>
+  <data name="Module_CloudDisableNote" xml:space="preserve"><value>停用後停止同步、不再連網。這台電腦上的登入狀態保留，重新啟用後接著同步；要徹底清除，請先在「帳號」中登出</value></data>
   <data name="Module_Clipboard_Description" xml:space="preserve"><value>記錄複製過的文字、圖片和檔案，可隨時尋找並重新貼上</value></data>
   <data name="Module_Gestures_Description" xml:space="preserve"><value>按住右鍵畫方向，執行快速鍵、視窗操作等動作</value></data>
   <data name="Module_SuperPanel_Description" xml:space="preserve"><value>選取文字或檔案後長按滑鼠側鍵，就地處理；短按側鍵照常後退 / 前進</value></data>
@@ -1617,6 +1829,15 @@
   <data name="Update_ViewOnGitHub" xml:space="preserve"><value>在 GitHub 上查看</value></data>
   <data name="Update_InstallOnStartup" xml:space="preserve"><value>下次啟動時自動安裝</value></data>
   <data name="Update_InstallOnStartupDescription" xml:space="preserve"><value>已下載的更新將在下次啟動 Pane 時（例如開機）自動安裝，不再詢問</value></data>
+  <data name="Update_SourceCloud" xml:space="preserve"><value>Pane 雲</value></data>
+  <data name="Update_SourceCloudDescription" xml:space="preserve"><value>會員從國內線路下載，優先增量更新，計入每月流量</value></data>
+  <data name="Update_SourceCloudLocked" xml:space="preserve"><value>開通雲同步後可用，現在從 GitHub 下載</value></data>
+  <data name="Update_CloudFallbackLowQuota" xml:space="preserve"><value>本月流量不多，這次從 GitHub 下載</value></data>
+  <data name="Update_CloudFallbackExpired" xml:space="preserve"><value>雲同步已到期，這次從 GitHub 下載</value></data>
+  <data name="Update_CloudFallbackSignedOut" xml:space="preserve"><value>登入已失效，這次從 GitHub 下載</value></data>
+  <data name="Update_CloudFallbackNetwork" xml:space="preserve"><value>暫時無法連線 Pane 雲，這次從 GitHub 下載</value></data>
+  <data name="Update_FromCloud" xml:space="preserve"><value>從 Pane 雲下載</value></data>
+  <data name="Update_IncrementalSize" xml:space="preserve"><value>{0}（增量）</value></data>
   <data name="Update_Source" xml:space="preserve"><value>更新源</value></data>
   <data name="Update_SourceGitHubDescription" xml:space="preserve"><value>從 GitHub 檢查和下載更新</value></data>
   <data name="Update_SourceMirrorDescription" xml:space="preserve"><value>從 Mirror酱 檢查更新；填寫 CDK 後也從 Mirror酱 下載，國內速度更快</value></data>
@@ -1742,4 +1963,10 @@
   <data name="Settings_DialogSearch_EnterFill" xml:space="preserve"><value>僅填入檔名</value></data>
   <data name="Settings_DialogSearch_Filter" xml:space="preserve"><value>依對話方塊的檔案類型篩選</value></data>
   <data name="Settings_DialogSearch_FilterDescription" xml:space="preserve"><value>對話方塊限定了檔案類型時，搜尋結果中僅顯示這些類型的檔案</value></data>
+  <data name="Clipboard_ThisDevice" xml:space="preserve"><value>本機</value></data>
+  <data name="Clipboard_OriginalDownloading" xml:space="preserve"><value>正在下載原圖 {0}</value></data>
+  <data name="Clipboard_OriginalExpired" xml:space="preserve"><value>原圖已過期，只剩縮圖</value></data>
+  <data name="Clipboard_OriginalNotSynced" xml:space="preserve"><value>原圖未同步，只能在{0}上貼上</value></data>
+  <data name="Clipboard_OriginalQuota" xml:space="preserve"><value>本月流量已用完，下月 1 日後可下載原圖</value></data>
+  <data name="Clipboard_OtherDevice" xml:space="preserve"><value>其他裝置</value></data>
 </root>

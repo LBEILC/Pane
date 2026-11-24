@@ -70,6 +70,7 @@ public sealed partial class SetupView : UserControl, IPanelView
         {
             await setup.InstallAsync(new(start.IsOn, desktop.IsOn, installPath), progress);
             DoneTitle.Text = update ? Strings.Setup_UpdateComplete : Strings.Setup_InstalledHeading;
+            AutostartBlockedText.Visibility = setup.AutostartBlocked ? Visibility.Visible : Visibility.Collapsed;
             SetupArt.Show(this, Done);
             if (setup.AutoUpdate && update)
             {

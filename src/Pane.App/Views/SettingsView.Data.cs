@@ -25,6 +25,7 @@ public sealed partial class SettingsView
     void RenderData()
     {
         if (dataReport is null && !dataMeasuring) _ = MeasureData();
+        RenderSync();   // 2026-11-24：Pane 云的「同步」组在最前（SettingsView.Sync.cs），能力没启用时不出
 
         // 存储占用
         var usage = new List<FrameworkElement>

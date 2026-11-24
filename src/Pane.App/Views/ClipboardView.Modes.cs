@@ -320,4 +320,9 @@ public sealed partial class ClipboardView
         tagColors ??= history.Tags().ToDictionary(t => t.Name, t => t.Color, StringComparer.OrdinalIgnoreCase);
         return TagColors.Dot(tagColors.GetValueOrDefault(name));
     }
+
+    // ---------------- Pane 云：别的电脑来的图片（IClipRowActions） ----------------
+
+    public long? OriginalSize(string clipId) => (Sync as IClipboardCloud)?.OriginalSize(clipId);
+    public void EnsureThumbnail(string clipId) => (Sync as IClipboardCloud)?.EnsureThumbnail(clipId);
 }

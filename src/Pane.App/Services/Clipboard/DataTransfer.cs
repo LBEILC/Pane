@@ -67,7 +67,8 @@ internal sealed partial class DataStorage
             StoredClip[] clips=[];
             if(options.Clipboard!=ClipboardExport.None){
                 var state=snapshot??new ClipboardStorage().LoadIndex(LocalFile(data,"clipboard/history.json"));
-                clips=state.Entries.Where(c=>c.Entry.Kind is ClipKind.Text or ClipKind.Code or ClipKind.Link or ClipKind.Color||options.Clipboard==ClipboardExport.WithImages&&c.Entry.Kind==ClipKind.Image).Select(c=>{
+                clips=state.Entries.Where(c=>c.Entry.Kind is ClipKind.Text or ClipKind.Code or ClipKind.Link or ClipKind.Color||options.Clipboard==ClipboardExport.WithImages&&c.Entry.Kind==ClipKind.Image&&c.Entry.ContentPath!=null).Select(c=>{
+                    c=c with{Replica=null};
                     if(c.Entry.Kind!=ClipKind.Image){
                         if(options.Clipboard==ClipboardExport.WithImages&&c.FormatId is {} formatId){
                             images.TryAdd("clipboard/"+formatId+".rich",RichFormats.PathFor(Path.Combine(data,"clipboard"),formatId));
@@ -80,7 +81,7 @@ internal sealed partial class DataStorage
                     if(c.Entry.Thumbnail?.Path is {} p)images.Add(thumb,p);
                     return c with{Entry=c.Entry with{ContentPath=full,Thumbnail=c.Entry.Thumbnail?.Path==null?null:new(thumb)}};
                 }).ToArray();
-                contents.Add("clipboard/history.json",JsonSerializer.SerializeToUtf8Bytes(state with{Entries=clips},ClipboardJson.Default.ClipboardIndex));
+                contents.Add("clipboard/history.json",JsonSerializer.SerializeToUtf8Bytes(state with{Entries=clips,Ledger=null},ClipboardJson.Default.ClipboardIndex));
             }
             var manifest=new JsonObject{["format"]=options.Clipboard==ClipboardExport.None?1:2,["app"]=SettingsStore.CurrentVersion(),["exportedAt"]=DateTimeOffset.UtcNow.ToString("O"),["settings"]=contents.ContainsKey("settings/settings.json"),["usage"]=contents.Keys.Any(n=>n.StartsWith("usage/",StringComparison.Ordinal)),["clipboard"]=options.Clipboard!=ClipboardExport.None,["clipboardEntries"]=clips.Length,["clipboardImages"]=clips.Count(c=>c.Entry.Kind==ClipKind.Image)};
             contents.Add("manifest.json",Encoding.UTF8.GetBytes(manifest.ToJsonString()));

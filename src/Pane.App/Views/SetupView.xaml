@@ -94,6 +94,10 @@
             </Border>
             <TextBlock x:Name="DoneTitle" Margin="0,16,0,0" HorizontalAlignment="Center"
                        FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+            <!-- 开机启动被拦截时的提示（108）：安装照常完成，只说一句 -->
+            <TextBlock x:Name="AutostartBlockedText" Margin="0,8,0,0" MaxWidth="420" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"
+                       Text="{x:Bind loc:Strings.Setup_AutostartBlocked}"
+                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
             <StackPanel Margin="0,16,0,0" Spacing="8" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
                     <Border Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}" Text="Alt"/></Border>

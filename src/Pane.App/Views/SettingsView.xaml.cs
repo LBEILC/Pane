@@ -51,6 +51,8 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures, "mouse"),
             new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel, "mouse"),
             new("dialog", Strings.Settings_FolderJump, "folder", Strings.Settings_FolderJump_Description, RenderFolderJump, ModuleIds.FolderJump, "mouse"),
+            // 账号（2026-11-24）：「Pane 云」能力启用时才出现，排在数据前（docs/cloud.md「个人资料、头像、铭牌」）
+            new("account", Strings.Settings_Account, "user", Strings.Settings_Account_Description, RenderAccount, ModuleIds.Cloud, "end"),
             new("data", Strings.Settings_Data, "database", Strings.Settings_Data_Description, RenderData, null, "end"),
             new("about", Strings.Settings_About, "info", Strings.Settings_About_Description, RenderAbout, null, "end"),
         ];

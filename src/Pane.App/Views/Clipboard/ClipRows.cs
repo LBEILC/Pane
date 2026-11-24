@@ -28,6 +28,7 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         Number = number;
         this.actions = actions;
         Body = new ClipText(entry.Text ?? string.Empty, query);
+        if (entry.Kind == ClipKind.Image && entry.SourceDevice is not null && entry.Thumbnail is null) actions.EnsureThumbnail(entry.Id);
         FileLines = (entry.Files ?? []).Select(f => new ClipText(System.IO.Path.GetFileName(f), query)).ToList();
         // 有本机位图就用 Image 显示（issue 21：ImageBrush 画在背景上时，图解码好了也常常要等别的东西触发重绘才出来，看着就是空白很久）；
         // 没有路径的（演示数据）用渐变底
@@ -37,7 +38,16 @@ public sealed partial class ClipRow : INotifyPropertyChanged
         SourcePicture = LoadIcon(entry.SourceIcon?.ImagePath);
         if (SourcePicture is null && entry.SourceIcon is { GradientFrom: { } from, GradientTo: { } to }) SourceBrush = Gradient(from, to);
         var dims = entry.Kind == ClipKind.Image && entry.ImageWidth is { } w && entry.ImageHeight is { } h ? $"{entry.Text} {w}×{h} · " : "";
-        MetaText = $"{entry.Source} · {dims}{Ago(entry.CopiedAt)}";
+        // Pane 云：别的电脑同步来的写「微信 · 笔记本 · 3 分钟前」（docs/cloud.md「剪贴板同步 → 区分设备」）
+        MetaText = $"{entry.Source} · {(entry.SourceDevice is { Length: > 0 } device ? device + " · " : "")}{dims}{Ago(entry.CopiedAt)}";
+        OriginalNote = entry.Original switch
+        {
+            ClipOriginal.Downloading => string.Format(Strings.Clipboard_OriginalDownloading, actions.OriginalSize(entry.Id) is { } size ? SizeText(size) : ""),
+            ClipOriginal.Expired => Strings.Clipboard_OriginalExpired,
+            ClipOriginal.NotSynced => string.Format(Strings.Clipboard_OriginalNotSynced, entry.SourceDevice ?? Strings.Clipboard_OtherDevice),
+            ClipOriginal.QuotaExceeded => Strings.Clipboard_OriginalQuota,
+            _ => null,
+        };
         // 「带格式」和标签小片（2026-11-23）：标签最多露 2 个，其余写 +N
         if (entry.Rich) MetaChips.Add(ClipTagChip.Rich());
         foreach (var name in entry.Tags.Take(2)) MetaChips.Add(ClipTagChip.Tag(name, actions.TagDot(name)));
@@ -62,6 +72,11 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     /// <summary>来源程序的真实小图标（服务缓存的 PNG）。有它就不画渐变图块。</summary>
     public ImageSource? SourcePicture { get; }
     public string MetaText { get; }
+    /// <summary>别的电脑来的图片：原图不在本机时缩略图底部的一句状态；Remote（粘贴时才下载）和本机的为 null。</summary>
+    public string? OriginalNote { get; }
+    public Visibility OriginalVisibility => V(OriginalNote is not null);
+    public double ThumbDim => Entry.Original is ClipOriginal.Expired or ClipOriginal.NotSynced ? 0.72 : 1;
+    static string SizeText(long b) => b >= 1 << 20 ? $"{b / 1048576.0:0.#} MB" : $"{Math.Max(1, b >> 10)} KB";
 
     public string TypeGlyph => Entry.Kind switch
     {
@@ -217,6 +232,10 @@ public interface IClipRowActions
     void Delete(ClipRow row);
     /// <summary>标签的色点；不带色点为 null。</summary>
     Brush? TagDot(string name);
+    /// <summary>Pane 云：别的电脑来的图片原图大小（「正在下载原图 1.2 MB」）；不知道为 null。</summary>
+    long? OriginalSize(string clipId) => null;
+    /// <summary>Pane 云：别的电脑来的图片显示出来了，缩略图还没下载就排队下载（IClipboardCloud.EnsureThumbnail）。</summary>
+    void EnsureThumbnail(string clipId) { }
 }
 
 /// <summary>标签色点（令牌 PaneTag1～6）。</summary>

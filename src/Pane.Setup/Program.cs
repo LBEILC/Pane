@@ -75,6 +75,15 @@ internal static class Program
                     step=relay?"copy-app":"extract-package";
                     UninstallChain.Log(step,"begin",path:directory);
                     if(relay)SetupFiles.Copy(args[1],directory);
+                    else if (autoUpdate && string.Equals(Path.GetFileName(Environment.ProcessPath), "Pane.Maintenance.exe", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // 增量下载已重建完整载荷。复制到原有带租约的临时目录，再交给同一个安装工作进程。
+                        string payload = AppContext.BaseDirectory;
+                        string manifest = Path.Combine(Directory.GetParent(Path.TrimEndingDirectorySeparator(payload))!.FullName, "manifest.json");
+                        var files = PayloadPatch.Manifest(File.ReadAllBytes(manifest), SetupFiles.VersionOf(Environment.ProcessPath!)!);
+                        SetupFiles.Copy(payload, directory);
+                        PayloadPatch.VerifyDirectory(directory, files);
+                    }
                     else
                     {
                         using var payload=Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip") ?? throw new IOException("安装包缺少程序文件");
