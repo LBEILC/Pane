@@ -32,12 +32,14 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
     public IReadOnlyList<CloudDevice> OtherDevices { get; private set; } = [];
     public event EventHandler? Changed;
 
-    internal SyncService(SettingsStore store, AccountService account, IEnumerable<ISyncCategory>? extensions = null)
+    internal SyncService(SettingsStore store, AccountService account, IEnumerable<ISyncCategory>? extensions = null, Memo.NoteStore? notes = null)
     {
         this.store = store;
         this.account = account;
         clipboard = Pane.Services.Clipboard.ClipboardCloudLink.For(store);
-        categories = (extensions ?? []).Concat(new[]{"clip","cliptags","control"}.Select(c=>new ClipboardCategory(this,c))).ToDictionary(c => c.Name);
+        this.notes = notes;
+        if (notes != null) notes.Changed += NotesChanged;
+        categories = (extensions ?? []).Concat(new[]{"clip","cliptags","control"}.Select(c=>new ClipboardCategory(this,c))).Append(new NotesCategory(this)).ToDictionary(c => c.Name);
         clipboard.Owner=()=>activeToken==null?null:account.SyncIdentity().Owner;
         clipboard.DeviceName=id=>OtherDevices.FirstOrDefault(d=>d.Id==id)?.Name;
         clipboard.Wake=()=>{if(Options.Clipboard)Wake();};
@@ -162,11 +164,11 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
         return Task.CompletedTask;
     }
     readonly Dictionary<string,ISyncCategory> categories;
-    string clipboardDevice="";
+    string localDeviceId="";
 
     async Task Run(string token, string encodedKey, string owner, SyncOptions options, CancellationToken ct)
     {
-        var device = clipboardDevice = account.DeviceId;
+        var device = localDeviceId = account.DeviceId;
         var key = CloudKeys.Decode(encodedKey);
         var keyId = CloudKeys.Check(key);
         var delay = 5;
@@ -190,20 +192,15 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
                     // 同一账号以 Fresh 重设密码会清空云端并更换密钥，旧游标和派生 id 都不能再用。
                     if (journal.Account == owner && journal.KeyId != keyId) journal = new();
                     LastSuccessAt = journal.LastSuccess;
-                    bool initial = !journal.Initialized || journal.Account != owner || journal.SettingsEnabled != options.Settings || journal.UsageEnabled != options.Usage || journal.ClipboardEnabled != ClipboardEnabled(options);
+                    bool syncNotes = NotesEnabled(options);
+                    if (syncNotes && (fetchDevices || pending != null)) fetchDevices = !await RefreshDevices(ct);
+                    bool initial = journal.NotesEnabled != NotesEnabled(options) || !journal.Initialized || journal.Account != owner || journal.SettingsEnabled != options.Settings || journal.UsageEnabled != options.Usage || journal.ClipboardEnabled != ClipboardEnabled(options);
                     if (initial)
                     {
                         if (!await Initial(journal, owner, token, key, device, options, ct)) return;
                     }
                     await Exchange(journal, token, key, device, options, initial || pending != null, ct);
-                    if (fetchDevices || options.Clipboard && pending != null)
-                    {
-                        var devices = await account.GetDevicesAsync(ct);
-                        ct.ThrowIfCancellationRequested();
-                        OtherDevices = devices.Value?.Where(d => !d.Current).ToArray() ?? [];
-                        fetchDevices = !devices.Ok;
-                        clipboard.History?.StorageNotify();
-                    }
+                    if (!syncNotes && (fetchDevices || options.Clipboard && pending != null)) fetchDevices = !await RefreshDevices(ct);
                     journal.LastSuccess = LastSuccessAt = DateTimeOffset.UtcNow;
                     journal.Save(file);
                     delay = 5;
@@ -241,6 +238,14 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
             lock(gate) if (!ct.IsCancellationRequested) { immediate?.TrySetResult(); immediate = null; }
         }
     }
+    async Task<bool> RefreshDevices(CancellationToken ct)
+    {
+        var devices = await account.GetDevicesAsync(ct);
+        ct.ThrowIfCancellationRequested();
+        OtherDevices = devices.Value?.Where(d => !d.Current).ToArray() ?? [];
+        clipboard.History?.StorageNotify();
+        return devices.Ok;
+    }
     async Task Wait(long cursor, string token, CancellationToken ct)
     {
         while(true)
@@ -255,7 +260,7 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
                 var reply = await remote;
                 if ((long)reply["seq"]! > cursor) return;
                 // 设备改名不推进记录游标，空闲长轮询到期时更新名称。
-                if(ClipboardEnabled(Options))
+                if(ClipboardEnabled(Options) || NotesEnabled(Options))
                 {
                     var devices=await account.GetDevicesAsync(ct);
                     if(devices.Ok)
@@ -274,6 +279,7 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
         lock(gate)
         {
             disposed = true;
+            if (notes != null) notes.Changed -= NotesChanged;
             clipboard.Owner=null; clipboard.Wake=null; clipboard.DeviceName=null;
             immediate?.TrySetCanceled(); immediate = null;
             run?.Cancel();

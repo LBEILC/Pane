@@ -285,6 +285,12 @@ internal static partial class Program
             catch (Exception error) { Console.Error.WriteLine(error); Environment.ExitCode = 1; }
             return;
         }
+        if (args is ["--notes",var notesServer,var notesPlans])
+        {
+            try { await Live(notesServer,notesPlans,notes:true); }
+            catch (Exception e) { Console.Error.WriteLine(e); Environment.ExitCode=1; }
+            return;
+        }
         if(args is ["--clipboard-echo",var echoServer,var echoPlans]){await Live(echoServer,echoPlans,clipboard:true,echo:true);return;}
         if(args is ["--clipboard",var binary,var prices,..var rest]){await Live(binary,prices,clipboard:true,perf:rest.FirstOrDefault());return;}
         if (args is ["--perf",var exe,var priceFile,var baseline,var current]) { await Live(exe,priceFile,baseline,current); return; }

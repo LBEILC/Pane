@@ -2,7 +2,7 @@
 // 界面开发期间用 DesignData/LauncherSampleSearch 的假数据。
 namespace Pane.Contracts;
 
-public enum LauncherItemKind { App, File, Folder, Command, Calculation, Web, Ai, Action }
+public enum LauncherItemKind { App, File, Folder, Command, Calculation, Web, Ai, Action, Note }   // Note：备忘录（123），界面自己打开窗口
 
 /// <summary>标题里要高亮的一段（按 UTF-16 下标）。搜索命中时加粗加下划线。</summary>
 public readonly record struct TextSpan(int Start, int Length);
@@ -179,6 +179,35 @@ public static class LauncherGroups
     public const string Timer = "timer";   // 定时关机（058）：「30 分钟后关机」这类说法的结果，排在最前，列表样式
     // 直达（098，issue 52）：输入本身是网址或路径时的「打开网址 / 打开文件夹 / 打开文件」，排在最前（定时之后），列表样式
     public const string Direct = "direct";
+    // 最佳结果（121，issue 69 / 86）：同样的输入以前选过的那一项，最多 1 条，排在最前（直达、定时之后），列表样式；它不再出现在原来的组里
+    public const string Best = "best";
+    // 备忘录（123）：搜到的备忘录，最多 3 条，列表样式，Id 写成 "note:" + 备忘录 id
+    public const string Notes = "notes";
+}
+
+/// <summary>
+/// 搜索记忆（121，issue 69 / 86，2026-11-25 设计定）：记住「输入什么、选了哪个」，SearchAsync 据此给出 <see cref="LauncherGroups.Best"/>。
+/// 只存本机（不同步、不进数据导出）；<c>LauncherSettings.LearnSelections</c> 关掉时不记也不用。
+/// 设置 → 启动器的「清空」调 <see cref="Clear"/>；条目「从最近使用中移除」「不在搜索中显示」时服务自己删掉这一项的记录。
+/// </summary>
+/// <summary>应用快捷键（122）的状态：注册成功、被别的程序或 Pane 自己的热键占用、应用找不到了、没生效（启动器能力停用或热键暂停）。</summary>
+public enum AppHotkeyState { Active, Occupied, AppMissing, Off }
+
+/// <summary>
+/// 应用快捷键（122，issue 67 / 62，2026-11-25 设计定）：按 <c>LauncherSettings.AppHotkeys</c> 注册全局热键，按下就启动这个应用，已在运行就切到它的窗口。
+/// 设置 → 快捷键 →「应用快捷键」组显示 <see cref="State"/>；状态变化时发 <see cref="Changed"/>（可能在后台线程触发）。
+/// </summary>
+public interface IAppHotkeys
+{
+    AppHotkeyState State(string appId);
+    event EventHandler? Changed;
+}
+
+public interface ISearchMemory
+{
+    /// <summary>记了多少个不同的输入（设置里显示用）。</summary>
+    int Count { get; }
+    void Clear();
 }
 
 /// <summary>

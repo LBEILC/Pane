@@ -50,6 +50,10 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
     static readonly FontFamily Mono = new("Cascadia Mono, Consolas, Microsoft YaHei UI");
     public string Glyph => Item.Icon.Glyph;
     public string? Hotkey => Item.Hotkey;
+    /// <summary>文件、文件夹行尾的类型标签（issue 82）：大写扩展名或「文件夹」。</summary>
+    public string? TypeTag => Cell == LauncherCell.File && Item.Kind is LauncherItemKind.File or LauncherItemKind.Folder
+        ? Pane.Views.Files.FileKinds.TypeTag(Item.Title, Item.Kind == LauncherItemKind.Folder) : null;
+    public Visibility TypeTagVisibility => TypeTag is null ? Visibility.Collapsed : Visibility.Visible;
     public string Title => Item.Title;
     public string CalcText => "= " + Item.Title;
     public Brush? Gradient { get; }

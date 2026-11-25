@@ -43,6 +43,9 @@ public sealed partial class SettingsView
         // 从搜索栏展开（issue 38）：「都不显示」时没有内容可展开，变灰
         var expand = Switch(l.ExpandOnOpen, v => SaveLauncher(x => x with { ExpandOnOpen = v }));
         Enable(expand, l.Home != LauncherHome.Nothing);
+        // 记住搜索时的选择（121，issue 69 / 86）：「清空」删掉全部记录，没有记录时变灰
+        var clearSelections = Button(Strings.Common_Clear, "trash", () => { app.SearchMemory?.Clear(); selectionsCleared = true; Render(); });
+        Enable(clearSelections, !selectionsCleared && (app.SearchMemory?.Count ?? 0) > 0);
         Group(Strings.Settings_Launcher_Activation,
             hotkeyRow,
             Row(Strings.Settings_Launcher_Position, moved ? Strings.Settings_Launcher_PositionSaved : Strings.Settings_Launcher_PositionDefault, reset),
@@ -57,6 +60,8 @@ public sealed partial class SettingsView
                 Seg([("RecentAndPinned", Strings.Settings_Launcher_HomeRecent), ("RecentOnly", Strings.Settings_Launcher_HomeRecentOnly), ("PinnedOnly", Strings.Settings_Launcher_HomePinned), ("Nothing", Strings.Settings_Launcher_HomeHidden)], l.Home.ToString(),
                     v => { SaveLauncher(x => x with { Home = Enum.Parse<LauncherHome>(v) }); Later(); })),
             Row(Strings.Settings_Launcher_ExpandOnOpen, Strings.Settings_Launcher_ExpandOnOpenDescription, expand),
+            Row(Strings.Settings_Launcher_LearnSelections, selectionsCleared ? Strings.Settings_Launcher_CommandsCleared : Strings.Settings_Launcher_LearnSelectionsDescription,
+                Switch(l.LearnSelections, v => SaveLauncher(x => x with { LearnSelections = v })), clearSelections),
             Row(Strings.Settings_Launcher_AutoAttach, Strings.Settings_Launcher_AutoAttachDescription,
                 Seg([("0", Strings.Common_Off), ("1", Strings.Settings_Launcher_AttachOneSecond), ("3", Strings.Settings_Launcher_AttachThreeSeconds), ("5", Strings.Settings_Launcher_AttachFiveSeconds)], l.AutoAttachSeconds.ToString(),
                     v => SaveLauncher(x => x with { AutoAttachSeconds = int.Parse(v) }))));
@@ -118,6 +123,7 @@ public sealed partial class SettingsView
             direct.Add(KeywordRow(Strings.Launcher_AskAi, "ask", l.AskKeywords));
         }
         direct.Add(KeywordRow(Strings.Launcher_SearchFiles, "files", l.FilesKeywords));
+        if (ModuleGate.On(ModuleIds.Memo)) direct.Add(KeywordRow(Strings.Memo_SaveAs, "memo", l.MemoKeywords));   // 备忘录（123）：「bw 内容」直接存
         if (keywordError != null) direct.Add(Row(Strings.Common_NotSaved, null, Status(false, keywordError)));
         Group(Strings.Settings_Launcher_DirectKeywords, direct.ToArray(), Strings.Settings_Launcher_DirectKeywordsDescription);
 
@@ -220,7 +226,7 @@ public sealed partial class SettingsView
                 Switch(l.RememberCommands, v => SaveLauncher(x => x with { RememberCommands = v })), clearHistory)],
             Strings.Settings_Launcher_TerminalDescription);
     }
-    bool terminalCleared, webHistoryCleared;
+    bool terminalCleared, webHistoryCleared, selectionsCleared;
 
     // 关键字直达的一行：多个关键字用空格隔开，留空 = 不用。CommitField 的错误本来写给 AI 分区，这里自己记
     string? keywordError;
@@ -234,15 +240,17 @@ public sealed partial class SettingsView
         var l = app.Store.Current.Launcher;
         var others = which switch
         {
-            "translate" => l.AskKeywords.Concat(l.FilesKeywords),
-            "ask" => l.TranslateKeywords.Concat(l.FilesKeywords),
-            _ => l.TranslateKeywords.Concat(l.AskKeywords),
+            "translate" => l.AskKeywords.Concat(l.FilesKeywords).Concat(l.MemoKeywords),
+            "ask" => l.TranslateKeywords.Concat(l.FilesKeywords).Concat(l.MemoKeywords),
+            "memo" => l.TranslateKeywords.Concat(l.AskKeywords).Concat(l.FilesKeywords),
+            _ => l.TranslateKeywords.Concat(l.AskKeywords).Concat(l.MemoKeywords),
         };
         if (keys.FirstOrDefault(k => others.Contains(k, StringComparer.OrdinalIgnoreCase)) is { } dup) return string.Format(Strings.Settings_Launcher_KeywordDuplicate, (object?)(dup));
         return Try(() => SaveLauncher(x => which switch
         {
             "translate" => x with { TranslateKeywords = keys },
             "ask" => x with { AskKeywords = keys },
+            "memo" => x with { MemoKeywords = keys },
             _ => x with { FilesKeywords = keys },
         }));
     }

@@ -14,6 +14,7 @@ public static class ModuleIds
     public const string Rename = "rename";
     public const string PowerTimer = "power-timer";   // 定时关机（2026-11-05，058）
     public const string Words = "words";   // 分词（2026-11-09，093）
+    public const string Memo = "memo";   // 备忘录（2026-11-25，123，Contracts/Notes.cs）
     public const string Cloud = "cloud";   // Pane 云：账号、云同步、会员下载（2026-11-24，docs/cloud.md「总体」，Contracts/Cloud.cs）
 }
 

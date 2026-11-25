@@ -21,8 +21,9 @@ public sealed partial class App
         }
     }
 
-    // 已接好 Hiding / EngageRequested 的剪贴板面板（能力停用再启用时面板是新建的，重新接）
-    GlassPanel? focusWiredPanel;
+    // 按键接管现在归剪贴板（2026-11-25）：钉住的剪贴板放开键盘后和超级面板可能同时开着，结束接管前先看是不是自己的
+    bool clipboardKeys;
+    void EndClipboardKeys(){if(!clipboardKeys)return;clipboardKeys=false;panelKeys?.End();}
 
     /// <summary>以不激活方式显示剪贴板；不能接管时返回 false，调用方照原来激活显示。</summary>
     bool ShowClipboardPassive(GlassPanel panel)
@@ -33,12 +34,7 @@ public sealed partial class App
         GetWindowThreadProcessId(foreground,out uint pid);
         if(pid==(uint)Environment.ProcessId)return false;   // 从启动器等 Pane 自己的窗口切过来
         if(!keys.Begin(foreground,ModuleGate.On(ModuleIds.Launcher))){view.Passive=false;return false;}
-        if(!ReferenceEquals(focusWiredPanel,panel))
-        {
-            focusWiredPanel=panel;
-            panel.Hiding+=(_,_)=>{panelKeys?.End();view.Passive=false;};
-            view.EngageRequested+=(_,_)=>{panelKeys?.End();EngageClipboard(panel,view);};
-        }
+        clipboardKeys=true;
         view.Passive=true;
         panel.Show(activate:false,passive:true);
         return true;
@@ -54,14 +50,14 @@ public sealed partial class App
     void OnPanelKey(object? sender,PanelKeyPress press)
     {
         if(SuperPanelKey(press))return;   // 超级面板不激活打开时（079）
-        if(!panels.TryGetValue("clipboard",out var panel)||!panel.Shown||!panel.Passive||panel.View is not ClipboardView view){panelKeys?.End();return;}
+        if(!clipboardKeys||!panels.TryGetValue("clipboard",out var panel)||!panel.Shown||!panel.Passive||panel.View is not ClipboardView view){clipboardKeys=false;panelKeys?.End();return;}
         // 操作列表、标签、编辑（2026-11-23，106）：先切到激活方式，模式里要用到搜索框、数字键和编辑框
-        if(press.Key is PanelKey.More or PanelKey.Tags or PanelKey.Edit){panelKeys?.End();EngageClipboard(panel,view);view.HandleKey(press);return;}
+        if(press.Key is PanelKey.More or PanelKey.Tags or PanelKey.Edit){EndClipboardKeys();EngageClipboard(panel,view);view.HandleKey(press);return;}
         if(press.Key==PanelKey.Type)
         {
             // 先激活、聚焦搜索框，再让服务把排队的键重放进来（输入法照常组字）
             EngageClipboard(panel,view);
-            panelKeys?.ReplayAndEnd();
+            clipboardKeys=false;panelKeys?.ReplayAndEnd();
             return;
         }
         view.HandleKey(press);

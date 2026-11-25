@@ -43,16 +43,17 @@ internal sealed partial class DataStorage
     public Task<DataExportResult> ExportAsync(string path,DataExportOptions options,IProgress<double>? progress,CancellationToken cancellationToken)=>Task.Run(async()=>{
         await operation.WaitAsync(cancellationToken).ConfigureAwait(false);
         try{
+            if(FlushNotes is {} flush) await flush().WaitAsync(cancellationToken).ConfigureAwait(false);
             if(options.Usage)await flushUsage().WaitAsync(cancellationToken).ConfigureAwait(false);
             if(history() is {} loading)await loading.Ready.ConfigureAwait(false);
             lock(settings.StorageSync){
                 var active=history();if(active?.Ready.IsCompletedSuccessfully!=true)active=null;
                 lock(active?.StorageGate??settings.StorageSync)
-                    return ExportCore(settings.DirectoryPath,path,options,active?.StorageIndex(),progress,cancellationToken);
+                    return ExportCore(settings.DirectoryPath,path,options,active?.StorageIndex(),progress,cancellationToken,CurrentMemoFolder);
             }
         }finally{operation.Release();}
     },cancellationToken);
-    static DataExportResult ExportCore(string data,string path,DataExportOptions options,ClipboardIndex? snapshot,IProgress<double>? progress,CancellationToken token)
+    static DataExportResult ExportCore(string data,string path,DataExportOptions options,ClipboardIndex? snapshot,IProgress<double>? progress,CancellationToken token,string? memoFolder=null)
     {
         string temp=path+"."+Guid.NewGuid().ToString("N")+".tmp";
         try{
@@ -83,6 +84,7 @@ internal sealed partial class DataStorage
                 }).ToArray();
                 contents.Add("clipboard/history.json",JsonSerializer.SerializeToUtf8Bytes(state with{Entries=clips,Ledger=null},ClipboardJson.Default.ClipboardIndex));
             }
+            ExportNotes(memoFolder ?? MemoFolder(data), contents, images);
             var manifest=new JsonObject{["format"]=options.Clipboard==ClipboardExport.None?1:2,["app"]=SettingsStore.CurrentVersion(),["exportedAt"]=DateTimeOffset.UtcNow.ToString("O"),["settings"]=contents.ContainsKey("settings/settings.json"),["usage"]=contents.Keys.Any(n=>n.StartsWith("usage/",StringComparison.Ordinal)),["clipboard"]=options.Clipboard!=ClipboardExport.None,["clipboardEntries"]=clips.Length,["clipboardImages"]=clips.Count(c=>c.Entry.Kind==ClipKind.Image)};
             contents.Add("manifest.json",Encoding.UTF8.GetBytes(manifest.ToJsonString()));
             int done=0,total=contents.Count+images.Count;progress?.Report(0);
@@ -108,7 +110,7 @@ internal sealed partial class DataStorage
         if(!name.StartsWith("clipboard/images/",StringComparison.Ordinal))return false;
         string leaf=name[17..];return leaf.EndsWith(".png",StringComparison.Ordinal)&&Guid.TryParseExact(leaf.EndsWith(".thumb.png",StringComparison.Ordinal)?leaf[..^10]:leaf[..^4],"N",out _);
     }
-    static bool Allowed(string name)=>TransferFiles.Contains(name)||ImageName(name)||RichName(name);
+    static bool Allowed(string name)=>TransferFiles.Contains(name)||ImageName(name)||RichName(name)||MemoEntry(name);
     static bool RichName(string name)=>name.StartsWith("clipboard/",StringComparison.Ordinal)&&name.EndsWith(".rich",StringComparison.Ordinal)&&name.Length==47&&Guid.TryParseExact(name.AsSpan(10,32),"N",out _);
     static JsonObject ValidateArchive(ZipArchive zip)
     {
@@ -139,8 +141,8 @@ internal sealed partial class DataStorage
         try{
             DeletePending(data);using var zip=ZipFile.OpenRead(path);var manifest=ValidateArchive(zip);
             if(!Enum.IsDefined(options.Mode))throw Invalid();
-            var entries=zip.Entries.Where(e=>Allowed(e.FullName)&&(e.FullName.StartsWith("settings/",StringComparison.Ordinal)?options.Settings:e.FullName.StartsWith("usage/",StringComparison.Ordinal)?options.Usage:options.Clipboard)).ToArray();
-            if(!entries.Any(e=>TransferFiles.Contains(e.FullName)))throw new DataStorageException(Strings.Data_ImportNothing);
+            var entries=zip.Entries.Where(e=>Allowed(e.FullName)&&(MemoEntry(e.FullName)|| (e.FullName.StartsWith("settings/",StringComparison.Ordinal)?options.Settings:e.FullName.StartsWith("usage/",StringComparison.Ordinal)?options.Usage:options.Clipboard))).ToArray();
+            if(!entries.Any(e=>TransferFiles.Contains(e.FullName)||MemoEntry(e.FullName)))throw new DataStorageException(Strings.Data_ImportNothing);
             int done=0;progress?.Report(0);
             foreach(var entry in entries){
                 cancellationToken.ThrowIfCancellationRequested();string target=Path.Combine(root,entry.FullName.Replace('/',Path.DirectorySeparatorChar));Directory.CreateDirectory(Path.GetDirectoryName(target)!);
@@ -161,6 +163,7 @@ internal sealed partial class DataStorage
     },cancellationToken);
     static void ValidatePayload(string root)
     {
+        if(Directory.Exists(Path.Combine(root,"memo"))) ImportNotes(Path.Combine(root,"memo"));
         foreach(string name in TransferFiles){string path=Path.Combine(root,name);if(!File.Exists(path))continue;using var doc=JsonDocument.Parse(File.ReadAllText(path));if(doc.RootElement.ValueKind is not(JsonValueKind.Object or JsonValueKind.Array))throw Invalid();}
         string usage=Path.Combine(root,"usage/launcher-usage.json");
         if(File.Exists(usage))foreach(var pair in ReadObject(usage)){

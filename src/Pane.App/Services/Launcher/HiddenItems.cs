@@ -15,6 +15,7 @@ internal sealed partial class LauncherSearch:ILauncherHiddenItems
             if(current.Launcher.HiddenItems.Any(e=>s.Aliases.GetValueOrDefault(e.Id,e.Id)==id))return current;
             return current with{Launcher=current.Launcher with{HiddenItems=[..current.Launcher.HiddenItems,new(id,item.Title)]}};
         });
+        SearchMemory.Remove(item.Id);
     }
     public void Unhide(string id)=>store.Update(current=>current.Launcher.HiddenItems.Any(e=>e.Id==id)
         ?current with{Launcher=current.Launcher with{HiddenItems=current.Launcher.HiddenItems.Where(e=>e.Id!=id).ToArray()}}:current);

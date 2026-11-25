@@ -16,6 +16,17 @@ internal sealed record LauncherSnapshot(IndexedApp[] Apps,SearchEntry[] Favorite
 }
 internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
 {
+    internal event EventHandler? HotkeyIndexChanged;
+    internal IndexedApp? FindHotkeyApp(string id){
+        var current=Volatile.Read(ref snapshot);
+        string canonical=current.Aliases.GetValueOrDefault(id,id);
+        return current.Apps.FirstOrDefault(app=>app.Id==canonical);
+    }
+    internal Task PressHotkeyAsync(IndexedApp app){
+        if(!app.Packaged && string.IsNullOrEmpty(app.Target))app=app with{Target=IndexedTarget(app)?.Path};
+        return AppHotkeyWindows.OpenAsync(app,()=>ExecuteAsync(ApplicationSource.Item(app,LauncherGroups.Applications),lifetime.Token));
+    }
+    internal Func<INoteStore?> NoteProvider { get; set; } = () => null;
     internal Func<IPowerTimer?> PowerTimerProvider { get; set; } = () => null;
     readonly TerminalService terminal;
     public ITerminalHistory TerminalHistory=>terminal.History;
@@ -45,10 +56,10 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();lastPortable=store.Current.Launcher.Portable.ToArray();
         environment??=new LauncherEnvironment();process??=new LaunchProcess();
         terminal=new(store,environment,process,programs);
-        WebSearchHistory=new(store);
+        WebSearchHistory=new(store); SearchMemory=new(store.DirectoryPath);
         portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
         actions=new(portablePlatform,executor,process);
-        sources=[new DirectSource(executor),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new CommandSource(executor),new WebSource(executor)];
+        sources=[new DirectSource(executor),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new NoteSource(() => NoteProvider()),new CommandSource(executor, () => NoteProvider() != null),new WebSource(executor)];
         store.LocalUsageReplaced += ReloadUsage;
         try{ReloadUsage();}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
@@ -112,6 +123,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
             Volatile.Write(ref snapshot,value.Snapshot with{Aliases=value.Metrics.Aliases});Metrics=value.Metrics;PrunePortable();portableStatus=new(value.Metrics.PortableStatus??[],StringComparer.OrdinalIgnoreCase);lastBuilt=value.BuiltAt;IndexError=null;
         }
         if(changed)SaveUsage();
+        HotkeyIndexChanged?.Invoke(this,EventArgs.Empty);
         AliasesChanged?.Invoke(this,EventArgs.Empty);
     }
     // ---- 设置页「应用图标」（设计加，IAppIconCatalog）----
@@ -144,23 +156,35 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     async Task<LauncherResult> SearchCoreAsync(string query,Action<LauncherResult>? partial,CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
+        var learningQuery=LearningQuery(query,context.Settings);
         var selected=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).ToArray();
         var pending=selected.Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
-        if(partial!=null){
-            var local=await Task.WhenAll(pending.Where((_,i)=>selected[i] is not FileSource)).ConfigureAwait(false);
+        IReadOnlyList<LauncherItem>[]? local = null;
+        if (partial != null)
+        {
+            local = await Task.WhenAll(pending.Where((_, i) => selected[i] is not FileSource)).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
-            if(pending.Any(t=>!t.IsCompleted))partial(Result(local,context));
+            if (pending.Any(t => !t.IsCompleted))
+            {
+                partial(await Result(local, context, learningQuery, false, cancellationToken).ConfigureAwait(false));
+                local = null;
+            }
         }
-        var groups=await Task.WhenAll(pending).ConfigureAwait(false);cancellationToken.ThrowIfCancellationRequested();
-        return Result(groups,context);
+        var groups = await Task.WhenAll(pending).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        var result = Result(groups, context, learningQuery, true, cancellationToken);
+        if (local != null && !result.IsCompleted)
+            partial!(await Result(local, context, learningQuery, false, cancellationToken).ConfigureAwait(false));
+        return await result.ConfigureAwait(false);
     }
-    LauncherResult Result(IReadOnlyList<LauncherItem>[] groups,SourceContext context)
+    async Task<LauncherResult> Result(IReadOnlyList<LauncherItem>[] groups, SourceContext context, string? learningQuery, bool final, CancellationToken token)
     {
         var rows=groups.SelectMany(g=>g).Where(item=>store.Current.Clipboard.Enabled||item.Id!="command:clipboard").ToArray();
         bool dark=Pane.Services.Icons.IconTheme.IsDark(store.Current.General.Theme);
         var apps=context.Snapshot.Apps.ToDictionary(a=>a.Id);
         if(context.Snapshot.IconSettingsKey==lastIcons)
             for(int i=0;i<rows.Length;i++)if(apps.TryGetValue(rows[i].Id,out var app)){var path=dark?app.DarkIcon:app.LightIcon;if(path!=null&&File.Exists(path))rows[i]=rows[i] with{Icon=new("app",path)};}
+        rows=await ApplyLearningAsync(rows,learningQuery,context,final,token).ConfigureAwait(false);
         return new(rows,context.Query.Length==0,groups.OfType<LauncherFileRows>().FirstOrDefault()?.Total??0);
     }
     static async Task<IReadOnlyList<LauncherItem>> SearchSource(ILauncherSource source,SourceContext context,CancellationToken token){
@@ -173,8 +197,9 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     internal static string BuildUrl(SearchEngine engine,string text)=>engine.UrlTemplate.Replace("{query}",Uri.EscapeDataString(text),StringComparison.Ordinal);
     public async Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();if(item.Id is "rename" or "power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
+        cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename"){RecordSelection(item);return;}if(item.Id=="power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         await source.ExecuteAsync(item,Context(""),cancellationToken).ConfigureAwait(false);
+        RecordSelection(item);
         if(item.Kind==LauncherItemKind.Web&&item.Id.StartsWith("web:",StringComparison.Ordinal))WebSearchHistory.RecordUrl(store.Current.Launcher.SearchEngines,item.Id[4..]);
         if(item.Kind==LauncherItemKind.File&&item.Id.StartsWith("file:",StringComparison.Ordinal))await RememberOpenedAsync(item.Id[5..]).ConfigureAwait(false);
     }
@@ -206,5 +231,5 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         if(actionId=="web-search"&&attachment.Text!=null){var engine=DefaultEngine(store.Current.Launcher);await executor.OpenAsync(BuildUrl(engine,attachment.Text),false,cancellationToken);WebSearchHistory.Record(engine,attachment.Text);return;}
         throw new NotSupportedException(actionId);
     }
-    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.LocalUsageReplaced-=ReloadUsage;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();WebSearchHistory.Dispose();lifetime.Dispose();}
+    public void Dispose(){lock(sync){if(disposed)return;disposed=true;store.LocalUsageReplaced-=ReloadUsage;store.Changed-=SettingsChanged;if(index is ProcessLauncherIndex processIndex)processIndex.OriginalsReady-=PublishOriginals;}lifetime.Cancel();indexing.GetAwaiter().GetResult();terminal.Dispose();WebSearchHistory.Dispose();SearchMemory.Dispose();lifetime.Dispose();}
 }

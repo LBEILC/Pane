@@ -131,7 +131,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     /// <summary>拖动上下边缘：新高度（DIP）和是不是上边缘（上边缘变高时面板下边不动）。宿主转给 GlassPanel.ResizeTo。</summary>
     public event EventHandler<(double Height, bool FromTop)>? HeightDragged;
     public event EventHandler? CloseRequested;
-    public UIElement? DragRegion => null;
+    // 拖动（2026-11-25）：搜索行底下的拖动底面；搜索框和按钮不在里面，按在它们上面不拖
+    public UIElement? DragRegion => MoveArea;
 
     public void OnShowing(PanelShowContext context)
     {
@@ -145,6 +146,9 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         else Notice.Show(null);
         activate = context.Activate;
         previousWindow = context.PreviousForegroundWindow;
+        // 钉住只在这次打开期间有效（2026-11-25）；设计预览 PANE_DESIGN_CLIP_PINNED=1 打开就是钉住的样子
+        SetPinned(Environment.GetEnvironmentVariable("PANE_DESIGN_CLIP_PINNED") == "1" && !ForLauncher, notify: false);
+        PinPanelButton.Visibility = ForLauncher ? Visibility.Collapsed : Visibility.Visible;   // 叠在启动器上：挑一条就回启动器，不给钉住
         filter = "all";
         pinsOpen = Environment.GetEnvironmentVariable("PANE_DESIGN_PINS_OPEN") == "1"; // 设计预览：展开已固定区
         // 设计预览：PANE_DESIGN_QUERY / PANE_DESIGN_FILTER 预先填入，不按键盘就能截图
@@ -414,6 +418,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
                 VirtualKey.Down => new(PanelKey.Down),
                 VirtualKey.Up => new(PanelKey.Up),
                 VirtualKey.Enter => new(shift ? PanelKey.ShiftEnter : PanelKey.Enter),
+                VirtualKey.P when ctrl && shift => new(PanelKey.PinPanel),
                 VirtualKey.P when ctrl => new(PanelKey.Pin),
                 VirtualKey.B when ctrl => new(PanelKey.Words),
                 VirtualKey.K when ctrl => new(PanelKey.More),
@@ -432,6 +437,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     /// </summary>
     public void HandleKey(PanelKeyPress press)
     {
+        if (press.Key == PanelKey.PinPanel) { TogglePinned(); return; }   // 哪种模式下都能钉住 / 取消
         if (ModeKey(press)) return;
         switch (press.Key)
         {
@@ -548,9 +554,40 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
         // 叠在启动器上打开的：不粘贴，交给启动器（宿主收起剪贴板、焦点回启动器）
         if (ForLauncher) { UseInLauncher?.Invoke(this, entry); return; }
         var id = entry.Id;
-        CloseRequested?.Invoke(this, EventArgs.Empty);
-        try { await history.PasteAsync(id, plainText, previousWindow, CancellationToken.None); }
+        AfterUse();
+        try { await history.PasteAsync(id, plainText, Target, CancellationToken.None); }
         catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.Common_Paste, e); } // 面板已收起：屏幕中间提示
+    }
+
+    // ---------------- 钉住面板（2026-11-25，docs/design.md「剪贴板钉住与拖动」） ----------------
+
+    /// <summary>钉住：粘贴后、点别处都不收起（宿主 GlassPanel.Pinned 读它）。每次呼出取消，收起时宿主也会取消。</summary>
+    public bool Pinned { get; private set; }
+    public event EventHandler<bool>? PinnedChanged;
+    /// <summary>钉住时粘贴 / 执行了一项（面板不收起）：宿主放开按键接管、切回不激活方式。</summary>
+    public event EventHandler? PastedWhilePinned;
+    /// <summary>钉住时贴到哪：宿主给「最近一次在前台的非 Pane 窗口」。没给或给 0 时用打开时的原窗口。</summary>
+    public Func<nint>? PasteTarget { get; set; }
+    nint Target => Pinned && PasteTarget?.Invoke() is { } t && t != 0 ? t : previousWindow;
+
+    public void SetPinned(bool on, bool notify = true)
+    {
+        if (on && ForLauncher) on = false;
+        if (Pinned == on) return;
+        Pinned = on;
+        PinPanelIcon.IsFilled = on;   // 同文件窗口的「总在最前」：状态靠形状表达
+        ToolTipService.SetToolTip(PinPanelButton, on ? Strings.Clipboard_UnpinPanelHint : Strings.Clipboard_PinPanelHint);
+        if (notify) PinnedChanged?.Invoke(this, on);
+    }
+    void TogglePinned() => SetPinned(!Pinned);
+    void OnPinPanel(object sender, RoutedEventArgs e) => TogglePinned();
+
+    /// <summary>粘贴 / 执行之后：没钉住就收起；钉住了面板留着（宿主放开键盘），列表照常（顺序冻结的规则不变）。</summary>
+    void AfterUse()
+    {
+        if (!Pinned) { CloseRequested?.Invoke(this, EventArgs.Empty); return; }
+        PastedWhilePinned?.Invoke(this, EventArgs.Empty);
+        Render(keepSelection: true);
     }
 
     /// <summary>启动器开着时按剪贴板热键，剪贴板叠在启动器上打开（2026-11-08 用户定）：选中条目交给启动器，不粘贴。宿主在显示前设。</summary>
@@ -570,6 +607,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
 
     /// <summary>「分词」（093）：宿主收到后打开分词窗口拆这条文字（剪贴板收起）。</summary>
     public event EventHandler<ClipEntry>? OpenWords;
+    /// <summary>操作列表「存为备忘录」（123）：文字条目存成一条新备忘录。</summary>
+    public event EventHandler<ClipEntry>? SaveMemo;
     public void Words(ClipRow row) => OpenWords?.Invoke(this, row.Entry);
 
     public void TogglePin(ClipRow row) => history.SetPinned(row.Entry.Id, !row.Entry.Pinned);
@@ -634,7 +673,8 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
             compact = [(["Enter"], Strings.Common_Paste), (["Shift", "+", "Enter"], shift), (["Alt", "+", "1~9"], Strings.Clipboard_QuickPaste),
                 (["Ctrl", "+", "K"], Strings.Launcher_MoreActions), .. send ? new[] { (new[] { "Tab" }, Strings.Clipboard_SendToLauncher) } : []];
             full = [(["↑", "↓"], Strings.Clipboard_Select), .. compact, (["Ctrl", "+", "T"], Strings.Clipboard_Tags), (["Ctrl", "+", "E"], Strings.Common_Edit),
-                (["Ctrl", "+", "P"], Strings.Clipboard_Pin), .. words ? new[] { (new[] { "Ctrl", "+", "B" }, Strings.Words_Open) } : []];
+                (["Ctrl", "+", "P"], Strings.Clipboard_Pin), .. words ? new[] { (new[] { "Ctrl", "+", "B" }, Strings.Words_Open) } : [],
+                (["Ctrl", "+", "Shift", "+", "P"], Strings.Clipboard_PinPanel)];
         }
         var key = string.Join("|", compact.Select(c => c.label)) + "/" + string.Join("|", full.Select(c => c.label)) + "/" + hints;
         if (key == footKey) return;

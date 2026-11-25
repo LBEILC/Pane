@@ -20,8 +20,11 @@ public sealed record FileHit(string Path, string Name, FileCategory Category, lo
 /// <summary>
 /// 一页结果。Total：当前分类下的总数（不只是这一页）。
 /// Counts：同一个关键词下每个分类的数量（含 All）；取不到或还没算完时为 null，界面就不显示数字。
+/// Folder（2026-11-25，任务 120，issue 60）：关键词是一个存在的完整文件夹路径时，这一页是「列这个文件夹」：
+/// Folder 是规范化后的完整路径；offset = 0 那一页的 Items[0] 是这个文件夹本身，后面是它直接包含的文件和文件夹。
+/// Total、Counts 都只算这个文件夹里的（Total 另加文件夹本身那 1 条）。普通搜索为 null。
 /// </summary>
-public sealed record FilePage(IReadOnlyList<FileHit> Items, int Total, IReadOnlyDictionary<FileCategory, int>? Counts);
+public sealed record FilePage(IReadOnlyList<FileHit> Items, int Total, IReadOnlyDictionary<FileCategory, int>? Counts, string? Folder = null);
 
 /// <summary>
 /// 右侧预览要的、FileHit 里没有的信息。都可以为 null（取不到就不显示那一项）。

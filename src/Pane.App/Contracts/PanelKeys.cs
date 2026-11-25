@@ -41,6 +41,8 @@ public enum PanelKey
     Tags,
     /// <summary>Ctrl+E（106）：剪贴板模式下拦，界面切到激活方式、原地编辑</summary>
     Edit,
+    /// <summary>Ctrl+Shift+P（2026-11-25，130）：剪贴板模式下拦，钉住 / 取消钉住面板（不切到激活方式）。Ctrl+P（不带 Shift）仍是 Pin</summary>
+    PinPanel,
 }
 
 /// <summary>接管哪一组键。</summary>

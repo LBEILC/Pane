@@ -13,10 +13,10 @@ internal static class StorageLocation
     static readonly ConditionalWeakTable<SettingsStore,State> states=new();
     public static LargeFilesLocation Resolve(SettingsStore settings)=>Volatile.Read(ref states.GetValue(settings,s=>new(Initial(s))).Location);
     public static void Set(SettingsStore settings,LargeFilesLocation location)=>Volatile.Write(ref states.GetValue(settings,s=>new(Initial(s))).Location,location);
-    static LargeFilesLocation Initial(SettingsStore settings)
+    static LargeFilesLocation Initial(SettingsStore settings)=>Resolve(settings.DirectoryPath,settings.Current.Storage.LargeFilesDirectory);
+    internal static LargeFilesLocation Resolve(string data,string? configured)
     {
-        string fallback=Path.Combine(settings.DirectoryPath,"clipboard");
-        string? configured=settings.Current.Storage.LargeFilesDirectory;
+        string fallback=Path.Combine(data,"clipboard");
         bool unavailable=configured!=null&&!Available(configured);
         return new(configured==null||unavailable?fallback:configured,configured==null||unavailable,configured,unavailable);
     }

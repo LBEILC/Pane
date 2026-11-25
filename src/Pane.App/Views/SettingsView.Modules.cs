@@ -38,6 +38,8 @@ public sealed partial class SettingsView
             [(ModuleIds.Launcher, Strings.Module_PowerTimer_WithLauncher)]),
         ModuleIds.Words => (Strings.Module_Words_Name, "words", Strings.Module_Words_Description,
             [(ModuleIds.Clipboard, Strings.Module_Words_WithClipboard), (ModuleIds.Launcher, Strings.Module_Words_WithLauncher)]),
+        ModuleIds.Memo => (Strings.Memo_Title, "note", Strings.Module_Memo_Description,
+            [(ModuleIds.Launcher, Strings.Module_Memo_WithLauncher), (ModuleIds.Clipboard, Strings.Module_Memo_WithClipboard)]),
         // Pane 云（2026-11-24 开卖放出）：账号、云同步、会员下载算一项，规则见 docs/cloud.md「总体」
         ModuleIds.Cloud => (Strings.Module_Cloud_Name, "cloud", Strings.Module_Cloud_Description,
             [(ModuleIds.Clipboard, Strings.Module_Cloud_WithClipboard), (ModuleIds.Launcher, Strings.Module_Cloud_WithLauncher)]),

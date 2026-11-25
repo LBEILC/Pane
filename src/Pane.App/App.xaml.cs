@@ -71,7 +71,11 @@ public sealed partial class App : Application
             Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(ModuleShellSettings());ApplySuperSettings();folderJump?.Apply(Store.Current.FolderJump);};
             if(Enum.TryParse<ThemeMode>(Environment.GetEnvironmentVariable("PANE_THEME"),true,out var theme))Glass.Apply(Glass.Current with {Theme=theme});
             int startupLevel=MemoryStartupLevel();
-            if(!demo&&startupLevel>=5){shell=new ShellHost(Command,ModuleShellSettings());shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
+            if(!demo&&startupLevel>=5){
+                shell=new ShellHost(Command,ModuleShellSettings());
+                shell.AppExists=id=>launcherSearch?.FindHotkeyApp(id)!=null;
+                shell.PressApp=id=>queue.TryEnqueue(()=>PressAppHotkey(id));
+                shell.HotkeyOccupied+=(_,conflict)=>{if(controlsEnabled)File.AppendAllText(output+".hotkey-conflicts",$"{conflict.Target};{conflict.Error}\n");HotkeyOccupied?.Invoke(this,conflict);};}
             await StartWinV();
             if(!demo)SettingsView.DataStorage=new Pane.Services.Clipboard.DataStorage(Store,()=>clipboardService,()=>{launcherSearch?.RebuildStorageCache();(FileIcons as Pane.Services.Icons.FileIcons)?.RebuildStorageCache();},text=>queue.TryEnqueue(()=>{if(!closing)shell?.NotifyOnce(text);}),ClearWebStorageCache,()=>launcherSearch?.WebSearchHistory.Completion??Task.CompletedTask);
             await StartModules();
@@ -99,6 +103,8 @@ public sealed partial class App : Application
         if(moduleId=="super")moduleId=Pane.Contracts.ModuleIds.SuperPanel;
         if(moduleId!=null&&Modules!=null&&Modules.Modules.Any(m=>m.Id==moduleId)&&!AllowModule(moduleId))return;
         if(command=="hotkey-words"){_ = ReadWordsSelection();return;}
+        if(command=="hotkey-memo"){ToggleMemo();return;}   /* 备忘录（123）：热键打开并新建一条，开着时再按收起 */
+        if(command=="show-memo"){foreach(var p in panels.Values)p.Hide();ShowMemo(null,create:true);return;}   /* 启动器命令「备忘录」 */
         if(command.StartsWith("hotkey-",StringComparison.Ordinal)){
             string name=command[7..];command="show-"+name;
             nint foreground=foregroundOverride??Native.GetForegroundWindow();
@@ -120,7 +126,7 @@ public sealed partial class App : Application
         }else if(command.StartsWith("show-")&&panels.TryGetValue(command[5..],out var panel)){
             // 启动器开着时呼出剪贴板：启动器不收起，剪贴板叠在上面，选的条目交给启动器（2026-11-08）
             var keep=command=="show-clipboard"?ClipboardOverLauncher(panel):null;
-            foreach(var other in panels.Values)if(other!=panel&&other!=keep)other.Hide();current=panel;
+            foreach(var other in panels.Values)if(other!=panel&&other!=keep&&!KeepPinned(other))other.Hide();current=panel;   // 钉住的剪贴板留着（2026-11-25）
             if(keep!=null){panel.Show(activate:!demo);return;}
         }
         else return;
@@ -204,6 +210,7 @@ public sealed partial class App : Application
         Clean(()=>(EngineIcons as IDisposable)?.Dispose());
         Clean(()=>(WebSuggestions as IDisposable)?.Dispose());Clean(()=>aiService?.Dispose());Clean(()=>launcherSearch?.Dispose());Clean(CloseEmptyIsland);Clean(()=>settings?.Dispose());foreach(var w in secondaries.Values.ToArray())Clean(w.Dispose);
         foreach(var panel in panels.Values)Clean(panel.Dispose);
+        if(Notes is Services.Memo.NoteStore memo)Clean(()=>memo.Completion.GetAwaiter().GetResult());
         Clean(()=>gestures?.Dispose());Clean(()=>background?.Close());Clean(()=>Glass?.Dispose());Clean(()=>manager?.Dispose());
         if(controlsEnabled)Clean(()=>File.WriteAllText(output+".stopped",Environment.ExitCode!=0?"cleanup-failed":"hotkeys=0;tray=0;panels=0"));Exit();
     }

@@ -32,7 +32,10 @@ public sealed partial class SettingsView
         {
             Row(Strings.Settings_Data_Total, null, Chip(dataReport is { } r ? SizeText(r.Total) : Strings.Settings_Data_Measuring)),
         };
-        foreach (var category in new[] { StorageCategory.Settings, StorageCategory.Usage, StorageCategory.Clipboard, StorageCategory.Cache, StorageCategory.Logs })
+        StorageCategory[] categories = ModuleGate.On(ModuleIds.Memo)
+            ? [StorageCategory.Settings, StorageCategory.Usage, StorageCategory.Clipboard, StorageCategory.Memo, StorageCategory.Cache, StorageCategory.Logs]
+            : [StorageCategory.Settings, StorageCategory.Usage, StorageCategory.Clipboard, StorageCategory.Cache, StorageCategory.Logs];
+        foreach (var category in categories)
         {
             var item = dataReport?.Items.FirstOrDefault(i => i.Category == category);
             var sub = item is null ? Strings.Settings_Data_Measuring : string.Format(Strings.Settings_Data_SizeFiles, SizeText(item.Bytes), item.Files);
@@ -84,6 +87,7 @@ public sealed partial class SettingsView
         StorageCategory.Usage => Strings.Settings_Data_CategoryUsage,
         StorageCategory.Clipboard => Strings.Settings_Data_CategoryClipboard,
         StorageCategory.Cache => Strings.Settings_Data_CategoryCache,
+        StorageCategory.Memo => Strings.Settings_Data_CategoryMemo,
         _ => Strings.Settings_Data_CategoryLogs,
     };
 

@@ -135,6 +135,7 @@ public sealed partial class ClipboardView
             if (e.Kind == ClipKind.Color) { list.Add(Op("paste-hex", Strings.Clipboard_PasteHex, "hash")); list.Add(Op("paste-rgb", Strings.Clipboard_PasteRgb, "palette")); }
             list.Add(Op("edit", Strings.Common_Edit, "pencil", "Ctrl+E"));
             if (row.CanSplit) list.Add(Op("words", Strings.Words_Open, "words", "Ctrl+B"));
+            if (ModuleGate.On(ModuleIds.Memo) && !string.IsNullOrWhiteSpace(e.Text)) list.Add(Op("memo", Strings.Memo_SaveAs, "note"));   // 备忘录（123）
         }
         if (ModuleGate.On(ModuleIds.Launcher)) list.Add(Op("send", Strings.Clipboard_SendToLauncher, "R", "Tab"));
         list.Add(Op("tags", Strings.Clipboard_TagsAction, "tag", "Ctrl+T"));
@@ -163,10 +164,11 @@ public sealed partial class ClipboardView
             case "edit": StartEdit(e); break;
             case "tags": OpenTags(e); break;
             case "words": LeaveMode(); OpenWords?.Invoke(this, e); break;
+            case "memo": LeaveMode(); SaveMemo?.Invoke(this, e); break;
             case "send": LeaveQuiet(); if (ForLauncher) UseInLauncher?.Invoke(this, e); else SendToLauncher?.Invoke(this, e); break;
             case "pin": history.SetPinned(e.Id, !e.Pinned); LeaveMode(); break;
             case "delete": LeaveMode(); history.Delete(e.Id); break;
-            default: LeaveQuiet(); CloseRequested?.Invoke(this, EventArgs.Empty); ActionRequested?.Invoke(this, (e, op.Id!)); break;
+            default: LeaveQuiet(); AfterUse(); ActionRequested?.Invoke(this, (e, op.Id!)); break;
         }
     }
 
@@ -186,8 +188,8 @@ public sealed partial class ClipboardView
     async Task PasteAs(ClipEntry e, ClipPasteAs kind)
     {
         if (ForLauncher) { UseInLauncher?.Invoke(this, e); return; }
-        CloseRequested?.Invoke(this, EventArgs.Empty);
-        try { await history.PasteAsAsync(e.Id, kind, previousWindow, CancellationToken.None); }
+        AfterUse();
+        try { await history.PasteAsAsync(e.Id, kind, Target, CancellationToken.None); }
         catch (Exception ex) { ((App)Application.Current).ReportFailure(Strings.Common_Paste, ex); }
     }
 

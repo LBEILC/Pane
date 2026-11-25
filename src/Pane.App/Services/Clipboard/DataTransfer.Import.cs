@@ -38,7 +38,9 @@ internal sealed partial class DataStorage
             WriteAtomic(journalPath,journal.ToJsonString());ImportStep?.Invoke("prepared");
             foreach(var item in files){
                 var row=item!.AsObject();string target=row["target"]!.GetValue<string>();
-                if(row["source"] is {} source){Directory.CreateDirectory(Path.GetDirectoryName(target)!);CopyDurable(source.GetValue<string>(),target+".import-tmp");File.Move(target+".import-tmp",target,true);}
+                if(row["source"] is {} source){Directory.CreateDirectory(Path.GetDirectoryName(target)!);CopyDurable(source.GetValue<string>(),target+".import-tmp");
+                    if(Path.GetFileName(target)==Memo.NoteDisk.Index)File.SetAttributes(target+".import-tmp",FileAttributes.Hidden);
+                    File.Move(target+".import-tmp",target,true);}
                 else File.Delete(target);
                 ImportStep?.Invoke("applied-file");
             }
@@ -52,7 +54,9 @@ internal sealed partial class DataStorage
     }
     static void CopyDurable(string source,string target)
     {
-        using var input=File.OpenRead(source);using var output=new FileStream(target,FileMode.Create,FileAccess.Write,FileShare.None);input.CopyTo(output);output.Flush(true);
+        using var input=File.OpenRead(source);
+        using(var output=new FileStream(target,FileMode.Create,FileAccess.Write,FileShare.None)){input.CopyTo(output);output.Flush(true);}
+        File.SetLastWriteTimeUtc(target,File.GetLastWriteTimeUtc(source));
     }
     static void RestoreTransaction(string root,JsonObject journal)
     {
@@ -62,8 +66,8 @@ internal sealed partial class DataStorage
                 string original=row["original"]!.GetValue<string>();
                 if(!StorageLocation.Within(Path.GetFullPath(original),Path.GetFullPath(root)))throw Invalid();
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);CopyDurable(original,target+".import-tmp");File.Move(target+".import-tmp",target,true);
-            }else File.Delete(target);
-            File.Delete(target+".import-tmp");
+            }else if(File.Exists(target))File.Delete(target);
+            if(File.Exists(target+".import-tmp"))File.Delete(target+".import-tmp");
         }
     }
     static void FinishImport(string data,JsonObject journal)
@@ -106,6 +110,7 @@ internal sealed partial class DataStorage
             }
             string staged=Path.Combine(output,Path.GetFileName(target));WriteAtomic(staged,value.ToJsonString());writes[target]=staged;
         }
+        MergeNotes(data,root,output,writes);
         string clipSource=Path.Combine(root,"clipboard/history.json");if(!File.Exists(clipSource))return writes;
         var disk=new ClipboardStorage();string index=LocalFile(data,"clipboard/history.json");var localIndex=disk.LoadIndex(index);var old=localIndex.Entries;
         var incomingIndex=disk.LoadIndex(clipSource);bool merge=options["merge"]!.GetValue<bool>();

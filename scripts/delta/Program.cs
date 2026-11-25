@@ -119,6 +119,8 @@ internal static class Program
             case ["manifest", var root, var version, var output]: File.WriteAllBytes(output, Manifest(root, version)); break;
             case ["patch", var baseline, var target, var from, var to, var manifest, var patch]:
                 Build(baseline, target, from, to, manifest, patch); break;
+            case ["verify", var baseline, var patch, var manifest, var from, var to, var output]:
+                PayloadPatch.Apply(baseline, patch, File.ReadAllBytes(manifest), from, to, output); break;
             case ["extract", var installer, var destination]:
                 PayloadPatch.Require(!Directory.Exists(destination));
                 Directory.CreateDirectory(destination);

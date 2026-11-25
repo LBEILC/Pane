@@ -12,12 +12,21 @@ internal sealed class CloudModule(Func<IAccountService> create, SettingsStore st
         [new(ModuleIds.Clipboard, DependencyKind.Optional), new(ModuleIds.Launcher, DependencyKind.Optional)]);
     readonly object gate = new();
     ISyncService? sync;
+    Memo.NoteStore? notes;
+    internal void SetNotes(Memo.NoteStore? value)
+    {
+        lock (gate)
+        {
+            notes = value;
+            (sync as SyncService)?.SetNotes(value);
+        }
+    }
     public IAccountService? Account { get; private set; }
     public ISyncService? Sync
     {
         get
         {
-            lock(gate) return sync ??= Account is AccountService account ? new SyncService(store,account) : Account as ISyncService;
+            lock(gate) return sync ??= Account is AccountService account ? new SyncService(store,account,notes:notes) : Account as ISyncService;
         }
     }
     void SettingsChanged(object? sender,EventArgs args)

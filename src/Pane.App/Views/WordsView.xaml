@@ -65,18 +65,26 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="PickText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" MaxLines="1"
                        FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
             <Border x:Name="JoinHost" Grid.Column="1" VerticalAlignment="Center" Visibility="Collapsed" ToolTipService.ToolTip="{x:Bind loc:Strings.Words_JoinHint}"/>
-            <Button x:Name="SendButton" Grid.Column="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnSend" IsTabStop="False"
+            <!-- 存为备忘录（123）：备忘录能力启用时才有 -->
+            <Button x:Name="MemoButton" Grid.Column="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnSaveMemo" IsTabStop="False">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:PaneIcon Glyph="note" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Memo_SaveAs}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button x:Name="SendButton" Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnSend" IsTabStop="False"
                     ToolTipService.ToolTip="Tab">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:PaneIcon Glyph="search" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
                     <TextBlock Text="{x:Bind loc:Strings.Clipboard_SendToLauncher}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="CopyButton" Grid.Column="3" Style="{StaticResource PanePrimaryButton}" Height="{StaticResource PaneControlMd}" MinHeight="0" CornerRadius="16" Padding="18,0,14,0"
+            <Button x:Name="CopyButton" Grid.Column="4" Style="{StaticResource PanePrimaryButton}" Height="{StaticResource PaneControlMd}" MinHeight="0" CornerRadius="16" Padding="18,0,14,0"
                     FontSize="{StaticResource PaneTextSm}" Click="OnCopy" IsTabStop="False" ToolTipService.ToolTip="Enter">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <TextBlock Text="{x:Bind loc:Strings.Common_Copy}" VerticalAlignment="Center"/>

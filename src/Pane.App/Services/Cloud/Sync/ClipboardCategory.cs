@@ -15,6 +15,12 @@ internal sealed partial class SyncService
         if(account.SyncIdentity().Owner is {} owner)
             clipboard.History?.Acknowledge(owner,id,r.Base,(string?)r.Body?["thumb"],(string?)r.Body?["orig"],(long?)r.Body?["size"]);
     }
+    async Task<string> Upload(byte[] key,string kind,byte[] bytes,CancellationToken ct)
+    {
+        string id=CloudKeys.Encode(Guid.NewGuid().ToByteArray());
+        await account.Blob(id,kind,SyncCrypto.EncryptBlob(key,id,bytes),Token,ct);
+        return id;
+    }
     sealed class ClipboardCategory(SyncService engine,string name):ISyncCategory
     {
         public string Name=>name;
@@ -99,12 +105,6 @@ internal sealed partial class SyncService
                 if(r.Category=="clip" && r.Body!=null && Time(r.Body,"copied")<before && (bool?)r.Body["pinned"]!=true && Values(r.Body["tags"]).Length==0)
                     journal.Records.Remove(id);
         }
-        async Task<string> Upload(byte[] key,string kind,byte[] bytes,CancellationToken ct)
-        {
-            string id=CloudKeys.Encode(Guid.NewGuid().ToByteArray());
-            await engine.account.Blob(id,kind,SyncCrypto.EncryptBlob(key,id,bytes),engine.Token,ct);
-            return id;
-        }
         static byte[] Compress(JsonObject fields)
         {
             using var buffer=new MemoryStream();
@@ -125,11 +125,11 @@ internal sealed partial class SyncService
                     if(!b.ContainsKey("thumb") && c?.Entry.Thumbnail?.Path is {} path && File.Exists(path))
                     {
                         var bytes=ClipboardThumbnail.Read(path);
-                        b["thumb"]=await Upload(key,"thumb",bytes,ct);
+                        b["thumb"]=await engine.Upload(key,"thumb",bytes,ct);
                     }
                     if(!b.ContainsKey("size") && c?.Entry.ContentPath is {} full && new FileInfo(full) is {Exists:true,Length:<=10485760} file)
                     {
-                        try{b["orig"]=await Upload(key,"orig",await File.ReadAllBytesAsync(full,ct),ct);b["size"]=file.Length;}
+                        try{b["orig"]=await engine.Upload(key,"orig",await File.ReadAllBytesAsync(full,ct),ct);b["size"]=file.Length;}
                         catch(AccountService.Failure e) when(e.Code=="storage_full"){b["size"]=null;b.Remove("orig");}
                     }
                 }
@@ -139,7 +139,7 @@ internal sealed partial class SyncService
                     foreach(var field in new[]{"text","html","rtf"})payload[field]=b[field]?.DeepClone();
                     var bytes=Compress(payload);var blocks=new List<string>();
                     for(int pos=0;pos<bytes.Length;pos+=2400000)
-                        blocks.Add(await Upload(key,"rich",bytes.AsMemory(pos,Math.Min(bytes.Length-pos,2400000)).ToArray(),ct));
+                        blocks.Add(await engine.Upload(key,"rich",bytes.AsMemory(pos,Math.Min(bytes.Length-pos,2400000)).ToArray(),ct));
                     foreach(var field in payload)b.Remove(field.Key);
                     b["richBlocks"]=Strings(blocks);
                 }
@@ -200,7 +200,7 @@ internal sealed partial class SyncService
             if(name=="clip")
             {
                 if(body==null)History.CloudDelete(Owner,id);
-                else await ApplyClip(body,key,id,device,seq,local==null && device!=engine.clipboardDevice,initial,ct);
+                else await ApplyClip(body,key,id,device,seq,local==null && device!=engine.localDeviceId,initial,ct);
             }
             j.Records[id]=remote;
         }
@@ -222,8 +222,8 @@ internal sealed partial class SyncService
                 DateTimeOffset.FromUnixTimeMilliseconds((long)b["copied"]!),(bool?)b["pinned"]==true)
                 {Tags=Values(b["tags"]),Rich=formats!=null,Original=kind!=ClipKind.Image?ClipOriginal.Local:orig!=null?ClipOriginal.Remote:ClipOriginal.NotSynced};
             fresh=fresh && History.CloudLookup(Owner,id)==null;
-            var clip=History.CloudApply(entry,new(Owner,id,origin==engine.clipboardDevice?null:origin,Time(b,"at"),Time(b,"pinAt"),Time(b,"tagsAt"),(string?)b["thumb"],orig,(long?)b["size"],Base:basis,CopiedAt:entry.CopiedAt,
-                ReceivedAt:fresh && origin!=engine.clipboardDevice ? (initial?entry.CopiedAt:History.CloudLink.Time.GetUtcNow()):null),formats,(string?)b["h"],fresh);
+            var clip=History.CloudApply(entry,new(Owner,id,origin==engine.localDeviceId?null:origin,Time(b,"at"),Time(b,"pinAt"),Time(b,"tagsAt"),(string?)b["thumb"],orig,(long?)b["size"],Base:basis,CopiedAt:entry.CopiedAt,
+                ReceivedAt:fresh && origin!=engine.localDeviceId ? (initial?entry.CopiedAt:History.CloudLink.Time.GetUtcNow()):null),formats,(string?)b["h"],fresh);
             if(initial || !fresh || !engine.Options.WriteToSystemClipboard || clip==null || origin!=device)return;
             if(kind==ClipKind.Image)
             {

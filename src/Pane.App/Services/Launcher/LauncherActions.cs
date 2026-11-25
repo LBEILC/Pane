@@ -175,7 +175,7 @@ internal sealed partial class LauncherSearch
     public async Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken)
     {
         if(action==LauncherItemAction.EditAliases)throw new NotSupportedException(nameof(LauncherItemAction.EditAliases));
-        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.HideFromSearch){Hide(item);return;}if(action==LauncherItemAction.RemoveFromRecent){RemoveRecent(item);return;}if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);},cancellationToken).ConfigureAwait(false);}
+        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.HideFromSearch){Hide(item);return;}if(action==LauncherItemAction.RemoveFromRecent){RemoveRecent(item);return;}if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);if(action==LauncherItemAction.RunAsAdmin)RecordSelection(item);},cancellationToken).ConfigureAwait(false);}
         catch(Win32Exception e) when(e.NativeErrorCode==1223){}
         catch(OperationCanceledException){throw;}
         catch(LauncherActionException){throw;}
@@ -185,6 +185,7 @@ internal sealed partial class LauncherSearch
     {
         if(item.Kind!=LauncherItemKind.App)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);
         lock(sync)uses.Remove(item.Id);
+        SearchMemory.Remove(item.Id);
         SaveUsage();
     }
     async Task ExecuteAppElevatedAsync(LauncherItem item,CancellationToken token)

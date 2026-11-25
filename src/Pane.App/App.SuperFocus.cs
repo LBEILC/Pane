@@ -18,10 +18,11 @@ public sealed partial class App
         GetWindowThreadProcessId(foreground,out uint pid);
         if(pid==(uint)Environment.ProcessId)return false;
         if(!keys.Begin(foreground,PanelKeyMode.Super))return false;
+        clipboardKeys=false;   // 接管换给了超级面板（钉住的剪贴板可能还开着，2026-11-25）
         if(!ReferenceEquals(superWiredPanel,panel))
         {
             superWiredPanel=panel;
-            panel.Hiding+=(_,_)=>{if(panels.TryGetValue("clipboard",out var clip)&&clip.Shown&&clip.Passive)return;panelKeys?.End();};
+            panel.Hiding+=(_,_)=>{if(clipboardKeys)return;panelKeys?.End();};   // 剪贴板在接管时不动它
         }
         panel.Show(true,x,y,activate:false,passive:true);
         return true;

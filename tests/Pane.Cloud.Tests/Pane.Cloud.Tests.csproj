@@ -11,13 +11,14 @@
     <Compile Include="$(AppSource)/Services/QrCode.cs" />
     <Compile Include="$(AppSource)/Services/Updates/*.cs;$(AppSource)/Services/Setup/SetupFiles.cs;$(AppSource)/Services/Setup/PayloadPatch.cs" />
     <Compile Include="../Pane.App.Tests/UpdateServer.cs" />
+    <Content Include="$(AppSource)/Services/Launcher/Data/pinyin.tsv" Link="LauncherData/pinyin.tsv" CopyToOutputDirectory="PreserveNewest" />
     <None Update="qr-matrices.txt" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="$(AppSource)/Services/Cloud/**/*.cs;$(AppSource)/Contracts/Cloud.cs;$(AppSource)/DesignData/CloudSample.cs" />
     <Compile Include="$(AppSource)/Services/Modules/ModuleHost.cs;$(AppSource)/Contracts/Modules.cs" />
     <ProjectReference Include="../../src/Pane.Gestures/Pane.Gestures.csproj" />
     <Compile Include="$(AppSource)/Services/Ai/SecretStore.cs;$(AppSource)/Contracts/Ai.cs" />
     <!-- 用产品的导出白名单验证隔离目录中的实际归档。 -->
-    <Compile Include="$(AppSource)/Services/Clipboard/*.cs;$(AppSource)/Settings/*.cs" />
+    <Compile Include="$(AppSource)/Services/Memo/*.cs;$(AppSource)/Services/Launcher/NameMatcher.cs;$(AppSource)/Contracts/Notes.cs;$(AppSource)/Services/Clipboard/*.cs;$(AppSource)/Settings/*.cs" />
     <Compile Include="$(AppSource)/Services/Launcher/WebSearchHistory.cs;$(AppSource)/Services/SelectionService.cs;$(AppSource)/Services/SelectionLog.cs" />
     <Compile Include="$(AppSource)/Services/PasteTransfer.cs;$(AppSource)/Services/FileSelection.cs" />
     <Compile Include="$(AppSource)/Hosting/RuntimeMode.cs;$(AppSource)/Hosting/ShellHotkeyBindings.cs" />

@@ -32,7 +32,7 @@ public sealed partial class App
             Modules.IsActive(ModuleIds.Rename)&&!Modules.IsActive(ModuleIds.Launcher)&&!Modules.IsActive(ModuleIds.SuperPanel),   /* 055：按能力列菜单项 */
             Modules.IsActive(ModuleIds.PowerTimer)&&PowerTimer!=null,
             PowerTimer?.Current is {} timer?string.Format(Strings.Tray_TimerStatus,(object?)PowerTimerText.State(timer),(object?)PowerTimerText.Span(timer.At-DateTimeOffset.Now)):null));   /* 058 */
-        foreach(var other in panels.Values)if(other!=trayPanel)other.Hide();
+        foreach(var other in panels.Values)if(other!=trayPanel&&!KeepPinned(other))other.Hide();
         current=trayPanel;
         trayPanel.Show(true,x,y,!demo);
     }

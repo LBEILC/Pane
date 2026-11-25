@@ -132,6 +132,13 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
         int fileTotal = Files.Count(e => Match(e, q) is not null) * 4;   // 假数据：假装 Everything 还有更多
         Pick(Commands, LauncherItemKind.Command, LauncherGroups.Commands, 3);
         Pick(SystemSettings, LauncherItemKind.Command, LauncherGroups.Settings, 4);
+        // 最佳结果（121）：演示「以前选过」，同原型 launcher.html 的 MEMORY
+        if (DemoBest.TryGetValue(q, out var bestName) && items.FindIndex(i => i.Title == bestName) is >= 0 and var bi)
+        {
+            var best = items[bi] with { Group = LauncherGroups.Best };
+            items.RemoveAt(bi);
+            items.Insert(0, best);
+        }
         items.Add(new("ai:translate", LauncherItemKind.Ai, LauncherGroups.Ai, $"翻译“{t}”", "用 AI 翻译", new("translate")));
         items.Add(new("ai:ask", LauncherItemKind.Ai, LauncherGroups.Ai, $"问 AI：“{t}”", "单轮回答，可以复制或粘贴", new("ai"), Hotkey: "Tab"));
         items.Add(new("web", LauncherItemKind.Web, LauncherGroups.Web, $"在网页中搜索“{t}”", "默认搜索引擎", new("search")));
@@ -144,10 +151,14 @@ public sealed class LauncherSampleSearch : ILauncherSearch, ILauncherItemActions
             {
                 IReadOnlyList<TextSpan>? spans = m!.Value.span is { } s ? [s] : null;
                 var glyph = kind == LauncherItemKind.File && e.Glyph == "folder" ? "folder" : e.Glyph;
-                items.Add(new(e.Id ?? e.Name, kind, group, e.Name, e.Sub, new(glyph, DesignIcon(kind), e.From, e.To), spans, e.Hotkey));
+                // 文件夹照真实服务给 Folder（行尾标签按它显示「文件夹」）
+                var itemKind = kind == LauncherItemKind.File && e.Glyph == "folder" ? LauncherItemKind.Folder : kind;
+                items.Add(new(e.Id ?? e.Name, itemKind, group, e.Name, e.Sub, new(glyph, DesignIcon(itemKind), e.From, e.To), spans, e.Hotkey));
             }
         }
     }
+
+    static readonly Dictionary<string, string> DemoBest = new() { ["py"] = "PyCharm", ["报价"] = "报价截图.png" };   // 不翻译：演示数据
 
     public Task ExecuteAsync(LauncherItem item, CancellationToken cancellationToken) => Task.CompletedTask;
 

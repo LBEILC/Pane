@@ -202,14 +202,22 @@
         <!-- 提示条（issue 25、062）：新版本已下载好 / 已更新到；面板总高不变，占的是列表的高度。只能用鼠标点，不抢焦点 -->
         <c:NoticeStrip x:Name="Notice"/>
 
+        <!-- 搜索行最底层垫一块拖动底面（2026-11-25）：搜索框和按钮以外的留白按住拖动整个面板，悬停显示移动光标（同启动器） -->
+        <c:MoveSurface x:Name="MoveArea" Grid.Row="1"/>
         <!-- 搜索框：聚焦时外圈一道主题色光环（主题色只用于焦点） -->
         <Grid Grid.Row="1" Padding="16,16,16,8" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <!-- 钉住面板（2026-11-25）：同文件窗口的「总在最前」，钉住时图钉实心、正文色；叠在启动器上打开时不出 -->
+            <Button x:Name="PinPanelButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" VerticalAlignment="Center"
+                    AutomationProperties.Name="{x:Bind loc:Strings.Clipboard_PinPanel}" ToolTipService.ToolTip="{x:Bind loc:Strings.Clipboard_PinPanelHint}" Click="OnPinPanel">
+                <c:PaneIcon x:Name="PinPanelIcon" Glyph="pin" Width="15" Height="15" Foreground="{ThemeResource PaneText2Brush}"/>
+            </Button>
             <!-- 按键提示收起为按钮（默认，2026-11-23）：悬停 200 ms 浮出全部快捷键 -->
-            <Button x:Name="HintsButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" VerticalAlignment="Center" Visibility="Collapsed"
+            <Button x:Name="HintsButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" VerticalAlignment="Center" Visibility="Collapsed"
                     AutomationProperties.Name="{x:Bind loc:Strings.Clipboard_KeyHints}" Click="OnHintsClick" PointerEntered="OnHintsEnter" PointerExited="OnHintsExit">
                 <c:PaneIcon Glyph="keyboard" Width="15" Height="15" Foreground="{ThemeResource PaneText2Brush}"/>
             </Button>

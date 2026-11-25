@@ -116,7 +116,7 @@ internal sealed class WindowsLauncherExecutor(Action<string> showPanel,Func<stri
     public Task CommandAsync(string id,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if(id is "clipboard" or "settings"){showPanel("show-"+id);return Task.CompletedTask;}
+        if(id is "clipboard" or "settings" or "memo"){showPanel("show-"+id);return Task.CompletedTask;}
         int command=id switch{"lock"=>0,"sleep"=>1,"restart"=>2,"shutdown"=>3,"recycle"=>4,"logoff"=>5,"hibernate"=>6,_=>throw new NotSupportedException(id)};
         return Run(()=>LauncherNative.PaneLauncherCommand(command),token);
     }

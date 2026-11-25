@@ -16,6 +16,8 @@ static partial class Program
     static async Task Main(string[] args)
     {
         if(args is ["--mirror-export"]){await MirrorExport097Tests();return;}
+        if(args is ["--123"]){await MemoTransfer123Tests();TestResults.Pass();return;}
+        if(args is ["--136"]){await MemoFolder136Tests();TestResults.Pass();return;}
         if(args is ["--083"]){await Transfer083Tests();TestResults.Pass();return;}
         if(args is ["--082"]){await Storage082Tests();TestResults.Pass();return;}
         if(args is ["--hidden-paste",var output]){HiddenPasteTests(output);return;}

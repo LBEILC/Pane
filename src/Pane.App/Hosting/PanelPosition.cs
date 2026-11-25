@@ -166,7 +166,8 @@ public sealed partial class GlassPanel
     {
         if(dragging||!Settled||!CanDrag(e.OriginalSource as DependencyObject)||!e.GetCurrentPoint(root).Properties.IsLeftButtonPressed)return;
         Native.GetCursorPos(out var p);long now=Environment.TickCount64;
-        if(lastClick!=0&&now-lastClick<=GetDoubleClickTime()&&Math.Abs(p.X-clickX)<=GetSystemMetrics(36)&&Math.Abs(p.Y-clickY)<=GetSystemMetrics(37))
+        // 双击恢复默认位置：跟着鼠标打开的面板（剪贴板）没有默认位置，不做（2026-11-25）
+        if(Placement!=PanelPlacement.Pointer&&lastClick!=0&&now-lastClick<=GetDoubleClickTime()&&Math.Abs(p.X-clickX)<=GetSystemMetrics(36)&&Math.Abs(p.Y-clickY)<=GetSystemMetrics(37))
         {lastClick=0;ResetPosition();e.Handled=true;return;}
         if(!root.CapturePointer(e.Pointer))return;
         dragging=true;dragMoved=false;dragPointer=e.Pointer.PointerId;pressX=p.X;pressY=p.Y;

@@ -186,6 +186,7 @@ public enum ClipDeviceView { Mixed, FilterOnly }
 /// <summary>
 /// 同步设置（存在 settings.json，本身不同步）。界面（「数据」→「同步」组）改完调 ISyncService.ApplyAsync。
 /// Enabled：同步总开关，默认关。Settings / Usage：同步设置、使用记录，打开总开关时默认都开。
+/// Notes（2026-11-25，任务 124）：同步备忘录，打开总开关时默认开；两台电脑都改过同一条时两份都留（docs/cloud-sync-api.md「notes」）。
 /// Clipboard：剪贴板同步，单独开关，默认关；打开时界面说清会上传哪些内容（加密后上传）。
 /// ExcludedApps：这些程序的内容照常在本机记录，只是不上传（程序 exe 名）。
 /// WriteToSystemClipboard：「其他设备复制时，同时放进本机剪贴板」，默认关；打开后这条不再被本机记录、上传。
@@ -198,7 +199,8 @@ public sealed record SyncOptions(
     ClipSyncScope ClipScope = ClipSyncScope.TextAndImages,
     IReadOnlyList<string>? ExcludedApps = null,
     bool WriteToSystemClipboard = false,
-    ClipDeviceView DeviceView = ClipDeviceView.Mixed);
+    ClipDeviceView DeviceView = ClipDeviceView.Mixed,
+    bool Notes = true);
 
 public interface ISyncService
 {

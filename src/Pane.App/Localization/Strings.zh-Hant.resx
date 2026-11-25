@@ -582,6 +582,7 @@
   <data name="Launcher_Group_Actions" xml:space="preserve"><value>動作</value></data>
   <data name="Launcher_Group_Ai" xml:space="preserve"><value>AI</value></data>
   <data name="Launcher_Group_Applications" xml:space="preserve"><value>應用程式</value></data>
+  <data name="Launcher_Group_Best" xml:space="preserve"><value>最佳結果</value></data>
   <data name="Launcher_Group_Calculation" xml:space="preserve"><value>計算</value></data>
   <data name="Launcher_Group_Commands" xml:space="preserve"><value>命令</value></data>
   <data name="Launcher_Group_Completion" xml:space="preserve"><value>補全</value></data>
@@ -616,6 +617,7 @@
   <data name="Launcher_AliasTooLong" xml:space="preserve"><value>每個別名最多 32 個字元</value></data>
   <data name="Launcher_RemoveFromApps" xml:space="preserve"><value>從應用程式清單移除</value></data>
   <data name="Launcher_RemoveFromRecent" xml:space="preserve"><value>從最近使用中移除</value></data>
+  <data name="Launcher_SetAppHotkey" xml:space="preserve"><value>設定快速鍵</value></data>
   <data name="Launcher_RestoreClipboard" xml:space="preserve"><value>重新複製到剪貼簿</value></data>
   <data name="Launcher_RunAsAdmin" xml:space="preserve"><value>以管理員身份執行</value></data>
   <data name="Launcher_RunFailed" xml:space="preserve"><value>執行失敗：{0}</value></data>
@@ -1415,6 +1417,8 @@
   <data name="Settings_Launcher_HomeRecentOnly" xml:space="preserve"><value>只顯示最近</value></data>
   <data name="Settings_Launcher_ExpandOnOpen" xml:space="preserve"><value>從搜尋欄展開</value></data>
   <data name="Settings_Launcher_ExpandOnOpenDescription" xml:space="preserve"><value>叫出時先顯示搜尋欄，再向下展開</value></data>
+  <data name="Settings_Launcher_LearnSelections" xml:space="preserve"><value>記住搜尋時的選擇</value></data>
+  <data name="Settings_Launcher_LearnSelectionsDescription" xml:space="preserve"><value>同樣的輸入下次把選過的放在最前，只存本機</value></data>
   <data name="Launcher_WebHint" xml:space="preserve"><value>輸入要用 {0} 搜尋的內容</value></data>
   <data name="Launcher_SearchUsing" xml:space="preserve"><value>使用 {0} 搜尋</value></data>
   <data name="Launcher_RemoveHistory" xml:space="preserve"><value>刪除此記錄（Shift+Delete）</value></data>
@@ -1762,6 +1766,43 @@
   <data name="Module_PowerTimer_Description" xml:space="preserve"><value>在指定時間關機、重新啟動或睡眠；執行前 1 分鐘提醒，可取消或延後</value></data>
   <data name="Module_PowerTimer_WithLauncher" xml:space="preserve"><value>與啟動器搭配使用：輸入「30 分鐘後關機」直接設定</value></data>
   <data name="Module_Words_Name" xml:space="preserve"><value>分詞</value></data>
+  <data name="Memo_Title" xml:space="preserve"><value>備忘錄</value></data>
+  <data name="Memo_NewHint" xml:space="preserve"><value>新增（Ctrl+N）</value></data>
+  <data name="Memo_New" xml:space="preserve"><value>新增</value></data>
+  <data name="Memo_PinHint" xml:space="preserve"><value>固定（Ctrl+P）</value></data>
+  <data name="Memo_UnpinHint" xml:space="preserve"><value>取消固定（Ctrl+P）</value></data>
+  <data name="Memo_Pin" xml:space="preserve"><value>固定</value></data>
+  <data name="Memo_PreviewHint" xml:space="preserve"><value>預覽 Markdown（Ctrl+E）</value></data>
+  <data name="Memo_Preview" xml:space="preserve"><value>預覽</value></data>
+  <data name="Memo_CopyAll" xml:space="preserve"><value>複製全文</value></data>
+  <data name="Memo_DeleteHint" xml:space="preserve"><value>刪除（Ctrl+D）</value></data>
+  <data name="Memo_Untitled" xml:space="preserve"><value>無標題</value></data>
+  <data name="Memo_Empty" xml:space="preserve"><value>還沒有備忘錄，按 Ctrl+N 新增</value></data>
+  <data name="Memo_NotFound" xml:space="preserve"><value>沒有包含「{0}」的備忘錄</value></data>
+  <data name="Memo_Pinned" xml:space="preserve"><value>已固定</value></data>
+  <data name="Memo_Count" xml:space="preserve"><value>共 {0} 則</value></data>
+  <data name="Memo_EditedAt" xml:space="preserve"><value>{0} 修改</value></data>
+  <data name="Memo_From" xml:space="preserve"><value>來自 {0}</value></data>
+  <data name="Memo_Placeholder" xml:space="preserve"><value>第一行是標題，直接輸入；支援簡單的 Markdown</value></data>
+  <data name="Memo_SearchPlaceholder" xml:space="preserve"><value>搜尋備忘錄</value></data>
+  <data name="Memo_Deleted" xml:space="preserve"><value>已刪除「{0}」</value></data>
+  <data name="Memo_SaveAs" xml:space="preserve"><value>存為備忘錄</value></data>
+  <data name="Memo_SaveTarget" xml:space="preserve"><value>存為備忘錄：{0}</value></data>
+  <data name="Memo_Saved" xml:space="preserve"><value>已存為備忘錄</value></data>
+  <data name="Module_Memo_Description" xml:space="preserve"><value>隨手記下文字，第一行就是標題；每則存成一個 .md 檔案，可以同步到其他電腦</value></data>
+  <data name="Module_Memo_WithLauncher" xml:space="preserve"><value>在啟動器中輸入「bw 內容」直接存一則，也能搜尋到備忘錄</value></data>
+  <data name="Module_Memo_WithClipboard" xml:space="preserve"><value>剪貼簿中的文字可以存為備忘錄</value></data>
+  <data name="Settings_Memo_Description" xml:space="preserve"><value>呼叫快速鍵、檔案位置</value></data>
+  <data name="Settings_Memo_HotkeyDescription" xml:space="preserve"><value>按下開啟備忘錄並新增一則</value></data>
+  <data name="Settings_Memo_FromLauncher" xml:space="preserve"><value>從啟動器存入</value></data>
+  <data name="Settings_Memo_FromLauncherDescription" xml:space="preserve"><value>輸入「{0} 內容」後按 Enter，直接存成一則新備忘錄；關鍵字在 啟動器 → 關鍵字直達 中修改</value></data>
+  <data name="Settings_Memo_Files" xml:space="preserve"><value>檔案</value></data>
+  <data name="Settings_Memo_Folder" xml:space="preserve"><value>存放位置</value></data>
+  <data name="Settings_Memo_OpenFolder" xml:space="preserve"><value>開啟資料夾</value></data>
+  <data name="Settings_Memo_FilesDescription" xml:space="preserve"><value>跟隨 資料 → 大型檔案位置。每則備忘錄是一個 .md 檔案，可以用其他編輯器開啟和修改，Pane 下次開啟時讀入</value></data>
+  <data name="Settings_Sync_Notes" xml:space="preserve"><value>備忘錄</value></data>
+  <data name="Settings_Sync_NotesDescription" xml:space="preserve"><value>兩台電腦都改過同一則時兩份都保留</value></data>
+  <data name="Settings_Data_CategoryMemo" xml:space="preserve"><value>備忘錄</value></data>
   <data name="Module_Words_Description" xml:space="preserve"><value>把一段文字拆成詞塊，點選或拖選其中幾塊後複製</value></data>
   <data name="Module_Words_WithClipboard" xml:space="preserve"><value>與剪貼簿搭配使用：文字項目上按 Ctrl+B 拆開</value></data>
   <data name="Module_Words_WithLauncher" xml:space="preserve"><value>與啟動器搭配使用：選好的文字可以交給啟動器繼續處理</value></data>
@@ -1897,6 +1938,14 @@
   <data name="Settings_Hotkeys_ActivationNote" xml:space="preserve"><value>在任意程式中均可使用；與其他程式的快速鍵衝突時顯示佔用情況</value></data>
   <data name="Settings_Hotkeys_Dialog" xml:space="preserve"><value>檔案對話方塊</value></data>
   <data name="Settings_Hotkeys_DialogNote" xml:space="preserve"><value>僅在「開啟 / 另存新檔」對話方塊位於前景時生效，可與全域快速鍵相同</value></data>
+  <data name="Settings_Hotkeys_Apps" xml:space="preserve"><value>應用程式快速鍵</value></data>
+  <data name="Settings_Hotkeys_AppsNote" xml:space="preserve"><value>按下後啟動此應用程式，已執行時切換到其視窗，有多個視窗時依次切換；也可在啟動器中選取應用程式後按 Ctrl+K 設定</value></data>
+  <data name="Settings_Hotkeys_AppSub" xml:space="preserve"><value>啟動或切換到此應用程式</value></data>
+  <data name="Settings_Hotkeys_AppOccupied" xml:space="preserve"><value>已被其他程式佔用，未生效</value></data>
+  <data name="Settings_Hotkeys_AppMissing" xml:space="preserve"><value>找不到這個應用程式，可能已解除安裝</value></data>
+  <data name="Settings_Hotkeys_AppOff" xml:space="preserve"><value>啟動器停用或快速鍵暫停時不生效</value></data>
+  <data name="Settings_Hotkeys_AddApp" xml:space="preserve"><value>新增應用程式</value></data>
+  <data name="Settings_Hotkeys_SearchApp" xml:space="preserve"><value>搜尋要新增的應用程式</value></data>
   <data name="Clipboard_FilesSummary" xml:space="preserve"><value>{0} 等 {1} 個檔案</value></data>
   <data name="Clipboard_PasteFiles" xml:space="preserve"><value>貼上檔案</value></data>
   <data name="Clipboard_PastePath" xml:space="preserve"><value>貼上路徑</value></data>
@@ -1926,6 +1975,9 @@
   <data name="Clipboard_SaveAndPaste" xml:space="preserve"><value>儲存並貼上</value></data>
   <data name="Clipboard_Discard" xml:space="preserve"><value>放棄</value></data>
   <data name="Clipboard_ResizeHint" xml:space="preserve"><value>拖曳調整高度，按兩下恢復預設</value></data>
+  <data name="Clipboard_PinPanel" xml:space="preserve"><value>釘住面板</value></data>
+  <data name="Clipboard_PinPanelHint" xml:space="preserve"><value>釘住面板：貼上後不收起（Ctrl+Shift+P）</value></data>
+  <data name="Clipboard_UnpinPanelHint" xml:space="preserve"><value>取消釘住（Ctrl+Shift+P）</value></data>
   <data name="Clipboard_KeyHints" xml:space="preserve"><value>按鍵提示</value></data>
   <data name="Settings_Clipboard_KeyHints" xml:space="preserve"><value>按鍵提示</value></data>
   <data name="Settings_Clipboard_KeyHintsDescription" xml:space="preserve"><value>收合為按鈕時，將游標停在搜尋框右側的鍵盤按鈕上查看全部快速鍵</value></data>

@@ -1,4 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup><Compile Include="../../src/Pane.App/Hosting/ShellHotkeyBindings.cs" Link="ShellHotkeyBindings.cs" /></ItemGroup>
+  <PropertyGroup>
+    <HiddenDesktopSource>../../experiments/027-idle/HiddenDesktop.cs</HiddenDesktopSource>
+    <DefineConstants Condition="Exists('$(HiddenDesktopSource)')">$(DefineConstants);PANE_HIDDEN_DESKTOP</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(HiddenDesktopSource)')">
+    <Compile Include="$(HiddenDesktopSource)" Link="HiddenDesktop.cs" />
+  </ItemGroup>
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><IsAotCompatible>true</IsAotCompatible></PropertyGroup>
   <ItemGroup><Compile Include="../../src/Pane.App/Contracts/PowerTimer.cs" Link="PowerTimer.cs"/><Compile Include="../../src/Pane.App/Services/PowerTimerService.cs" Link="PowerTimerService.cs"/>
     <Compile Include="../../src/Pane.App/Contracts/Update.cs" Link="Contracts/Update.cs" />
@@ -13,6 +21,8 @@
     <Compile Include="../../src/Pane.App/Services/Icons/*.cs" Link="Icons/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Services/Launcher/*.cs" Link="Launcher/%(Filename)%(Extension)" />
     <Compile Include="../../src/Pane.App/Settings/*.cs" Link="Settings/%(Filename)%(Extension)" /><Compile Include="../../src/Pane.App/Contracts/Rename.cs" Link="Rename.cs"/>
+    <Compile Include="../../src/Pane.App/Contracts/Notes.cs;../../src/Pane.App/Services/Memo/*.cs" />
+    <Compile Include="../../src/Pane.App/Contracts/DataStorage.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Launcher.cs" Link="Contracts/Launcher.cs" />
     <Compile Include="../../src/Pane.App/Contracts/AppIcons.cs" Link="Contracts/AppIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Clipboard.cs" Link="Contracts/Clipboard.cs" />

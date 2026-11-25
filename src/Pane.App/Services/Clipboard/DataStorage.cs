@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Pane.Contracts;
+using Pane.Services.Memo;
 using Pane.Localization;
 using Pane.Settings;
 
@@ -41,17 +42,22 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
     }
     void OnChanged(){foreach(EventHandler handler in Changed?.GetInvocationList()??[])try{handler(this,EventArgs.Empty);}catch(Exception){ }}
     static readonly string[] CacheFiles=["launcher-index.json","launcher-index.json.tmp","launcher-index-request.json","launcher-index-candidate.json","launcher-index-candidate.json.tmp","launcher-index-candidate.json.raw","launcher-index-candidate.json.raw.tmp","catalog-evidence.json","icon-measurements.json"];
+    internal string CurrentMemoFolder=>NoteDisk.FolderFor(settings.DirectoryPath,LargeFiles);
     IEnumerable<string> Files(StorageCategory category,CancellationToken token)
     {
         string data=settings.DirectoryPath;
         IEnumerable<string> roots=category switch{
+            StorageCategory.Memo=>new[]{CurrentMemoFolder},
             StorageCategory.Settings=>new[]{"settings.json","gestures.json",Path.Combine("cloud","sync.json")}.Select(p=>Path.Combine(data,p)),
             StorageCategory.Usage=>new[]{"launcher-usage.json","terminal-history.json","web-search-history.json"}.Select(p=>Path.Combine(data,p)),
             StorageCategory.Clipboard=>new[]{Path.Combine(data,"clipboard")},
             StorageCategory.Cache=>CacheFiles.Concat(["launcher-icons","masked-icons","file-icons","engine-icons","updates"]).Select(p=>Path.Combine(data,p)),
             StorageCategory.Logs=>new[]{Path.Combine(data,"logs")},_=>[]};
         var seen=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach(string root in roots)foreach(string path in Walk(root,token))if(seen.Add(path))yield return path;
+        foreach(string root in roots)foreach(string path in Walk(root,token)){
+            if(category==StorageCategory.Clipboard && StorageLocation.Within(path,CurrentMemoFolder))continue;
+            if(seen.Add(path))yield return path;
+        }
         if(category==StorageCategory.Clipboard){
             foreach(string root in new[]{LargeFiles.Path,LargeFiles.Configured}.OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase))
                 foreach(string path in Walk(root,token).Where(p=>Path.GetDirectoryName(p)!.Equals(root,StringComparison.OrdinalIgnoreCase)&&Path.GetExtension(p).Equals(".png",StringComparison.OrdinalIgnoreCase)))
@@ -79,7 +85,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
         foreach(var category in Enum.GetValues<StorageCategory>()){
             long bytes=0;int count=0;
             foreach(string path in Files(category,cancellationToken))if(TrySize(path,out long size)){bytes+=size;count++;}
-            string folder=category switch{StorageCategory.Clipboard=>Path.Combine(settings.DirectoryPath,"clipboard"),StorageCategory.Logs=>Path.Combine(settings.DirectoryPath,"logs"),_=>settings.DirectoryPath};
+            string folder=category switch{StorageCategory.Memo=>CurrentMemoFolder,StorageCategory.Clipboard=>Path.Combine(settings.DirectoryPath,"clipboard"),StorageCategory.Logs=>Path.Combine(settings.DirectoryPath,"logs"),_=>settings.DirectoryPath};
             items.Add(new(category,bytes,count,folder));
         }
         return new StorageReport(items);
@@ -143,7 +149,14 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                 var sources=roots.Where(Directory.Exists).SelectMany(root=>Directory.GetFiles(root,"*.png")).Distinct(StringComparer.OrdinalIgnoreCase)
                     .Where(p=>Path.GetDirectoryName(p)!.Equals(Path.Combine(settings.DirectoryPath,"clipboard"),StringComparison.OrdinalIgnoreCase)||StorageLocation.IsGeneratedImage(p)||referenced.Contains(p))
                     .Where(p=>!Path.GetDirectoryName(p)!.Equals(target,StringComparison.OrdinalIgnoreCase)).ToArray();
-                var files=sources.Select(p=>new StorageMoveFile(p,Path.Combine(target,Path.GetFileName(p)))).ToArray();
+                var destination=new LargeFilesLocation(target,folder==null,folder==null?null:target,false);
+                string memoSource=CurrentMemoFolder;
+                string memoTarget=NoteDisk.FolderFor(settings.DirectoryPath,destination);
+                bool moveNotes=!memoSource.Equals(memoTarget,StringComparison.OrdinalIgnoreCase) && Directory.Exists(memoSource);
+                var moving=moveNotes?NoteDisk.Scan(memoSource):[];
+                var existing=moveNotes?NoteDisk.Scan(memoTarget):[];
+                if(existing.Select(r=>r.Id).Intersect(moving.Select(r=>r.Id)).Any())throw new IOException("目标目录含有相同 id 的备忘录");
+                var files=sources.Select(p=>new StorageMoveFile(p,Path.Combine(target,Path.GetFileName(p)))).Concat(moving.Select(r=>new StorageMoveFile(Path.Combine(memoSource,r.FileName),Path.Combine(memoTarget,r.FileName)))).ToArray();
                 if(files.Select(f=>f.Target).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=files.Length||files.Any(f=>File.Exists(f.Target)))throw new IOException();
                 long needed=files.Sum(f=>new FileInfo(f.Source).Length),available=FreeSpace(target);
                 if(needed>available){long missing=needed-available;string amount=missing>=1024L*1024*1024?$"{missing/(1024d*1024*1024):0.##} GB":$"{Math.Max(1,Math.Ceiling(missing/(1024d*1024))):0} MB";throw new DataStorageException(string.Format(Strings.Data_MoveNoSpace,amount));}
@@ -153,22 +166,24 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                 bool created=!Directory.Exists(target);
                 try{
                     settings.CommitStorage(folder==null?null:target,saveSettings=>{
-                        StorageRecovery.Begin(settings.DirectoryPath,files);
+                        StorageRecovery.Begin(settings.DirectoryPath,files,moveNotes?Path.Combine(memoSource,NoteDisk.Index):null,moveNotes?Path.Combine(memoTarget,NoteDisk.Index):null);
                         try{
-                            Directory.CreateDirectory(target);progress?.Report(0);
+                            Directory.CreateDirectory(target);if(moveNotes)Directory.CreateDirectory(memoTarget);progress?.Report(0);
                             for(int i=0;i<files.Length;i++){
                                 token.ThrowIfCancellationRequested();var file=files[i];Copy(file.Source,file.Target);
                                 using var source=File.OpenRead(file.Source);using var destination=File.OpenRead(file.Target);
                                 if(source.Length!=destination.Length||!SHA256.HashData(source).SequenceEqual(SHA256.HashData(destination)))throw new IOException();
                                 progress?.Report((i+1d)/(files.Length+1));
                             }
+                            if(moveNotes)NoteDisk.Atomic(Path.Combine(memoTarget,NoteDisk.Index),NoteDisk.Encode(existing.Concat(moving)),true);
                             token.ThrowIfCancellationRequested();disk.SaveIndex(index,state with{Entries=moved},_=>{});saveSettings();
                             foreach(var file in files)File.Delete(file.Source);
+                            if(moveNotes)File.Delete(Path.Combine(memoSource,NoteDisk.Index));
                             StorageRecovery.Complete(settings.DirectoryPath);
                         }catch{StorageRecovery.Recover(settings.DirectoryPath);throw;}
                     });
                     active?.StorageMoved(moved,target);
-                    Volatile.Write(ref location,new(target,folder==null,folder==null?null:target,false));
+                    Volatile.Write(ref location,destination);
                     StorageLocation.Set(settings,location);
                 }catch{
                     if(created)try{Directory.Delete(target);}catch(IOException){ }catch(UnauthorizedAccessException){ }
@@ -179,7 +194,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
         catch(OperationCanceledException){throw;}
         catch(Exception e){string reason=e switch{UnauthorizedAccessException=>Strings.Common_InputPermissionDenied,FileNotFoundException or DirectoryNotFoundException=>Strings.Common_FileNotFound,TimeoutException=>Strings.Common_Timeout,_=>$"0x{e.HResult:X8}"};throw new DataStorageException(string.Format(Strings.Data_MoveFailed,reason),e);}
         finally{operation.Release();}
-        active?.StorageNotify();settings.NotifyStorageChanged();OnChanged();
+        NotesMoved?.Invoke();active?.StorageNotify();settings.NotifyStorageChanged();OnChanged();
         try{progress?.Report(1);}catch(Exception){ }
     },token);
 }

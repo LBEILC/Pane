@@ -212,6 +212,43 @@ int launcherOpen(const wchar_t* target,int packaged){
  CoTaskMemFree(item);return !ok&&error==ERROR_CANCELLED?-ERROR_CANCELLED:static_cast<int>(ok);
 }
 }
+namespace {
+struct WindowQuery {
+ const wchar_t* identity;
+ bool packaged;
+ void (__stdcall *found)(HWND);
+};
+BOOL CALLBACK matchAppWindow(HWND window,LPARAM data){
+ if(!IsWindowVisible(window))return TRUE;
+ auto& query=*reinterpret_cast<WindowQuery*>(data);
+ if(query.packaged){
+  ComPtr<IPropertyStore> properties;
+  PROPVARIANT value{};
+  if(SUCCEEDED(SHGetPropertyStoreForWindow(window,IID_PPV_ARGS(&properties))) &&
+     SUCCEEDED(properties->GetValue(PKEY_AppUserModel_ID,&value)) && value.vt==VT_LPWSTR && value.pwszVal){
+   bool match=_wcsicmp(value.pwszVal,query.identity)==0;
+   PropVariantClear(&value);
+   if(match)query.found(window);
+   return TRUE;
+  }
+  PropVariantClear(&value);
+ }
+ DWORD pid=0;GetWindowThreadProcessId(window,&pid);
+ HANDLE process=OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION,FALSE,pid);
+ if(!process)return TRUE;
+ wchar_t identity[32768];DWORD count=32768;UINT32 appIdCount=32768;
+ bool known=query.packaged?GetApplicationUserModelId(process,&appIdCount,identity)==ERROR_SUCCESS:
+     QueryFullProcessImageNameW(process,0,identity,&count)!=FALSE;
+ CloseHandle(process);
+ if(known && _wcsicmp(identity,query.identity)==0)query.found(window);
+ return TRUE;
+}
+}
+API void PaneFindAppWindows(const wchar_t* identity,int packaged,void (__stdcall *found)(HWND)){
+ Apartment apartment;
+ WindowQuery query{identity,packaged!=0,found};
+ EnumDesktopWindows(GetThreadDesktop(GetCurrentThreadId()),matchAppWindow,reinterpret_cast<LPARAM>(&query));
+}
 API int PaneLauncherOpen(const wchar_t* target,int packaged){
  if(!target||!*target)return 0;
  // 保持工作槽存活到进程结束，超时任务仍可能引用它。

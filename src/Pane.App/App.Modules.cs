@@ -7,6 +7,17 @@ namespace Pane;
 
 public sealed partial class App
 {
+    public IAppHotkeys? AppHotkeys => shell?.AppBindings;
+    async void PressAppHotkey(string id)
+    {
+        try {
+            if (AppHotkeys?.State(id)==AppHotkeyState.Active && launcherSearch is {} search && search.FindHotkeyApp(id) is {} app)
+                await search.PressHotkeyAsync(app);
+        } catch(Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
+    }
+    void AppIndexChanged(object? sender,EventArgs args) => queue.TryEnqueue(()=>{
+        if(ReferenceEquals(sender,launcherSearch)&&Store.Current.Launcher.AppHotkeys.Length>0)shell?.Apply(ModuleShellSettings());
+    });
     public IModuleCatalog Modules { get; private set; } = null!;
     readonly ClipboardBridge clipboardBridge = new();
     bool gestureModule, superModule;
@@ -68,7 +79,7 @@ public sealed partial class App
         // 新能力只需新增一个类，在此登记；显示顺序由这个列表决定。
         cloudModule = new(() => demo ? new DesignData.CloudSample() : new Services.Cloud.AccountService(Store.DirectoryPath, Settings.SettingsStore.CurrentVersion()), Store);
         var host = new ModuleHost([new LauncherModule(this), new ClipboardModule(this), new GesturesModule(this),
-            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this), new WordsModule(this), cloudModule], Store,
+            new SuperModule(this), new AiModule(this), new FolderJumpModule(this), new RenameModule(this), new PowerTimerModule(this), new WordsModule(this), new MemoModule(this), cloudModule], Store,
             () => WinVService?.State is WinVState.On or WinVState.Pending, OnUi);
         Modules = host;
         Store.DispatchSyncNotification = notify => queue.TryEnqueue(() => { if (!closing) notify(); });
@@ -94,9 +105,9 @@ public sealed partial class App
     Pane.Settings.PaneSettings ModuleShellSettings()
     {
         var s = Store.Current;
-        if (Modules == null) return s with { Modules = new() { [ModuleIds.Launcher] = false, [ModuleIds.Clipboard] = false, [ModuleIds.Words] = false } };
+        if (Modules == null) return s with { Modules = new() { [ModuleIds.Launcher] = false, [ModuleIds.Clipboard] = false, [ModuleIds.Memo] = false, [ModuleIds.Words] = false } };
         return s with { Modules = new(s.Modules ?? []) { [ModuleIds.Launcher] = Modules.IsActive(ModuleIds.Launcher),
-            [ModuleIds.Clipboard] = Modules.IsActive(ModuleIds.Clipboard), [ModuleIds.Words] = Modules.IsActive(ModuleIds.Words) },
+            [ModuleIds.Clipboard] = Modules.IsActive(ModuleIds.Clipboard), [ModuleIds.Memo] = Modules.IsActive(ModuleIds.Memo), [ModuleIds.Words] = Modules.IsActive(ModuleIds.Words) },
             Clipboard = s.Clipboard with { Enabled = Modules.IsActive(ModuleIds.Clipboard) } };
     }
     bool AllowModule(string id)
@@ -179,9 +190,12 @@ public sealed partial class App
             if (!a.demo)
             {
                 a.launcherSearch = new(a.Store, new Pane.Services.Launcher.WindowsAppCatalog(a.Store.DirectoryPath), everything, new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))));
+                a.launcherSearch.HotkeyIndexChanged += a.AppIndexChanged;
+                a.launcherSearch.NoteProvider = () => a.Notes;
                 a.launcherSearch.PowerTimerProvider = () => a.PowerTimer; a.WebSuggestions = new Pane.Services.Launcher.WebSuggestions(() => a.Store.Current.Launcher.WebSuggestions);
                 a.TerminalHistory = a.launcherSearch.TerminalHistory;
                 a.WebSearchHistory = a.launcherSearch.WebSearchHistory;
+                a.SearchMemory = a.launcherSearch.SearchMemory;
                 SettingsView.PortableApps = a.launcherSearch;
                 SettingsView.AppAliases = a.launcherSearch;
                 SettingsView.HiddenItems = a.launcherSearch;
@@ -200,11 +214,13 @@ public sealed partial class App
         public override async Task StopAsync(CancellationToken token)
         {
             var a = App; a.RemoveSecondary(SecondaryId.Files); a.RemoveModulePanel("launcher"); a.launcherView = null;
+            if(a.launcherSearch!=null)a.launcherSearch.HotkeyIndexChanged -= a.AppIndexChanged;
             SettingsView.AppAliases = null;
             SettingsView.HiddenItems = null;
             SettingsView.PortableApps = null; a.launcherSearch?.Dispose(); a.launcherSearch = null; (a.WebSuggestions as IDisposable)?.Dispose(); a.WebSuggestions = null;
             a.TerminalHistory = null; a.Files = null; a.FileSearchStatus=null!;
             a.WebSearchHistory=null;
+            a.SearchMemory=null;
             if(a.EngineIcons is Pane.Services.Launcher.EngineIcons engines){engines.Dispose();await engines.Completion;}
             a.EngineIcons=null;
             var icons=a.FileIcons;a.FileIcons=new Pane.Services.Icons.EmptyFileIcons();(icons as IDisposable)?.Dispose();
@@ -230,6 +246,7 @@ public sealed partial class App
             a.AddModulePanel("clipboard", Strings.Common_Clipboard, view, view, PanelPlacement.Pointer);
             a.WireClipboardLauncher(a.panels["clipboard"], view);
             a.WireClipboardActions(a.panels["clipboard"], view);
+            a.WireClipboardPin(a.panels["clipboard"], view);
         }
         public override async Task StopAsync(CancellationToken token)
         {
@@ -326,6 +343,37 @@ public sealed partial class App
             if (service is Pane.Services.PowerTimerService real && App.shell != null) App.shell.PowerTimeChanged -= real.SystemTimeChanged;
             service?.Cancel(); (service as IDisposable)?.Dispose(); App.PowerTimer = null;
             return Task.CompletedTask;
+        }
+    }
+    public INoteStore? Notes { get; private set; }
+    sealed class MemoModule(App app) : Capability(app, ModuleIds.Memo, ModuleCategory.Clipboard, "note")
+    {
+        // TODO(design): 暂把随手记归在剪贴板分类，能力页定稿时核对。
+        public override async Task StartAsync(CancellationToken token)
+        {
+            string Folder() => Services.Memo.NoteDisk.FolderFor(App.Store.DirectoryPath,SettingsView.DataStorage?.LargeFiles);
+            var log = new Services.SelectionLog(App.Store.DirectoryPath,"memo.log");
+            var store = new Services.Memo.NoteStore(Folder,App.Store.StorageSync,log:log.Write);
+            await store.Completion;
+            App.Notes = store;
+            App.cloudModule?.SetNotes(store);
+            if (SettingsView.DataStorage is Services.Clipboard.DataStorage data)
+            {
+                data.FlushNotes = () => store.Completion;
+                data.NotesMoved = store.Refresh;
+            }
+        }
+        public override async Task StopAsync(CancellationToken token)
+        {
+            var store = App.Notes as Services.Memo.NoteStore;
+            App.cloudModule?.SetNotes(null);
+            App.Notes = null;
+            if (store != null) await store.Completion;
+            if (SettingsView.DataStorage is Services.Clipboard.DataStorage data)
+            {
+                data.FlushNotes = null;
+                data.NotesMoved = null;
+            }
         }
     }
     sealed class WordsModule(App app) : Capability(app, ModuleIds.Words, ModuleCategory.Clipboard, "words", ModuleIds.Clipboard, ModuleIds.Launcher)

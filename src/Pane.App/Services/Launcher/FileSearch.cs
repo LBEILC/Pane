@@ -80,21 +80,49 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
         int index=name.IndexOf(query,StringComparison.OrdinalIgnoreCase);
         return index<0?null:[new(index,query.Length)];
     }
+    internal Func<string,FileHit?> FolderProbe {get;set;}=ReadFolder;
+    static FileHit? ReadFolder(string path)
+    {
+        var directory=new DirectoryInfo(path);
+        if(!directory.Exists)return null;
+        return new(path,directory.Name,FileCategory.Folder,null,directory.LastWriteTimeUtc);
+    }
+    async Task<FileHit?> FindFolderAsync(string text,CancellationToken token)
+    {
+        if(text.Length>=2&&text[0]=='"'&&text[^1]=='"')text=text[1..^1];
+        if(DirectSource.LocalPath(text) is not {} path)return null;
+        path=Path.TrimEndingDirectorySeparator(path);
+        try{
+            return await Task.Run(()=>FolderProbe(path),token)
+                .WaitAsync(TimeSpan.FromMilliseconds(300),token).ConfigureAwait(false);
+        }catch(Exception e) when(e is TimeoutException or IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException){
+            return null;
+        }
+    }
     public async Task<FilePage> SearchAsync(FileQuery query,int offset,int count,CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentOutOfRangeException.ThrowIfNegative(offset);ArgumentOutOfRangeException.ThrowIfNegative(count);
         if(string.IsNullOrWhiteSpace(query.Text))return new([],0,null);
         var text=query.Text.Trim();
+        var folder=await FindFolderAsync(text,cancellationToken).ConfigureAwait(false);
+        var search=folder==null?text:$"parent:\"{folder.Path}\"";
+        bool includeFolder=folder!=null&&offset==0&&count>0;
+        int childOffset=folder==null?offset:Math.Max(0,offset-1);
+        int childCount=includeFolder?count-1:count;
         EverythingPage page;
-        try{page=await ipc.QueryAsync(Filter(text,query.Category),offset,count,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);}
+        try{page=await ipc.QueryAsync(Filter(search,query.Category),childOffset,childCount,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);}
         catch(TimeoutException){throw new FileSearchUnavailableException(Strings.Launcher_EverythingTimeout);}
         IReadOnlyDictionary<FileCategory,int>? counts=null;
         if(offset==0){
-            var pending=CountsAsync(text,query.Category,page.Total);
+            var pending=CountsAsync(search,query.Category,page.Total);
             if(pending.IsCompletedSuccessfully)counts=pending.Result;
         }
         cancellationToken.ThrowIfCancellationRequested();
+        if(folder!=null){
+            IReadOnlyList<FileHit> items=includeFolder?[folder,..page.Items]:page.Items;
+            return new(items,page.Total+1,counts,folder.Path);
+        }
         return new(page.Items.Select(hit=>hit with{Highlights=Highlights(hit.Name,text)}).ToArray(),page.Total,counts);
     }
     readonly object countsLock=new();

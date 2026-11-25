@@ -132,6 +132,7 @@ public sealed partial class GlassPanel : IDisposable
         // 设计改（2026-10-31）：前台是本面板或另一个随用随收的面板（启动器 → 剪贴板、面板已开再呼出）时，
         // 沿用它记下的原窗口；原来直接记成面板自己，收起后粘贴切不回去，误报「没有权限往这个窗口输入」
         var foreground=Native.GetForegroundWindow();
+        lastPinnedForeground=foreground;
         var panel=transient.FirstOrDefault(p=>p.Input==foreground||p.Visual==foreground);
         Previous=panel==null?foreground:panel.Previous;
         if(!near){Native.GetCursorPos(out var cursor);px=cursor.X;py=cursor.Y;}
@@ -162,18 +163,29 @@ public sealed partial class GlassPanel : IDisposable
         // 两次独立置顶不能保证 owner 与 owned 窗口连续；背景可能插在中间。
         // 显式以输入窗定位视觉窗，并禁止系统联动调整所有者的 Z 序。
         if(!Native.SetWindowPos(Visual,Input,0,0,0,0,0x213))throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-        if(!demo&&activate&&interactive){Activate();pendingFocus=true;}
+        retryShowActivation=false;
+        if(!demo&&activate&&interactive)
+        {
+            bool active=Activate();
+            // 显示和首帧之间仍可能在切换前台。仅在呼出时的窗口仍是前台时补试一次。
+            retryShowActivation=!active&&!settingsWindow&&Shown;
+            showForeground=foreground;
+            pendingFocus=Shown;
+        }
         outsideButtons=MouseButtonsDown();
     }
     // 设计改（2026-10-30）：从鼠标钩子触发的面板（超级面板长按侧键）不是前台进程发起的，系统会拒绝 SetForegroundWindow，
     // 面板拿不到焦点：点外面不收起、Esc 和数字键也不响应。被拒绝时临时挂到前台窗口线程的输入上再激活一次（常用做法）
-    void Activate()
+    bool retryShowActivation;
+    nint showForeground;
+    bool Activate()
     {
-        if(Native.SetForegroundWindow(Input)&&Native.GetForegroundWindow()==Input)return;
+        if(Native.SetForegroundWindow(Input)&&Native.GetForegroundWindow()==Input)return true;
         uint mine=GetCurrentThreadId(),theirs=GetWindowThreadProcessId(Native.GetForegroundWindow(),out _);
         bool attached=theirs!=0&&theirs!=mine&&AttachThreadInput(mine,theirs,true);
         try{BringWindowToTop(Input);Native.SetForegroundWindow(Input);}
         finally{if(attached)AttachThreadInput(mine,theirs,false);}
+        return Native.GetForegroundWindow()==Input;
     }
     // WS_EX_NOACTIVATE 只在不激活方式下加上；激活方式（含 Engage 之后）去掉，点击照常激活
     void SetPassive(bool on)
@@ -182,6 +194,24 @@ public sealed partial class GlassPanel : IDisposable
         nint style=GetWindowLongPtrW(Input,-20);nint next=on?style|0x08000000:style&~(nint)0x08000000;
         if(next!=style)SetWindowLongPtrW(Input,-20,next);
     }
+    /// <summary>
+    /// 钉住（剪贴板，2026-11-25）：返回 true 时失焦、点面板外面、原窗口不再是前台都不收起，
+    /// 改为切回不激活方式、Previous 跟到新的前台窗口（非 Pane），并发 LeftWhilePinned（宿主放开按键接管）。Esc、热键照常收起。
+    /// </summary>
+    public Func<bool>? Pinned {get;set;}
+    public event EventHandler? LeftWhilePinned;
+    bool IsPinned=>Shown&&Pinned?.Invoke()==true;
+    /// <summary>钉住时放开键盘（粘贴之后）：切回不激活方式，面板留着；之后点面板不激活，点搜索框再 Engage。</summary>
+    public void ReleaseKeyboard(){if(Shown&&!disposing&&interactive&&!settingsWindow&&!demo)SetPassive(true);}
+    nint lastPinnedForeground;
+    void LeavePinned(nint foreground)
+    {
+        ReleaseKeyboard();
+        lastPinnedForeground=foreground;
+        if(foreground!=0&&!OwnWindow(foreground))Previous=foreground;
+        LeftWhilePinned?.Invoke(this,EventArgs.Empty);
+    }
+    static bool OwnWindow(nint window){GetWindowThreadProcessId(window,out uint pid);return pid==(uint)Environment.ProcessId;}
     /// <summary>从不激活方式切到激活方式（打字搜索、点搜索框）：激活面板并聚焦。之后失去焦点照常收起。</summary>
     // 已显示的面板重新拿回前台和键盘焦点（剪贴板叠在启动器上用完收起后，焦点回到启动器）
     public void Refocus()
@@ -200,7 +230,11 @@ public sealed partial class GlassPanel : IDisposable
     void CheckPassiveForeground()
     {
         var foreground=Native.GetForegroundWindow();
-        if(foreground==0||foreground==Previous||foreground==Input||foreground==Visual)return;
+        if(foreground==0||foreground==Input||foreground==Visual)return;
+        // 钉住时按窗口句柄跟踪目标，同一应用的另一个窗口也能接收下一次粘贴。
+        // 切到 Pane 自己的窗口也要放开键盘，Previous 仍保留外部窗口。
+        if(IsPinned){if(foreground!=lastPinnedForeground)LeavePinned(foreground);return;}
+        if(foreground==Previous)return;
         if(GetAncestor(foreground,3)is var root0&&root0!=0&&root0==GetAncestor(Previous,3))return;
         GetWindowThreadProcessId(foreground,out uint pid);
         if(pid==(uint)Environment.ProcessId)return;
@@ -219,7 +253,7 @@ public sealed partial class GlassPanel : IDisposable
         int now=MouseButtonsDown(),pressed=now&~outsideButtons;outsideButtons=now;
         if(pressed==0||settingsWindow||!interactive||demo||dragging||Native.GetForegroundWindow()==Input||!(HideOnBlur?.Invoke()??true))return;
         Native.GetCursorPos(out var p);Native.GetWindowRect(Input,out var r);
-        if(p.X<r.Left||p.X>=r.Right||p.Y<r.Top||p.Y>=r.Bottom)Hide();
+        if(p.X<r.Left||p.X>=r.Right||p.Y<r.Top||p.Y>=r.Bottom){if(IsPinned)LeavePinned(Native.GetForegroundWindow());else Hide();}   // 钉住：点外面只放开键盘
     }
     [DllImport("user32.dll")] static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint attach,uint to,bool on);
@@ -309,7 +343,19 @@ public sealed partial class GlassPanel : IDisposable
     internal void Tick()
     {
         if(disposing)return;
-        if(pendingFocus&&root.IsLoaded){pendingFocus=false;Focus();}
+        if(pendingFocus&&root.IsLoaded&&(!retryShowActivation||!revealing))
+        {
+            pendingFocus=false;
+            bool retry=retryShowActivation;
+            retryShowActivation=false;
+            if(!retry)Focus();
+            else if(Shown&&!Passive)
+            {
+                var foreground=Native.GetForegroundWindow();
+                if(foreground==Input||(foreground==showForeground&&Native.SetForegroundWindow(Input)&&Native.GetForegroundWindow()==Input))
+                    Focus();
+            }
+        }
         if(resizing)StepResize();
         if(deferFrames>0&&--deferFrames==0){if(Shown&&!IsIconic(Input))FollowTo(deferredRect);else ElementCompositionPreview.GetElementVisual(root).Opacity=opacity;}
         if(rectAnimating)StepRect();
@@ -415,7 +461,12 @@ public sealed partial class GlassPanel : IDisposable
         if(h==Input && m==0x21 && Passive)return 3;   // 不激活方式：点面板不激活（MA_NOACTIVATE）
         if(m==0x10){Hide();return 0;}
         if(m==0x14)return 1;
-        if(h==Input&&m==6&&(w&0xffff)==0&&Shown&&interactive&&!dragging&&!settingsWindow&&!demo&&l!=Input&&l!=Visual&&!Native.IsChild(Input,l)&&(HideOnBlur?.Invoke()??true))Hide();
+        if(h==Input&&m==6&&(w&0xffff)==0&&Shown&&interactive&&!dragging&&!settingsWindow&&!demo&&l!=Input&&l!=Visual&&!Native.IsChild(Input,l)&&(HideOnBlur?.Invoke()??true))
+        {
+            // 钉住：失焦不收起，等前台真的换过去再切回不激活方式（这时 GetForegroundWindow 还没变）
+            if(IsPinned)root.DispatcherQueue.TryEnqueue(()=>{if(IsPinned)LeavePinned(Native.GetForegroundWindow());});
+            else Hide();
+        }
         if(h==Input&&m==7&&island!=null&&!Passive)Focus();
         return Native.DefWindowProcW(h,m,w,l);
     }

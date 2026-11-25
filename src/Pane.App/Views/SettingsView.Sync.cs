@@ -87,6 +87,8 @@ public sealed partial class SettingsView
         {
             rows.Add(Row(Strings.Settings_Sync_Settings, Strings.Settings_Sync_SettingsDescription, Switch(o.Settings, v => Apply(x => x with { Settings = v }))));
             rows.Add(Row(Strings.Settings_Sync_Usage, Strings.Settings_Sync_UsageDescription, Switch(o.Usage, v => Apply(x => x with { Usage = v }))));
+            // 备忘录（124）：备忘录能力停用时不列
+            if (ModuleGate.On(ModuleIds.Memo)) rows.Add(Row(Strings.Settings_Sync_Notes, Strings.Settings_Sync_NotesDescription, Switch(o.Notes, v => Apply(x => x with { Notes = v }))));
             rows.Add(Row(Strings.Settings_Sync_Clipboard, Strings.Settings_Sync_ClipboardDescription, Switch(o.Clipboard, v => { Apply(x => x with { Clipboard = v }); Later(); })));
             if (o.Clipboard)
             {

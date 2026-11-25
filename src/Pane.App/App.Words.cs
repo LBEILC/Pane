@@ -19,7 +19,7 @@ public sealed partial class App
         (int X,int Y) at;
         if(fromClipboard&&panels.TryGetValue("clipboard",out var clip)&&clip.Shown)at=clip.Origin;
         else{Native.GetCursorPos(out var p);at=(p.X+12,p.Y+12);}
-        Present(SecondaryId.Words,Strings.Module_Words_Name,()=>{var v=new WordsView(segmenter,secondaryActions!);v.SendToLauncher+=(_,t)=>SendWordsToLauncher(t);return v;},
+        Present(SecondaryId.Words,Strings.Module_Words_Name,()=>{var v=new WordsView(segmenter,secondaryActions!);v.SendToLauncher+=(_,t)=>SendWordsToLauncher(t);v.SaveMemo+=SaveToMemo;return v;},
             v=>((WordsView)v).Open(text,source,fromClipboard),at);
     }
 

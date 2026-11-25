@@ -53,6 +53,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     readonly nint window;
     readonly Action<string> command;
     readonly List<int> registered=[];
+    readonly HashSet<Hotkey> registeredChords=[];
     readonly Microsoft.UI.Dispatching.DispatcherQueue queue;
     readonly Thread thread;
     readonly ManualResetEventSlim ready=new();
@@ -126,15 +127,21 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         var words=settings.Words.Hotkey;
         if(words!=null)words=Override("words",words);
         bool wordsEnabled=settings.Modules?.GetValueOrDefault("words",true)??true;
-        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV,words,wordsEnabled);
+        var memo = (settings.Modules?.GetValueOrDefault("memo",true) ?? true) ? settings.Memo.Hotkey : null;
+        registeredChords.Clear();
+        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV,words,wordsEnabled,memo);
+        AppBindings.Bind(settings.Launcher.AppHotkeys,!suspended&&(settings.Modules?.GetValueOrDefault("launcher",true)??true),AppExists,(id,key)=>!registeredChords.Contains(key)&&RegisterChord(id,key,out _));
         OriginalClipboardHotkeySuppressed=active&&!settings.Clipboard.KeepHotkeyWithWinV;
         var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,!OriginalClipboardHotkeySuppressed&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled),suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
         uint wordsKey=wordsEnabled&&!suspended&&words?.IsValidDoubleTap==true?words.VirtualKey:0u;
         if(wordsKey!=0&&(wordsKey==keys.Launcher||wordsKey==keys.Clipboard)){RegistrationResult("words",words!,false,1409);wordsKey=0;}
-        if(keys.Launcher!=0||keys.Clipboard!=0||wordsKey!=0){
-            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard,wordsKey);
+        uint memoKey=!suspended && memo?.IsValidDoubleTap==true ? memo.VirtualKey : 0u;
+        if(memoKey!=0 && (memoKey==keys.Launcher || memoKey==keys.Clipboard || memoKey==wordsKey)){RegistrationResult("memo",memo!,false,1409);memoKey=0;}
+        if(keys.Launcher!=0||keys.Clipboard!=0||wordsKey!=0||memoKey!=0){
+            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard,wordsKey,memoKey);
             keyboardStarted=code==0;
             if(code!=0){if(keys.Launcher!=0)RegistrationResult("launcher",a,false,code);if(keys.Clipboard!=0)RegistrationResult("clipboard",b,false,code);}
+            if(memoKey!=0)RegistrationResult("memo",memo!,code==0,code);
             if(wordsKey!=0)RegistrationResult("words",words!,code==0,code);
         }
         lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
@@ -143,18 +150,25 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         else{CancelTrayRetry();retryIndex=0;}
         if(!settings.General.ShowTrayIcon&&tray){Shell_NotifyIconW(2,ref data);tray=false;}
     }
+    internal Pane.Services.Launcher.AppHotkeyBindings AppBindings {get;} = new();
+    internal Func<string,bool> AppExists {get;set;} = _=>false;
+    internal Action<string>? PressApp {get;set;}
     void Register(int id,string name,Hotkey key){
         if(key.DoubleTap){RegistrationResult(name,key,false,87);return;}
+        bool ok=RegisterChord(id,key,out int code);
+        RegistrationResult(name,key,ok,code);
+    }
+    bool RegisterChord(int id,Hotkey key,out int code){
         var chord=Pane.Services.HotkeyConversions.ToGesture(key);
         uint mods=ShellHotkeyBindings.NoRepeat;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Ctrl))mods|=2;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Alt))mods|=1;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Shift))mods|=4;if(chord.Modifiers.HasFlag(Pane.Gestures.KeyModifiers.Win))mods|=8;
-        bool ok=Native.RegisterHotKey(shellWindow,id,mods,key.VirtualKey);int code=ok?0:Marshal.GetLastWin32Error();if(ok)registered.Add(id);
-        RegistrationResult(name,key,ok,code);
+        bool ok=Native.RegisterHotKey(shellWindow,id,mods,key.VirtualKey);code=ok?0:Marshal.GetLastWin32Error();if(ok){registered.Add(id);registeredChords.Add(key);}
+        return ok;
     }
     void RegistrationResult(string name,Hotkey key,bool ok,int code){
         lock(diagnostics)diagnostics.Add($"{name}={key.Modifiers}+{key.VirtualKey};registered={ok};error={code}");
         if(!ok){var conflict=new HotkeyConflict(name,key,code);lock(conflicts)conflicts.Add(conflict);queue.TryEnqueue(()=>HotkeyOccupied?.Invoke(this,conflict));
             // 设计加（2026-10-30）：注册失败时提示一次，否则按了没反应也不知道为什么
-            var what=name=="launcher"?Strings.Common_Launcher:name=="words"?Strings.Module_Words_Name:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
+            var what=name=="launcher"?Strings.Common_Launcher:name=="words"?Strings.Module_Words_Name:name=="memo"?Strings.Memo_Title:Strings.Common_Clipboard;NotifyOnce(string.Format(Strings.Setup_HotkeyConflict, (object?)(Pane.Views.Controls.HotkeyBox.Text(key).Replace("Space",Strings.Common_SpaceKey)), (object?)(what), (object?)(what)));}
     }
     nint WndProc(nint h,uint m,nuint w,nint l){
         // 在广播线程直接清标记，不依赖 UI 调度在系统结束会话前执行。
@@ -166,7 +180,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         if(taskbarCreated!=0&&m==taskbarCreated){CancelTrayRetry();retryIndex=0;tray=false;TryTray();return 0;}
         if(m==0x113&&retryTimer!=0&&w==retryTimer){CancelTrayRetry();TryTray();return 0;}
         if(m==0x8004){while(winVRequests.TryDequeue(out var request)){try{winVRequested=request.Enabled;if(currentSettings is {} settings)ApplyCore(settings);request.Done.TrySetResult(winVActive);}catch(Exception e){request.Done.TrySetException(e);}}return 0;}
-        if(m==0x312){if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
+        if(m==0x312){if(!suspended&&AppBindings.AppFor((int)w) is {} app){PressApp?.Invoke(app);return 0;}if(ShellHotkeyBindings.Command(w) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8005){if(!suspended&&w==keyboardGeneration&&ShellHotkeyBindings.Command((nuint)l) is {} hotkey)Dispatch(hotkey);return 0;}
         if(m==0x8003){while(notifications.TryDequeue(out var text)){if(!tray)continue;data.Info=text;data.Title="Pane";data.Flags=0x10;Shell_NotifyIconW(1,ref data);data.Flags=7;}return 0;}
         if(m==0x8002){try{if(pending is {} s)ApplyCore(s);}catch(Exception ex){lock(diagnostics)diagnostics.Add($"apply-settings=failed;code={ex.HResult:X8}");}return 0;}
@@ -212,7 +226,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     [DllImport("user32.dll")] static extern bool PostMessageW(nint h,uint m,nuint w,nint l);
     [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessageW(string name);
-    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard,uint words);
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard,uint words,uint memo);
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern void PaneKeyboardStop();
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardActive();
 }

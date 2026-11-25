@@ -53,7 +53,7 @@ internal sealed class PanelKeyRouter : IPanelKeyRouter, IDisposable
             if (!disposed && w == generation && Active)
             {
                 int value = (int)l, key = (value & 255) - 1;
-                if (key >= 0 && key <= (int)PanelKey.Edit) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
+                if (key >= 0 && key <= (int)PanelKey.PinPanel) Pressed?.Invoke(this, new((PanelKey)key, value >> 8));
             }
             return 0;
         }

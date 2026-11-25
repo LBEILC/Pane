@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  备忘录窗口（二级窗口，设计负责人，2026-11-25，第一期「随手记」）。照原型 prototype/memo.html（docs/design.md「备忘录」）。
+  默认 760 × 500、最小 560 × 360。头 56：种类「备忘录」，右边 新建、总在最前、关闭；
+  主体左 240：搜索框 + 列表（已固定在前，再按修改时间）；右：顶上一行修改时间和 固定 / 预览 / 复制全文 / 删除，下面编辑区或 Markdown 预览；
+  底 38：按键提示 + 「共 N 条」。删除后编辑区底部出撤销条 5 秒。
+-->
+<UserControl
+    x:Class="Pane.Views.MemoView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:loc="using:Pane.Localization"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:c="using:Pane.Views.Controls"
+    IsTabStop="True" UseSystemFocusVisuals="False">
+
+    <Grid x:Name="Root">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="38"/>
+        </Grid.RowDefinitions>
+
+        <!-- 头：种类、新建、总在最前、关闭。空白处可拖动窗口（宿主处理） -->
+        <Grid x:Name="Head" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Border Height="28" Padding="8,0,10,0" CornerRadius="14" VerticalAlignment="Center"
+                    Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:PaneIcon Glyph="note" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock Text="{x:Bind loc:Strings.Memo_Title}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                </StackPanel>
+            </Border>
+            <Button Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnNew" IsTabStop="False"
+                    ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_NewHint}">
+                <c:PaneIcon Glyph="plus" Width="16" Height="16"/>
+            </Button>
+            <Button x:Name="PinButton" Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPinWindow" IsTabStop="False"
+                    ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
+                <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
+            </Button>
+            <Button Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" IsTabStop="False"
+                    ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
+                <c:PaneIcon Glyph="close" Width="16" Height="16"/>
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- 左：搜索 + 列表 -->
+            <Grid BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Border Margin="12,12,12,6" Height="{StaticResource PaneControlSm}" CornerRadius="{StaticResource PaneRadiusControl}" Padding="9,0,10,0"
+                        Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <Grid ColumnSpacing="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <c:PaneIcon Glyph="search" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText3Brush}"/>
+                        <TextBox x:Name="Query" Grid.Column="1" VerticalAlignment="Center" MinHeight="0" Padding="0" c:TextBleed.Bleed="4" BorderThickness="0" Background="Transparent"
+                                 PlaceholderText="{x:Bind loc:Strings.Memo_SearchPlaceholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
+                                 FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
+                                 IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnQueryChanged"/>
+                    </Grid>
+                </Border>
+                <ScrollViewer x:Name="ListScroller" Grid.Row="1" Padding="8,0,8,8" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                    <StackPanel x:Name="List" Spacing="2"/>
+                </ScrollViewer>
+                <TextBlock x:Name="ListEmpty" Grid.Row="1" Visibility="Collapsed" Margin="16,28,16,0" TextAlignment="Center" TextWrapping="Wrap" LineHeight="22"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+            </Grid>
+
+            <!-- 右：修改时间和按钮、编辑区 / 预览、撤销条 -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="40"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid x:Name="Bar" Padding="20,0,10,0" ColumnSpacing="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <TextBlock x:Name="Meta" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                        <!-- 同步冲突副本：chip「来自 电脑名」（组件库 pane-tag kind="chip"） -->
+                        <Border x:Name="FromChip" Visibility="Collapsed" Height="20" CornerRadius="10" Padding="8,0,8,0" VerticalAlignment="Center"
+                                Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                            <TextBlock x:Name="FromText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText2Brush}"/>
+                        </Border>
+                    </StackPanel>
+                    <Button x:Name="NotePinButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnPinNote" IsTabStop="False"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_PinHint}">
+                        <c:PaneIcon x:Name="NotePinIcon" Glyph="pin" Width="15" Height="15"/>
+                    </Button>
+                    <Button x:Name="PreviewButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnTogglePreview" IsTabStop="False"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_PreviewHint}">
+                        <c:PaneIcon x:Name="PreviewIcon" Glyph="eye" Width="15" Height="15"/>
+                    </Button>
+                    <Button x:Name="CopyButton" Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnCopyAll" IsTabStop="False"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_CopyAll}">
+                        <c:PaneIcon x:Name="CopyIcon" Glyph="copy" Width="15" Height="15"/>
+                    </Button>
+                    <Button x:Name="DeleteButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnDelete" IsTabStop="False"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_DeleteHint}">
+                        <c:PaneIcon Glyph="trash" Width="15" Height="15"/>
+                    </Button>
+                </Grid>
+                <Border x:Name="EditorHost" Grid.Row="1" Padding="16,0,16,16">
+                <TextBox x:Name="Editor" AcceptsReturn="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Padding="0" MinHeight="0"
+                         c:TextBleed.Bleed="4" ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                         PlaceholderText="{x:Bind loc:Strings.Memo_Placeholder}" PlaceholderForeground="{ThemeResource PaneText3Brush}"
+                         FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
+                         IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnEditorChanged"/>
+                </Border>
+                <ScrollViewer x:Name="PreviewScroller" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                    <StackPanel x:Name="PreviewPanel" Padding="20,0,20,20" Spacing="8"/>
+                </ScrollViewer>
+                <TextBlock x:Name="NoneText" Grid.Row="1" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                <!-- 撤销条：删除后 5 秒 -->
+                <Border x:Name="UndoBar" Grid.Row="1" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,14"
+                        Padding="14,6,6,6" CornerRadius="{StaticResource PaneRadiusChip}" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock x:Name="UndoText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
+                        <Button Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnUndo" IsTabStop="False">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:PaneIcon Glyph="undo" Width="14" Height="14" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                                <TextBlock Text="{x:Bind loc:Strings.Common_Undo}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <!-- 底栏：按键提示、数量 -->
+        <Grid Grid.Row="2" Padding="16,0,16,0" ColumnSpacing="16" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <c:WrapPanel x:Name="Hints" VerticalAlignment="Center" HorizontalSpacing="16" VerticalSpacing="0"/>
+            <TextBlock x:Name="CountText" Grid.Column="1" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+        </Grid>
+
+        <!-- 样板（NativeAOT 下不按名字查资源） -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="HintLabelProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="TitleProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="SubProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="BodyProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="MonoProto" FontFamily="{StaticResource PaneFontMono}" FontSize="12" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="MathProto" FontFamily="{StaticResource PaneFontMath}" Foreground="{StaticResource PaneAccentBrush}"/>
+            <Border x:Name="CodeProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="HoverProto" Background="{ThemeResource PaneFillHoverBrush}"/>
+            <Border x:Name="SelectedProto" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+            <Border x:Name="KbdProto" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
+        </StackPanel>
+    </Grid>
+</UserControl>

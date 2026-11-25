@@ -15,6 +15,8 @@ public enum StorageCategory
     Cache,
     /// <summary>logs 文件夹；可清空</summary>
     Logs,
+    /// <summary>备忘录的 .md 文件和索引（2026-11-25，123）；备忘录能力停用时不列</summary>
+    Memo,
 }
 
 /// <param name="Folder">「打开文件夹」打开的位置；没有就是 null。</param>

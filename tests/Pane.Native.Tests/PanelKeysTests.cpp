@@ -73,7 +73,7 @@ void unit(){
   {0x33,{false,true},PanelQuick},{0x50,{true},PanelPin},{9,{},PanelSend},{27,{},PanelEscape},
   {0x41,{},PanelType},{0x41,{false,false,false,true},PanelType},
   {0x26,{false,false,false,true},PanelNone},{0x28,{true},PanelNone},{13,{false,true},PanelNone},
-  {0x33,{true,true},PanelNone},{0x33,{false,true,true},PanelNone},{0x50,{true,false,false,true},PanelNone},
+  {0x33,{true,true},PanelNone},{0x33,{false,true,true},PanelNone},{0x50,{true,false,false,true},PanelPinPanel},
   {9,{true},PanelNone},{27,{false,false,true},PanelNone},{0x43,{true},PanelNone},{0x41,{true,true},PanelNone},
   {0x61,{false,true},PanelNone},{8,{},PanelNone},{46,{},PanelNone},{37,{},PanelNone},{39,{},PanelNone},
   {36,{},PanelNone},{35,{},PanelNone},{33,{},PanelNone},{34,{},PanelNone},{0x70,{},PanelNone},{0xA4,{},PanelNone}
@@ -91,8 +91,17 @@ void unit(){
    auto expected=m.alt&&!m.ctrl&&!m.win?PanelQuick:!m.ctrl&&!m.alt&&!m.win?PanelType:PanelNone;
    check(r.action==expected&&r.number==(expected==PanelQuick?vk-0x30:0),"all quick digit modifier combinations");
   }
-  PanelKeys pin;pin.begin(true,held);auto expected=bits==1?PanelPin:bits==0||bits==8?PanelType:PanelNone;
-  check(pin.feed({'P',0,true},m,0).action==expected,"all pin modifiers");
+  for(auto mode:{PanelMode::Clipboard,PanelMode::ClipboardWithSend}){
+   PanelKeys pin;pin.begin(mode,held);
+   auto expected=bits==1?PanelPin:bits==9?PanelPinPanel:bits==0||bits==8?PanelType:PanelNone;
+   auto press=pin.feed({'P',0,true},m,0);
+   check(press.action==expected&&press.swallow==(expected!=PanelNone),"clipboard P modifiers");
+   if(expected==PanelPin||expected==PanelPinPanel){
+    auto repeat=pin.feed({'P',0,true},m,1);
+    check(repeat.swallow&&repeat.action==expected,"pin shortcut repeats");
+    check(pin.feed({'P',0,false},m,2).swallow&&!pin.pending(),"pin shortcut release");
+   }
+  }
   PanelKeys wordsKeys;wordsKeys.begin(true,held);wordsKeys.wordsEnabled=true;
   check(wordsKeys.feed({'B',0,true},m,0).action==(bits==1?PanelWords:bits==0||bits==8?PanelType:PanelNone),"all words modifiers");
   PanelKeys disabledWords;disabledWords.begin(true,held);

@@ -62,6 +62,7 @@ public sealed partial class WordsView : UserControl, ISecondaryView, IDisposable
         KeyHints.Fill(Foot, [([Strings.Common_SpaceKey], Strings.Words_Select), (["Shift", "+", "←", "→"], Strings.Words_Extend), (["Ctrl", "+", "A"], Strings.Words_SelectAll)],
             HintLabelProto, KbdProto);
         SendButton.Visibility = ModuleGate.On(ModuleIds.Launcher) ? Visibility.Visible : Visibility.Collapsed;
+        MemoButton.Visibility = ModuleGate.On(ModuleIds.Memo) ? Visibility.Visible : Visibility.Collapsed;
         PreviewKeyDown += OnKeyDown;
         KeyUp += OnKeyUp;
         Unloaded += OnUnloaded;
@@ -349,6 +350,15 @@ public sealed partial class WordsView : UserControl, ISecondaryView, IDisposable
 
     void OnCopy(object sender, RoutedEventArgs e) => Copy();
     void OnSend(object sender, RoutedEventArgs e) => Send();
+
+    /// <summary>「存为备忘录」（123）：存选中的；什么都没选就存整段。存成了窗口关闭。</summary>
+    public event Func<string, bool>? SaveMemo;
+    void OnSaveMemo(object sender, RoutedEventArgs e)
+    {
+        var text = Joined();
+        if (text.Length == 0) { SelectAll(); text = Joined(); }
+        if (text.Length > 0 && SaveMemo?.Invoke(text) == true) CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
     void OnSelectAll(object sender, RoutedEventArgs e) { SelectAll(); Focus(FocusState.Programmatic); }
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 

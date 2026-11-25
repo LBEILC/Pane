@@ -47,6 +47,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             new("launcher", Strings.Settings_Launcher, "search", Strings.Settings_Launcher_Description, RenderLauncher, ModuleIds.Launcher, "input"),
             new("clipboard", Strings.Settings_Clipboard, "clipboard", Strings.Settings_Clipboard_Description, RenderClipboard, ModuleIds.Clipboard, "input"),
             new("words", Strings.Module_Words_Name, "words", Strings.Settings_Words_Description, RenderWords, ModuleIds.Words, "input"),
+            new("memo", Strings.Memo_Title, "note", Strings.Settings_Memo_Description, RenderMemo, ModuleIds.Memo, "input"),
             new("ai", "AI", "ai", Strings.Settings_Ai_Description, RenderAi, ModuleIds.Ai, "input"),
             new("gesture", Strings.Settings_Gestures, "gesture", Strings.Settings_Gestures_Description, RenderGesture, ModuleIds.Gestures, "mouse"),
             new("superpanel", Strings.Settings_SuperPanel, "pointer", Strings.Settings_SuperPanel_Description, RenderSuper, ModuleIds.SuperPanel, "mouse"),
@@ -148,6 +149,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (PortableApps is { } pa) pa.Changed += OnFileSearchChanged;   // 扫描完成：同样只重建启动器分区
         Data.Changed += OnDataChanged;   // 数据分区（082）
         if (AppAliases is { } aa) aa.Changed += OnFileSearchChanged;   // 别名改了（启动器里设的）：重建启动器分区
+        if (app.AppHotkeys is { } ah) ah.Changed += OnAppHotkeysChanged;   // 应用快捷键（122）注册结果变了：重建快捷键页
         app.Modules.Changed += OnModulesChanged;
         Unloaded += OnUnloaded;
         Show(current);
@@ -169,6 +171,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
         if (PortableApps is { } pa) pa.Changed -= OnFileSearchChanged;
         Data.Changed -= OnDataChanged;
         if (AppAliases is { } aa) aa.Changed -= OnFileSearchChanged;
+        if (app.AppHotkeys is { } ah) ah.Changed -= OnAppHotkeysChanged;
         app.Modules.Changed -= OnModulesChanged;
         signIn?.Cancel();
         app.SetHotkeysSuspended(false);

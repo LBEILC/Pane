@@ -40,6 +40,15 @@ public static class FileKinds
         return brushes[c] = new SolidColorBrush(Windows.UI.Color.FromArgb(255, (byte)(v >> 16), (byte)(v >> 8), (byte)v));
     }
 
+    // 行尾类型标签（issue 60 / 82，原型 launcher.html 的 typeTag）：文件是大写扩展名（最多 8 个字母，再长或没有就不显示），
+    // 文件夹是「文件夹」。启动器的文件行和文件窗口共用
+    public static string? TypeTag(string name, bool folder)
+    {
+        if (folder) return Strings.Files_CategoryFolder;
+        var ext = System.IO.Path.GetExtension(name);
+        return ext.Length is >= 2 and <= 9 ? ext[1..].ToUpperInvariant() : null;
+    }
+
     public static string Size(long? bytes) => bytes switch
     {
         null => "",
@@ -101,7 +110,13 @@ public sealed partial class FileRow : INotifyPropertyChanged
     public MatchedText Match { get; }
     public string Folder => System.IO.Path.GetDirectoryName(Hit.Path) ?? Hit.Path;
     public string Modified => FileKinds.When(Hit.Modified);
-    public string Size => Hit.Category == FileCategory.Folder ? Strings.Files_CategoryFolder : FileKinds.Size(Hit.Size);
+    /// <summary>今天改过的文件，时间加粗（issue 60）。</summary>
+    public Windows.UI.Text.FontWeight ModifiedWeight => Hit.Modified is { } m && m.ToLocalTime().Date == DateTime.Today ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+    // 文件夹的类型已经写在行尾标签里，大小这一行不再写「文件夹」
+    public string Size => FileKinds.Size(Hit.Size);
+    public Visibility SizeVisibility => Hit.Category == FileCategory.Folder ? Visibility.Collapsed : Visibility.Visible;
+    public string? TypeTag => FileKinds.TypeTag(Hit.Name, Hit.Category == FileCategory.Folder);
+    public Visibility TypeTagVisibility => TypeTag is null ? Visibility.Collapsed : Visibility.Visible;
     public string Glyph => FileKinds.Glyph(Hit.Category);
     public Brush Tile => FileKinds.Brush(Hit.Category);
     /// <summary>系统图标（设置 → 外观 → 文件图标：系统，036）；还没取到时为 null，先显示彩色类型图块。</summary>

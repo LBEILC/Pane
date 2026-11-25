@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup Condition="'$(MSBuildProjectName)'=='Pane.App'">
+    <Compile Remove="Hosting/GlassPanel.cs;Hosting/ShellHost.cs" />
+    <Compile Include="$(ProbeDirectory)/GlassPanel.cs;$(ProbeDirectory)/ShellHost.cs;$(MSBuildThisFileDirectory)Probe119.cs" />
+  </ItemGroup>
+</Project>

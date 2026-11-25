@@ -5,6 +5,8 @@ public sealed record PaneSettings(int Version, GeneralSettings General, Launcher
     Pane.Contracts.SyncOptions syncOptions = new();
     public Pane.Contracts.SyncOptions SyncOptions { get => syncOptions; init => syncOptions = value ?? new(); }
     WordsSettings words=new(); public WordsSettings Words { get=>words; init=>words=value??new(); }
+    // 备忘录（设计加，2026-11-25，任务 123，docs/design.md「备忘录」）
+    MemoSettings memo=new(); public MemoSettings Memo { get=>memo; init=>memo=value??new(); }
     StorageSettings storage=new(); public StorageSettings Storage { get=>storage; init=>storage=value??new(); }
     // 能力模块的启用状态（设计加，2026-11-04，055）：键是 Pane.Contracts.ModuleIds，没写的用 ModuleInfo.DefaultEnabled。
     // 旧设置文件没有这项时，按旧的总开关迁移（Clipboard / SuperPanel / FolderJump 的 Enabled），见 docs/design.md「能力模块」
@@ -23,6 +25,8 @@ public sealed record FolderJumpSettings(bool Enabled=true, Hotkey? JumpHotkey=nu
 // 分词（设计加，2026-11-09，093）：Hotkey = 在任意程序里选中文字后呼出分词窗口（null = 不设，默认）；可以是组合键或双击修饰键，规则同剪贴板热键；
 // CloseAfterCopy = 复制后关闭窗口；DragPunctuation = 拖选时带上中间的标点；Join = 选中的几段不挨着时怎么接（记住上次选的）
 public enum WordsJoin { Smart, Space, Line }
+// 备忘录（设计加，2026-11-25，任务 123）：Hotkey = 呼出热键（默认不设，同分词），按下打开窗口并新建一条
+public sealed record MemoSettings(Hotkey? Hotkey=null);
 public sealed record WordsSettings(Hotkey? Hotkey=null, bool CloseAfterCopy=true, bool DragPunctuation=false, WordsJoin Join=WordsJoin.Smart);
 // 软件内更新（设计加，2026-10-30，023）：AutoUpdate 开着就自动检查并在后台下载，下载好后提示重启更新
 // 设计加（2026-11-05，issue 25、062）：InstallOnStartup = 下次启动时自动安装已下载好的更新（默认关）；
@@ -66,6 +70,9 @@ public sealed record Hotkey(KeyModifiers Modifiers, ushort VirtualKey)
 }
 public enum KeepInputMode { Clear, OneMinute, Always }
 public sealed record FavoriteEntry(string Path, bool IsFolder);
+// 设计加（2026-11-25，计划 B，issue 67 / 62，任务 122）：应用快捷键。AppId 是启动器里应用条目的 LauncherItem.Id（app:…），
+// Name 只在应用找不到时显示；只支持组合键（不支持双击修饰键）
+public sealed record AppHotkey(string AppId, string Name, Hotkey Hotkey);
 public sealed record AppAliasEntry(string AppId, string Name, string[] Aliases);
 // 不在搜索中显示的条目（设计加，2026-11-13，issue 49，任务 098）：Name 是隐藏时的标题，索引里找不到时设置页用它显示
 public sealed record HiddenItemEntry(string Id, string Name);
@@ -89,8 +96,13 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     public bool ExpandOnOpen { get; init; }
     // 设计加（2026-11-09，issue 39）：用关键字搜网页时记下搜过的词（见 IWebSearchHistory），默认开；旧设置文件没有这一项时为 true
     public bool RememberWebSearches { get; init; } = true;
+    // 设计加（2026-11-25，issue 69 / 86，任务 121）：记住「输入什么、选了哪个」，同样的输入下次把选过的放进「最佳结果」（见 ISearchMemory），默认开；
+    // 关掉后不记、也不用已有记录（「清空」才删）
+    public bool LearnSelections { get; init; } = true;
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
+    AppHotkey[] appHotkeys=[];
+    public AppHotkey[] AppHotkeys { get=>appHotkeys; init=>appHotkeys=value??[]; }
     AppAliasEntry[] appAliases=[];
     public AppAliasEntry[] AppAliases { get=>appAliases; init=>appAliases=value??[]; }
     SearchEngine[] searchEngines=DefaultSearchEngines();
@@ -130,6 +142,9 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     public string[] AskKeywords { get=>askKeywords; init=>askKeywords=value??["ai"]; }
     string[] filesKeywords=["f"];
     public string[] FilesKeywords { get=>filesKeywords; init=>filesKeywords=value??["f"]; }
+    // 设计加（2026-11-25，任务 123）：「bw 内容」Enter 直接存成一条新备忘录（界面解析，同上面三组关键字）
+    string[] memoKeywords=["bw"];
+    public string[] MemoKeywords { get=>memoKeywords; init=>memoKeywords=value??["bw"]; }
     // 便携软件（设计加，2026-11-04，057，issue 19，见 docs/design.md「便携软件」）：文件夹（扫描本身和下一层）、单独添加的程序、
     // 用 Pane 打开过而记住的程序（最多 100 个）。三种都进「应用」组。路径不分大小写去重，顺序就是设置页列表的顺序
     PortableEntry[] portable=[];

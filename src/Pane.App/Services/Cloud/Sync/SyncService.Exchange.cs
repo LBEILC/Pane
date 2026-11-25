@@ -117,7 +117,7 @@ internal sealed partial class SyncService
             if (r.Category == "settings" && r.Body != null ||
                 r.Category == "usage" && id == SyncCrypto.Id(key,"usage",device))
             { r.Base = 0; r.Dirty = true; }
-            else if (r.Category is not ("clip" or "cliptags" or "control")) j.Records.Remove(id);
+            else if (r.Category is not ("notes" or "clip" or "cliptags" or "control")) j.Records.Remove(id);
         }
         // 全量快照没有墓碑。本机有值但没有对应记录时，让 Capture 用当前值重新建队。
         if (options.Settings)
@@ -127,6 +127,14 @@ internal sealed partial class SyncService
                 if (!seen.Contains(id) && j.Records.GetValueOrDefault(id)?.Body == null) j.Settings.Remove(path);
             }
         Capture(j,key,device,options);
+        if (NotesEnabled(options))
+            foreach (var (id, r) in j.Records.ToArray())
+            {
+                if (r.Category != "notes" || seen.Contains(id) || r.Unknown != null) continue;
+                if (r.Dirty) r.Base = 0;
+                else if (r.Body != null)
+                    await Receive(j,new() { ["id"]=id, ["c"]="notes", ["seq"]=0, ["deleted"]=true },key,device,options,new(),ct,initial:true);
+            }
         if (mode == SyncMergeChoice.Merge)
             foreach(var r in j.Records.Values.Where(r => r.Category == "settings" && r.Body != null))
             {
@@ -170,6 +178,8 @@ internal sealed partial class SyncService
             if (!seen.Contains(own)) j.Records.Remove(own);
         }
         Apply(j,patch,options,own);
+        ct.ThrowIfCancellationRequested();
+        j.NotesEnabled = NotesEnabled(options);
         j.ClipboardEnabled = ClipboardEnabled(options); j.SettingsEnabled = options.Settings; j.UsageEnabled = options.Usage;
         j.KeyId = CloudKeys.Check(key);
         j.Account = owner; j.Initialized = true; j.Cursor = cursor;
@@ -201,6 +211,7 @@ internal sealed partial class SyncService
             await handler.Receive(j,wire,key,initial,ct);
             return;
         }
+        if ((string?)wire["c"] == "notes") return;
         var remote = Decode(wire,key);
         j.Records.TryGetValue(id,out var local);
         if (!initial && local != null && local.Base >= remote.Base) return;
@@ -299,6 +310,7 @@ internal sealed partial class SyncService
                 r.Base = (long)accepted["seq"]!;
                 r.Device = device;
                 if(r.Category=="clip")AcknowledgeClip((string)accepted["id"]!,r);
+                if (r.Category == "notes") r.NoteBaseHash = NotesCategory.TextHash(r.Body);
                 r.Dirty = r.DeleteFirst && r.Body != null;
                 r.DeleteFirst = false;
             }
@@ -311,6 +323,7 @@ internal sealed partial class SyncService
                 handler.Rejected(j,rejected);
             }
             Apply(j,patch,options,SyncCrypto.Id(key,"usage",device));
+            ct.ThrowIfCancellationRequested();
             j.Cursor = (long)reply["seq"]!;
             j.Save(file);
             more = (bool?)reply["more"] == true || j.Records.Values.Any(Eligible);

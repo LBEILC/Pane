@@ -17,7 +17,7 @@ public sealed partial class App
     public IWebSuggestions? WebSuggestions {get;set;}
     /// <summary>终端命令历史（037）：设置页「清空」用。工程赋真实实现。</summary>
     public ITerminalHistory? TerminalHistory {get;set;}
-    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder, Words }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
+    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder, Words, Memo }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
     readonly Dictionary<SecondaryId,GlassPanel> secondaries=[];
     readonly Dictionary<SecondaryId,(int X,int Y,double W,double H)> secondaryBounds=[];
     // 销毁窗口前要做的退订（关窗口、能力停用两条路径都调用）
@@ -35,6 +35,19 @@ public sealed partial class App
         launcher.OpenChat+=(q,history)=>ShowChat(q,history);
         launcher.OpenRename+=(files,window)=>ShowRename(files,window);
         launcher.OpenTimer+=ShowTimer;   /* 058：「定时关机…」 */
+        launcher.SetAppHotkey+=SetAppHotkey;   /* 122：Ctrl+K「设置快捷键」 */
+        launcher.OpenMemo+=id=>ShowMemo(id,create:false);   /* 123：搜到的备忘录 */
+        launcher.SaveMemo+=SaveToMemo;   /* 123：「bw 内容」 */
+    }
+
+    /// <summary>启动器 Ctrl+K「设置快捷键」（122）：没加过就先配一个没被占用的 Ctrl+Alt+字母，再打开 设置 → 快捷键，它的热键框直接进入录入。</summary>
+    void SetAppHotkey(LauncherItem item)
+    {
+        var s=Store.Current;
+        if(!s.Launcher.AppHotkeys.Any(a=>a.AppId==item.Id))
+            Store.Save(s with{Launcher=s.Launcher with{AppHotkeys=[..s.Launcher.AppHotkeys,new Pane.Settings.AppHotkey(item.Id,item.Title,SettingsView.SuggestAppHotkey(item.Title,s))]}});
+        SettingsView.FocusAppHotkey=item.Id;
+        OpenSettings("hotkeys");
     }
 
     public void ShowFiles(string query,string? focus)=>Present(SecondaryId.Files, Strings.Common_Files,()=>new FilesView(Files,secondaryActions!),v=>((FilesView)v).Open(query,focus));
@@ -66,7 +79,7 @@ public sealed partial class App
     void Present(SecondaryId id,string name,Func<Microsoft.UI.Xaml.Controls.UserControl> make,Action<IPanelView> open,(int X,int Y)? at=null)
     {
         if(closing)return;
-        var owner=id switch { SecondaryId.Files=>ModuleIds.Launcher, SecondaryId.Rename=>ModuleIds.Rename, SecondaryId.Timer=>ModuleIds.PowerTimer, SecondaryId.Words=>ModuleIds.Words, _=>ModuleIds.Ai };
+        var owner=id switch { SecondaryId.Files=>ModuleIds.Launcher, SecondaryId.Rename=>ModuleIds.Rename, SecondaryId.Timer=>ModuleIds.PowerTimer, SecondaryId.Words=>ModuleIds.Words, SecondaryId.Memo=>ModuleIds.Memo, _=>ModuleIds.Ai };
         if(!AllowModule(owner))return;
         if(!secondaries.TryGetValue(id,out var panel)){
             var view=make();var sv=(ISecondaryView)view;
@@ -85,7 +98,7 @@ public sealed partial class App
             panel.Prepare();secondaries[id]=panel;
         }
         // 从启动器 / 超级面板展开：那两个面板先收起
-        foreach(var p in panels.Values)p.Hide();
+        foreach(var p in panels.Values)if(!KeepPinned(p))p.Hide();
         open(panel.View);
         current=panel;
         panel.BringToFront(activate:!demo&&Environment.GetEnvironmentVariable("PANE_VERIFY")!="1");
@@ -107,6 +120,7 @@ public sealed partial class App
             case "settings":Command("show-settings");break;   /* 配合 PANE_DESIGN_SETTINGS 选分区 */
             case "dialog":ShowDialogBarDemo();break;   /* 对话框搜索框（2026-11-23），PANE_DESIGN_DIALOG=save 看另存为 */
             case "launcher":Command("show-launcher");break;   /* 带上 PANE_DESIGN_QUERY 看启动器结果 */
+            case "memo":DesignMemo(q=="new");break;   /* 备忘录（123）：隔离数据目录里先放几条样例；QUERY=new 看新建一条 */
             case "translate":ShowTranslate(q??"Glassmorphism relies on background blur, translucency and a subtle highlight border.");break;
             case "tray":{var m=GlassPanel.MonitorFromPoint(new GlassPanel.Point(),1);var info=new GlassPanel.MonitorInfo{Size=System.Runtime.InteropServices.Marshal.SizeOf<GlassPanel.MonitorInfo>()};GlassPanel.GetMonitorInfoW(m,ref info);ShowTrayMenu($"{info.Monitor.Right-140},{info.Monitor.Bottom-24}");break;}/* 演示：模拟任务栏右下角的托盘图标 */
             case "folder-jump":/* 演示：屏幕中间偏左上，像对话框文件名框的左下角 */

@@ -85,7 +85,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     List<MenuEntry> menuEntries = [];
 
     /// <summary>操作列表的一行：Pin 是界面自己做的固定 / 取消固定（issue 27）；否则 Action 为服务给的操作，为空是「打开」。</summary>
-    readonly record struct MenuEntry(LauncherItemAction? Action = null, bool Pin = false);
+    readonly record struct MenuEntry(LauncherItemAction? Action = null, bool Pin = false, bool Hotkey = false);
+    /// <summary>应用快捷键（122）：Ctrl+K「设置快捷键」，宿主加进设置并打开 设置 → 快捷键。</summary>
+    public event Action<LauncherItem>? SetAppHotkey;
 
     /// <summary>文件窗口：查询文字、要选中的文件路径（文件格按 Tab 时）。宿主负责创建或复用窗口。</summary>
     public event Action<string, string?>? OpenFiles;
@@ -95,6 +97,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     public event Action<IReadOnlyList<string>?, nint>? OpenRename;
     /// <summary>「定时关机…」（058）：打开定时窗口。</summary>
     public event Action? OpenTimer;
+    /// <summary>备忘录（123）：打开窗口选中这一条（id 为 null 选第一条）。</summary>
+    public event Action<string?>? OpenMemo;
+    /// <summary>「bw 内容」：直接存成一条新备忘录，存成了返回 true（启动器随后收起）。</summary>
+    public event Func<string, bool>? SaveMemo;
     /// <summary>AI 对话窗口：要直接发出的问题，或带过去的一问一答（「继续对话」）。</summary>
     public event Action<string?, IReadOnlyList<AiChatMessage>?>? OpenChat;
     /// <summary>文件格 Ctrl+Enter「打开所在文件夹」用；宿主设置（021 之前演示模式用假服务）。</summary>
@@ -481,6 +487,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (AiOn && Has(Options.TranslateKeywords)) return ("ai:translate", text);
         if (AiOn && Has(Options.AskKeywords)) return ("ai:ask", text);
         if (Has(Options.FilesKeywords)) return ("files", text);
+        if (ModuleGate.On(Contracts.ModuleIds.Memo) && Has(Options.MemoKeywords)) return ("memo", text);   // 备忘录（123）：「bw 内容」直接存一条
         return null;
     }
 
@@ -714,6 +721,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             {
                 "ai:translate" => (Strings.Common_Translate, string.Format(Strings.Launcher_TranslateTarget, (object?)(direct.Text)), "translate"),
                 "ai:ask" => (Strings.Launcher_AskAi, string.Format(Strings.Launcher_AskTarget, (object?)(direct.Text)), "ai"),
+                "memo" => (Strings.Memo_SaveAs, string.Format(Strings.Memo_SaveTarget, (object?)(direct.Text)), "note"),
                 _ => (Strings.Launcher_SearchFiles, string.Format(Strings.Launcher_SearchFilesTarget, (object?)(direct.Text)), "folder"),
             };
             Add(Section(label, LauncherSectionKind.List), new("direct:" + direct.ActionId, LauncherItemKind.Action, LauncherGroups.Actions, title, null, new(glyph), Hotkey: "Enter"), LauncherCell.Command);
@@ -737,7 +745,15 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             // 服务给的 AI / 网页两组不用了（动作行代替）
             foreach (var item in result.Items.Where(i => i.Kind == LauncherItemKind.Calculation).Take(1))
                 Add(Section("", LauncherSectionKind.Calc), item, LauncherCell.Calc);
-            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command && i.Group is not (LauncherGroups.Settings or LauncherGroups.Timer)).Take(MaxApps).ToList();
+            // 最佳结果（121，issue 69 / 86）：同样的输入以前选过的那一项，跨组一条、列表样式，没有算式时默认选中；下面各组按 Group 排除它
+            foreach (var item in result.Items.Where(i => i.Group == LauncherGroups.Best).Take(1))
+            {
+                var s = Section(Strings.Launcher_Group_Best, LauncherSectionKind.List);
+                var cell = item.Kind switch { LauncherItemKind.App => LauncherCell.App, LauncherItemKind.File or LauncherItemKind.Folder => LauncherCell.File, _ => LauncherCell.Command };
+                Add(s, item, cell);
+                if (cell == LauncherCell.File && Pane.Views.Files.SystemIcons.Enabled) foreach (var r in s.Rows) r.SetSystemIcon(FileIcon(r));
+            }
+            var apps = result.Items.Where(i => i.Kind is LauncherItemKind.App or LauncherItemKind.Command && i.Group is not (LauncherGroups.Settings or LauncherGroups.Timer or LauncherGroups.Best)).Take(MaxApps).ToList();
             if (apps.Count > 0)
             {
                 var s = Section(Strings.Launcher_Group_Applications, LauncherSectionKind.Tiles);
@@ -758,7 +774,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 foreach (var r in s.Rows) _ = FillEngineIcon(r);
             }
             // 常用（设置里加的文件 / 文件夹）在前，再是 Everything 的前 3 个
-            var favorites = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group is not (LauncherGroups.Files or LauncherGroups.Direct)).ToList();
+            var favorites = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group is not (LauncherGroups.Files or LauncherGroups.Direct or LauncherGroups.Best)).ToList();
             var files = result.Items.Where(i => i.Kind is LauncherItemKind.File or LauncherItemKind.Folder && i.Group == LauncherGroups.Files).ToList();
             if (favorites.Count + files.Count > 0)
             {
@@ -768,6 +784,17 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 int total = Math.Max(result.FileTotal, files.Count);
                 if (total > MaxFiles)
                     Add(s, new("files:more", LauncherItemKind.Action, LauncherGroups.Files, string.Format(Strings.Launcher_AllFileResults, (object?)(total)), null, new("external")), LauncherCell.More);
+            }
+        }
+
+        // 备忘录（123）：搜到的备忘录，列表样式，在文件后面；最多 3 条（服务已限）
+        if (q.Length > 0 && menuItem is null && !attachmentMode && !q.StartsWith('>'))
+        {
+            var notes = result.Items.Where(i => i.Group == LauncherGroups.Notes && i.Kind == LauncherItemKind.Note).ToList();
+            if (notes.Count > 0 && DirectQuery(q) is null && KeywordQuery(q) is null)
+            {
+                var s = Section(Strings.Memo_Title, LauncherSectionKind.List);
+                foreach (var item in notes) Add(s, item, LauncherCell.Command);
             }
         }
 
@@ -790,6 +817,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     int DefaultSelection()
     {
         int Find(Func<LauncherRow, bool> f) => rows.FindIndex(r => f(r));
+        // 最佳结果（121）：没有算式时默认选它
+        int best = Find(r => r.Item.Group == LauncherGroups.Best);
+        if (best >= 0 && Find(r => r.Cell == LauncherCell.Calc) < 0) return best;
         int i = Find(r => r.Cell is LauncherCell.Calc or LauncherCell.App or LauncherCell.Command or LauncherCell.Attachment);
         if (i < 0) i = Find(r => r.Cell == LauncherCell.File);
         return i < 0 ? 0 : i;
@@ -857,6 +887,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         "ai:translate" => (string.Format(Strings.Launcher_TranslateTarget, (object?)(q)), [(["Enter"], Strings.Common_Translate), (["Tab"], Strings.Launcher_OpenTranslate)]),
         "ai:ask" => (string.Format(Strings.Launcher_AskTarget, (object?)(q)), [(["Enter"], Strings.Launcher_AskAi), (["Tab"], Strings.Launcher_OpenChat)]),
         "files" => (string.Format(Strings.Launcher_SearchFilesTarget, (object?)(q)), [(["Enter"], Strings.Launcher_OpenFiles)]),
+        "memo" => (string.Format(Strings.Memo_SaveTarget, (object?)(q)), [(["Enter"], Strings.Memo_SaveAs)]),
         _ when id.StartsWith("web:", StringComparison.Ordinal) => (Strings.FormatName(Strings.Launcher_SearchWithQuery, name, q), [(["Enter"], Strings.Common_Search)]),
         _ => ($"{name}「{q}」", [(["Enter"], name)]),
     };
@@ -1212,6 +1243,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         var item = row.Item;
         var q = shownQuery;
         if (row.Cell == LauncherCell.Menu) { if (!tab) await RunMenu(row); return; }
+        // 备忘录（123）：Enter 打开备忘录窗口并选中这一条
+        if (item.Kind == LauncherItemKind.Note && !tab) { CloseRequested?.Invoke(this, EventArgs.Empty); OpenMemo?.Invoke(item.Id.StartsWith("note:", StringComparison.Ordinal) ? item.Id[5..] : null); return; }
 
         // 关键字直达（052）：和动作行同样的动作，只是内容去掉了关键字；Tab 照动作行展开成翻译 / 对话窗口
         if (IsKeywordDirect(item))
@@ -1220,6 +1253,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             switch (d.ActionId)
             {
                 case "files": OpenFiles?.Invoke(d.Text, null); break;
+                case "memo": if (!tab && SaveMemo?.Invoke(d.Text) == true) CloseRequested?.Invoke(this, EventArgs.Empty); break;
                 case "ai:translate" when tab: OpenTranslate?.Invoke(d.Text); break;
                 case "ai:ask" when tab: OpenChat?.Invoke(d.Text, null); break;
                 default: if (!tab) RunAi(d.ActionId[3..], d.Text); break;
@@ -1344,7 +1378,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
         Disarm();
         menuItem = row.Item;
-        menuEntries = [new(), .. pinnable ? [new MenuEntry(Pin: true)] : Array.Empty<MenuEntry>(), .. list.Select(a => new MenuEntry(a))];
+        bool hotkey = pinnable && row.Item.Id.StartsWith("app:", StringComparison.Ordinal) && SetAppHotkey is not null;   // 应用快捷键（122）：只给应用
+        menuEntries = [new(), .. pinnable ? [new MenuEntry(Pin: true)] : Array.Empty<MenuEntry>(), .. hotkey ? [new MenuEntry(Hotkey: true)] : Array.Empty<MenuEntry>(), .. list.Select(a => new MenuEntry(a))];
         var s = new LauncherSection(row.Item.Title, LauncherSectionKind.List, []);
         sections = [s];
         rows = [];
@@ -1367,6 +1402,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
     static (string Title, string Glyph) MenuLabel(MenuEntry entry, LauncherItem item) => entry.Pin
         ? IsPinned(item) ? (Strings.Launcher_UnpinFromHome, "pin-off") : (Strings.Launcher_PinToHome, "pin")
+        : entry.Hotkey ? (Strings.Launcher_SetAppHotkey, "keyboard")
         : entry.Action switch
     {
         null => (Strings.Common_Open, "external"),
@@ -1396,6 +1432,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     {
         if (menuItem is not { } item || row.Index >= menuEntries.Count) return;
         if (menuEntries[row.Index].Pin) { await TogglePin(row, item); return; }
+        if (menuEntries[row.Index].Hotkey) { menuItem = null; Disarm(); CloseRequested?.Invoke(this, EventArgs.Empty); SetAppHotkey?.Invoke(item); return; }
         var action = menuEntries[row.Index].Action;
         if (action == LauncherItemAction.EditAliases) { EnterAlias(item); return; }
         if (action == LauncherItemAction.Uninstall && !Confirmed(row)) return;

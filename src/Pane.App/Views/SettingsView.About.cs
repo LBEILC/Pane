@@ -305,7 +305,8 @@ public sealed partial class SettingsView
                     plain.Children.Add(NoteLine(line));
                 block = plain;
             }
-            var tail = new StackPanel { Spacing = 10, Padding = new Thickness(14, 2, 14, 12) };
+            // 上面有更新内容时紧接着标题行（上边距 2）；没有更新内容（比如 Pane 云源取不到说明）时按钮单独一块，上下都留 12，不顶到分隔线
+            var tail = new StackPanel { Spacing = 10, Padding = new Thickness(14, block != null ? 2 : 12, 14, 12) };
             if (block != null) tail.Children.Add(block);
             var link = Button(Strings.Update_ViewOnGitHub, "external", () => OpenUrl(latest.PageUrl));
             link.HorizontalAlignment = HorizontalAlignment.Left;

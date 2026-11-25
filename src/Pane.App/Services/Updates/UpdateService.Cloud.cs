@@ -80,7 +80,9 @@ internal sealed partial class UpdateService
                 files.Add(name, (new(name, new Uri($"releases/{version}/files/{name}", UriKind.Relative), size), hash.ToLowerInvariant()));
             }
             var installer = files[setup].Asset;
-            Latest = new(version, "", published, installer.Size, $"https://github.com/LBEILC/Pane/releases/tag/v{version}");
+            string notes = root.TryGetProperty("notes", out var body) ? body.GetString() ?? "" : "";
+            Latest = new(version, PlainNotes(notes), published, installer.Size, $"https://github.com/LBEILC/Pane/releases/tag/v{version}",
+                ReleaseNotesCatalog.ParseMarkdown(notes, version, published));
             if (files.TryGetValue(patch, out var delta) && files.TryGetValue(manifest, out var list))
             {
                 incremental = new(delta.Asset, list.Asset, installer.Size);

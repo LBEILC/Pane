@@ -18,6 +18,7 @@ internal static partial class Program
         internal JsonObject Profile = Me.DeepClone().AsObject();
         internal Dictionary<string, byte[]> Files = new() { [Full] = [1, 2, 3, 4] };
         internal DateTimeOffset Available = DateTimeOffset.UtcNow;
+        internal string? Notes;
         internal bool Offline, Conflict;
         internal List<(string Name, long Offset)> Transfers = [];
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
@@ -31,8 +32,10 @@ internal static partial class Program
                 var files = new JsonArray();
                 foreach (var (name, bytes) in Files)
                     files.Add((JsonNode)new JsonObject { ["name"] = name, ["size"] = bytes.Length, ["sha256"] = PayloadPatch.Hash(bytes) });
-                return Task.FromResult(Json(new JsonObject { ["version"] = "0.1.100", ["published_at"] = 1,
-                    ["available_at"] = Available.ToUnixTimeSeconds(), ["files"] = files }));
+                var release = new JsonObject { ["version"] = "0.1.100", ["published_at"] = new DateTimeOffset(2026, 10, 30, 0, 0, 0, TimeSpan.Zero).ToUnixTimeSeconds(),
+                    ["available_at"] = Available.ToUnixTimeSeconds(), ["files"] = files };
+                if (Notes != null) release["notes"] = Notes;
+                return Task.FromResult(Json(release));
             }
             string key = Path.GetFileName(path);
             Check(path == "/api/v1/releases/0.1.100/files/" + key, "版本文件路径");
@@ -73,16 +76,28 @@ internal static partial class Program
         handler.Files[Patch] = buffer.ToArray();
     }
 
+    static void CheckNotes(UpdateRelease? release, UpdateRelease expected, string scenario)
+    {
+        Check(release?.Notes == expected.Notes && release?.Details is {} details && expected.Details is {} reference &&
+            details.Version == reference.Version && details.Date == reference.Date && details.Items.SequenceEqual(reference.Items), scenario);
+    }
+
     static async Task CloudUpdates()
     {
         string root = Path.Combine(Path.GetTempPath(), "Pane-116-" + Guid.NewGuid().ToString("N"));
-        await using var github = new UpdateServer();
+        await using var github = new UpdateServer { Body = "## 新增\n- 快速搜索\n## 改进\n- 下载提示\n## 修复\n- 设置保存" };
         try
         {
+            using var reference = new UpdateService("0.1.99", Path.Combine(root, "github"), () => false, _ => {}, github.Url);
+            await reference.CheckAsync(default);
+            var expected = reference.Latest!;
+            Check(expected.Details?.Items.Select(item => item.Kind).SequenceEqual(
+                [ReleaseNoteKind.New, ReleaseNoteKind.Improved, ReleaseNoteKind.Fixed]) == true, "GitHub 正文三组");
             foreach (var scenario in new[] { "patch", "broken", "low_quota", "subscription_required", "signed_out", "network", "409", "range", "manual", "automatic", "mirror" })
             {
                 string dir = Path.Combine(root, scenario), baseline = Path.Combine(dir, "installed");
                 var handler = new ReleaseHandler();
+                handler.Notes = scenario switch { "patch" => github.Body, "broken" => "", "409" => "## 修复\n- 云源条目", _ => null };
                 handler.Profile.Remove("avatar");
                 var sub = handler.Profile["subscription"]!;
                 sub["status"] = scenario == "subscription_required" ? "expired" : "active";
@@ -136,6 +151,8 @@ internal static partial class Program
                         github.Url, () => UpdateSource.PaneCloud, testBaseline: baseline);
                     await service.CheckAsync(default);
                     Check(service.Latest != null && service.State == UpdateState.Available && handler.Transfers.Count == 0, scenario + " 检查");
+                    if (scenario == "patch") CheckNotes(service.Latest, expected, "云源与 GitHub 正文一致");
+                    if (scenario is "broken" or "range") Check(service.Latest is { Notes: "", Details: null }, scenario + " 空或缺失正文");
                     if (scenario == "range")
                     {
                         byte[] data = handler.Files[Full];
@@ -151,6 +168,14 @@ internal static partial class Program
                     string? reason = scenario switch { "low_quota" or "409" => "low_quota", "signed_out" or "subscription_required" or "network" => scenario, _ => null };
                     Check(service.State == UpdateState.Ready && service.CloudFallback == (reason != null) && service.CloudFallbackReason == reason, scenario + " 下载和原因");
                     Check((github.Requests > requests) == (reason != null) && !github.Credentials, scenario + " GitHub 请求边界");
+                    if (reason != null) CheckNotes(service.Latest, expected, scenario + " 回退后使用 GitHub 正文");
+                    if (scenario == "patch")
+                    {
+                        using var restored = new UpdateService("0.1.99", dir, () => false, _ => {}, github.Url,
+                            () => UpdateSource.PaneCloud, testBaseline: baseline);
+                        Check(restored.State == UpdateState.Ready, "重启恢复云更新");
+                        CheckNotes(restored.Latest, expected, "重启保留云更新正文");
+                    }
                     if (scenario == "patch") Check(service.Latest?.Incremental == true && handler.Transfers.Select(t => t.Name).SequenceEqual([Manifest, Patch]), "云补丁就绪");
                     if (scenario == "broken") Check(service.Latest?.Incremental == false && handler.Transfers.Select(t => t.Name).SequenceEqual([Manifest, Patch, Full]), "重建失败后从云下全量");
                     if (scenario == "range") Check(handler.Transfers.Single() == (Full, 2L), "HTTP Range 续传");

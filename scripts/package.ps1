@@ -77,7 +77,13 @@ $checksums=foreach($file in $attachments){
 $sums=Join-Path $dist 'SHA256SUMS.txt'
 [IO.File]::WriteAllText($sums,($checksums -join "`n")+"`n",[Text.UTF8Encoding]::new($false))
 $raw=Get-ChildItem -LiteralPath $source -Recurse -File | Measure-Object Length -Sum
-Assert-ForbiddenFiles -Files @($installer,$releaseInstaller,(Join-Path $dist 'SHA256SUMS.txt')) -Rules $rules
+$manifest=Join-Path $dist "Pane-Manifest-$version.json"
+Assert-ForbiddenFiles -Files @($installer,$releaseInstaller,$manifest,$sums) -Rules $rules
+foreach($attachment in $attachments | Select-Object -Skip 2){
+    if([IO.Path]::GetFileName($attachment) -notmatch ('^Pane-Patch-(\d+\.\d+\.\d+)-'+[regex]::Escape($version)+'\.zip$')){throw "未知附件：$attachment"}
+    $from=$Matches[1]
+    Assert-ReleasePatch -Patch $attachment -Baseline (Join-Path $dist "payloads/$from") -Manifest $manifest -From $from -To $version -Rules $rules
+}
 $payload=Get-ChildItem -LiteralPath $stage -Recurse -File | Measure-Object Length -Sum
 $result=[ordered]@{version=$version;source=$source;stage=$stage;installer=$installer;rawFiles=$raw.Count;rawBytes=$raw.Sum;files=$payload.Count;bytes=$payload.Sum;compressedBytes=(Get-Item -LiteralPath $zip).Length;installerBytes=(Get-Item -LiteralPath $installer).Length}
 $result.attachments=$attachments+@($sums)

@@ -42,11 +42,19 @@
                     <TextBlock Text="{x:Bind Folder}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}"
                                Foreground="{ThemeResource PaneText3Brush}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"/>
                 </StackPanel>
-                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right">
-                    <TextBlock Text="{x:Bind Modified}" HorizontalAlignment="Right" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" LineHeight="16"
-                               Foreground="{ThemeResource PaneText3Brush}"/>
-                    <TextBlock Text="{x:Bind Size}" HorizontalAlignment="Right" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" LineHeight="16"
-                               Foreground="{ThemeResource PaneText3Brush}"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Right">
+                    <StackPanel VerticalAlignment="Center">
+                        <!-- 今天改过的文件时间加粗（issue 60） -->
+                        <TextBlock Text="{x:Bind Modified}" FontWeight="{x:Bind ModifiedWeight}" HorizontalAlignment="Right" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" LineHeight="16"
+                                   Foreground="{ThemeResource PaneText3Brush}"/>
+                        <TextBlock Text="{x:Bind Size}" Visibility="{x:Bind SizeVisibility}" HorizontalAlignment="Right" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" LineHeight="16"
+                                   Foreground="{ThemeResource PaneText3Brush}"/>
+                    </StackPanel>
+                    <!-- 类型标签（issue 60 / 82）：组件库 pane-tag kind="chip"，定宽 48 让时间列对齐 -->
+                    <Border Height="20" MinWidth="48" CornerRadius="10" Padding="8,0,8,0" VerticalAlignment="Center" Visibility="{x:Bind TypeTagVisibility}"
+                            Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                        <TextBlock Text="{x:Bind TypeTag}" HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText2Brush}"/>
+                    </Border>
                 </StackPanel>
             </Grid>
         </DataTemplate>

@@ -44,7 +44,7 @@ internal abstract class LauncherSource(string group,int order,string prefix):ILa
 internal sealed class ApplicationSource(ILauncherExecutor executor,Action<string> used):LauncherSource(LauncherGroups.Applications,1,"app:")
 {
     public override int Limit(SourceContext c)=>c.Settings.AppRows*(c.Settings.Width switch{LauncherWidth.Compact=>6,LauncherWidth.Wide=>9,_=>7});
-    static LauncherItem Item(IndexedApp app,string group)=>new(app.Id,LauncherItemKind.App,group,app.Name.Name,Strings.Launcher_ApplicationSubtitle,new("app",app.Icon));
+    internal static LauncherItem Item(IndexedApp app,string group)=>new(app.Id,LauncherItemKind.App,group,app.Name.Name,Strings.Launcher_ApplicationSubtitle,new("app",app.Icon));
     public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token){
         token.ThrowIfCancellationRequested();
         if(c.Query.Length==0){
@@ -93,11 +93,23 @@ internal sealed class FavoriteSource(ILauncherExecutor executor):EntrySource(Lau
     protected override SearchEntry[] Entries(SourceContext c)=>c.Snapshot.Favorites;
     public override Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token)=>executor.OpenAsync(item.Id[9..],false,token);
 }
-internal sealed class CommandSource(ILauncherExecutor executor):EntrySource(LauncherGroups.Commands,4,"command:")
+internal sealed class NoteSource(Func<INoteStore?> notes) : LauncherSource(LauncherGroups.Notes,3,"note:")
 {
+    public override int Limit(SourceContext c) => 3;
+    public override Task<IReadOnlyList<LauncherItem>> SearchAsync(SourceContext c,CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        return Rows((notes()?.Search(c.Query,Limit(c)) ?? []).Select(m => new LauncherItem("note:"+m.Note.Id,
+            LauncherItemKind.Note,Group,m.Note.Title.Length == 0 ? Strings.Memo_Untitled : m.Note.Title,m.Snippet,new("note"),m.TitleHighlights)));
+    }
+    public override Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token) => Task.CompletedTask;
+}
+internal sealed class CommandSource(ILauncherExecutor executor, Func<bool>? memoEnabled=null):EntrySource(LauncherGroups.Commands,4,"command:")
+{
+    static readonly SearchEntry Memo=new("command:memo",LauncherItemKind.Command,new PinyinTable().Create("备忘录"),"Pane","note");
     static readonly SearchEntry Rename=new("rename",LauncherItemKind.Command,new PinyinTable().CreateLocalized(Strings.Launcher_CommandRename, Strings.Simplified(nameof(Strings.Launcher_CommandRename))),Strings.Launcher_CommandSubtitle,"pencil");
     static readonly SearchName EnglishRename=new("rename","rename".Select((c,i)=>new NameToken(i,1,[c.ToString()],[c.ToString()])).ToArray());
-    protected override SearchEntry[] Entries(SourceContext c)=>[..c.Snapshot.Commands.Where(e=>e.Id!="rename").Select(LocalizeCommand),Rename];
+    protected override SearchEntry[] Entries(SourceContext c)=>[..c.Snapshot.Commands.Where(e=>e.Id!="rename").Select(LocalizeCommand),Rename,..(memoEnabled?.Invoke()==true ? new[]{Memo} : [])];
     static SearchEntry LocalizeCommand(SearchEntry entry)
     {
         string title = entry.Id switch

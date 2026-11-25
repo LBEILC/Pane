@@ -19,6 +19,8 @@ internal sealed class SyncRecord
             key.TryGetValue<string>(out var path) && SyncData.IsLocal(path));
         set => dirty = value;
     }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? NoteBaseHash { get; set; }
     public long DeletedAt { get; set; }
     public string? LocalProgram { get; set; }
     public bool DeleteFirst { get; set; }
@@ -30,6 +32,7 @@ internal sealed class SyncJournal
     public string? Account { get; set; }
     public string? KeyId { get; set; }
     public long Cursor { get; set; }
+    public bool NotesEnabled { get; set; }
     public bool SettingsEnabled { get; set; }
     public bool ClipboardEnabled { get; set; }
     public bool UsageEnabled { get; set; }

@@ -39,7 +39,7 @@ public sealed partial class App
         catch(Exception e){ReportFailure(Strings.FolderJump_ListAction,e);return;}
         jumpDialog=request.Dialog;
         jumpView!.Apply(entries);
-        foreach(var other in panels.Values)if(other!=jumpPanel)other.Hide();
+        foreach(var other in panels.Values)if(other!=jumpPanel&&!KeepPinned(other))other.Hide();
         current=jumpPanel;
         jumpPanel.Show(true,request.X,request.Y,!demo);
     }

@@ -34,6 +34,8 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
     FileCategory category = FileCategory.All;
     FileSort sort = FileSort.Relevance;
     int selected = -1, total;
+    // 120：关键词是完整文件夹路径时，第一行是这个文件夹本身，底部数量只算它里面的（Total 多算了这一行）
+    bool listingFolder;
     bool loading, topmost;
     string? focusPath;
     CancellationTokenSource? pending, previewPending;
@@ -140,6 +142,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         rows.Clear();
         selected = -1;
         total = 0;
+        listingFolder = false;
         if (q.Length == 0 || search is null)
         {
             foreach (var c in categories) c.SetCount(null);
@@ -154,6 +157,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         catch (Exception ex) { if (cts == pending) { Bind(); ShowEmpty(string.Format(Strings.Files_SearchError, App.FailureReason(ex) ?? Strings.Common_UnexpectedProblem)); } return; }
         if (cts.IsCancellationRequested) return;
         total = page.Total;
+        listingFolder = page.Folder is not null;
         foreach (var c in categories) c.SetCount(page.Counts?.GetValueOrDefault(c.Category));
         if (page.Counts is null) _ = FetchCounts(q, cts);
         Append(page.Items);
@@ -219,7 +223,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         // 下次搜索先清空 rows 再等结果，这期间一滚动 / 重新排版，它就按旧长度取行，越界崩溃（打字快、输入法改词时常见）
         List.ItemsSource = rows.ToList();
         ListScroller.ChangeView(null, 0, null, true);
-        TotalText.Text = rows.Count == 0 ? "" : string.Format(Strings.Files_Count, (object?)(total));
+        TotalText.Text = rows.Count == 0 ? "" : string.Format(Strings.Files_Count, (object?)(listingFolder ? total - 1 : total));
         DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, UpdateThumb);
     }
 
