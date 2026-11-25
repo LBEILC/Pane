@@ -18,25 +18,55 @@ internal sealed class ClipboardCloudLink
     internal Action? Wake {get;set;}
 }
 internal sealed record ClipReplica(string Owner,string Id,string? Origin,long Edit,long Pin,long Tags,
-    string? Thumb=null,string? Orig=null,long? Size=null,int QuotaMonth=0,long Base=0,string? Program=null)
+    string? Thumb=null,string? Orig=null,long? Size=null,int QuotaMonth=0,long Base=0,string? Program=null,
+    string[]? Aliases=null, DateTimeOffset? ReceivedAt=null, string? ReceivedHash=null, DateTimeOffset? CopiedAt=null, long? LocalEdit=null,long? LocalPin=null,long? LocalTags=null)
 {
     internal static long Now(long previous=0) => Math.Max(DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),previous+1);
-    internal static ClipReplica Create(string owner,string program) => new(owner,Convert.ToBase64String(Guid.NewGuid().ToByteArray()).TrimEnd('=').Replace('+','-').Replace('/','_'),null,Now(),0,0,Program:program);
-    internal ClipReplica Edited()=>this with {Edit=Now(Edit)};
-    internal ClipReplica PinnedNow()=>this with {Pin=Now(Pin)};
-    internal ClipReplica TaggedNow()=>this with {Tags=Now(Tags)};
+    internal static ClipReplica Create(string owner,string program,DateTimeOffset copiedAt) => new(owner,Convert.ToBase64String(Guid.NewGuid().ToByteArray()).TrimEnd('=').Replace('+','-').Replace('/','_'),null,Now(),0,0,Program:program,CopiedAt:copiedAt);
+    internal bool Matches(string id)=>Id==id || Aliases?.Contains(id)==true;
+    internal ClipReplica Copied(DateTimeOffset now)=>Edited() with {CopiedAt=now};
+    internal ClipReplica Edited(){long at=Now(Edit);return this with {Edit=at,LocalEdit=at};}
+    internal ClipReplica PinnedNow(){long at=Now(Pin);return this with {Pin=at,LocalPin=at};}
+    internal ClipReplica TaggedNow(){long at=Now(Tags);return this with {Tags=at,LocalTags=at};}
 }
+internal sealed record ClipboardWrite(string EntryId,DateTimeOffset At);
 internal sealed record ReplicaTag(string Owner,string Key,string? Name,int? Color,int Order,long At);
 internal sealed class ClipLedger
 {
     public Dictionary<string,string> Deleted {get;set;}=[];
     public Dictionary<string,long> Clear {get;set;}=[];
     public Dictionary<string,ReplicaTag> Tags {get;set;}=[];
-    internal ClipLedger Copy()=>new(){Deleted=new(Deleted),Clear=new(Clear),Tags=new(Tags)};
+    public Dictionary<string,ClipboardWrite> Writes {get;set;}=[];
+    internal ClipLedger Copy()=>new(){Deleted=new(Deleted),Clear=new(Clear),Tags=new(Tags),Writes=new(Writes)};
 }
 internal sealed partial class ClipboardHistory
 {
     ClipLedger ledger=new();
+    static bool Within(DateTimeOffset a,DateTimeOffset b)=>(a-b).Duration()<=TimeSpan.FromMinutes(10);
+    bool MoveEcho(string owner,string hash,DateTimeOffset now,string program)
+    {
+        var match=entries.Where(c=>c.Replica?.Owner==owner && c.SyncHash==hash &&
+            c.Replica.ReceivedHash==hash && c.Replica.ReceivedAt is {} at && Within(now,at)).MaxBy(c=>c.Replica!.ReceivedAt);
+        if (match==null && ledger.Writes.TryGetValue(owner+"/"+hash,out var write) && Within(now,write.At))
+        {
+            match=entries.Find(c=>c.Entry.Id==write.EntryId && c.SyncHash==hash);
+            if(match==null)return true;
+        }
+        // TODO(design): 对端自动写入也可能折返到最初复制的电脑。这一端没有接收记录，
+        // 暂限已确认上传且来源程序不同的副本；窗口内用户在另一程序主动复制也可能命中。
+        if(match==null && settings.Current.SyncOptions.WriteToSystemClipboard && !string.IsNullOrEmpty(program))
+            match=entries.Where(c=>c.SyncHash==hash && c.Replica is {Origin:null,Base:>0,CopiedAt:{} copied} r &&
+                r.Owner==owner && Within(now,copied) && !Names.Equals(Path.GetFileName(program),r.Program))
+                .MaxBy(c=>c.Replica!.CopiedAt);
+        if(match==null)return false;
+        entries[entries.IndexOf(match)]=match with{Entry=match.Entry with{CopiedAt=now}};
+        return true;
+    }
+    void TrackDeletion(ClipReplica replica)
+    {
+        ledger.Deleted[replica.Id]=replica.Owner;
+        foreach(string alias in replica.Aliases??[])ledger.Deleted[alias]=replica.Owner;
+    }
     internal ClipboardCloudLink CloudLink=>ClipboardCloudLink.For(settings);
     string? ActiveOwner=>settings.Current.SyncOptions is {Enabled:true,Clipboard:true} ? CloudLink.Owner?.Invoke():null;
     string? CaptureOwner(string program,ClipKind kind)
@@ -112,7 +142,7 @@ internal sealed partial class ClipboardHistory
     }
     internal StoredClip? CloudLookup(string owner,string id)
     {
-        lock(sync)return entries.Find(c=>c.Replica?.Owner==owner && c.Replica.Id==id);
+        lock(sync)return entries.Find(c=>c.Replica?.Owner==owner && c.Replica.Matches(id));
     }
     internal void Acknowledge(string owner,string id,long basis,string? thumb,string? orig,long? size)
     {
@@ -143,17 +173,43 @@ internal sealed partial class ClipboardHistory
     }
     internal void CloudDelete(string owner,string cloudId)
     {
-        lock(sync){entries.RemoveAll(c=>c.Replica?.Owner==owner && c.Replica.Id==cloudId);Schedule(false);}
+        lock(sync)
+        {
+            var clip=CloudLookup(owner,cloudId);
+            if(clip?.Replica is {} r){TrackDeletion(r);entries.Remove(clip);}
+            Schedule(false);
+        }
         NotifyChanged();
     }
-    internal StoredClip? CloudApply(ClipEntry incoming,ClipReplica replica,RichFormats? formats)
+    static bool MatchesContent(StoredClip clip,ClipKind kind,string hash)
+    {
+        if(clip.Entry.Kind==ClipKind.Files || (clip.Entry.Kind==ClipKind.Image)!=(kind==ClipKind.Image))return false;
+        if(clip.SyncHash!=null)return clip.SyncHash==hash;
+        // 没有 h 的云记录保持独立。尚未开同步时保存的本机内容可以按原文或原图核对。
+        if(clip.Replica!=null)return false;
+        if(kind!=ClipKind.Image)return clip.Fingerprint=="t:"+hash;
+        if(clip.Entry.ContentPath is not {} path)return false;
+        try{return ClipboardPixels.Hash(File.ReadAllBytes(path))==hash;}
+        catch(Exception e) when(e is IOException or UnauthorizedAccessException){return false;}
+    }
+    internal StoredClip? CloudApply(ClipEntry incoming,ClipReplica replica,RichFormats? formats,string? hash=null,bool newRemote=false)
     {
         StoredClip result;
         lock(sync)
         {
             if(stopping || ledger.Deleted.ContainsKey(replica.Id))return null;
-            var index=entries.FindIndex(c=>c.Replica?.Id==replica.Id && c.Replica.Owner==replica.Owner);
+            var index=entries.FindIndex(c=>c.Replica?.Owner==replica.Owner && c.Replica.Matches(replica.Id));
+            if(index<0 && newRemote && hash!=null)
+            {
+                var candidate=entries.Where(c=>(c.Replica==null || c.Replica.Owner==replica.Owner) &&
+                    Within(c.Replica?.CopiedAt??c.Entry.CopiedAt,incoming.CopiedAt) && MatchesContent(c,incoming.Kind,hash))
+                    .MaxBy(c=>c.Entry.CopiedAt);
+                if(candidate!=null)index=entries.IndexOf(candidate);
+            }
             var prior=index<0?null:entries[index];
+            bool alias=prior?.Replica is {} primary && primary.Id!=replica.Id;
+            var received=replica.ReceivedAt??prior?.Replica?.ReceivedAt;
+            string? receivedHash=replica.ReceivedAt!=null?hash:prior?.Replica?.ReceivedHash;
             if(index<0 && ledger.Clear.GetValueOrDefault(replica.Owner)>incoming.CopiedAt.ToUnixTimeMilliseconds() && !incoming.Pinned && incoming.Tags.Count==0)return null;
             var icon=SourceIcon(incoming.Source);
             var entry=incoming with{Id=prior?.Entry.Id??Guid.NewGuid().ToString("N"),SourceIcon=prior?.Entry.SourceIcon??icon,
@@ -161,15 +217,39 @@ internal sealed partial class ClipboardHistory
             string? format=null;
             if(prior?.Replica is {} r)
             {
-                if(r.Edit>replica.Edit){entry=entry with{Text=prior.Entry.Text,Kind=prior.Entry.Kind,Rich=prior.Entry.Rich,CopiedAt=prior.Entry.CopiedAt};format=prior.FormatId;replica=replica with{Edit=r.Edit};}
+                if(r.Edit>replica.Edit || alias && newRemote){hash=prior.SyncHash;entry=entry with{Text=prior.Entry.Text,Kind=prior.Entry.Kind,Rich=prior.Entry.Rich,CopiedAt=prior.Entry.CopiedAt};format=prior.FormatId;replica=replica with{Edit=r.Edit};}
                 if(r.Pin>replica.Pin){entry=entry with{Pinned=prior.Entry.Pinned};replica=replica with{Pin=r.Pin};}
                 if(r.Tags>replica.Tags){entry=entry with{Tags=prior.Entry.Tags};replica=replica with{Tags=r.Tags};}
                 if(entry.ContentPath!=null)entry=entry with{Original=ClipOriginal.Local};
                 else if(replica.Orig!=null && replica.Orig==r.Orig)entry=entry with{Original=prior.Entry.Original};
-                replica=replica with{QuotaMonth=r.QuotaMonth,Program=r.Program};
+                var localEdit=r.LocalEdit??r.Edit;
+                var localPin=r.LocalPin??r.Pin;
+                var localTags=r.LocalTags??r.Tags;
+                if(alias)
+                {
+                    var aliases=r.Aliases??[];
+                    if(!aliases.Contains(replica.Id))aliases=[..aliases,replica.Id];
+                    entry=entry with{Source=prior.Entry.Source,SourceIcon=prior.Entry.SourceIcon,CopiedAt=prior.Entry.CopiedAt,Original=prior.Entry.Original};
+                    replica=r with{Aliases=aliases,Edit=replica.Edit,Pin=replica.Pin,Tags=replica.Tags};
+                }
+                else
+                {
+                    if(replica.Edit==r.Edit && prior.Entry.CopiedAt>entry.CopiedAt)entry=entry with{CopiedAt=prior.Entry.CopiedAt};
+                    replica=replica with{QuotaMonth=r.QuotaMonth,Program=r.Program,Aliases=r.Aliases};
+                }
+                replica=replica with{LocalEdit=localEdit,LocalPin=localPin,LocalTags=localTags};
+            }
+            if(prior!=null && prior.Replica==null)
+            {
+                entry=entry with{Source=prior.Entry.Source,Pinned=entry.Pinned||prior.Entry.Pinned,
+                    Tags=entry.Tags.Concat(prior.Entry.Tags).Distinct(Names).ToArray(),
+                    Original=entry.ContentPath!=null?ClipOriginal.Local:entry.Original};
             }
             if(entry.Rich && format==null)format=formats?.Save(directory);
-            result=new(entry,prior?.Fingerprint??"cloud:"+replica.Id,format,replica);
+            string fingerprint=prior?.Fingerprint??"cloud:"+replica.Id;
+            if(fingerprint.StartsWith("t:",StringComparison.Ordinal) && entry.Text!=null)
+                fingerprint="t:"+Hash(System.Text.Encoding.UTF8.GetBytes(entry.Text));
+            result=new(entry,fingerprint,format,replica with{ReceivedAt=received,ReceivedHash=receivedHash},hash);
             if(index<0)entries.Add(result);else entries[index]=result;
             Schedule(false);
         }
@@ -199,7 +279,18 @@ internal sealed partial class ClipboardHistory
     }
     internal async Task WriteReceived(StoredClip c,CancellationToken ct)
     {
-        try{await writer.WriteReceived(c.Entry,Formats(c),ct);}
+        try
+        {
+            await writer.WriteReceived(c.Entry,Formats(c),ct);
+            if(c.SyncHash is {} hash && c.Replica is {} r)
+                lock(sync)
+                {
+                    var now=CloudLink.Time.GetUtcNow();
+                    foreach(var key in ledger.Writes.Where(p=>!Within(now,p.Value.At)).Select(p=>p.Key).ToArray())ledger.Writes.Remove(key);
+                    ledger.Writes[r.Owner+"/"+hash]=new(c.Entry.Id,now);
+                    Schedule(false);
+                }
+        }
         catch(Exception e) when(e is IOException or TimeoutException or UnauthorizedAccessException)
         {
             // 系统剪贴板被其他应用占用不影响已合入的历史和后续记录。

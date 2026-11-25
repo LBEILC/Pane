@@ -57,27 +57,41 @@ internal sealed partial class SyncService
             {
                 var r=c.Replica!;var e=c.Entry;
                 if(r.Origin==null && (e.Kind==ClipKind.Image && engine.Options.ClipScope==ClipSyncScope.Text || engine.Options.ExcludedApps?.Contains(r.Program??"",StringComparer.OrdinalIgnoreCase)==true))continue;
-                j.Records.TryGetValue(r.Id,out var rec);
-                if(rec?.Unknown!=null || rec!=null && rec.Body==null)continue;
-                var b=rec?.Body;
-                bool edit=r.Edit>Time(b,"at"),pin=r.Pin>Time(b,"pinAt"),tags=r.Tags>Time(b,"tagsAt");
-                if(!(edit||pin||tags))continue;
-                var local=Local(j,r.Id,name,device);
-                if(rec==null)local.Base=r.Base;
-                local.LocalProgram=r.Program;
-                b=local.Body!;
-                if(edit)
-                {
-                    // TODO(design): 可同步字段使用白名单；来源只传显示名，exe、图标和文件路径留在本机。
-                    b["at"]=r.Edit;b["origin"]=r.Origin??device;b["kind"]=e.Kind.ToString();b["source"]=e.Source;
-                    b["copied"]=e.CopiedAt.ToUnixTimeMilliseconds();b["width"]=e.ImageWidth;b["height"]=e.ImageHeight;
-                    b["text"]=e.Text;b.Remove("richBlocks");
-                    var f=History.Formats(c);b["html"]=f==null?null:Convert.ToBase64String(f.Html);
-                    b["rtf"]=f==null?null:Convert.ToBase64String(f.Rtf);
-                }
-                if(pin){b["pinAt"]=r.Pin;b["pinned"]=e.Pinned;}
-                if(tags){b["tagsAt"]=r.Tags;b["tags"]=Strings(e.Tags);}
+                CaptureClip(j,device,c,r.Id);
+                foreach(string alias in r.Aliases??[])
+                    if(j.Records.ContainsKey(alias))CaptureClip(j,device,c,alias);
             }
+        }
+        void CaptureClip(SyncJournal j,string device,StoredClip c,string id)
+        {
+            var r=c.Replica!;
+            var e=c.Entry;
+            bool alias=id!=r.Id;
+            j.Records.TryGetValue(id,out var rec);
+            if(rec?.Unknown!=null || rec!=null && rec.Body==null)return;
+            var b=rec?.Body;
+            bool edit=(r.LocalEdit??r.Edit)==r.Edit && r.Edit>Time(b,"at") && (!alias || b?["h"]?.ToString()!=c.SyncHash);
+            bool pin=(r.LocalPin??r.Pin)==r.Pin && r.Pin>Time(b,"pinAt");
+            bool tags=(r.LocalTags??r.Tags)==r.Tags && r.Tags>Time(b,"tagsAt");
+            if(!(edit||pin||tags))return;
+            var local=Local(j,id,name,device);
+            if(rec==null)local.Base=r.Base;
+            local.LocalProgram=r.Program;
+            b=local.Body!;
+            if(edit)
+            {
+                // TODO(design): 可同步字段使用白名单；来源只传显示名，exe、图标和文件路径留在本机。
+                b["at"]=r.Edit;b["kind"]=e.Kind.ToString();
+                if(!alias){b["origin"]=r.Origin??device;b["source"]=e.Source;}
+                if(c.SyncHash!=null)b["h"]=c.SyncHash;
+                if(!alias)b["copied"]=(r.CopiedAt??e.CopiedAt).ToUnixTimeMilliseconds();
+                b["width"]=e.ImageWidth;b["height"]=e.ImageHeight;
+                b["text"]=e.Text;b.Remove("richBlocks");
+                var f=History.Formats(c);b["html"]=f==null?null:Convert.ToBase64String(f.Html);
+                b["rtf"]=f==null?null:Convert.ToBase64String(f.Rtf);
+            }
+            if(pin){b["pinAt"]=r.Pin;b["pinned"]=e.Pinned;}
+            if(tags){b["tagsAt"]=r.Tags;b["tags"]=Strings(e.Tags);}
         }
         static void PruneCleared(SyncJournal journal,long before)
         {
@@ -186,11 +200,11 @@ internal sealed partial class SyncService
             if(name=="clip")
             {
                 if(body==null)History.CloudDelete(Owner,id);
-                else await ApplyClip(body,key,id,device,seq,!initial && local==null && device!=engine.clipboardDevice,ct);
+                else await ApplyClip(body,key,id,device,seq,local==null && device!=engine.clipboardDevice,initial,ct);
             }
             j.Records[id]=remote;
         }
-        async Task ApplyClip(JsonObject b,byte[] key,string id,string device,long basis,bool fresh,CancellationToken ct)
+        async Task ApplyClip(JsonObject b,byte[] key,string id,string device,long basis,bool fresh,bool initial,CancellationToken ct)
         {
             if(!Enum.TryParse<ClipKind>((string?)b["kind"],out var kind)||kind==ClipKind.Files)return;
             string origin=(string?)b["origin"]??device;
@@ -208,8 +222,9 @@ internal sealed partial class SyncService
                 DateTimeOffset.FromUnixTimeMilliseconds((long)b["copied"]!),(bool?)b["pinned"]==true)
                 {Tags=Values(b["tags"]),Rich=formats!=null,Original=kind!=ClipKind.Image?ClipOriginal.Local:orig!=null?ClipOriginal.Remote:ClipOriginal.NotSynced};
             fresh=fresh && History.CloudLookup(Owner,id)==null;
-            var clip=History.CloudApply(entry,new(Owner,id,origin==engine.clipboardDevice?null:origin,Time(b,"at"),Time(b,"pinAt"),Time(b,"tagsAt"),(string?)b["thumb"],orig,(long?)b["size"],Base:basis),formats);
-            if(!fresh || !engine.Options.WriteToSystemClipboard || clip==null || origin!=device)return;
+            var clip=History.CloudApply(entry,new(Owner,id,origin==engine.clipboardDevice?null:origin,Time(b,"at"),Time(b,"pinAt"),Time(b,"tagsAt"),(string?)b["thumb"],orig,(long?)b["size"],Base:basis,CopiedAt:entry.CopiedAt,
+                ReceivedAt:fresh && origin!=engine.clipboardDevice ? (initial?entry.CopiedAt:History.CloudLink.Time.GetUtcNow()):null),formats,(string?)b["h"],fresh);
+            if(initial || !fresh || !engine.Options.WriteToSystemClipboard || clip==null || origin!=device)return;
             if(kind==ClipKind.Image)
             {
                 if(!(await engine.FetchOriginalAsync(clip.Entry.Id,ct)).Ok)return;

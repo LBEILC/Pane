@@ -126,7 +126,19 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
     public Task ApplyAsync(SyncOptions options, CancellationToken ct) => Task.Run(() =>
     {
         ct.ThrowIfCancellationRequested();
-        store.UpdateFromSync(s => s with { SyncOptions = options });
+        store.UpdateFromSync(s =>
+        {
+            // null 表示从未设置过名单，显式清空后保存的是空数组。
+            var next = options;
+            if (next.ExcludedApps == null)
+            {
+                var apps = s.SyncOptions.ExcludedApps;
+                if (apps == null && !s.SyncOptions.Clipboard && next.Clipboard)
+                    apps = ["rdpclip.exe", "SunloginClient.exe", "ToDesk.exe", "AnyDesk.exe", "TeamViewer.exe", "rustdesk.exe", "parsecd.exe"];
+                next = next with { ExcludedApps = apps };
+            }
+            return s with { SyncOptions = next };
+        });
         Restart();
     },ct);
     public Task SyncNowAsync(CancellationToken ct)

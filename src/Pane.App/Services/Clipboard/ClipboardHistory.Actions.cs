@@ -61,7 +61,8 @@ internal sealed partial class ClipboardHistory
             var clip=entries[i];
             if(clip.Entry.Kind is ClipKind.Files or ClipKind.Image)throw new NotSupportedException();
             if(string.IsNullOrEmpty(text))return;
-            entries[i]=new(clip.Entry with{Text=text,Kind=ClipboardClassifier.Classify(text),Rich=false},"t:"+Hash(Encoding.UTF8.GetBytes(text)),null,clip.Replica?.Edited());
+            string hash=Hash(Encoding.UTF8.GetBytes(text));
+            entries[i]=new(clip.Entry with{Text=text,Kind=ClipboardClassifier.Classify(text),Rich=false},"t:"+hash,null,clip.Replica?.Edited(),hash);
             Schedule();
         }
         NotifyChanged();

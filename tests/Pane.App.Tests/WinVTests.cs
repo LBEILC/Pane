@@ -1,4 +1,5 @@
 using Pane.Contracts;
+using Pane.Localization;
 using Pane.Services.WinV;
 using Pane.Services.Setup;
 using Pane.Settings;
@@ -82,6 +83,9 @@ internal static class WinVTests
                 string dir = Path.Combine(root, "failure"); var service = new WinVReplacement(dir, registry, explorer, key);
                 await service.EnableAsync(true, default);
                 Check(service.State == WinVState.Pending && service.Error != null && key.Calls == 0, "重启失败不注册");
+                var restartError = service.Error;
+                service.RegistrationChanged(true);
+                Check(service.State == WinVState.On && service.Error == restartError, "宿主注册成功保留重启失败提示");
                 await service.DisableAsync(false, default);
                 Check(!registry.Hotkeys.Exists && service.State == WinVState.RestorePending, "重启失败可恢复");
                 await service.SetSystemHistoryDisabledAsync(true, default);
@@ -109,6 +113,9 @@ internal static class WinVTests
                 var key = new FakeHotkey(); var explorer = new FakeExplorer();
                 var service = new WinVReplacement(dir, registry, explorer, key); await service.InitializeAsync();
                 Check(service.State == WinVState.Pending && registry.Hotkeys.Text == "QV" && registry.History.Number == 0, "写前崩溃启动补完");
+                Check(key.Calls == 1 && service.Error == Strings.Settings_WinV_Occupied, "启动首次注册失败报告占用");
+                service.RegistrationChanged(true);
+                Check(service.State == WinVState.On && service.Error == null, "宿主重新注册成功清除占用提示");
                 await service.RestoreForUninstallAsync();
                 Check(registry.Hotkeys.Text == "Q" && registry.History.Number == 0, "历史原来已关闭仍原样恢复");
                 journal.Enabled = false; journal.Restoring = true; registry.Hotkeys = new(true, "QV");

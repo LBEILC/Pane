@@ -20,6 +20,7 @@ public sealed partial class SettingsView
 
     const string TermsVersion = "2026-11-24", PrivacyVersion = "2026-11-24";   // = 协议生效日期，同官网 site/assets/account.js
     const string TermsUrl = "https://pane.lubeiluchen.com/legal.html?doc=terms";
+    const string FoundersUrl = "https://pane.lubeiluchen.com/founders.html";   // 创始会员墙
 
     // 表单的字，输入时只记下来，不重建界面（重建会丢焦点）
     string acEmail = "", acPw = "", acPw2 = "", acCode = "", acNick = "", acRec = "", acOld = "", acRedeem = "";
@@ -457,6 +458,7 @@ public sealed partial class SettingsView
         {
             profile.Add(Row(Strings.Settings_Account_FounderPublic,
                 founder.Hidden ? Strings.Settings_Account_FounderHidden : Strings.Settings_Account_FounderPublicDescription,
+                AcButton(Strings.Settings_Account_FounderPage, "external", () => OpenUrl(FoundersUrl)),
                 Switch(founder.Public, on =>
                 {
                     if (on) { acFounderConfirm = true; Later(0); return; }   // 打开前先确认（下一行）

@@ -219,6 +219,7 @@
   <data name="Settings_Account_ResetKept" xml:space="preserve"><value>密碼已重設，雲端資料已保留</value></data>
   <data name="Settings_Account_Founder" xml:space="preserve"><value>創始會員</value></data>
   <data name="Settings_Account_FounderTip" xml:space="preserve"><value>創始會員 No.{0} · 前 100 位永久會員</value></data>
+  <data name="Settings_Account_FounderPage" xml:space="preserve"><value>查看創始會員頁</value></data>
   <data name="Settings_Account_FounderPublic" xml:space="preserve"><value>在創始會員頁顯示暱稱</value></data>
   <data name="Settings_Account_FounderPublicDescription" xml:space="preserve"><value>開啟後，你的暱稱和加入年月會顯示在官網創始會員頁，任何人都能看到。頭像和電子郵件不會公開</value></data>
   <data name="Settings_Account_FounderPublicConfirm" xml:space="preserve"><value>你的暱稱「{0}」和加入年月將顯示在創始會員頁，任何人都能看到，他人看到後可能自行儲存。關閉後 1 分鐘內從頁面上消失</value></data>

@@ -47,11 +47,16 @@ internal sealed class WinVReplacement : IWinVReplacement
     bool loaded, historyDisabled;
     public WinVState State { get; private set; }
     public bool SystemHistoryDisabled => historyDisabled && !journal.Restoring;
-    public string? Error { get; private set; }
+    sealed record Failure(string Message, bool IsOccupied = false);
+    volatile Failure? failure;
+    public string? Error => failure?.Message;
     public event EventHandler? Changed;
     public void RegistrationChanged(bool registered)
     {
         if (!journal.Enabled || journal.Restoring) return;
+        // 保存失败可能同时写入新错误，只清除这一次读到的占用错误。
+        if (registered && failure is { IsOccupied: true } occupied)
+            Interlocked.CompareExchange(ref failure, null, occupied);
         if (registered && !journal.MayHaveReleased)
         {
             journal.MayHaveReleased = true;
@@ -65,7 +70,7 @@ internal sealed class WinVReplacement : IWinVReplacement
         // 后台宿主重新注册成功也记录下来；不在热键线程等待文件 IO。
         await gate.WaitAsync().ConfigureAwait(false);
         try { if (journal.Enabled && !journal.Restoring) Save(); }
-        catch (Exception e) { Error = string.Format(Strings.Settings_WinV_StateSaveError, e.Message); }
+        catch (Exception e) { failure = new(string.Format(Strings.Settings_WinV_StateSaveError, e.Message)); }
         finally { gate.Release(); Changed?.Invoke(this, EventArgs.Empty); }
     }
     public WinVReplacement(string directory, IWinVRegistry registry, IWinVExplorer explorer, IWinVHotkey hotkey)
@@ -90,11 +95,11 @@ internal sealed class WinVReplacement : IWinVReplacement
     async Task Run(Func<Task> action, CancellationToken token)
     {
         await gate.WaitAsync(token);
-        try { Error = null; Load(); token.ThrowIfCancellationRequested(); await action(); }
+        try { failure = null; Load(); token.ThrowIfCancellationRequested(); await action(); }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             // TODO(design): 请复核系统操作失败的文案。
-            Error = string.Format(Strings.Settings_WinV_SetupError, e.Message);
+            failure = new(string.Format(Strings.Settings_WinV_SetupError, e.Message));
         }
         finally { gate.Release(); Changed?.Invoke(this, EventArgs.Empty); }
     }
@@ -123,7 +128,7 @@ internal sealed class WinVReplacement : IWinVReplacement
         bool registered = await hotkey.SetAsync(true);
         State = registered ? WinVState.On : WinVState.Pending;
         if (registered) { journal.MayHaveReleased = true; Save(); }
-        else Error = Strings.Settings_WinV_Occupied;
+        else failure = new(Strings.Settings_WinV_Occupied, IsOccupied: true);
     }
     public Task EnableAsync(bool restartExplorer, CancellationToken cancellationToken) => Run(async () =>
     {

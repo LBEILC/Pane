@@ -28,7 +28,7 @@ internal interface IClipboardImages
     (int Width,int Height) Save(byte[] png,string full,string thumbnail);
     (int Width,int Height)? Thumbnail(string path,string thumbnail)=>null;
 }
-internal sealed record StoredClip(ClipEntry Entry,string Fingerprint,string? FormatId=null, ClipReplica? Replica=null);
+internal sealed record StoredClip(ClipEntry Entry,string Fingerprint,string? FormatId=null, ClipReplica? Replica=null, string? SyncHash=null);
 internal sealed record ClipboardIndex(int Version,ClipTag[] Tags,StoredClip[] Entries, ClipLedger? Ledger=null);
 [JsonSerializable(typeof(ClipboardIndex))]
 [JsonSerializable(typeof(StoredClip[]))]
@@ -126,24 +126,34 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
         else return;
         lock(sync){
             if(stopping||!settings.Current.Clipboard.Enabled)return;
-            var now=DateTimeOffset.UtcNow;var latest=entries.MaxBy(e=>e.Entry.CopiedAt);
-            var formatId=fingerprint.StartsWith("t:",StringComparison.Ordinal)?content.Formats?.Save(directory):null;
-            var owner=CaptureOwner(content.Program,kind);
-            if(s.Dedupe&&latest?.Fingerprint==fingerprint && latest.Replica?.Origin==null && latest.Replica?.Owner==owner){entries[entries.IndexOf(latest)]=latest with{Replica=latest.Replica?.Edited(),FormatId=formatId,Entry=latest.Entry with{CopiedAt=now,Rich=formatId!=null}};Trim();}
-            else {
-                string id=Guid.NewGuid().ToString("N");string? full=null,thumb=null;int? width=null,height=null;
-                if(kind==ClipKind.Image){Directory.CreateDirectory(imageDirectory);full=Path.Combine(imageDirectory,id+".png");thumb=Path.Combine(imageDirectory,id+".thumb.png");var size=images.Save(content.Png!,full,thumb);width=size.Width;height=size.Height;}
-                entries.Add(new(new(id,kind,kind==ClipKind.Image?null:content.Text,kind==ClipKind.Files?content.Files?.ToArray():null,
-                    thumb==null?null:new(thumb),width,height,content.Source,content.Icon==null?null:new("app",content.Icon),now,false,full){Rich=formatId!=null},fingerprint,formatId,owner==null?null:ClipReplica.Create(owner,content.Program)));
-                Trim();
-                if(kind==ClipKind.Files){
-                    string thumbnail=Path.Combine(imageDirectory,id+".thumb.png");
-                    pendingThumbnails.Add(thumbnail);
-                    thumbnailTasks.RemoveAll(t=>t.IsCompleted);
-                    thumbnailTasks.Add(Task.Run(()=>CreateFileThumbnail(id,content.Files!.ToArray(),thumbnail)));
-                }
+            var now=CloudLink.Time.GetUtcNow();
+            string? activeOwner=ActiveOwner;
+            string? hash=kind==ClipKind.Image ? (activeOwner!=null ? ClipboardPixels.Hash(content.Png!) : null) : fingerprint[2..];
+            if (kind!=ClipKind.Files && activeOwner!=null && hash!=null && MoveEcho(activeOwner,hash,now,content.Program))
+            {
+                Schedule(false);
             }
-            Schedule();
+            else
+            {
+                var latest=entries.MaxBy(e=>e.Entry.CopiedAt);
+                var formatId=fingerprint.StartsWith("t:",StringComparison.Ordinal)?content.Formats?.Save(directory):null;
+                var owner=CaptureOwner(content.Program,kind);
+                if(s.Dedupe&&latest?.Fingerprint==fingerprint && (owner==null || Within(now,latest.Replica?.CopiedAt??latest.Entry.CopiedAt)) && latest.Replica?.Origin==null && latest.Replica?.Owner==owner){entries[entries.IndexOf(latest)]=latest with{Replica=latest.Replica?.Copied(now),SyncHash=hash,FormatId=formatId,Entry=latest.Entry with{CopiedAt=now,Rich=formatId!=null}};Trim();}
+                else {
+                    string id=Guid.NewGuid().ToString("N");string? full=null,thumb=null;int? width=null,height=null;
+                    if(kind==ClipKind.Image){Directory.CreateDirectory(imageDirectory);full=Path.Combine(imageDirectory,id+".png");thumb=Path.Combine(imageDirectory,id+".thumb.png");var size=images.Save(content.Png!,full,thumb);width=size.Width;height=size.Height;}
+                    entries.Add(new(new(id,kind,kind==ClipKind.Image?null:content.Text,kind==ClipKind.Files?content.Files?.ToArray():null,
+                        thumb==null?null:new(thumb),width,height,content.Source,content.Icon==null?null:new("app",content.Icon),now,false,full){Rich=formatId!=null},fingerprint,formatId,owner==null?null:ClipReplica.Create(owner,content.Program,now),hash));
+                    Trim();
+                    if(kind==ClipKind.Files){
+                        string thumbnail=Path.Combine(imageDirectory,id+".thumb.png");
+                        pendingThumbnails.Add(thumbnail);
+                        thumbnailTasks.RemoveAll(t=>t.IsCompleted);
+                        thumbnailTasks.Add(Task.Run(()=>CreateFileThumbnail(id,content.Files!.ToArray(),thumbnail)));
+                    }
+                }
+                Schedule();
+            }
         }
         Changed?.Invoke(this,EventArgs.Empty);
     }
@@ -152,7 +162,7 @@ internal sealed partial class ClipboardHistory:IClipboardHistory,IDisposable
     void Schedule(bool localChange=true){dirty=true;signal.Set();if(localChange)CloudLink.Wake?.Invoke();}
     public void SetPinned(string id,bool pinned)=>Change(id,e=>e with{Pinned=pinned},true);
     void Change(string id,Func<ClipEntry,ClipEntry> update,bool pin=false){lock(sync){int i=entries.FindIndex(e=>e.Entry.Id==id);if(i<0)return;entries[i]=entries[i] with{Replica=pin?entries[i].Replica?.PinnedNow():entries[i].Replica,Entry=update(entries[i].Entry)};Trim();Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
-    public void Delete(string id){lock(sync){if(entries.Find(e=>e.Entry.Id==id)?.Replica is {} r && r.Owner==ActiveOwner)ledger.Deleted[r.Id]=r.Owner;entries.RemoveAll(e=>e.Entry.Id==id);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
+    public void Delete(string id){lock(sync){if(entries.Find(e=>e.Entry.Id==id)?.Replica is {} r && r.Owner==ActiveOwner)TrackDeletion(r);entries.RemoveAll(e=>e.Entry.Id==id);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
     public void ClearUnpinned(){lock(sync){if(ActiveOwner is {} owner)ledger.Clear[owner]=ClipReplica.Now();entries.RemoveAll(e=>!e.Entry.Pinned&&e.Entry.Tags.Count==0);Schedule();}Changed?.Invoke(this,EventArgs.Empty);}
     public Task PasteAsync(string id,bool plainText,nint targetWindow,CancellationToken cancellationToken)=>Paste(id,plainText,null,targetWindow,cancellationToken);
     public Task PasteAsAsync(string id,ClipPasteAs kind,nint targetWindow,CancellationToken cancellationToken)=>Paste(id,false,kind,targetWindow,cancellationToken);

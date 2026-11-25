@@ -12,7 +12,7 @@ using Pane.Settings;
 internal static partial class Program
 {
     // 参数是本机从源码构建的开发服务和它的套餐文件。整个服务（含 SQLite 和块）只使用本次临时目录。
-    static async Task Live(string binary,string plans,string? baseline=null,string? current=null,bool clipboard=false,string? perf=null,bool localSettingsOnly=false)
+    static async Task Live(string binary,string plans,string? baseline=null,string? current=null,bool clipboard=false,string? perf=null,bool localSettingsOnly=false,bool echo=false)
     {
         string root = Directory.CreateTempSubdirectory("Pane-live-112-").FullName;
         string db = Path.Combine(root,"test.db");
@@ -82,7 +82,7 @@ internal static partial class Program
                         await Measure(perf,enabled?"clipboard":"settings",sample.DirectoryPath);
                     }
                 }
-                else await LiveClipboard(Store,Sql);
+                else await LiveClipboard(Store,Sql,echo);
                 return;
             }
             if (baseline != null && current != null)
