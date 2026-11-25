@@ -179,7 +179,7 @@ API void PanePressPolicyBegin(int enabled,int timeout,int fullscreen,int paused,
  p.superButton=superButton;p.hold=hold;p.superFullscreen=superFullscreen!=0;
 }
 API void PanePressPolicyRule(const wchar_t* path,const wchar_t* windowClass,int disabled,int super){
- if(preparingPressPolicy)preparingPressPolicy->rules.push_back({path?path:L"",windowClass?windowClass:L"",windowClass!=nullptr,disabled!=0,super!=0});
+ if(preparingPressPolicy)preparingPressPolicy->rules.push_back({normalizeProgramPath(path?path:L""),windowClass?windowClass:L"",windowClass!=nullptr,disabled!=0,super!=0});
 }
 API void PanePressPolicyCommit(){
  if(preparingPressPolicy)pressPolicy.publish(std::move(preparingPressPolicy));

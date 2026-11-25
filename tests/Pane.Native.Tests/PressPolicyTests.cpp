@@ -1,6 +1,9 @@
 #define NOMINMAX
 #include <windows.h>
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #ifdef PANE_BEFORE
 #include "../../.codex-runs/032/before/PolicyEvents.h"
 #else
@@ -26,6 +29,40 @@ LRESULT nextHook(HHOOK,int,WPARAM,LPARAM){return 0;}
 #undef CallNextHookEx
 int checks=0,failures=0;
 void check(bool value,const char* name){checks++;if(!value){failures++;std::cout<<"FAIL "<<name<<'\n';}}
+#ifndef PANE_BEFORE
+void programRuleCases(){
+ std::ifstream cases(std::filesystem::path(__FILE__).parent_path().parent_path()/"ProgramRuleCases.txt");
+ check(cases.is_open(),"shared program rule cases");
+ wchar_t windows[MAX_PATH+1]{};
+ GetWindowsDirectoryW(windows,MAX_PATH+1);
+ for(std::string line;std::getline(cases,line);){
+  if(line.empty()||line.front()=='#')continue;
+  std::istringstream row(line);
+  std::vector<std::wstring> fields;
+  for(std::string part;std::getline(row,part,'|');){
+   std::wstring value(part.begin(),part.end());
+   if(value.compare(0,5,L"%WIN%")==0)value.replace(0,5,windows);
+   fields.push_back(std::move(value));
+  }
+  int ruleCount=fields.at(3).empty()?1:2,winner=std::stoi(fields.at(4));
+  for(int disabled=0;disabled<=ruleCount;++disabled){
+   PanePressPolicyBegin(1,0,0,0,4,400,0);
+   for(int i=1;i<=ruleCount;++i){
+    auto& spec=fields[i+1];
+    auto split=spec.find(L'@');
+    auto path=spec.substr(0,split);
+    PanePressPolicyRule(path.c_str(),split==std::wstring::npos?nullptr:spec.c_str()+split+1,i==disabled,0);
+    PanePressPolicyRule(path.c_str(),nullptr,1,1);
+   }
+   PanePressPolicyCommit();
+   auto result=decidePress(*pressPolicy.read(),fixture,{fields[1],L"Fixture"});
+   std::string name=line.substr(0,line.find('|'));
+   check(result.enabled==(winner==0||winner!=disabled),(name+" gesture").c_str());
+   check(result.superButton==(fields[5]==L"1"?0:4),(name+" super").c_str());
+  }
+ }
+}
+#endif
 void reset(){capture={};updateTimer();head=tail=0;}
 void publish(){auto revision=PanePolicyBegin();PanePolicy(reinterpret_cast<intptr_t>(fixture.window),fixture.pid,0,0,96,0,1,0);PanePolicyCommit(revision);}
 LRESULT raw(WPARAM message,int x=0,DWORD flags=0,ULONG_PTR tag=0){MSLLHOOKSTRUCT p{};p.pt={x,0};p.flags=flags;p.dwExtraInfo=tag;return hook(HC_ACTION,message,reinterpret_cast<LPARAM>(&p));}
@@ -53,6 +90,7 @@ int main(){running=true;observe=false;configure();
   publish();PanePolicyBegin();gesture("press while background refresh is in progress",0,flags);
  }
 #ifndef PANE_BEFORE
+ programRuleCases();
  configure();publish();fixtureIdentity.path.clear();check(raw(WM_RBUTTONDOWN)==1,"unknown process path still captures");reset();
  fixtureIdentity.path=L"C:\\fixture.exe";
  PanePressPolicyBegin(1,0,1,0,4,400,1);PanePressPolicyRule(L"c:\\FIXTURE.exe",nullptr,1,0);PanePressPolicyCommit();

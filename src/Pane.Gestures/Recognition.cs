@@ -56,10 +56,58 @@ public sealed class GestureRecognizer
 
 public static class GestureMatcher
 {
-    public static AppRule? Rule(GestureConfig config, string exePath, string? windowClass) =>
-        config.Apps.Where(a => string.Equals(a.ExePath, exePath, StringComparison.OrdinalIgnoreCase) &&
-            (a.WindowClass is null || string.Equals(a.WindowClass, windowClass, StringComparison.Ordinal)))
-        .OrderByDescending(a => a.WindowClass is not null).FirstOrDefault();
+    static readonly string WindowsDirectory = NormalizePath(Environment.GetFolderPath(Environment.SpecialFolder.Windows));
+
+    static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return "";
+        path = path.Replace('/', '\\');
+        if (path.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase)) path = @"\\" + path[8..];
+        else if (path.StartsWith(@"\\?\", StringComparison.Ordinal) && path.Length > 6 && path[5] == ':') path = path[4..];
+        try { return Path.GetFullPath(path).TrimEnd('\\'); }
+        catch (Exception e) when (e is ArgumentException or IOException or NotSupportedException) { return ""; }
+    }
+
+    // 两个候选文件夹都是目标路径的祖先时，较长的前缀就是更深的一层。
+    static int MatchRank(string rule, string target)
+    {
+        if (target.Length == 0 || rule.Length == 0) return 0;
+        if (target.Equals(rule, StringComparison.OrdinalIgnoreCase)) return int.MaxValue;
+        int end = rule.LastIndexOf('\\');
+        if (end <= 0 || (end == 2 && rule[1] == ':')) return 0;
+        var folder = rule.AsSpan(0, end);
+        if (WindowsDirectory.Length == 0 || folder.Equals(WindowsDirectory, StringComparison.OrdinalIgnoreCase) ||
+            (end > WindowsDirectory.Length && folder[WindowsDirectory.Length] == '\\' &&
+             folder.StartsWith(WindowsDirectory, StringComparison.OrdinalIgnoreCase))) return 0;
+        return target.Length > end && target[end] == '\\' &&
+            target.AsSpan().StartsWith(folder, StringComparison.OrdinalIgnoreCase) ? end : 0;
+    }
+
+    internal static bool SuperExcluded(string[] paths, string exePath)
+    {
+        if (paths.Length == 0) return false;
+        string target = NormalizePath(exePath);
+        return paths.Any(path => MatchRank(NormalizePath(path), target) > 0);
+    }
+
+    public static AppRule? Rule(GestureConfig config, string exePath, string? windowClass)
+    {
+        if (config.Apps.Count == 0) return null;
+        string target = NormalizePath(exePath);
+        AppRule? best = null;
+        int bestRank = 0;
+        foreach (var rule in config.Apps)
+        {
+            if (rule.WindowClass is not null && rule.WindowClass != windowClass) continue;
+            int rank = MatchRank(NormalizePath(rule.ExePath), target);
+            if (rank > bestRank || (rank > 0 && rank == bestRank && best?.WindowClass is null && rule.WindowClass is not null))
+            {
+                best = rule;
+                bestRank = rank;
+            }
+        }
+        return best;
+    }
 
     public static GestureBinding? Match(GestureConfig config, GesturePattern pattern, string exePath = "", string? windowClass = null)
     {

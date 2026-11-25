@@ -1248,7 +1248,7 @@
   <data name="Settings_Gestures_ProgramDisabled" xml:space="preserve"><value>在該程式中不觸發手勢</value></data>
   <data name="Settings_Gestures_ProgramInherit" xml:space="preserve"><value>沿用全域手勢</value></data>
   <data name="Settings_Gestures_Programs" xml:space="preserve"><value>按程式設定</value></data>
-  <data name="Settings_Gestures_ProgramsDescription" xml:space="preserve"><value>新增的程式預設停用手勢；改為「啟用」後沿用全域手勢，點擊右側箭頭可為該程式新增專用手勢</value></data>
+  <data name="Settings_Gestures_ProgramsDescription" xml:space="preserve"><value>新增的程式預設停用手勢；改為「啟用」後沿用全域手勢，點擊右側箭頭可為該程式新增專用手勢。同一資料夾裡的其他程式也按這一項處理</value></data>
   <data name="Settings_Gestures_QueryRequired" xml:space="preserve"><value>搜尋位址中必須包含 {query}</value></data>
   <data name="Settings_Gestures_RemoveChord" xml:space="preserve"><value>刪除最後一個</value></data>
   <data name="Settings_Gestures_RemoveDirection" xml:space="preserve"><value>刪除最後一段</value></data>
@@ -1490,7 +1490,7 @@
   <data name="Settings_Super_DisableFullscreenDescription" xml:space="preserve"><value>遊戲、影片全螢幕時，側鍵保持原有功能</value></data>
   <data name="Settings_Super_Enable" xml:space="preserve"><value>啟用超級面板</value></data>
   <data name="Settings_Super_ExcludedPrograms" xml:space="preserve"><value>在以下程式中不觸發</value></data>
-  <data name="Settings_Super_ExcludedProgramsDescription" xml:space="preserve"><value>在這些程式中長按側鍵時，按鍵照常傳給程式</value></data>
+  <data name="Settings_Super_ExcludedProgramsDescription" xml:space="preserve"><value>在這些程式中長按側鍵時，按鍵照常傳給程式；同一資料夾裡的其他程式也一樣</value></data>
   <data name="Settings_Super_ForwardButton" xml:space="preserve"><value>長按前進鍵</value></data>
   <data name="Settings_Super_HoldDuration" xml:space="preserve"><value>長按時長</value></data>
   <data name="Settings_Super_HoldDurationDescription" xml:space="preserve"><value>過短容易誤觸，過長回應遲緩；預設 0.4 秒</value></data>

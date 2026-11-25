@@ -178,7 +178,7 @@ public sealed class GestureService : IGestureService
         bool blocked=!recognitionEnabled||paused||wgRunning||c.Settings.PauseInFullscreen&&full||GestureMatcher.Rule(c,target.ExePath,target.WindowClass)?.Mode==AppRuleMode.Disabled;
         SetState(wgRunning?GestureServiceState.WGesturesRunning:paused?GestureServiceState.Paused:c.Settings.PauseInFullscreen&&full?GestureServiceState.PausedByFullscreen:GestureServiceState.Running);
         var sp=Volatile.Read(ref superPolicy);
-        bool superBlocked=paused||wgRunning||sp.Fullscreen&&full||sp.Disabled.Any(p=>string.Equals(p,target.ExePath,StringComparison.OrdinalIgnoreCase));
+        bool superBlocked=paused||wgRunning||sp.Fullscreen&&full||GestureMatcher.SuperExcluded(sp.Disabled,target.ExePath);
         Win.PaneSuperPolicy(superBlocked?0:sp.Button,sp.Hold);
         bool allBlocked=blocked&&(superBlocked||sp.Button==0);
         Win.PanePolicy(target.Window,target.ProcessId,target.Start.X,target.Start.Y,dpi,allBlocked?1:0,blocked?0:(int)c.Settings.EnabledButtons,c.Settings.StationaryTimeoutMs??0);

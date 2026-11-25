@@ -1,0 +1,17 @@
+# 用例|进程路径|第一条规则|第二条规则|命中序号（0 为无）|超级面板排除（两条路径均加入排除列表）
+# 规则可用 @ 指定窗口类，测试窗口的类为 Fixture。相同文件夹、相同窗口类优先级时取第一条。
+launcher|D:\App\Viewer.exe|D:\App\ViewerLauncher.exe||1|1
+version|D:\App\1.2.3\App.exe|D:\App\App.exe||1|1
+boundary|D:\App2\x.exe|D:\App\App.exe||0|0
+windows-other|%WIN%\System32\notepad.exe|%WIN%\System32\mstsc.exe||0|0
+windows-exact|%WIN%\System32\mstsc.exe|%WIN%\System32\mstsc.exe||1|1
+windows-folder|%WIN%\other.exe|%WIN%\app.exe||0|0
+drive-root|D:\b.exe|D:\a.exe||0|0
+exact-wins|D:\App\Helper.exe|D:\App\App.exe|D:\App\Helper.exe|2|1
+same-folder-first|D:\App\Other.exe|D:\App\App.exe|D:\App\Helper.exe|1|1
+deeper-wins|D:\App\sub\x.exe|D:\App\App.exe|D:\App\sub\Tool.exe|2|1
+folder-class|D:\App\x.exe|D:\App\App.exe|D:\App\Helper.exe@Fixture|2|1
+wrong-class|D:\App\x.exe|D:\App\App.exe|D:\App\Helper.exe@fixture|1|1
+exact-before-class|D:\App\Helper.exe|D:\App\App.exe@Fixture|D:\App\Helper.exe|2|1
+depth-before-class|D:\App\sub\x.exe|D:\App\App.exe@Fixture|D:\App\sub\Tool.exe|2|1
+normalized|d:/APP/sub/../HELPER.exe/|D:\App\App.exe|D:\App\Helper.exe|2|1

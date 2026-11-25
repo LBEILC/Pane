@@ -56,6 +56,7 @@ static partial class Program
     }
     static void Matching()
     {
+        ProgramRuleCases();
         var global=Binding("global",[GestureDirection.Down]);var local=global with{Name="override"};
         var c=GestureConfigStore.Empty with{Global=[global],Apps=[new(Target.ExePath,null,AppRuleMode.InheritAndOverride,[local]),new(Target.ExePath,"Other",AppRuleMode.Disabled,[])]};
         Check(GestureMatcher.Match(c,global.Pattern)==global,"global");
@@ -63,6 +64,30 @@ static partial class Program
         Check(GestureMatcher.Match(c,global.Pattern,Target.ExePath,"Other")==null,"class specific disabled");
         Check(GestureMatcher.Match(c,global.Pattern,@"C:\Other\cmd.exe")==global,"same basename does not override");
         Check(GestureMatcher.Match(c,global.Pattern,"unknown")==global,"unknown global fallback");
+    }
+    static void ProgramRuleCases()
+    {
+        var global = Binding("global", [GestureDirection.Down]);
+        var local = global with { Name = "override" };
+        string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        foreach (string line in File.ReadLines(Path.Combine(AppContext.BaseDirectory, "ProgramRuleCases.txt")))
+        {
+            if (line.StartsWith('#')) continue;
+            var fields = line.Replace("%WIN%", windows).Split('|');
+            var paths = fields[2..4].Where(p => p.Length != 0).Select(p => p.Split('@')).ToArray();
+            int winner = int.Parse(fields[4]);
+            Check(GestureMatcher.SuperExcluded(paths.Select(p => p[0]).ToArray(), fields[1]) == (fields[5] == "1"), fields[0] + " super");
+            // 轮流禁用每条规则，验证胜出的规则既能禁用，也能提供专用手势。
+            for (int disabled = 0; disabled <= paths.Length; disabled++)
+            {
+                var rules = paths.Select((p, i) => new AppRule(p[0], p.ElementAtOrDefault(1),
+                    i + 1 == disabled ? AppRuleMode.Disabled : AppRuleMode.InheritAndOverride, [local])).ToArray();
+                var config = GestureConfigStore.Empty with { Global = [global], Apps = rules };
+                Check(GestureMatcher.Rule(config, fields[1], "Fixture") == (winner == 0 ? null : rules[winner - 1]), fields[0] + " rule");
+                Check(GestureMatcher.Match(config, global.Pattern, fields[1], "Fixture") ==
+                    (winner == 0 ? global : winner == disabled ? null : local), fields[0] + " binding");
+            }
+        }
     }
     static void Sessions()
     {
