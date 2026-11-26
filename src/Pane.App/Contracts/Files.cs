@@ -5,14 +5,24 @@ namespace Pane.Contracts;
 /// <summary>文件窗口左侧的分类。按扩展名归类，清单见 docs/specs/021；文件夹单独一类；归不进去的只出现在「全部」。</summary>
 public enum FileCategory { All, Folder, Document, Spreadsheet, Presentation, Pdf, Text, Image, Video, Audio, Archive, Program }
 
-/// <summary>排序：相关度（Everything 的默认顺序，名字开头命中靠前）或修改时间（新的在前）。</summary>
+/// <summary>
+/// 排序：相关度或修改时间（新的在前）。
+/// 相关度（2026-11-25 起由 Pane 自己排，任务 125，docs/design.md「文件搜索的相关度」）：名字完全相同 > 名字开头命中 > 词首命中 > 名字中间命中；
+/// 同一档里路径浅的、名字短的、最近改过的靠前；AppData、Temp、点开头的目录、node_modules 这类杂项路径降权（不排除）；搜索记忆里这个输入选过的排最前。
+/// 列文件夹（Folder 不为 null）时「相关度」照旧按名字排。
+/// </summary>
 public enum FileSort { Relevance, Modified }
 
-public sealed record FileQuery(string Text, FileCategory Category, FileSort Sort);
+/// <summary>
+/// Extensions（任务 125）：不为 null 时文件只给这些扩展名（小写、不带点），文件夹照常；从对话框搜索「查看全部」进来、为对话框选时用对话框的文件类型。
+/// FoldersOnly（任务 125）：只给文件夹（「选择文件夹」对话框）。两项都影响 Total 和 Counts。
+/// </summary>
+public sealed record FileQuery(string Text, FileCategory Category, FileSort Sort, IReadOnlyList<string>? Extensions = null, bool FoldersOnly = false);
 
 /// <summary>
 /// 一条结果。Name 是文件名（含扩展名），Path 是完整路径。
-/// Size：文件夹为 null；Modified 取不到为 null。Highlights 是 Name 里命中的位置（按 UTF-16 下标）。
+/// Size：文件夹为 null；Modified 取不到为 null。Highlights 是 Name 里命中的位置（按 UTF-16 下标）；
+/// 按相关度排时标的是定档的那一处（比如词首命中时不一定是第一处）。
 /// </summary>
 public sealed record FileHit(string Path, string Name, FileCategory Category, long? Size, DateTimeOffset? Modified,
     IReadOnlyList<TextSpan>? Highlights = null);

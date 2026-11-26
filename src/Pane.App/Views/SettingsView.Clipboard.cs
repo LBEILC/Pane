@@ -144,7 +144,7 @@ public sealed partial class SettingsView
         var now = state is WinVState.Pending or WinVState.RestorePending
             ? Button(Strings.Settings_WinV_RestartExplorer, "refresh", () => Run(t => state == WinVState.Pending ? w.EnableAsync(true, t) : w.DisableAsync(true, t)))
             : null;
-        yield return Row(label, Strings.Settings_WinV_ReplaceDescription,
+        yield return Row(label, app.IsPortable ? $"{Strings.Settings_WinV_ReplaceDescription}；{Strings.Settings_Portable_RegistryNote}" : Strings.Settings_WinV_ReplaceDescription,
             new[] { status, now, toggle }.OfType<FrameworkElement>());
         var history = Switch(w.SystemHistoryDisabled, v => Run(t => w.SetSystemHistoryDisabledAsync(v, t)));
         Enable(history, replaced);

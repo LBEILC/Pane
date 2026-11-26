@@ -4,6 +4,8 @@ using Pane.Localization;
 // - 空输入：已打开的资源管理器窗口、最近使用（IFolderJump.Entries）；打字：文件夹、文件（IDialogSearch.SearchAsync）。
 // - 文件夹：Enter 跳过去。「打开」里的文件：Enter 直接打开、Shift+Enter 仅填入文件名（设置 OpenOnEnter 为 false 时两者对调）。
 //   「另存为」里的文件：Enter 保存到此处（文件名不变），Ctrl+Enter 使用此文件名。
+// - 结果没列全时最后一行「在文件窗口中查看全部 N 个」（2026-11-25，任务 125）：Tab 在任何一行上都打开文件窗口「为对话框选」，选中这一行时 Enter 也打开。
+//   选了一项（跳转）就记进搜索记忆，下次同样的输入排最前。
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -18,8 +20,11 @@ namespace Pane.Views;
 
 public sealed partial class DialogSearchView : UserControl, IPanelView
 {
-    /// <summary>一条结果：文件夹或文件。Group：Explorer / Recent / Folders / Files。</summary>
-    sealed record Item(string Path, string Name, bool Folder, string Group, IReadOnlyList<TextSpan>? Highlights = null);
+    /// <summary>一条结果：文件夹或文件。Group：Explorer / Recent / Folders / Files / More（「查看全部」那一行）。</summary>
+    sealed record Item(string Path, string Name, bool Folder, string Group, IReadOnlyList<TextSpan>? Highlights = null)
+    {
+        public bool More => Group == "more";
+    }
 
     readonly SlidingHighlight highlight;
     readonly List<(Item Item, Grid Row)> items = [];
@@ -65,7 +70,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
     /// <summary>「打开」里的文件按 Enter 直接打开（设置 FolderJumpSettings.OpenOnEnter）。</summary>
     public bool OpenOnEnter { get; set; } = true;
     public Func<IReadOnlyList<FolderJumpEntry>> Entries { get; set; } = () => [];
-    public Func<string, IReadOnlyList<string>?, CancellationToken, Task<IReadOnlyList<FileHit>>>? Search { get; set; }
+    public Func<string, FileDialogInfo?, CancellationToken, Task<DialogSearchResult>>? Search { get; set; }
     /// <summary>贴在对话框上方：结果往上展开（搜索行在最下面）。</summary>
     public bool Up { get; private set; }
     /// <summary>这一侧最多能给多高（DIP），宿主按屏幕剩下的空间算。</summary>
@@ -78,6 +83,10 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
     public event EventHandler? LayoutChanged;
     /// <summary>Esc 收起后焦点还给对话框。</summary>
     public event EventHandler? ReturnFocus;
+    /// <summary>「查看全部」（任务 125）：宿主打开文件窗口为这个对话框选。Query 是输入，Focus 是当时选中的那一项（「查看全部」行本身为 null）。</summary>
+    public event EventHandler<(string Query, string? Focus)>? ViewAll;
+    /// <summary>选了一项：宿主记进搜索记忆（ISearchMemory.RecordFile）。空输入时（已打开、最近使用两组）不记。</summary>
+    public event EventHandler<(string Query, string Path)>? Chosen;
 
     public void Apply(FileDialogInfo info, bool up)
     {
@@ -178,6 +187,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
         var q = Input.Text.Trim();
         var list = new List<Item>();
         string? problem = null;
+        int total = 0;
         if (q.Length == 0)
         {
             try
@@ -191,15 +201,18 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
         {
             try
             {
-                var hits = await run(q, Info?.Extensions, token);
+                var result = await run(q, Info, token);
                 if (token.IsCancellationRequested) return;
-                foreach (var h in hits) list.Add(new Item(h.Path, h.Name, h.Category == FileCategory.Folder, h.Category == FileCategory.Folder ? "folders" : "files", h.Highlights));
+                foreach (var h in result.Items) list.Add(new Item(h.Path, h.Name, h.Category == FileCategory.Folder, h.Category == FileCategory.Folder ? "folders" : "files", h.Highlights));
+                total = result.Total;
             }
             catch (OperationCanceledException) { return; }
             catch (FileSearchUnavailableException e) { problem = e.Message; }
             catch (Exception e) { problem = e.Message; }
         }
         if (token.IsCancellationRequested || !Expanded) return;
+        // 没列全：最后一行「在文件窗口中查看全部 N 个」
+        if (total > list.Count) list.Add(new Item("", string.Format(Strings.Launcher_AllFileResults, (object?)total), false, "more"));
         Draw(list, problem);
     }
 
@@ -212,7 +225,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
         string? last = null;
         foreach (var it in list)
         {
-            if (it.Group != last)
+            if (it.Group != last && !it.More)
             {
                 last = it.Group;
                 Rows.Children.Add(new TextBlock
@@ -242,6 +255,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
     // 行同启动器的列表行，缩到 42 高：28 图标格、名字（命中加粗）、所在路径；选中行右侧 Enter 键帽
     Grid RowFor(Item it)
     {
+        if (it.More) return MoreRow(it);
         var row = new Grid { Height = 42, Padding = new Thickness(10, 0, 10, 0), ColumnSpacing = 10, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Tag = it };
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -263,6 +277,24 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
         row.Children.Add(text);
         var key = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Opacity = 0 };
         KeyCombo.SetText(key, "Enter");
+        Grid.SetColumn(key, 2);
+        row.Children.Add(key);
+        return row;
+    }
+
+    // 「查看全部」行：同启动器的 More 行，38 高、外链图标居中在 28 的图标格里、次要文字色，右边 Tab 键帽常显
+    Grid MoreRow(Item it)
+    {
+        var row = new Grid { Height = 38, Padding = new Thickness(10, 0, 10, 0), ColumnSpacing = 10, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Tag = it };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(28) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        row.Children.Add(new PaneIcon { Glyph = "external", Width = 16, Height = 16, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = HintLabelProto.Foreground });
+        var text = new TextBlock { Text = it.Name, VerticalAlignment = VerticalAlignment.Center, FontFamily = HintLabelProto.FontFamily, FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Foreground = (Brush)Application.Current.Resources["PaneText2Brush"] };
+        Grid.SetColumn(text, 1);
+        row.Children.Add(text);
+        var key = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        KeyCombo.SetText(key, "Tab");
         Grid.SetColumn(key, 2);
         row.Children.Add(key);
         return row;
@@ -293,7 +325,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
     void Select(int index, bool scroll = true)
     {
         if (items.Count == 0) return;
-        if (selected >= 0 && selected < items.Count) KeyOf(items[selected].Row).Opacity = 0;
+        if (selected >= 0 && selected < items.Count && !items[selected].Item.More) KeyOf(items[selected].Row).Opacity = 0;
         selected = (index % items.Count + items.Count) % items.Count;
         var row = items[selected].Row;
         KeyOf(row).Opacity = 1;
@@ -312,21 +344,34 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
     {
         var it = selected >= 0 && selected < items.Count ? items[selected].Item : null;
         var list = new List<(string[], string)> { (["↑", "↓"], Strings.Clipboard_Select) };
-        if (it is { Folder: true }) list.Add((["Enter"], Strings.DialogSearch_Jump));
+        if (it is { More: true }) list.Add((["Enter"], Strings.Launcher_OpenFiles));
+        else if (it is { Folder: true }) list.Add((["Enter"], Strings.DialogSearch_Jump));
         else if (it is not null && Info?.Save == true) { list.Add((["Enter"], Strings.DialogSearch_SaveHere)); list.Add((["Ctrl", "+", "Enter"], Strings.DialogSearch_UseName)); }
         else if (it is not null)
         {
             list.Add((["Enter"], OpenOnEnter ? Strings.DialogSearch_OpenNow : Strings.DialogSearch_FillName));
             list.Add((["Shift", "+", "Enter"], OpenOnEnter ? Strings.DialogSearch_FillName : Strings.DialogSearch_OpenNow));
         }
+        if (it is { More: false } && HasMore) list.Add((["Tab"], Strings.DialogSearch_ViewAllHint));
         list.Add((["Esc"], Strings.Common_Collapse));
         return list.ToArray();
     }
 
     void BuildHints() => KeyHints.Fill(Hints, HintItems(), HintLabelProto, KbdProto);
 
+    bool HasMore => items.Count > 0 && items[^1].Item.More;
+
+    void OpenAll()
+    {
+        var focus = selected >= 0 && selected < items.Count && !items[selected].Item.More ? items[selected].Item.Path : null;
+        ViewAll?.Invoke(this, (Input.Text.Trim(), focus));
+    }
+
     void Run(Item it, Action how)
     {
+        if (it.More) { OpenAll(); return; }
+        var q = Input.Text.Trim();
+        if (q.Length > 0) Chosen?.Invoke(this, (q, it.Path));
         var dir = it.Folder ? it.Path : System.IO.Path.GetDirectoryName(it.Path);
         if (dir is null) return;
         if (it.Folder) Navigate?.Invoke(this, (dir, null, false));
@@ -350,6 +395,7 @@ public sealed partial class DialogSearchView : UserControl, IPanelView
             case VirtualKey.Enter:
                 if (selected >= 0 && selected < items.Count) Run(items[selected].Item, Down(VirtualKey.Control) ? Action.Ctrl : Down(VirtualKey.Shift) ? Action.Shift : Action.Enter);
                 break;
+            case VirtualKey.Tab when HasMore: OpenAll(); break;
             case VirtualKey.Escape:
                 if (Input.Text.Length > 0) Input.Text = "";
                 else { Collapse(); ReturnFocus?.Invoke(this, EventArgs.Empty); }

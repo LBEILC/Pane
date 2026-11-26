@@ -51,8 +51,10 @@ public sealed class GestureService : IGestureService
     public event EventHandler<SuperPanelRequest>? SuperPanelRequested;
     public event EventHandler<string>? PauseHotkeyUnavailable;
     public event EventHandler? EmergencyExitRequested;
-    public GestureService(GestureConfig config,bool observeOnly=false)
+    readonly string? logRoot;
+    public GestureService(GestureConfig config,bool observeOnly=false,string? dataDirectory=null)
     {
+        logRoot=dataDirectory??Environment.GetEnvironmentVariable("PANE_DATA_DIR");
         GestureConfigStore.Validate(config);this.config=config;
         // 强制正常捕获只允许在从未显示的测试桌面，且必须显式隔离数据与实例。
         isolatedTest=Environment.GetEnvironmentVariable("PANE_TEST_GESTURES")=="1"
@@ -220,7 +222,7 @@ public sealed class GestureService : IGestureService
             case 6:session?.End(true);session=null;trail.Writer.TryWrite(new(button,e.X,e.Y,TrailPhase.End));SuperPanelRequested?.Invoke(this,new(e.X,e.Y,(GestureButton)e.Value));break;
             case 8:
                 try{
-                    string root=Environment.GetEnvironmentVariable("PANE_DATA_DIR")??Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),"Pane");
+                    if(logRoot is not {} root) break;
                     string folder=Path.Combine(root,"logs");Directory.CreateDirectory(folder);
                     File.AppendAllText(Path.Combine(folder,"hook.log"),$"{DateTimeOffset.UtcNow:O} {(e.Value switch {1=>"raw-input-without-hook",3=>"replay-rate-circuit-breaker",4=>"reinstall-rate-circuit-breaker",_=>"slow-hook-callback"})}\n");
                 }catch(IOException){}catch(UnauthorizedAccessException){}

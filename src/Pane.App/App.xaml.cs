@@ -9,6 +9,7 @@ using Windows.Foundation;
 namespace Pane;
 public sealed partial class App : Application
 {
+    public bool IsPortable => RuntimeMode.Current.IsPortable;
     public bool IsProduction => RuntimeMode.Current.IsProduction;
     public Pane.Contracts.IAutostart Autostart {get;private set;}=null!;
     readonly bool controlsEnabled=!RuntimeMode.Current.IsProduction&&!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_RESULT"));
@@ -64,8 +65,14 @@ public sealed partial class App : Application
         try {
             GlassParameters.InitializeResources(Resources);queue.EnsureSystemDispatcherQueue();manager=WindowsXamlManager.InitializeForCurrentThread();
             string data=RuntimeMode.Current.DataDirectory;
-            Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();ApplyUiLanguage();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
-            var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry());Autostart=autostart;autostart.Align();
+            Store=new SettingsStore(data,GlassParameters.Defaults());Store.CorruptFile+=(_,_)=>Ack("settings-recovered");Store.Load();
+            if (IsPortable && Environment.GetCommandLineArgs().Skip(1).SequenceEqual(new[] { "--portable-probe" }))
+            {
+                Exit();
+                return;
+            }
+            ApplyUiLanguage();if(!demo)Fonts=new Pane.Services.FontCatalog();ApplyUiFont();/* 设计：界面字体 */
+            var autostart=new Pane.Services.AutostartService(IsProduction,Environment.ProcessPath!,Store,CreateStartupRegistry(),IsPortable);Autostart=autostart;autostart.Align();
             aiService=new Pane.Services.Ai.AiService(Store);AiSetup=aiService;Ai=demo?new Pane.DesignData.AiSample():aiService;aiService.SetModuleEnabled(false);
             Glass=new GlassParameters(Store.Current.General);
             Store.Changed+=(_,_)=>{Glass.Apply(Store.Current.General);shell?.Apply(ModuleShellSettings());ApplySuperSettings();folderJump?.Apply(Store.Current.FolderJump);};
@@ -84,7 +91,7 @@ public sealed partial class App : Application
             if(IsProduction&&!demo)Updates=new Pane.Services.Updates.UpdateService(Pane.Services.Setup.SetupFiles.VersionOf(Environment.ProcessPath!)??"0.1.0",data,()=>Store.Current.Update.AutoUpdate,path=>{
                 var start=new System.Diagnostics.ProcessStartInfo(path){UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=Path.GetDirectoryName(Path.GetFullPath(path))!};start.ArgumentList.Add("--auto-update");
                 using var installer=System.Diagnostics.Process.Start(start)??throw new IOException(Strings.Setup_InstallerLaunchFailed);Shutdown();
-            }, selectedSource:()=>Store.Current.Update.Source);
+            }, selectedSource:()=>Store.Current.Update.Source, portable:IsPortable);
             StartUpdates();/* 设计接线：软件内更新 */StartBackground();StartReleaseProbe();
             timer=queue.CreateTimer();timer.Interval=TimeSpan.FromMilliseconds(8);timer.Tick+=(_,_)=>{try{Tick();}finally{if(!NeedsFrames)timer.Stop();}};timer.Start();
         }catch(Exception e){ReportCrash(e);Shutdown();}

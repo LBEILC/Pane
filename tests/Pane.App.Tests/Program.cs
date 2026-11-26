@@ -15,8 +15,10 @@ static class Program
   if(args is ["--updates"]){try{int total=await UpdateTests.Run();total+=await MirrorUpdateTests.Run();Console.WriteLine($"PASS update suites assertions={total}");}catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}return;}
   if(args is ["--update-e2e-before",var beforeOld,var beforeNew,var beforeEvidence]){await UpdateEndToEnd.Run(beforeOld,beforeNew,beforeEvidence,true);return;}
   if(args is ["--update-e2e",var oldPackage,var newPackage,var evidence]){await UpdateEndToEnd.Run(oldPackage,newPackage,evidence);return;}
-  if(args is ["--setup-only"]){
+  if(args is ["--setup-only"] or ["--single-instance-only"] or ["--portable-only"]){
    var fixture=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(new(KeyModifiers.Alt,32)),new(new(KeyModifiers.Ctrl,86)));
+   if(args[0]=="--portable-only"){await PortableTests.Run(fixture);return;}
+   if(args[0]=="--single-instance-only"){SingleInstanceTests.Run();Autostart099Tests.Run(fixture);return;}
    try {int total=SetupLaunchTests.Run();total+=await SetupTests.Run(fixture);total+=UninstallTests.Run();total+=await UpdateTests.Run();total+=await MirrorUpdateTests.Run();total+=await SetupFailureTests.Run(fixture);total+=await SetupLinkTests.Run(fixture);
    Console.WriteLine($"PASS setup suites assertions={total}");}catch(Exception error){Console.WriteLine(error);Environment.ExitCode=1;}return;
   }
@@ -52,7 +54,9 @@ static class Program
   checks+=await WinVTests.Run();
   checks+=await SelectionTests.Run();
   checks+=ReleaseTests.Run(settings);
+  checks+=await PortableTests.Run(settings);
   checks+=Autostart099Tests.Run(settings);
+  checks+=SingleInstanceTests.Run();
   checks+=SetupLaunchTests.Run();
   checks+=await SetupTests.Run(settings);
   checks+=UninstallTests.Run();

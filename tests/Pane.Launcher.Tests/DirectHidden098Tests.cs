@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Reflection;
 using System.Text.Json;
 using Pane.Contracts;
 using Pane.Localization;
@@ -14,7 +13,8 @@ static partial class Program
         var executor=new FakeExecutor();var files=new FakeFiles();var platform=new ActionPlatform();
         var value=IndexBuilder.Build(new FakeCatalog(20),[],default);
         var store=new SettingsStore(root,Defaults());
-        using var search=new LauncherSearch(store,new Index078(value),files,executor,new Environment037(),new Process037(),actionPlatform:platform);
+        var targets = new OpenTargetService(executor);
+        using var search=new LauncherSearch(store,new Index078(value),files,executor,new Environment037(),new Process037(),actionPlatform:platform,openTargets:targets);
         await search.Indexing;
         foreach(var (input,url) in new[]{("https://github.com","https://github.com/"),("HTTP://a.b/c?d=1","http://a.b/c?d=1"),("www.bing.com","https://www.bing.com/"),("  https://github.com  ","https://github.com/")}){
             var item=(await search.SearchAsync(input,default)).Items.Single(i=>i.Group==LauncherGroups.Direct);
@@ -22,7 +22,7 @@ static partial class Program
             Check((await search.GetActionsAsync(item,default)).Count==0,"098 网址无附加操作");
             await search.ExecuteAsync(item,default);Check(executor.Calls.Last()=="open:"+url+":False","098 网址经执行器打开");
         }
-        foreach(string query in new[]{"http://","ftp://x","javascript:alert(1)","file:///C:/","ms-settings:display","go https://x","https://a.b/ a","github.com",@"\\server\share","relative.txt",Path.Combine(root,"absent")})
+        foreach(string query in new[]{"http://","ftp://x","javascript:alert(1)","file:relative","ms-settings:display","go https://x","https://a.b/ a","github.com",@"\\server","relative.txt",Path.Combine(root,"absent")})
             Check(!(await search.SearchAsync(query,default)).Items.Any(i=>i.Group==LauncherGroups.Direct),"098 不识别 "+query);
         string file=Path.Combine(root,"Fixture.txt");File.WriteAllText(file,"fixture");
         foreach(var (input,path,kind) in new[]{(root,root,LauncherItemKind.Folder),(file.Replace('\\','/'),file,LauncherItemKind.File),("%TEMP%",Path.GetFullPath(Environment.ExpandEnvironmentVariables("%TEMP%")),LauncherItemKind.Folder),(Path.GetPathRoot(root)!,Path.GetPathRoot(root)!,LauncherItemKind.Folder)}){
@@ -44,14 +44,13 @@ static partial class Program
         partial=null;await search.SearchAsync(root,r=>partial=r,default);
         Check(partial?.Items.Any(i=>i.Group==LauncherGroups.Direct)==true,"098 首批包含路径");
         files.Delay=0;
-        var direct=((ILauncherSource[])typeof(LauncherSearch).GetField("sources",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(search)!).OfType<DirectSource>().Single();
-        var realProbe=direct.Probe;using var release=new ManualResetEventSlim();var ended=new TaskCompletionSource();
-        direct.Probe=_=>{try{release.Wait();return LauncherItemKind.File;}finally{ended.TrySetResult();}};
+        var realProbe=targets.Probe;using var release=new ManualResetEventSlim();var ended=new TaskCompletionSource();
+        targets.Probe=_=>{try{release.Wait();return OpenTargetKind.File;}finally{ended.TrySetResult();}};
         files.ReturnRow=true;var watch=Stopwatch.StartNew();
         try{var timed=await search.SearchAsync(file,default);Check(watch.ElapsedMilliseconds<700&&!timed.Items.Any(i=>i.Group==LauncherGroups.Direct)&&timed.Items.Any(i=>i.Group==LauncherGroups.Files),"098 存在检查超时保留其他来源");}
-        finally{release.Set();await ended.Task;direct.Probe=realProbe;files.ReturnRow=false;}
-        direct.Probe=_=>throw new UnauthorizedAccessException();
-        Check(!(await search.SearchAsync(file,default)).Items.Any(i=>i.Group==LauncherGroups.Direct),"098 不可访问静默忽略");direct.Probe=realProbe;
+        finally{release.Set();await ended.Task;targets.Probe=realProbe;files.ReturnRow=false;}
+        targets.Probe=_=>throw new UnauthorizedAccessException();
+        Check(!(await search.SearchAsync(file,default)).Items.Any(i=>i.Group==LauncherGroups.Direct),"098 不可访问静默忽略");targets.Probe=realProbe;
         using(var cancel=new CancellationTokenSource()){
             cancel.Cancel();int calls=0;try{await search.SearchAsync(file,_=>calls++,cancel.Token);Check(false,"098 取消");}catch(OperationCanceledException){Check(calls==0,"098 取消后无首批");}
         }

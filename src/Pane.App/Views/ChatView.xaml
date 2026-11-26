@@ -57,9 +57,11 @@
         </Grid>
 
         <!-- 对话 -->
-        <ScrollViewer x:Name="ChatScroller" Grid.Row="1" Padding="22,18,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnChatScrolled">
-            <StackPanel x:Name="Messages" Spacing="16"/>
-        </ScrollViewer>
+        <c:ScrollFade Grid.Row="1">
+            <ScrollViewer x:Name="ChatScroller" Padding="22,18,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnChatScrolled">
+                <StackPanel x:Name="Messages" Spacing="16"/>
+            </ScrollViewer>
+        </c:ScrollFade>
         <!-- 往上翻过就不再自动滚到底；生成中出现「回到最新」，点了恢复跟随 -->
         <Button x:Name="JumpButton" Grid.Row="1" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
                 Height="{StaticResource PaneControlSm}" Padding="12,0,12,0" CornerRadius="14" Visibility="Collapsed" Click="OnJump" IsTabStop="False">

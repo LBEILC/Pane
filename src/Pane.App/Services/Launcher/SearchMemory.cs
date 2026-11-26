@@ -18,8 +18,10 @@ internal sealed class SearchMemory : ISearchMemory, IDisposable
     Task writer = Task.CompletedTask;
     static readonly TimeSpan retention = TimeSpan.FromDays(90);
 
-    public SearchMemory(string directory)
+    readonly Func<string,string?> normalize;
+    public SearchMemory(string directory, Func<string,string?>? normalize = null)
     {
+        this.normalize = normalize ?? (q => q.Trim().ToLowerInvariant());
         path = Path.Combine(directory, "search-memory.json");
         try
         {
@@ -54,6 +56,23 @@ internal sealed class SearchMemory : ISearchMemory, IDisposable
 
     public int Count { get { lock (gate) { Expire(); return history.Count; } } }
     void Expire() { var now = DateTimeOffset.UtcNow; if (now >= nextExpiry) Prune(now); }
+
+    string? FileQueryKey(string query)
+    {
+        var key = normalize(query);
+        if (string.IsNullOrEmpty(key) || key.StartsWith('>') || OpenTargetService.Url(OpenTargetService.SingleLine(key)) != null ||
+            OpenTargetService.LocalPath(OpenTargetService.SingleLine(key)) != null || Calculator.Calc(key) != null ||
+            PowerTimerParser.Parse(key,DateTimeOffset.Now) != null) return null;
+        return key;
+    }
+
+    public void RecordFile(string query, string path)
+    {
+        if (FileQueryKey(query) is { Length: > 0 } key && Path.IsPathFullyQualified(path)) Record(key,"file:" + path);
+    }
+
+    internal string[] FileIds(string query) => FileQueryKey(query) is { Length: > 0 } key
+        ? Ranked(key).Where(id => id.StartsWith("file:", StringComparison.Ordinal)).ToArray() : [];
 
     internal void Record(string query, string id)
     {

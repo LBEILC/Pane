@@ -110,7 +110,7 @@ internal static class SetupEntry
         }
         return true;
     }
-    private static void InitializeLanguage(string data)
+    internal static void InitializeLanguage(string data)
     {
         // WinUI 尚未初始化，不能调用会创建 FontFamily 的 GlassParameters.Defaults()。
         string? configured = null;

@@ -133,7 +133,7 @@ internal sealed class LauncherActions(LauncherActionPlatform platform,ILauncherE
 {
     internal ActionTarget? Target(LauncherItem item,IndexedApp? app)=>item.Kind switch {
         LauncherItemKind.App=>app is {Packaged:false}?platform.Resolve(app.Launch):null,
-        LauncherItemKind.File or LauncherItemKind.Folder=>UninstallMatching.Normalize(item.Id.StartsWith("favorite:")?item.Id[9..]:item.Id.StartsWith("file:")?item.Id[5..]:item.Id.StartsWith("direct:path:",StringComparison.Ordinal)?DirectSource.LocalPath(item.Id[12..]):null,false) is {} path?new(path,[]):null,
+        LauncherItemKind.File or LauncherItemKind.Folder=>UninstallMatching.Normalize(item.Id.StartsWith("favorite:")?item.Id[9..]:item.Id.StartsWith("file:")?item.Id[5..]:item.Id.StartsWith("direct:path:",StringComparison.Ordinal)?OpenTargetService.LocalPath(item.Id[12..]):null,false) is {} path?new(path,[]):null,
         _=>null
     };
     internal IReadOnlyList<LauncherItemAction> Get(LauncherItem item,ActionTarget? target,bool portable=false)

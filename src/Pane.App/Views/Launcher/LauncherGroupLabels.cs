@@ -23,6 +23,7 @@ internal static class LauncherGroupLabels
         LauncherGroups.Other => Strings.Launcher_Group_Other,
         LauncherGroups.Actions => Strings.Launcher_Group_Actions,
         LauncherGroups.Timer => Strings.Launcher_Group_Timer,
+        LauncherGroups.Direct => Strings.Common_Open,
         _ => group
     };
 }

@@ -1,12 +1,14 @@
 using Pane.Localization;
 using System.Diagnostics;
+using System.Security.Principal;
 using Pane.Contracts;
 namespace Pane.Services.Setup;
 
 internal sealed class SetupProcesses(SetupPaths paths, bool isolated,
     Func<string, string[], bool, int>? shellLaunch = null,
     Action<ProcessStartInfo, bool>? directLaunch = null,
-    Action<int>? logFallback = null) : ISetupProcesses
+    Action<int, bool>? logShellFailure = null,
+    Func<bool>? isAdministrator = null) : ISetupProcesses
 {
     public void SetPaths(SetupPaths value) => paths = value;
     public bool Running
@@ -24,7 +26,7 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated,
         using var process = Start(paths.Exe, ["--exit"]);
         // 发送者返回时原进程可能还在清理服务；等实际退出再换目录。
         var watch = Stopwatch.StartNew();
-        if (!process.WaitForExit(12000))
+        if (!process.WaitForExit(12000) || process.ExitCode != 0)
             throw new SetupException(Strings.Setup_RunningExitFailed);
         while (Running && watch.ElapsedMilliseconds < 15000) Thread.Sleep(50);
         if (Running)
@@ -37,14 +39,22 @@ internal sealed class SetupProcesses(SetupPaths paths, bool isolated,
         {
             int result = (shellLaunch ?? DesktopShellLaunch.Launch)(paths.Exe, arguments, !background);
             if (result >= 0) return;
-            if (logFallback != null) logFallback(result);
-            else UninstallChain.Log("desktop-shell-launch", "fallback", new System.Runtime.InteropServices.COMException("桌面外壳启动失败，改用直接启动", result), paths.Exe);
+            bool elevated = (isAdministrator ?? IsAdministrator)();
+            if (logShellFailure != null) logShellFailure(result, elevated);
+            else UninstallChain.Log("desktop-shell-launch", elevated ? "skip-elevated" : "fallback",
+                new System.Runtime.InteropServices.COMException(elevated ? "桌面外壳启动失败，管理员安装进程跳过直接启动" : "桌面外壳启动失败，改用直接启动", result), paths.Exe);
+            if (elevated) return;
         }
         // 安装自测只启动验证入口，避免实际注册全局服务。
         var info = StartInfo(paths.Exe, arguments);
         if (directLaunch != null) { directLaunch(info, isolated); return; }
         using var process = Process.Start(info) ?? throw new IOException(Strings.Setup_LaunchFailed);
         if (isolated && (!process.WaitForExit(15000) || process.ExitCode != 0)) throw new IOException("隔离新版启动失败"); // 不翻译：诊断异常
+    }
+    static bool IsAdministrator()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
     }
     string IsolatedRoot()
     {

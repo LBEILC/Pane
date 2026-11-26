@@ -16,7 +16,7 @@ public sealed partial class App
     CancellationTokenSource? trailCancellation;
     void StartGestures(string data){
         string path=Path.Combine(data,"gestures.json");
-        gestureService=new(GestureConfigStore.LoadOrDefaults(path),Environment.GetEnvironmentVariable("PANE_OBSERVE")=="1");
+        gestureService=new(GestureConfigStore.LoadOrDefaults(path),Environment.GetEnvironmentVariable("PANE_OBSERVE")=="1",data);
         gestureService.StateChanged+=(_,_)=>queue.TryEnqueue(()=>{
             if(closing||gestureService==null)return;bool paused=gestureService.IsPaused;if(shell!=null)shell.GesturesPaused=paused;
             if(paused!=wasPaused){wasPaused=paused;gestures?.Hint(new(GestureHintKind.Notice,[],CommandName:paused?Strings.Gestures_Paused:Strings.Gestures_Resumed));}

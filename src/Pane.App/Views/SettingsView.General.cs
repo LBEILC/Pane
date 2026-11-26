@@ -248,6 +248,6 @@ public sealed partial class SettingsView
         // 099 / issue 48：exe 设了「以管理员身份运行」，开机时 Windows 直接跳过，不替用户改兼容性设置
         if (state == AutostartState.ElevationRequired)
             return Row(label, Strings.Settings_Autostart_ElevationHint, Status(false, Strings.Settings_Autostart_ElevationRequired), toggle);
-        return Row(label, Strings.Settings_Autostart_Description, toggle);
+        return Row(label, app.IsPortable ? $"{Strings.Settings_Autostart_Description}；{Strings.Settings_Portable_RegistryNote}" : Strings.Settings_Autostart_Description, toggle);
     }
 }

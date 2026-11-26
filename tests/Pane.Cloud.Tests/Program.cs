@@ -158,7 +158,7 @@ internal static partial class Program
         Check((await account.RegisterAsync(email,"123456",pass,"演示",new("terms","privacy",true),default)).Ok,"registered");
         Check(File.ReadAllBytes(account.Profile!.AvatarPath!).SequenceEqual(new byte[]{1,2,3}),"avatar stored");
         var key=(string)Session()["key"]!;
-        Check((string?)Session()["token"]==token && (string?)Session()["id"]=="u_test" && secrets.Read("device.dpapi")==device,"DPAPI roundtrip");
+        Check((string?)Session()["token"]==token && (string?)Session()["id"]=="u_test" && secrets.Read(Path.GetFileName(Directory.GetFiles(Path.Combine(root,"cloud"),"device-*.dpapi").Single()))==device,"DPAPI roundtrip");
         int before = fake.Calls;
         await module.Sync.SyncNowAsync(default);
         Check(fake.Calls == before,"登录后同步关闭零调用");
@@ -299,7 +299,15 @@ internal static partial class Program
         Vectors();
         QrTests.Run();
         var root=Path.Combine(Path.GetTempPath(),"Pane-110-"+Guid.NewGuid().ToString("N"));
-        try { await Integration(root); Console.WriteLine($"PASS assertions={checks}"); }
+        try {
+            string copied = Path.Combine(root, "portable", "cloud");
+            Directory.CreateDirectory(copied);
+            File.WriteAllBytes(Path.Combine(copied, "session.dpapi"), RandomNumberGenerator.GetBytes(32));
+            await using var first = new AccountService(Path.GetDirectoryName(copied)!, "1", machine:"first");
+            await using var second = new AccountService(Path.GetDirectoryName(copied)!, "1", machine:"second");
+            string firstId = first.DeviceId;
+            Check(first.State == AccountState.SignedOut && firstId != second.DeviceId && firstId == first.DeviceId, "便携目录换机");
+            await Integration(root); Console.WriteLine($"PASS assertions={checks}"); }
         finally { if(Directory.Exists(root)) Directory.Delete(root,true); }
     }
 }

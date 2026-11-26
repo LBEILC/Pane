@@ -147,6 +147,18 @@
   <data name="Common_Copy" xml:space="preserve"><value>复制</value></data>
   <data name="Common_CopyPath" xml:space="preserve"><value>复制路径</value></data>
   <data name="Common_CrashLog" xml:space="preserve"><value>Pane 上次意外退出，日志已保存到 {0}</value></data>
+  <data name="Memo_ClipboardTagNote" xml:space="preserve"><value>选了会加到备忘录标签里，之后两边各改各的</value></data>
+  <data name="Memo_ClipboardTags" xml:space="preserve"><value>从剪贴板标签添加</value></data>
+  <data name="Memo_LessTags" xml:space="preserve"><value>收起</value></data>
+  <data name="Memo_ManageTags" xml:space="preserve"><value>管理</value></data>
+  <data name="Memo_ManageTagsHint" xml:space="preserve"><value>在设置里改名、改颜色、删除</value></data>
+  <data name="Memo_MemoTags" xml:space="preserve"><value>备忘录标签</value></data>
+  <data name="Memo_MoreTags" xml:space="preserve"><value>还有 {0} 个</value></data>
+  <data name="Memo_TagEmpty" xml:space="preserve"><value>这个标签下还没有备忘录</value></data>
+  <data name="Memo_TagHint" xml:space="preserve"><value>标签（Ctrl+T）</value></data>
+  <data name="Settings_About_Portable" xml:space="preserve"><value>便携版</value></data>
+  <data name="Settings_About_PortableRemove" xml:space="preserve"><value>不再使用</value></data>
+  <data name="Settings_About_PortableRemoveDescription" xml:space="preserve"><value>便携版不用卸载，删掉整个文件夹即可。删之前先关掉开机启动和「用 Pane 替换 Win+V」，它们写在这台电脑的注册表里</value></data>
   <data name="Settings_Account" xml:space="preserve"><value>账号</value></data>
   <data name="Settings_Account_NeedsSignIn" xml:space="preserve"><value>登录已失效，请重新登录</value></data>
   <data name="Settings_Account_NeedsSignInDescription" xml:space="preserve"><value>密码或邮箱在别处改过，或这台电脑已被移除。重新登录后同步接着进行</value></data>
@@ -308,6 +320,10 @@
   <data name="Settings_Account_ConfirmDelete" xml:space="preserve"><value>确认注销</value></data>
   <data name="Settings_Account_DeleteNeedPassword" xml:space="preserve"><value>请输入当前密码</value></data>
   <data name="Settings_Account_Deleted" xml:space="preserve"><value>账号已注销</value></data>
+  <data name="Settings_Memo_Tags" xml:space="preserve"><value>标签</value></data>
+  <data name="Settings_Memo_TagsEmpty" xml:space="preserve"><value>还没有标签，在备忘录窗口里按 Ctrl+T 添加</value></data>
+  <data name="Settings_Memo_TagsNote" xml:space="preserve"><value>删除标签只从备忘录上去掉它，不删备忘录；和剪贴板的标签是两套</value></data>
+  <data name="Settings_Portable_RegistryNote" xml:space="preserve"><value>会写入这台电脑的注册表，换电脑后要重新打开</value></data>
   <data name="Settings_Sync" xml:space="preserve"><value>同步</value></data>
   <data name="Settings_Sync_Cloud" xml:space="preserve"><value>Pane 云同步</value></data>
   <data name="Settings_Sync_SignedOut" xml:space="preserve"><value>登录 Pane 账号后，可以在多台电脑之间同步设置、使用记录和剪贴板</value></data>
@@ -1610,6 +1626,8 @@
   <data name="Setup_Updating" xml:space="preserve"><value>正在更新…</value></data>
   <data name="Setup_UpdatingFiles" xml:space="preserve"><value>正在更新程序</value></data>
   <data name="Setup_Version" xml:space="preserve"><value>版本 {0}</value></data>
+  <data name="Startup_ElevatedInstance" xml:space="preserve"><value>Pane 正以管理员身份运行，无法从这里打开。请通过托盘图标使用，或从托盘菜单退出后重新打开。</value></data>
+  <data name="Startup_PortableReadOnly" xml:space="preserve"><value>无法写入 Pane 所在的文件夹（{0}），便携版要把数据存在这里。请把 Pane 放到可以写入的位置，比如 D:\Pane。</value></data>
   <data name="SuperPanel_AutoTranslate" xml:space="preserve"><value>自动翻译</value></data>
   <data name="SuperPanel_AutoTranslateTooLong" xml:space="preserve"><value>内容较长（约 {0:N0} 字），未自动翻译</value></data>
   <data name="SuperPanel_ClipboardUnavailable" xml:space="preserve"><value>剪贴板暂时不可用，无法读取选中的文字</value></data>
@@ -1664,6 +1682,8 @@
   <data name="Tray_Title" xml:space="preserve"><value>托盘菜单</value></data>
   <data name="Tray_UpdateReady" xml:space="preserve"><value>新版本 {0} 已下载完成</value></data>
   <data name="Update_Automatic" xml:space="preserve"><value>自动更新</value></data>
+  <data name="Update_AutomaticCheck" xml:space="preserve"><value>自动检查更新</value></data>
+  <data name="Update_AutomaticCheckDescription" xml:space="preserve"><value>每天检查一次，有新版本时在这里提示；便携版要自己下载新的压缩包替换</value></data>
   <data name="Update_AutomaticDescription" xml:space="preserve"><value>每天检查一次，有新版本时在后台下载，完成后提示重启更新；关闭后仅在此处手动检查</value></data>
   <data name="Update_AvailableVersion" xml:space="preserve"><value>发现新版本 {0}</value></data>
   <data name="Update_CheckedHoursAgo" xml:space="preserve"><value>{0} 小时前检查过</value></data>
@@ -1686,6 +1706,7 @@
   <data name="Update_JustChecked" xml:space="preserve"><value>刚刚检查过</value></data>
   <data name="Update_NetworkFailed" xml:space="preserve"><value>无法连接 GitHub，请检查网络后重试</value></data>
   <data name="Update_NeverChecked" xml:space="preserve"><value>尚未检查</value></data>
+  <data name="Update_OpenDownloadPage" xml:space="preserve"><value>打开下载页</value></data>
   <data name="Update_RateLimited" xml:space="preserve"><value>GitHub 暂时限制了检查次数，请稍后重试</value></data>
   <data name="Update_ReadyNotification" xml:space="preserve"><value>Pane {0} 已下载完成，可在 设置 → 关于 中重启更新</value></data>
   <data name="Update_ReadyVersion" xml:space="preserve"><value>{0} 已下载完成</value></data>
@@ -2007,6 +2028,13 @@
   <data name="DialogSearch_FillName" xml:space="preserve"><value>填入文件名</value></data>
   <data name="DialogSearch_SaveHere" xml:space="preserve"><value>保存到此处</value></data>
   <data name="DialogSearch_UseName" xml:space="preserve"><value>使用此文件名</value></data>
+  <data name="DialogSearch_ViewAllHint" xml:space="preserve"><value>查看全部</value></data>
+  <data name="Files_DialogTarget" xml:space="preserve"><value>「{0}」对话框 · {1}</value></data>
+  <data name="Files_DialogTargetNoApp" xml:space="preserve"><value>「{0}」对话框</value></data>
+  <data name="Files_DialogOpen" xml:space="preserve"><value>打开</value></data>
+  <data name="Files_DialogSave" xml:space="preserve"><value>另存为</value></data>
+  <data name="Files_DialogFolder" xml:space="preserve"><value>选择文件夹</value></data>
+  <data name="Files_ExitDialog" xml:space="preserve"><value>不再为对话框选择</value></data>
   <data name="Settings_DialogSearch" xml:space="preserve"><value>搜索</value></data>
   <data name="Settings_DialogSearch_Show" xml:space="preserve"><value>在对话框下方显示搜索框</value></data>
   <data name="Settings_DialogSearch_ShowDescription" xml:space="preserve"><value>「打开 / 另存为」对话框出现时在其下方显示搜索框；对话框位于前台时，按启动器热键可直接开始搜索</value></data>

@@ -10,7 +10,7 @@ public sealed partial class App
     public void ShowMemo(string? noteId,bool create)
     {
         if(Notes is not { } store)return;
-        Present(SecondaryId.Memo,Strings.Memo_Title,()=>new MemoView(store,secondaryActions!),v=>{var m=(MemoView)v;if(create)m.OpenNew();else m.OpenNote(noteId);});
+        Present(SecondaryId.Memo,Strings.Memo_Title,()=>{var v=new MemoView(store,secondaryActions!);v.ManageTags+=(_,_)=>OpenSettings("memo");return v;},v=>{var m=(MemoView)v;if(create)m.OpenNew();else m.OpenNote(noteId);});
     }
 
     // 备忘录热键：窗口开着且在前台就收起，否则打开并新建一条（同启动器、剪贴板热键再按收起）
@@ -36,16 +36,32 @@ public sealed partial class App
                 "常用地址\n上海市浦东新区张江路 123 号 4 栋 501 室\n邮编 201203，电话 138 0013 8000"})
                 store.Add(text);
             if(store.All.FirstOrDefault(n=>n.Title=="常用地址") is { } pin)store.SetPinned(pin.Id,true); // 不翻译：演示数据
+            // 标签（144）：照原型的示例
+            foreach(var (name,color) in new (string,int?)[]{("工作",1),("生活",3),("待办",4),("读书",null),("灵感",6)})store.CreateTag(name,color); // 不翻译：演示数据
+            foreach(var n in store.All){
+                string[] tags=n.Title switch{"常用地址"=>["生活"],"周五评审要带的"=>["工作","待办"],"Wi-Fi 密码"=>["工作"],"读书笔记"=>["读书","灵感"],_=>n.Title.StartsWith("买",StringComparison.Ordinal)?["生活","待办"]:[]}; // 不翻译：演示数据
+                if(tags.Length>0)store.SetTags(n.Id,tags);
+            }
         }
         var second=store.All.FirstOrDefault(n=>n.Title.StartsWith("周五",StringComparison.Ordinal))?.Id; // 不翻译：演示数据
         if(create)ShowMemo(null,create:true);else ShowMemo(second,create:false);
     }
 
     /// <summary>把一段文字直接存成一条新备忘录（启动器「bw 内容」、剪贴板 / 分词的「存为备忘录」），屏幕中间提示一句「已存为备忘录」。空白文字不存。</summary>
-    public bool SaveToMemo(string text)
+    public bool SaveToMemo(string text)=>SaveToMemo(text,[]);
+
+    /// <summary>剪贴板「存为备忘录」（144）：带上那条的标签；备忘录里没有的按剪贴板标签的色点新建，同名的直接用。</summary>
+    public bool SaveToMemo(string text,IReadOnlyList<string> tags)
     {
         if(Notes is not { } store||string.IsNullOrWhiteSpace(text))return false;
-        try{store.Add(text.Trim('\r','\n'));}
+        try{
+            if(tags.Count==0)store.Add(text.Trim('\r','\n'));
+            else{
+                var colors=new Dictionary<string,int?>(StringComparer.OrdinalIgnoreCase);
+                try{foreach(var t in ClipboardHistory.Tags())colors[t.Name]=t.Color;}catch(Exception){}
+                store.Add(text.Trim('\r','\n'),tags,colors);
+            }
+        }
         catch(Exception ex){System.Diagnostics.Trace.WriteLine(ex);return false;}
         gestures?.Hint(new(GestureHintKind.Notice,[],CommandName:Strings.Memo_Saved));
         return true;

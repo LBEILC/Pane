@@ -28,7 +28,7 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
     readonly List<(string Id, Border Row)> rows = [];
     string? selected;           // 选中的 id；DraftId = 新建的空白；null = 没有选中
     string draftText = "";
-    bool preview, topmost, loading;
+    bool preview, topmost, loading, loadingQuery;
     Note? deleted;
     MarkdownStyle? style;
 
@@ -37,8 +37,7 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         InitializeComponent();
         this.store = store;
         this.output = output;
-        KeyHints.Fill(Hints, [(["Ctrl", "+", "N"], Strings.Memo_New), (["Ctrl", "+", "F"], Strings.Common_Search), (["Ctrl", "+", "E"], Strings.Memo_Preview), (["Ctrl", "+", "P"], Strings.Memo_Pin)],
-            HintLabelProto, KbdProto);
+        FillHints();
         saveTimer.Tick += (_, _) => { saveTimer.Stop(); SaveNow(); };
         undoTimer.Tick += (_, _) => { undoTimer.Stop(); UndoBar.Visibility = Visibility.Collapsed; deleted = null; };
         copiedTimer.Tick += (_, _) => { copiedTimer.Stop(); CopyIcon.Glyph = "copy"; };
@@ -57,7 +56,7 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
     public UIElement? DragRegion => Head;
     public void OnShowing(PanelShowContext context) { }
     public void OnShown() { if (selected == DraftId || selected != null && !preview) FocusEditor(); else Query.Focus(FocusState.Programmatic); }
-    public void OnHidden() { SaveNow(); DropDraft(); }
+    public void OnHidden() { SaveNow(); if (tagMode) LeaveTags(); DropDraft(); }
 
     void OnUnloaded(object sender, RoutedEventArgs e) => Dispose();
     public void Dispose()
@@ -92,22 +91,25 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         selected = id != null && store.All.Any(n => n.Id == id) ? id : store.All.FirstOrDefault()?.Id;
         Render();
         if (selected != null && !preview) FocusEditor();
+        if (Environment.GetEnvironmentVariable("PANE_DESIGN_MEMO_TAGS") == "1") EnterTags();   // 设计预览：直接打开标签选择（截图脚本按不了 Ctrl+T）
     }
 
     // ---------------- 列表 ----------------
 
     IReadOnlyList<Note> Visible()
     {
-        var q = Query.Text.Trim();
-        var all = store.All;
-        if (q.Length == 0) return all;
-        var hits = store.Search(q, 200).Select(m => m.Note.Id).ToHashSet();
+        var q = tagMode ? savedQuery.Trim() : Query.Text.Trim();
+        IEnumerable<Note> all = store.All;
+        if (filterTag is { } tag) all = all.Where(n => n.Tags.Any(t => Same(t, tag)));   // 标签筛选（144）
+        if (q.Length == 0) return all.ToList();
+        var hits = store.Search(q, 200).Select(m => m.Note.Id).ToHashSet();   // 搜索框里的 #标签 由存储认
         return all.Where(n => hits.Contains(n.Id)).ToList();
     }
 
     void Render()
     {
-        RenderList();
+        RenderFilter();
+        if (tagMode) RenderTags(); else RenderList();
         RenderMain();
     }
 
@@ -130,7 +132,7 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         if (draft) AddRow(null, draftText);   // 新建的一条在「全部」最上面（固定的始终在前，同原型）
         foreach (var n in others) AddRow(n, n.Text);
         ListEmpty.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        ListEmpty.Text = !any ? Strings.Memo_Empty : string.Format(Strings.Memo_NotFound, (object?)q);
+        ListEmpty.Text = !any ? Strings.Memo_Empty : q.Length == 0 && filterTag != null ? Strings.Memo_TagEmpty : string.Format(Strings.Memo_NotFound, (object?)q);
         CountText.Text = store.All.Count > 0 ? string.Format(Strings.Memo_Count, (object?)store.All.Count) : "";
     }
 
@@ -153,9 +155,15 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         var rest = Rest(text);
         if (note?.From is { } from) rest = string.Format(Strings.Memo_From, (object?)from) + " · " + rest;
         var p = new TextBlock { Text = rest.Length > 0 ? rest : " ", TextTrimming = TextTrimming.CharacterEllipsis, TextWrapping = TextWrapping.NoWrap,
-            FontFamily = SubProto.FontFamily, FontSize = SubProto.FontSize, Foreground = SubProto.Foreground };
-        Grid.SetRow(p, 1); Grid.SetColumnSpan(p, 2);
-        grid.Children.Add(t); grid.Children.Add(w); grid.Children.Add(p);
+            FontFamily = SubProto.FontFamily, FontSize = SubProto.FontSize, Foreground = SubProto.Foreground, VerticalAlignment = VerticalAlignment.Center };
+        // 第二行：正文预览 + 标签小片（144，最多 2 个，其余 +N）
+        var line = new Grid { ColumnSpacing = 4 };
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        line.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        line.Children.Add(p);
+        if (note is { Tags.Count: > 0 }) { var pills = Pills(note.Tags, 2); Grid.SetColumn(pills, 1); line.Children.Add(pills); }
+        Grid.SetRow(line, 1); Grid.SetColumnSpan(line, 2);
+        grid.Children.Add(t); grid.Children.Add(w); grid.Children.Add(line);
         var row = new Border { Padding = new Thickness(10, 8, 10, 8), CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), Child = grid };
         Paint(row, id == selected, false);
         row.PointerEntered += (_, _) => Paint(row, id == selected, true);
@@ -213,7 +221,9 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         var note = Current;
         bool draft = selected == DraftId;
         bool has = note != null || draft;
-        foreach (var b in new[] { NotePinButton, PreviewButton, CopyButton, DeleteButton }) b.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        foreach (var b in new[] { TagButton, NotePinButton, PreviewButton, CopyButton, DeleteButton }) b.Visibility = has ? Visibility.Visible : Visibility.Collapsed;
+        TagButton.IsEnabled = note != null;   // 新建的空白还没存，有字以后才能打标签
+        FillPills(MetaTags, note?.Tags ?? [], 4, name => { if (tagMode) LeaveTags(); FilterBy(name); });
         NoneText.Visibility = has ? Visibility.Collapsed : Visibility.Visible;
         NoneText.Text = store.All.Count == 0 ? Strings.Memo_Empty : "";
         Editor.Visibility = has && !preview ? Visibility.Visible : Visibility.Collapsed;
@@ -256,7 +266,8 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
             // 第一次有字：交给存储，变成真正的一条
             if (draftText.Trim().Length > 0)
             {
-                try { var n = store.Add(draftText); selected = n.Id; draftText = ""; RenderList(); RenderMainMeta(); return; }
+                // 正在按某个标签看时，新建的那条先带上它（144）
+                try { var n = filterTag is { } tag ? store.Add(draftText, [tag]) : store.Add(draftText); selected = n.Id; draftText = ""; RenderList(); RenderMainMeta(); return; }
                 catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex); }
             }
             UpdateCurrentRow(EditorText);
@@ -274,7 +285,7 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         var title = TitleOf(text);
         if (g.Children[0] is TextBlock t) { t.Text = title.Length > 0 ? title : Strings.Memo_Untitled; t.FontWeight = title.Length > 0 ? FontWeights.SemiBold : FontWeights.Normal; t.Foreground = title.Length > 0 ? TitleProto.Foreground : SubProto.Foreground; }
         if (g.Children[1] is TextBlock w) w.Text = Files.FileKinds.When(DateTimeOffset.Now);
-        if (g.Children[2] is TextBlock p) { var r = Rest(text); p.Text = r.Length > 0 ? r : " "; }
+        if (g.Children[2] is Grid line && line.Children[0] is TextBlock p) { var r = Rest(text); p.Text = r.Length > 0 ? r : " "; }
         Meta.Text = string.Format(Strings.Memo_EditedAt, (object?)Files.FileKinds.When(DateTimeOffset.Now));
     }
 
@@ -283,6 +294,8 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
     {
         var note = Current;
         NotePinIcon.IsFilled = note?.Pinned == true;
+        TagButton.IsEnabled = note != null;
+        FillPills(MetaTags, note?.Tags ?? [], 4, name => FilterBy(name));
         Meta.Text = string.Format(Strings.Memo_EditedAt, (object?)Files.FileKinds.When(note?.Modified ?? DateTimeOffset.Now));
     }
 
@@ -381,6 +394,8 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
 
     void OnQueryChanged(object sender, TextChangedEventArgs e)
     {
+        if (loadingQuery) return;
+        if (tagMode) { tagSel = 0; RenderTags(); return; }
         var list = Visible();
         if (selected is { Length: > 0 } id && list.All(n => n.Id != id)) { SaveNow(); selected = list.FirstOrDefault()?.Id; }
         Render();
@@ -393,6 +408,20 @@ public sealed partial class MemoView : UserControl, ISecondaryView, IDisposable
         bool ctrl = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
         bool inQuery = Query.FocusState != FocusState.Unfocused;
         bool inEditor = Editor.FocusState != FocusState.Unfocused;
+        // 标签选择（144）：↑↓ 选、Enter 打上 / 去掉、Esc 或 Ctrl+T 完成；打字筛选（搜索框）
+        if (e.Key == VirtualKey.T && ctrl) { if (tagMode) LeaveTags(); else EnterTags(); e.Handled = true; return; }
+        if (tagMode)
+        {
+            switch (e.Key)
+            {
+                case VirtualKey.Escape: LeaveTags(); break;
+                case VirtualKey.Down or VirtualKey.Up: tagSel += e.Key == VirtualKey.Down ? 1 : -1; RenderTags(); break;
+                case VirtualKey.Enter: ToggleTag(tagSel); break;
+                default: return;
+            }
+            e.Handled = true;
+            return;
+        }
         switch (e.Key)
         {
             case VirtualKey.N when ctrl: OpenNew(); break;

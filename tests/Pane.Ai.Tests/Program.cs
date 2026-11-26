@@ -36,6 +36,10 @@ internal static partial class Program
         store.Load();Check(store.Current.Ai.Actions.Length==4&&!Directory.GetFiles(directory,"*.bad-*").Any(),"old settings");
         foreach(var bad in new[]{settings with{Endpoints=[FixtureEndpoint("file:///x")]},settings with{ProxyUrl="invalid"},settings with{Actions=[new("x","x","x","x"),new("x","y","y","y")]},settings with{Actions=[new("","x","x","x")]},settings with{Actions=[new("x","","x","x")]},settings with{Actions=[new("x","x","x","")]}})await Error<ArgumentException>(()=>{store.Save(store.Current with{Ai=bad});return Task.CompletedTask;},"validation");
         await using var server=new FakeServer();
+        foreach (string name in new[]{AiService.KeyFile(store.Current.Ai.CurrentEndpoint.Id),"ai-account.bin"})
+            File.WriteAllBytes(Path.Combine(store.DirectoryPath,name),System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
+        using (var copied=new AiService(store))
+            Check(copied.ApiKeyMask==null && copied.Account==null,"换机后服务商密钥和账号视为空");
         using var ai=new AiService(store,new(){Api=server.Url,Issuer=server.Url,OpenBrowser=server.Browser});
         int events=0;ai.StatusChanged+=(_,_)=>events++;
         Check(ai.Status==AiStatus.NotConfigured,"not configured");

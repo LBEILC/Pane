@@ -112,34 +112,36 @@
             </Grid.ColumnDefinitions>
 
             <!-- 左：预设（展开时）、规则卡片、添加规则 -->
-            <ScrollViewer x:Name="RulesScroller" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0"
-                          VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Padding="10,10,10,12">
-                    <Border x:Name="PresetBox" Visibility="Collapsed" Margin="0,0,0,10" Padding="10,8,8,10" CornerRadius="{StaticResource PaneRadiusItem}"
-                            Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
-                        <StackPanel Spacing="6">
-                            <TextBlock Text="{x:Bind loc:Strings.Rename_ApplyPresetHint}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
-                            <c:WrapPanel x:Name="PresetList" HorizontalSpacing="6" VerticalSpacing="6"/>
-                        </StackPanel>
-                    </Border>
-                    <StackPanel x:Name="RulesPanel" Spacing="8"/>
-                    <Button x:Name="AddRuleButton" Margin="0,8,0,0" HorizontalAlignment="Stretch" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlMd}" Click="OnAddRule">
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                            <c:PaneIcon x:Name="AddRuleIcon" Glyph="plus" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}" RenderTransformOrigin="0.5,0.5">
-                                <c:PaneIcon.RenderTransform><RotateTransform x:Name="AddRuleTurn"/></c:PaneIcon.RenderTransform>
-                            </c:PaneIcon>
-                            <TextBlock x:Name="AddRuleText" Text="{x:Bind loc:Strings.Rename_AddRule}" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
-                        </StackPanel>
-                    </Button>
-                    <!-- 添加规则：就地展开七种规则（不弹菜单），点一种加到最后 -->
-                    <Grid x:Name="KindGrid" Visibility="Collapsed" Margin="0,6,0,0" ColumnSpacing="6" RowSpacing="6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                    </Grid>
-                </StackPanel>
-            </ScrollViewer>
+            <c:ScrollFade>
+                <ScrollViewer x:Name="RulesScroller" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0"
+                              VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Padding="10,10,10,12">
+                        <Border x:Name="PresetBox" Visibility="Collapsed" Margin="0,0,0,10" Padding="10,8,8,10" CornerRadius="{StaticResource PaneRadiusItem}"
+                                Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="{x:Bind loc:Strings.Rename_ApplyPresetHint}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                                <c:WrapPanel x:Name="PresetList" HorizontalSpacing="6" VerticalSpacing="6"/>
+                            </StackPanel>
+                        </Border>
+                        <StackPanel x:Name="RulesPanel" Spacing="8"/>
+                        <Button x:Name="AddRuleButton" Margin="0,8,0,0" HorizontalAlignment="Stretch" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlMd}" Click="OnAddRule">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <c:PaneIcon x:Name="AddRuleIcon" Glyph="plus" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}" RenderTransformOrigin="0.5,0.5">
+                                    <c:PaneIcon.RenderTransform><RotateTransform x:Name="AddRuleTurn"/></c:PaneIcon.RenderTransform>
+                                </c:PaneIcon>
+                                <TextBlock x:Name="AddRuleText" Text="{x:Bind loc:Strings.Rename_AddRule}" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                            </StackPanel>
+                        </Button>
+                        <!-- 添加规则：就地展开七种规则（不弹菜单），点一种加到最后 -->
+                        <Grid x:Name="KindGrid" Visibility="Collapsed" Margin="0,6,0,0" ColumnSpacing="6" RowSpacing="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </c:ScrollFade>
 
             <!-- 右：预览 -->
             <Grid Grid.Column="1">
@@ -163,12 +165,14 @@
                     </Button>
                 </Grid>
                 <Grid x:Name="PreviewArea" Grid.Row="1" AllowDrop="True" Background="Transparent" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnDrop">
-                    <ScrollViewer x:Name="PreviewScroller" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="8,6,8,10">
-                        <Grid>
-                            <Canvas x:Name="RowHoverLayer" IsHitTestVisible="False"/>
-                            <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource RowTemplate}" PointerMoved="OnListPointerMoved" PointerExited="OnListPointerExited" Tapped="OnListTapped"/>
-                        </Grid>
-                    </ScrollViewer>
+                    <c:ScrollFade>
+                        <ScrollViewer x:Name="PreviewScroller" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" Padding="8,6,8,10">
+                            <Grid>
+                                <Canvas x:Name="RowHoverLayer" IsHitTestVisible="False"/>
+                                <ItemsRepeater x:Name="List" ItemTemplate="{StaticResource RowTemplate}" PointerMoved="OnListPointerMoved" PointerExited="OnListPointerExited" Tapped="OnListTapped"/>
+                            </Grid>
+                        </ScrollViewer>
+                    </c:ScrollFade>
                     <StackPanel x:Name="EmptyBox" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Padding="24,0,24,0">
                         <Border Width="52" Height="52" CornerRadius="14" HorizontalAlignment="Center"
                                 Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">

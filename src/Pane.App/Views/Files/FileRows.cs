@@ -97,7 +97,10 @@ public sealed partial class CategoryItem : INotifyPropertyChanged
     public bool IsSelected { get => selected; set { if (selected == value) return; selected = value; Changed(nameof(SelectedVisibility)); Changed(nameof(Weight)); Changed(nameof(TextOpacity)); } }
     public Visibility SelectedVisibility => selected ? Visibility.Visible : Visibility.Collapsed;
     public Windows.UI.Text.FontWeight Weight => selected ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
-    public double TextOpacity => selected ? 1 : 0.78;   // 未选中用次要文字的观感（同一支画刷降不透明度）
+    public double TextOpacity => !enabled ? 0.4 : selected ? 1 : 0.78;   // 未选中用次要文字的观感（同一支画刷降不透明度）；不可用的再淡
+    bool enabled = true;
+    /// <summary>为「选择文件夹」对话框选时，文件夹以外的分类不可用（任务 125）：变淡、点了不切、Tab 跳过。</summary>
+    public bool Enabled { get => enabled; set { if (enabled == value) return; enabled = value; Changed(nameof(TextOpacity)); } }
     public event PropertyChangedEventHandler? PropertyChanged;
     void Changed(string n) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(n));
 }

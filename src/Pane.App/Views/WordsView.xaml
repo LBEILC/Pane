@@ -50,13 +50,15 @@
         </Grid>
 
         <!-- 词块 -->
-        <ScrollViewer x:Name="Scroller" Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-            <StackPanel Padding="18,16,18,16" Spacing="10">
-                <c:WrapPanel x:Name="Chips" HorizontalSpacing="6" VerticalSpacing="6" Background="Transparent"
-                             PointerPressed="OnChipsPressed" PointerMoved="OnChipsMoved" PointerReleased="OnChipsReleased" PointerCaptureLost="OnChipsCaptureLost"/>
-                <TextBlock x:Name="Notice" Visibility="Collapsed" TextWrapping="Wrap" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
-            </StackPanel>
-        </ScrollViewer>
+        <c:ScrollFade Grid.Row="1">
+            <ScrollViewer x:Name="Scroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                <StackPanel Padding="18,16,18,16" Spacing="10">
+                    <c:WrapPanel x:Name="Chips" HorizontalSpacing="6" VerticalSpacing="6" Background="Transparent"
+                                 PointerPressed="OnChipsPressed" PointerMoved="OnChipsMoved" PointerReleased="OnChipsReleased" PointerCaptureLost="OnChipsCaptureLost"/>
+                    <TextBlock x:Name="Notice" Visibility="Collapsed" TextWrapping="Wrap" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                </StackPanel>
+            </ScrollViewer>
+        </c:ScrollFade>
 
         <!-- 操作行（组件库 .w2-actions） -->
         <Grid Grid.Row="2" MinHeight="52" Padding="18,0,12,0" ColumnSpacing="10" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">

@@ -21,10 +21,11 @@ internal sealed partial class DataStorage
     static void ExportNotes(string folder,Dictionary<string,byte[]> contents,Dictionary<string,string> bodies)
     {
         if (!Directory.Exists(folder)) return;
-        var rows = NoteDisk.Scan(folder);
-        if (rows.Length == 0) return;
-        NoteDisk.SaveIndex(folder,rows);
-        contents.Add("memo/"+NoteDisk.Index,File.ReadAllBytes(Path.Combine(folder,NoteDisk.Index)));
+        var index = NoteDisk.ScanIndex(folder);
+        var rows = index.Rows;
+        if (rows.Length == 0 && index.Definitions.Length == 0) return;
+        NoteDisk.SaveIndex(folder,index);
+        contents.Add("memo/"+NoteDisk.Index,NoteDisk.Encode(index with { FileIds = null }));
         foreach (var row in rows) bodies.Add("memo/"+row.FileName,Path.Combine(folder,row.FileName));
     }
 
@@ -41,7 +42,8 @@ internal sealed partial class DataStorage
         string source = Path.Combine(pending,"memo");
         if (!Directory.Exists(source)) return;
         string target = MemoFolder(data);
-        var local = NoteDisk.Scan(target).ToDictionary(r => r.Id);
+        var current = NoteDisk.ScanIndex(target);
+        var local = current.Rows.ToDictionary(r => r.Id);
         var occupied = local.Values.Select(r => r.FileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var row in ImportNotes(source))
         {
@@ -61,7 +63,7 @@ internal sealed partial class DataStorage
             writes[Path.Combine(target,name)] = body;
         }
         string index = Path.Combine(output,NoteDisk.Index);
-        NoteDisk.Atomic(index,NoteDisk.Encode(local.Values),true);
+        NoteDisk.Atomic(index,NoteDisk.Encode(NoteDisk.MergeIndex(local.Values,current,NoteDisk.Read(source))),true);
         writes[Path.Combine(target,NoteDisk.Index)] = index;
     }
 }

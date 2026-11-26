@@ -6,9 +6,19 @@ internal static class Program
     [STAThread] static void Main()
     {
         var args=Environment.GetCommandLineArgs().Skip(1).ToArray();
-        Pane.Hosting.SetupCrashDiagnostics.Install(args);
+        var mode = Pane.Hosting.RuntimeMode.Current;
+        if (mode.IsPortable)
+        {
+            Environment.ExitCode = mode.CheckWritable(AppContext.BaseDirectory, folder => {
+                Pane.Hosting.SetupEntry.InitializeLanguage(mode.DataDirectory);
+                MessageBoxW(0, string.Format(Pane.Localization.Strings.Startup_PortableReadOnly, folder), "Pane", 0x10);
+            });
+            if (Environment.ExitCode != 0) return;
+            if (args is ["--portable-probe"]) { RunApplication(); return; }
+        }
+        else Pane.Hosting.SetupCrashDiagnostics.Install(args);
         Pane.Hosting.StartupDirectory.Initialize(args);
-        if(Pane.Hosting.SetupEntry.TryRun(args,RunApplication))return;
+        if(!mode.IsPortable && Pane.Hosting.SetupEntry.TryRun(args,RunApplication))return;
         if(args.FirstOrDefault()=="--launcher-index") { Environment.ExitCode=Pane.Services.Launcher.IndexWorker.Run(args);return; }
         var command=Pane.Hosting.LaunchArguments.Parse(args);if(command==Pane.Hosting.LaunchCommand.Invalid){Environment.ExitCode=2;return;}
         try {Pane.Hosting.AutostartDiagnostics.Begin(command);Pane.Hosting.RestartProcess.WaitForParent();bool entered=Pane.Hosting.SingleInstance.Enter(command);Pane.Hosting.AutostartDiagnostics.AfterSingleInstance(command,entered);if(!entered)return;if(Pane.App.TryStartupUpdate())return;Pane.Hosting.NativeCrashRecovery.Start();RunApplication();}
@@ -19,6 +29,9 @@ internal static class Program
             catch(Exception error){if(Pane.Hosting.RuntimeMode.Current.IsProduction)new Pane.Hosting.CrashLog(Pane.Hosting.RuntimeMode.Current.DataDirectory).Write(error);Environment.ExitCode=1;}
         }
     }
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet=System.Runtime.InteropServices.CharSet.Unicode, ExactSpelling=true)]
+    static extern int MessageBoxW(nint owner, string message, string title, uint flags);
+
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
     static void RunApplication()
     {

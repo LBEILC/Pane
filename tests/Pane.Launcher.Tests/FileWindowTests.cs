@@ -21,11 +21,11 @@ static partial class Program
         var page=await service.SearchAsync(new("test",FileCategory.Text,FileSort.Modified),50,50,default);
         Check(ipc.Calls.Single()==("<test> file: ext:"+FileSearch.Extensions[FileCategory.Text].Replace(' ',';'),50,50,14),"filter paging sort");
         Check(page.Total==123&&page.Items[0].Size==12&&page.Items[0].Modified==DateTimeOffset.UnixEpoch&&page.Items[0].Highlights!.SequenceEqual([new TextSpan(0,4)]),"metadata and highlight");
-        ipc.Calls.Clear();page=await service.SearchAsync(new("test",FileCategory.All,FileSort.Relevance),0,50,default);
-        Check(page.Counts?.Count==12&&page.Counts.Values.All(v=>v==123)&&ipc.Calls.Count==12,"all counts");
-        Check(ipc.Calls[0]==("test",0,50,1)&&ipc.Calls.Skip(1).All(c=>c.Count==0),"counts no rows");
+        ipc.Calls.Clear();page=await service.SearchAsync(new("test",FileCategory.All,FileSort.Relevance),0,1,default);
+        Check(page.Counts?.Count==12&&page.Counts.Values.All(v=>v==123)&&ipc.Calls.Count(c=>c.Count==0)==11,"all counts");
+        Check(ipc.Calls[0]==("test",0,512,1)&&ipc.Calls.Skip(3).All(c=>c.Count==0),"counts no rows");
         Check((await service.SearchAsync(new("",FileCategory.All,FileSort.Relevance),0,50,default)).Total==0,"empty");
-        ipc.Unavailable=true;try{await service.SearchAsync(new("test",FileCategory.All,FileSort.Relevance),0,50,default);Check(false,"unavailable");}catch(FileSearchUnavailableException){Check(true,"unavailable");}
+        ipc.Unavailable=true;try{await service.SearchAsync(new("uncached",FileCategory.All,FileSort.Relevance),0,50,default);Check(false,"unavailable");}catch(FileSearchUnavailableException){Check(true,"unavailable");}
         using(var cancelled=new CancellationTokenSource()){cancelled.Cancel();try{await service.SearchAsync(new("test",FileCategory.All,FileSort.Relevance),0,50,cancelled.Token);Check(false,"cancel");}catch(OperationCanceledException){Check(true,"cancel");}}
         await service.OpenAsync(@"C:\fixture.txt",default);await service.RevealAsync(@"C:\fixture.txt",default);Check(executor.Calls.Count==2,"file executor");
         string dir=Path.Combine(Path.GetTempPath(),"pane021-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(dir);

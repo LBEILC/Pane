@@ -29,6 +29,9 @@ internal sealed class SecretStore(string directory)
             var path=Path.Combine(directory,name);if(!File.Exists(path))return null;
             byte[] plain=Transform(File.ReadAllBytes(path),false);
             try{return Encoding.UTF8.GetString(plain);}finally{CryptographicOperations.ZeroMemory(plain);}
+        }catch(AiCredentialException){
+            new SelectionLog(directory, "credentials.log").Write("DPAPI: credential unavailable");
+            return null;
         }catch(Exception e) when(e is IOException or UnauthorizedAccessException){throw new AiCredentialException(Strings.Ai_CredentialsReadFailed);}
     }
     internal void Write(string name,string? value)

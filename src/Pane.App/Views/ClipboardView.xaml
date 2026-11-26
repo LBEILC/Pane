@@ -257,50 +257,52 @@
         <!-- 列表 -->
         <Grid Grid.Row="3">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
-            <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                <Grid x:Name="ListContent" Padding="8,4,8,8">
-                    <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
-                    <ItemsControl x:Name="Sections" ItemTemplate="{StaticResource SectionTemplate}" IsTabStop="False"/>
-                    <TextBlock x:Name="Empty" Text="{x:Bind loc:Strings.Clipboard_NoMatches}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,24,0,24"
-                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
-                    <!-- 就地模式（2026-11-23）：操作列表、标签选择、编辑。进来时列表收起，这一块出来 -->
-                    <StackPanel x:Name="ModePanel" Visibility="Collapsed">
-                        <TextBlock x:Name="ModeLabel" Style="{StaticResource PaneGroupLabel}" TextTrimming="CharacterEllipsis"/>
-                        <ItemsControl x:Name="OpList" ItemTemplate="{StaticResource OpTemplate}" IsTabStop="False"/>
-                        <TextBlock x:Name="ModeEmpty" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,18,0,18"
+            <c:ScrollFade Thumb="False">
+                <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                    <Grid x:Name="ListContent" Padding="8,4,8,8">
+                        <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
+                        <ItemsControl x:Name="Sections" ItemTemplate="{StaticResource SectionTemplate}" IsTabStop="False"/>
+                        <TextBlock x:Name="Empty" Text="{x:Bind loc:Strings.Clipboard_NoMatches}" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,24,0,24"
                                    FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
-                        <!-- 标签选择下面一句：有标签的内容长期保存 -->
-                        <Grid x:Name="ModeNote" Visibility="Collapsed" Margin="12,8,12,0" Padding="0,8,0,0" ColumnSpacing="6" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <c:PaneIcon Glyph="info" Width="13" Height="13" Margin="0,2,0,0" VerticalAlignment="Top" Foreground="{ThemeResource PaneText3Brush}"/>
-                            <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Clipboard_TagKeepHint}" TextWrapping="Wrap" LineHeight="17"
-                                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
-                        </Grid>
-                        <!-- 编辑：这一条的文字放进编辑框（最高 240 后框内滚动），下面说明 + 放弃 / 保存 / 保存并粘贴 -->
-                        <StackPanel x:Name="EditPanel" Visibility="Collapsed" Padding="12,4,12,0" Spacing="8">
-                            <TextBox x:Name="Editor" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="240"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
-                                     FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" PreviewKeyDown="OnEditorKeyDown"/>
-                            <Grid ColumnSpacing="8">
+                        <!-- 就地模式（2026-11-23）：操作列表、标签选择、编辑。进来时列表收起，这一块出来 -->
+                        <StackPanel x:Name="ModePanel" Visibility="Collapsed">
+                            <TextBlock x:Name="ModeLabel" Style="{StaticResource PaneGroupLabel}" TextTrimming="CharacterEllipsis"/>
+                            <ItemsControl x:Name="OpList" ItemTemplate="{StaticResource OpTemplate}" IsTabStop="False"/>
+                            <TextBlock x:Name="ModeEmpty" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,18,0,18"
+                                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
+                            <!-- 标签选择下面一句：有标签的内容长期保存 -->
+                            <Grid x:Name="ModeNote" Visibility="Collapsed" Margin="12,8,12,0" Padding="0,8,0,0" ColumnSpacing="6" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,1,0,0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock x:Name="EditNote" Text="{x:Bind loc:Strings.Clipboard_EditRichNote}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                <c:PaneIcon Glyph="info" Width="13" Height="13" Margin="0,2,0,0" VerticalAlignment="Top" Foreground="{ThemeResource PaneText3Brush}"/>
+                                <TextBlock Grid.Column="1" Text="{x:Bind loc:Strings.Clipboard_TagKeepHint}" TextWrapping="Wrap" LineHeight="17"
                                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
-                                    <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Clipboard_Discard}" Click="OnEditCancel"/>
-                                    <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Common_Save}" Click="OnEditSave"/>
-                                    <Button Style="{StaticResource PanePrimaryButton}" Height="28" Content="{x:Bind loc:Strings.Clipboard_SaveAndPaste}" Click="OnEditPaste"/>
-                                </StackPanel>
                             </Grid>
+                            <!-- 编辑：这一条的文字放进编辑框（最高 240 后框内滚动），下面说明 + 放弃 / 保存 / 保存并粘贴 -->
+                            <StackPanel x:Name="EditPanel" Visibility="Collapsed" Padding="12,4,12,0" Spacing="8">
+                                <TextBox x:Name="Editor" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="240"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto" IsSpellCheckEnabled="False" IsTextPredictionEnabled="False"
+                                         FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" PreviewKeyDown="OnEditorKeyDown"/>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="EditNote" Text="{x:Bind loc:Strings.Clipboard_EditRichNote}" VerticalAlignment="Center" TextWrapping="Wrap"
+                                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                        <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Clipboard_Discard}" Click="OnEditCancel"/>
+                                        <Button Style="{StaticResource PaneTextButton}" Content="{x:Bind loc:Strings.Common_Save}" Click="OnEditSave"/>
+                                        <Button Style="{StaticResource PanePrimaryButton}" Height="28" Content="{x:Bind loc:Strings.Clipboard_SaveAndPaste}" Click="OnEditPaste"/>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
                         </StackPanel>
-                    </StackPanel>
-                </Grid>
-            </ScrollViewer>
+                    </Grid>
+                </ScrollViewer>
+            </c:ScrollFade>
         </Grid>
 
         <!-- 快捷键提示：只在「常驻显示」时出现（2026-11-23，默认收起为按钮） -->

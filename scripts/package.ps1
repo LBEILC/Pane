@@ -69,7 +69,19 @@ $installer=Join-Path $dist "Pane 安装 $version.exe"
 Copy-Item -LiteralPath "$work/wrapper/Pane.Setup.exe" -Destination $installer -Force
 $releaseInstaller=Join-Path $dist "Pane-Setup-$version.exe"
 Copy-Item -LiteralPath $installer -Destination $releaseInstaller -Force
-$attachments=@($releaseInstaller)+@(& "$PSScriptRoot/release-patches.ps1" -Stage $stage -Dist $dist -Version $version -SkipHistory:$SkipPatchHistory)
+$portableName="Pane-Portable-$version.zip"
+$portableRoot=Join-Path $work 'portable-stage/Pane'
+New-Item -ItemType Directory -Path (Split-Path $portableRoot -Parent) | Out-Null
+Copy-Item -LiteralPath $stage -Destination $portableRoot -Recurse
+[IO.File]::WriteAllBytes((Join-Path $portableRoot 'portable'),[byte[]]@())
+$portableZip=Join-Path $work $portableName
+[IO.Compression.ZipFile]::CreateFromDirectory($portableRoot,$portableZip,[IO.Compression.CompressionLevel]::Optimal,$true)
+$restored=Join-Path $work 'portable-check'
+[IO.Compression.ZipFile]::ExtractToDirectory($portableZip,$restored)
+Assert-ForbiddenFiles -Files @(Get-ChildItem -LiteralPath $restored -File -Recurse | ForEach-Object {$_.FullName}) -Rules $rules
+$portable=Join-Path $dist $portableName
+Copy-Item -LiteralPath $portableZip -Destination $portable -Force
+$attachments=@($releaseInstaller,$portable)+@(& "$PSScriptRoot/release-patches.ps1" -Stage $stage -Dist $dist -Version $version -SkipHistory:$SkipPatchHistory)
 $checksums=foreach($file in $attachments){
     $checksum=(Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()
     "$checksum  $([IO.Path]::GetFileName($file))"
@@ -79,7 +91,7 @@ $sums=Join-Path $dist 'SHA256SUMS.txt'
 $raw=Get-ChildItem -LiteralPath $source -Recurse -File | Measure-Object Length -Sum
 $manifest=Join-Path $dist "Pane-Manifest-$version.json"
 Assert-ForbiddenFiles -Files @($installer,$releaseInstaller,$manifest,$sums) -Rules $rules
-foreach($attachment in $attachments | Select-Object -Skip 2){
+foreach($attachment in $attachments | Select-Object -Skip 3){
     if([IO.Path]::GetFileName($attachment) -notmatch ('^Pane-Patch-(\d+\.\d+\.\d+)-'+[regex]::Escape($version)+'\.zip$')){throw "未知附件：$attachment"}
     $from=$Matches[1]
     Assert-ReleasePatch -Patch $attachment -Baseline (Join-Path $dist "payloads/$from") -Manifest $manifest -From $from -To $version -Rules $rules
@@ -99,6 +111,6 @@ foreach($old in $packages){
     try {Remove-LinkSafeTree $old.FullName}catch{Write-Warning "旧打包目录没删掉：$($old.FullName)：$($_.Exception.Message)"}
 }
 $result | ConvertTo-Json
-# 017 将仓库外可执行文件统一认作正式版；未扩展该身份规则前不输出会误用正式数据的绿色版。
+
 
 } finally { $env:CL=$previousCl; $env:_LINK_=$previousLink }

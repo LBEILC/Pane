@@ -4,6 +4,7 @@ using Pane.Localization;
 // - 贴在对话框外的下边缘（间距 8，和对话框同宽、限在 420～756、水平居中）；下面放不下（不到搜索行 + 200）且上面更宽时贴到上边缘外，结果往上展开；
 // - 不激活出现；点击或对话框在前台时按启动器热键才聚焦；失去焦点回到对话框不收起，切到别的程序收起；
 // - 对话框不在前台、最小化、关闭时收起。设置：FolderJumpSettings.SearchBar / OpenOnEnter（FilterByType 由服务处理）。
+// - 「查看全部」（任务 125）：打开文件窗口为这个对话框选；对话框关了或换了一个，文件窗口回到普通模式。选了一项都记进搜索记忆。
 using Pane.Contracts;
 using Pane.Hosting;
 using Pane.Views;
@@ -34,6 +35,8 @@ public sealed partial class App
         if (closing) return;
         var f = Store.Current.FolderJump;
         dialogBarInfo = info;
+        // 文件窗口正在为某个对话框选：那个对话框关了或换了一个，就回到普通文件窗口
+        if (secondaries.TryGetValue(SecondaryId.Files, out var filesPanel) && filesPanel.View is FilesView fv && fv.DialogHandle != 0 && fv.DialogHandle != info?.Dialog) fv.ExitDialog();
         if (info is null || !f.Enabled || !f.SearchBar || info.Minimized) { HideDialogBar(); return; }
         if (!info.Foreground)
         {
@@ -51,9 +54,11 @@ public sealed partial class App
         if (dialogBarPanel != null) return;
         var view = dialogBarView = new DialogSearchView();
         view.Entries = () => folderJump?.Entries() ?? (demo ? DemoFolders : []);
-        view.Search = (q, ext, t) => dialogBarService?.SearchAsync(q, ext, 12, t) ?? Task.FromResult<IReadOnlyList<FileHit>>([]);
+        view.Search = (q, dialog, t) => dialogBarService?.SearchAsync(q, dialog, 12, t) ?? Task.FromResult(new DialogSearchResult([], 0));
         view.LayoutChanged += (_, _) => { if (dialogBarInfo is { } i) PlaceDialogBar(i); };
         view.ReturnFocus += (_, _) => { if (dialogBarInfo is { } i) Native.SetForegroundWindow(i.Dialog); };
+        view.Chosen += (_, x) => SearchMemory?.RecordFile(x.Query, x.Path);
+        view.ViewAll += (_, x) => { if (dialogBarInfo is { } i) ShowFiles(x.Query, x.Focus, i); };
         view.Navigate += async (_, x) =>
         {
             if (dialogBarService is not { } service || dialogBarInfo is not { } i) return;
@@ -68,6 +73,19 @@ public sealed partial class App
         WatchFrames(dialogBarPanel);
         dialogBarPanel.Prepare();
         panels["dialog-search"] = dialogBarPanel;
+    }
+
+    // 文件窗口为对话框选好了：记进搜索记忆，让对话框跳过去，关掉文件窗口，对话框回到前台（同搜索条的 Navigate）
+    async void PickForDialog(FilesView files, FileDialogInfo dialog, string folder, string? fileName, bool confirm, string query, string path)
+    {
+        if (query.Length > 0) SearchMemory?.RecordFile(query, path);
+        if (dialogBarService is { } service)
+        {
+            try { await service.NavigateAsync(dialog.Dialog, folder, fileName, confirm, CancellationToken.None); }
+            catch (Exception e) { ReportFailure(Strings.FolderJump_JumpAction, e); }
+        }
+        if (secondaries.TryGetValue(SecondaryId.Files, out var panel) && ReferenceEquals(panel.View, files)) panel.Hide();
+        if (!confirm && Native.GetForegroundWindow() != dialog.Dialog) Native.SetForegroundWindow(dialog.Dialog);
     }
 
     void PlaceDialogBar(FileDialogInfo info)
@@ -108,11 +126,18 @@ public sealed partial class App
     // ---- 设计预览：PANE_DESIGN_OPEN=dialog（演示模式没有真实对话框：在屏幕上画一个假的对话框位置，看搜索框） ----
     void ShowDialogBarDemo()
     {
-        var sample = new Pane.DesignData.DialogSearchSample(Environment.GetEnvironmentVariable("PANE_DESIGN_DIALOG") == "save");
+        var sample = new Pane.DesignData.DialogSearchSample(Environment.GetEnvironmentVariable("PANE_DESIGN_DIALOG") ?? "open");
         AttachDialogSearch(sample);
         EnsureDialogBar();
         OnDialogBar(sample.Current);
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY") is { } q) queue.TryEnqueue(() => { dialogBarView?.FocusSearch(); if (dialogBarView != null) dialogBarView.SetQuery(q); });
+    }
+
+    // 设计预览：PANE_DESIGN_OPEN=dialog-files 直接打开文件窗口「为对话框选」（PANE_DESIGN_DIALOG、PANE_DESIGN_QUERY 同上，默认搜 proj）
+    void ShowDialogFilesDemo()
+    {
+        var sample = new Pane.DesignData.DialogSearchSample(Environment.GetEnvironmentVariable("PANE_DESIGN_DIALOG") ?? "open");
+        ShowFiles(Environment.GetEnvironmentVariable("PANE_DESIGN_QUERY") ?? "proj", null, sample.Current); // 不翻译：演示数据
     }
 
     static readonly FolderJumpEntry[] DemoFolders =

@@ -221,14 +221,16 @@
         <!-- 结果区：上沿一条分隔线；滚动条隐藏 -->
         <Grid x:Name="ResultsArea" Grid.Row="2" Visibility="Collapsed">
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
-            <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" MaxHeight="452"
-                          VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                <Grid x:Name="ResultsContent" Padding="8,4,8,8">
-                    <!-- 选中高亮画在这一层（Composition），滑动跟随选中项 -->
-                    <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
-                    <ItemsControl x:Name="Sections" ItemTemplateSelector="{StaticResource SectionSelector}" IsTabStop="False"/>
-                </Grid>
-            </ScrollViewer>
+            <c:ScrollFade Thumb="False">
+                <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" MaxHeight="452"
+                              VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                    <Grid x:Name="ResultsContent" Padding="8,4,8,8">
+                        <!-- 选中高亮画在这一层（Composition），滑动跟随选中项 -->
+                        <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
+                        <ItemsControl x:Name="Sections" ItemTemplateSelector="{StaticResource SectionSelector}" IsTabStop="False"/>
+                    </Grid>
+                </ScrollViewer>
+            </c:ScrollFade>
             <!-- AI 结果卡片：代替结果列表 -->
             <c:AiCard x:Name="Card" Margin="20,16,20,12" Visibility="Collapsed"/>
         </Grid>

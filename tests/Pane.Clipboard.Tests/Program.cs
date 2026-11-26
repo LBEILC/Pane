@@ -17,6 +17,7 @@ static partial class Program
     {
         if(args is ["--mirror-export"]){await MirrorExport097Tests();return;}
         if(args is ["--123"]){await MemoTransfer123Tests();TestResults.Pass();return;}
+        if(args is ["--144"]){await MemoTags144Tests();TestResults.Pass();return;}
         if(args is ["--136"]){await MemoFolder136Tests();TestResults.Pass();return;}
         if(args is ["--083"]){await Transfer083Tests();TestResults.Pass();return;}
         if(args is ["--082"]){await Storage082Tests();TestResults.Pass();return;}
@@ -76,6 +77,17 @@ static partial class Program
             Check(events>0,"changed notification");
         }
         Check(source1.Disposed,"source disposed");
+        var copyRoot = TestResults.NewDirectory("portable-");
+        string copiedHistory = Directory.CreateDirectory(Path.Combine(copyRoot,"clipboard")).FullName;
+        foreach (string file in Directory.GetFiles(Path.Combine(root,"clipboard")))
+            File.Copy(file,Path.Combine(copiedHistory,Path.GetFileName(file)));
+        using (var moved = new ClipboardHistory(new SettingsStore(copyRoot,Defaults()),new FakeSource(),writer,imageFiles))
+        {
+            await moved.Ready;
+            var entry = moved.Snapshot().Single(item=>item.Id==imageId);
+            Check(entry.ContentPath==Path.Combine(copiedHistory,imageId+".png") && File.Exists(entry.ContentPath)
+                && entry.Thumbnail?.Path==Path.Combine(copiedHistory,imageId+".thumb.png") && File.Exists(entry.Thumbnail.Path),"便携副本原图和缩略图在清理后仍可读");
+        }
         using(var history=new ClipboardHistory(settings,new FakeSource(),writer,imageFiles)){
             await history.Ready;Check(history.Snapshot().Any(e=>e.Id==pinned&&e.Pinned)&&history.Snapshot().Any(e=>e.Id==imageId&&e.ContentPath==full)&&history.Snapshot().Any(e=>e.Files?.Count==2),"storage roundtrip metadata files images pins");
             history.Delete(imageId);Check(!history.Snapshot().Any(e=>e.Id==imageId),"delete");

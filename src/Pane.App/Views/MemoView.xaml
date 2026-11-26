@@ -56,9 +56,10 @@
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 左：搜索 + 列表 -->
+            <!-- 左：搜索 + 标签筛选 + 列表（标签选择时列表就地换成标签列表） -->
             <Grid BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,1,0">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
@@ -76,10 +77,14 @@
                                  IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnQueryChanged"/>
                     </Grid>
                 </Border>
-                <ScrollViewer x:Name="ListScroller" Grid.Row="1" Padding="8,0,8,8" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                    <StackPanel x:Name="List" Spacing="2"/>
-                </ScrollViewer>
-                <TextBlock x:Name="ListEmpty" Grid.Row="1" Visibility="Collapsed" Margin="16,28,16,0" TextAlignment="Center" TextWrapping="Wrap" LineHeight="22"
+                <!-- 标签筛选（144）：全部 + 各标签（条数），折行最多两行，多的收成「还有 N 个」，最后「管理」 -->
+                <c:WrapPanel x:Name="Filter" Grid.Row="1" Margin="12,0,12,6" HorizontalSpacing="4" VerticalSpacing="4" Visibility="Collapsed"/>
+                <c:ScrollFade Grid.Row="2" Thumb="False">
+                    <ScrollViewer x:Name="ListScroller" Padding="8,0,8,8" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                        <StackPanel x:Name="List" Spacing="2"/>
+                    </ScrollViewer>
+                </c:ScrollFade>
+                <TextBlock x:Name="ListEmpty" Grid.Row="2" Visibility="Collapsed" Margin="16,28,16,0" TextAlignment="Center" TextWrapping="Wrap" LineHeight="22"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
             </Grid>
 
@@ -96,6 +101,7 @@
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                         <TextBlock x:Name="Meta" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
@@ -104,20 +110,26 @@
                                 Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
                             <TextBlock x:Name="FromText" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText2Brush}"/>
                         </Border>
+                        <!-- 这一条的标签（144）：最多 4 个，点了按它筛 -->
+                        <StackPanel x:Name="MetaTags" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <Button x:Name="NotePinButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnPinNote" IsTabStop="False"
+                    <Button x:Name="TagButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnTagButton" IsTabStop="False"
+                            ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_TagHint}">
+                        <c:PaneIcon x:Name="TagIcon" Glyph="tag" Width="15" Height="15"/>
+                    </Button>
+                    <Button x:Name="NotePinButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnPinNote" IsTabStop="False"
                             ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_PinHint}">
                         <c:PaneIcon x:Name="NotePinIcon" Glyph="pin" Width="15" Height="15"/>
                     </Button>
-                    <Button x:Name="PreviewButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnTogglePreview" IsTabStop="False"
+                    <Button x:Name="PreviewButton" Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnTogglePreview" IsTabStop="False"
                             ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_PreviewHint}">
                         <c:PaneIcon x:Name="PreviewIcon" Glyph="eye" Width="15" Height="15"/>
                     </Button>
-                    <Button x:Name="CopyButton" Grid.Column="3" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnCopyAll" IsTabStop="False"
+                    <Button x:Name="CopyButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnCopyAll" IsTabStop="False"
                             ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_CopyAll}">
                         <c:PaneIcon x:Name="CopyIcon" Glyph="copy" Width="15" Height="15"/>
                     </Button>
-                    <Button x:Name="DeleteButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnDelete" IsTabStop="False"
+                    <Button x:Name="DeleteButton" Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="28" Height="28" Click="OnDelete" IsTabStop="False"
                             ToolTipService.ToolTip="{x:Bind loc:Strings.Memo_DeleteHint}">
                         <c:PaneIcon Glyph="trash" Width="15" Height="15"/>
                     </Button>
@@ -129,9 +141,11 @@
                          FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" SelectionHighlightColor="{StaticResource PaneAccentBrush}"
                          IsSpellCheckEnabled="False" IsTextPredictionEnabled="False" TextChanged="OnEditorChanged"/>
                 </Border>
-                <ScrollViewer x:Name="PreviewScroller" Grid.Row="1" Visibility="Collapsed" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                    <StackPanel x:Name="PreviewPanel" Padding="20,0,20,20" Spacing="8"/>
-                </ScrollViewer>
+                <c:ScrollFade Grid.Row="1" Thumb="False">
+                    <ScrollViewer x:Name="PreviewScroller" Visibility="Collapsed" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                        <StackPanel x:Name="PreviewPanel" Padding="20,0,20,20" Spacing="8"/>
+                    </ScrollViewer>
+                </c:ScrollFade>
                 <TextBlock x:Name="NoneText" Grid.Row="1" Visibility="Collapsed" HorizontalAlignment="Center" VerticalAlignment="Center"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"/>
                 <!-- 撤销条：删除后 5 秒 -->
@@ -172,6 +186,8 @@
             <Border x:Name="HoverProto" Background="{ThemeResource PaneFillHoverBrush}"/>
             <Border x:Name="SelectedProto" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
             <Border x:Name="KbdProto" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
+            <Border x:Name="AccentProto" BorderBrush="{StaticResource PaneAccentBrush}"/>
+            <c:PaneIcon x:Name="IconProto" Foreground="{ThemeResource PaneText2Brush}"/>
         </StackPanel>
     </Grid>
 </UserControl>

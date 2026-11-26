@@ -27,7 +27,7 @@ internal sealed class WindowsStartupRegistry:IStartupRegistry
     public void Write(string command){using var key=Registry.CurrentUser.CreateSubKey(Run);key.SetValue("Pane",command,RegistryValueKind.String);}
     public void Delete(){using var key=Registry.CurrentUser.OpenSubKey(Run,true);key?.DeleteValue("Pane",false);}
 }
-internal sealed class AutostartService(bool production,string executable,SettingsStore store,IStartupRegistry registry):IAutostart
+internal sealed class AutostartService(bool production,string executable,SettingsStore store,IStartupRegistry registry,bool portable=false):IAutostart
 {
     string Command=>$"\"{executable}\" --autostart";
     public string? UnavailableReason=>production?null:Strings.Settings_Autostart_Development;
@@ -49,6 +49,8 @@ internal sealed class AutostartService(bool production,string executable,Setting
     public void Align(){
         if(!production||!store.Current.General.StartWithWindows)return;
         var old=registry.Read();
+        // 便携目录换机后要由用户在本机打开；同机移动后原路径已不存在，仍可修正。
+        if(portable && (old==null || File.Exists(Executable(old))))return;
         if(old==null?!registry.Disabled:IsPane(old)&&!PointsTo(old,executable)){
             try { registry.Write(Command); }
             catch(Exception error) when(AccessDenied(error)){Pane.Hosting.AutostartDiagnostics.OpenLog()?.AlignDenied(error);}

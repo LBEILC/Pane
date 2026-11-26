@@ -50,7 +50,15 @@ public sealed partial class App
         OpenSettings("hotkeys");
     }
 
-    public void ShowFiles(string query,string? focus)=>Present(SecondaryId.Files, Strings.Common_Files,()=>new FilesView(Files,secondaryActions!),v=>((FilesView)v).Open(query,focus));
+    public void ShowFiles(string query,string? focus)=>ShowFiles(query,focus,null);
+    /// <summary>dialog 不为 null：文件窗口为这个对话框选（对话框搜索的「查看全部」，任务 125）。</summary>
+    void ShowFiles(string query,string? focus,FileDialogInfo? dialog)=>Present(SecondaryId.Files, Strings.Common_Files,()=>{
+        var v=new FilesView(Files,secondaryActions!);
+        // 打开 / 为对话框选了一项：记进搜索记忆；为对话框选完让对话框跳过去、关窗口（宿主在 App.DialogBar）
+        v.Chosen+=(_,x)=>SearchMemory?.RecordFile(x.Query,x.Path);
+        v.DialogPick+=(_,x)=>PickForDialog(v,x.Dialog,x.Folder,x.FileName,x.Confirm,x.Query,x.Path);
+        return v;
+    },v=>((FilesView)v).Open(query,focus,dialog,Store.Current.FolderJump.OpenOnEnter));
     /// <summary>打开设置并跳到某个分区（各处「去设置」，issue 11）。</summary>
     public void OpenSettings(string? section){Command("show-settings");if(section!=null&&settings?.View is SettingsView v)v.ShowSection(section);}
     public void ShowTranslate(string? text)=>Present(SecondaryId.Translate, Strings.Common_Translate,()=>{var v=new TranslateView(Ai,secondaryActions!);v.OpenSettings+=(_,_)=>OpenSettings("ai");return v;},v=>((TranslateView)v).Open(text));
@@ -118,7 +126,8 @@ public sealed partial class App
             case "files":ShowFiles(q??"报价",null);break; // 不翻译：演示数据
             case "clipboard":Command("show-clipboard");break;
             case "settings":Command("show-settings");break;   /* 配合 PANE_DESIGN_SETTINGS 选分区 */
-            case "dialog":ShowDialogBarDemo();break;   /* 对话框搜索框（2026-11-23），PANE_DESIGN_DIALOG=save 看另存为 */
+            case "dialog":ShowDialogBarDemo();break;
+            case "dialog-files":ShowDialogFilesDemo();break;   /* 125：文件窗口「为对话框选」 */   /* 对话框搜索框（2026-11-23），PANE_DESIGN_DIALOG=save 看另存为 */
             case "launcher":Command("show-launcher");break;   /* 带上 PANE_DESIGN_QUERY 看启动器结果 */
             case "memo":DesignMemo(q=="new");break;   /* 备忘录（123）：隔离数据目录里先放几条样例；QUERY=new 看新建一条 */
             case "translate":ShowTranslate(q??"Glassmorphism relies on background blur, translucency and a subtle highlight border.");break;

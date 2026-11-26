@@ -15,7 +15,7 @@ public sealed partial class App
     {
         var mode=Pane.Hosting.RuntimeMode.Current;
         // 隔离根和开发、演示宿主沿用原有行为，测试直接注入假安装回调。
-        if(!mode.IsProduction||Environment.GetEnvironmentVariable("PANE_DEMO")=="1"||
+        if(mode.IsPortable||!mode.IsProduction||Environment.GetEnvironmentVariable("PANE_DEMO")=="1"||
             !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("PANE_DATA_DIR")))return false;
         string settingsPath=System.IO.Path.Combine(mode.DataDirectory,"settings.json");
         if(!System.IO.File.Exists(settingsPath))return false;

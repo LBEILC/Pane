@@ -160,6 +160,28 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
         selected = 0;
         UpdateLayout();
         if (has) Select(0); // 没读到选区时动作全是灰的，不显示选中
+        selectionTarget = null;
+        if (has) _ = DetectSelection(sel.Text!, ++showVersion);
+    }
+
+    // 网址和路径（issue 71，任务 141）：选中的整段是网址或存在的路径时，「搜索」换成「打开」，不再交给搜索引擎
+    OpenTarget? selectionTarget;
+    int showVersion;
+    async Task DetectSelection(string text, int version)
+    {
+        OpenTarget? target;
+        try { target = await ((App)Application.Current).OpenTargets.DetectAsync(text, CancellationToken.None); }
+        catch (Exception) { return; }
+        if (target is null || version != showVersion || files is not null) return;
+        int i = items.FindIndex(a => a.Id == "search");
+        if (i < 0) return;
+        selectionTarget = target;
+        var glyph = target.Kind switch { OpenTargetKind.Url => "external", OpenTargetKind.Folder => "folder-open", _ => "doc" };
+        var list = items.ToList();
+        list[i] = new SuperAction("open", Strings.Common_Open, glyph, false) { Enabled = items[i].Enabled };
+        SetItems(list);
+        UpdateLayout();
+        if (list[i].Enabled) Select(selected);
     }
 
     SelectionResult current = new(null, 0, SelectionFailure.Empty);
@@ -305,6 +327,13 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
             case "copy-translation": CopyTranslation(); return;
             case "translate-window": OpenTranslate?.Invoke(text); return;
             case "ask": OpenChat?.Invoke(text); return;
+        }
+        if (a.Id == "open" && selectionTarget is { } target)
+        {
+            CloseRequested?.Invoke(this, EventArgs.Empty);
+            try { await ((App)Application.Current).OpenTargets.OpenAsync(target, false, CancellationToken.None); }
+            catch (Exception e) { ((App)Application.Current).ReportFailure(Strings.Common_Open, e); }
+            return;
         }
         if (!a.IsAi)
         {

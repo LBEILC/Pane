@@ -3,6 +3,9 @@ using Pane.Localization;
 // 输入防抖后搜；左侧分类带数量，Tab / Shift+Tab 切换；结果分批加载（每批 50，滚到接近底部再要）；
 // 上下键选中，Enter 打开，Ctrl+Enter 打开所在文件夹，可拖出；右侧预览可关；底部换排序。
 // Esc 有输入时清空，输入为空时关窗口（2026-11-03，issue 11）；Ctrl+W 关。
+// 为对话框选（2026-11-25，任务 125，docs/design.md「文件搜索的相关度、对话框搜索「查看全部」」）：从对话框搜索的「查看全部」进来时，
+// 头部标出是哪个对话框，结果按对话框的文件类型筛选（「选择文件夹」只要文件夹），Enter / 双击 / 预览按钮照对话框搜索条的规则让对话框跳过去。
+// 打开、打开所在文件夹、为对话框选了一项都记进搜索记忆（ISearchMemory.RecordFile）。
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -39,6 +42,9 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
     bool loading, topmost;
     string? focusPath;
     CancellationTokenSource? pending, previewPending;
+    // 为对话框选：目标对话框、「打开」里 Enter 是不是直接打开（设置 FolderJumpSettings.OpenOnEnter）
+    FileDialogInfo? dialog;
+    bool openOnEnter = true;
 
     public FilesView(IFileSearch? search, ISelectionActions output)
     {
@@ -72,11 +78,16 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         Unloaded += (_, _) => Icons.Ready -= OnIconReady;
     }
 
-    /// <summary>打开（或复用）窗口时宿主调用：带上查询文字，focus 是要选中的文件（启动器里文件格按 Tab）。</summary>
-    public void Open(string query, string? focus)
+    /// <summary>
+    /// 打开（或复用）窗口时宿主调用：带上查询文字，focus 是要选中的文件（启动器里文件格按 Tab）。
+    /// dialog 不为 null：为这个对话框选（对话框搜索的「查看全部」，任务 125）；为 null 是普通文件窗口。
+    /// </summary>
+    public void Open(string query, string? focus, FileDialogInfo? dialog = null, bool openOnEnter = true)
     {
         focusPath = focus;
-        SelectCategory(FileCategory.All, search: false);
+        this.openOnEnter = openOnEnter;
+        SetDialog(dialog);
+        SelectCategory(dialog?.FoldersOnly == true ? FileCategory.Folder : FileCategory.All, search: false);
         // 直接搜，不等 TextChanged：窗口还没进可视树时改文字，TextChanged 偶尔不来，结果区一直是空的（2026-10-31 实测）
         Input.Text = query;
         debounce.Stop();
@@ -108,6 +119,89 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
 
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
 
+    // ---------------- 为对话框选 ----------------
+
+    /// <summary>选好了（任务 125）：宿主让 Dialog 跳到 Folder（FileName 为 null 表示文件名不动、Confirm 确认），记进搜索记忆，再关窗口。</summary>
+    public event EventHandler<(FileDialogInfo Dialog, string Folder, string? FileName, bool Confirm, string Query, string Path)>? DialogPick;
+    /// <summary>打开或打开所在文件夹（普通模式）：宿主记进搜索记忆。</summary>
+    public event EventHandler<(string Query, string Path)>? Chosen;
+
+    /// <summary>现在在为哪个对话框选；宿主在对话框关掉或换了一个时调用 <see cref="ExitDialog"/>。</summary>
+    public nint DialogHandle => dialog?.Dialog ?? 0;
+
+    /// <summary>对话框关了（或换了一个）：回到普通文件窗口，结果按不筛选重搜。</summary>
+    public void ExitDialog()
+    {
+        if (dialog is null) return;
+        SetDialog(null);
+        _ = Search();
+    }
+
+    void OnExitDialog(object sender, RoutedEventArgs e) { ExitDialog(); Input.Focus(FocusState.Programmatic); }
+
+    void SetDialog(FileDialogInfo? d)
+    {
+        dialog = d;
+        TargetChip.Visibility = d is null ? Visibility.Collapsed : Visibility.Visible;
+        if (d is not null)
+        {
+            var kind = d.FoldersOnly ? Strings.Files_DialogFolder : d.Save ? Strings.Files_DialogSave : Strings.Files_DialogOpen;
+            TargetText.Text = d.AppName is { Length: > 0 } app ? string.Format(Strings.Files_DialogTarget, (object?)kind, (object?)app) : string.Format(Strings.Files_DialogTargetNoApp, (object?)kind);
+            ToolTipService.SetToolTip(TargetChip, TargetText.Text);
+        }
+        bool filter = d is { FoldersOnly: false, Extensions.Count: > 0 };
+        FilterChip.Visibility = filter ? Visibility.Visible : Visibility.Collapsed;
+        if (filter) FilterText.Text = string.Format(Strings.DialogSearch_FilterChip, (object?)(d!.FilterName ?? string.Join("、", d.Extensions!)));
+        foreach (var c in categories) c.Enabled = d?.FoldersOnly != true || c.Category == FileCategory.Folder;
+        if (d?.FoldersOnly != true && !categories.First(c => c.Category == category).Enabled) category = FileCategory.All;
+        FillHints();
+        UpdateActions();
+    }
+
+    FileQuery Query(string q) => new(q, category, sort, dialog?.FoldersOnly == true ? null : dialog?.Extensions, dialog?.FoldersOnly == true);
+
+    enum How { Enter, Shift, Ctrl }
+
+    // 选中项在对话框里能做什么（照对话框搜索条，DialogSearchView.HintItems / Run）：第一项是 Enter
+    (string[] Keys, string Label, How How)[] DialogActions(FileHit? hit)
+    {
+        if (dialog is null || hit is null) return [];
+        if (hit.Category == FileCategory.Folder) return [(["Enter"], Strings.DialogSearch_Jump, How.Enter)];
+        if (dialog.Save) return [(["Enter"], Strings.DialogSearch_SaveHere, How.Enter), (["Ctrl", "+", "Enter"], Strings.DialogSearch_UseName, How.Ctrl)];
+        return openOnEnter
+            ? [(["Enter"], Strings.DialogSearch_OpenNow, How.Enter), (["Shift", "+", "Enter"], Strings.DialogSearch_FillName, How.Shift)]
+            : [(["Enter"], Strings.DialogSearch_FillName, How.Enter), (["Shift", "+", "Enter"], Strings.DialogSearch_OpenNow, How.Shift)];
+    }
+
+    void Pick(How how)
+    {
+        if (dialog is not { } d || Current is not { } row) return;
+        var hit = row.Hit;
+        if (!DialogActions(hit).Any(a => a.How == how)) return;
+        var dir = hit.Category == FileCategory.Folder ? hit.Path : System.IO.Path.GetDirectoryName(hit.Path);
+        if (dir is null) return;
+        (string? name, bool confirm) = hit.Category == FileCategory.Folder ? (null, false)
+            : d.Save ? (how == How.Ctrl ? hit.Name : null, false)
+            : (hit.Name, openOnEnter ? how == How.Enter : how == How.Shift);
+        DialogPick?.Invoke(this, (d, dir, name, confirm, Input.Text.Trim(), hit.Path));
+    }
+
+    // 预览里的两个按钮：普通模式「打开」「所在文件夹」；为对话框选时是这一项的对话框动作（文件夹只有「跳转」）
+    void UpdateActions()
+    {
+        var acts = DialogActions(Current?.Hit);
+        if (dialog is null || acts.Length == 0)
+        {
+            PrimaryButton.Content = Strings.Common_Open;
+            SecondaryButton.Content = Strings.Files_ContainingFolder;
+            SecondaryButton.Visibility = Visibility.Visible;
+            return;
+        }
+        PrimaryButton.Content = acts[0].Label;
+        SecondaryButton.Visibility = acts.Length > 1 ? Visibility.Visible : Visibility.Collapsed;
+        if (acts.Length > 1) SecondaryButton.Content = acts[1].Label;
+    }
+
     void OnPin(object sender, RoutedEventArgs e)
     {
         topmost = !topmost;
@@ -125,12 +219,20 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         if ((Input.Text.Length == 0) != hintsForEmpty) FillHints();
     }
 
-    // 提示栏的 Esc：有输入时是「清空」，空的时候是「关闭」
+    // 提示栏的 Esc：有输入时是「清空」，空的时候是「关闭」；为对话框选时 Enter 那几项跟着选中项（文件夹 / 文件）换
     bool hintsForEmpty;
+    string? hintsKey;
     void FillHints()
     {
         hintsForEmpty = Input.Text.Length == 0;
-        KeyHints.Fill(Hints, [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder), (["Esc"], hintsForEmpty ? Strings.Common_Close : Strings.Common_Clear)], HintLabelProto, KbdProto);
+        (string[] keys, string label)[] items = dialog is null
+            ? [(["Enter"], Strings.Common_Open), (["Ctrl", "+", "Enter"], Strings.Common_OpenContainingFolder)]
+            : DialogActions(Current?.Hit).Select(a => (a.Keys, a.Label)).ToArray();
+        items = [.. items, (["Esc"], hintsForEmpty ? Strings.Common_Close : Strings.Common_Clear)];
+        var key = string.Join("|", items.Select(i => i.label));
+        if (key == hintsKey) return;
+        hintsKey = key;
+        KeyHints.Fill(Hints, items, HintLabelProto, KbdProto);
     }
 
     async Task Search()
@@ -146,20 +248,23 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         if (q.Length == 0 || search is null)
         {
             foreach (var c in categories) c.SetCount(null);
+            countsQuery = null;
             Bind();
             ShowEmpty(search is null ? Strings.Files_SearchUnavailable : null);
             return;
         }
         FilePage page;
-        try { page = await search.SearchAsync(new FileQuery(q, category, sort), 0, Batch, cts.Token); }
+        try { page = await search.SearchAsync(Query(q), 0, Batch, cts.Token); }
         catch (OperationCanceledException) { return; }
         catch (FileSearchUnavailableException ex) { if (cts == pending) { Bind(); ShowEmpty(ex.Message); } return; }
         catch (Exception ex) { if (cts == pending) { Bind(); ShowEmpty(string.Format(Strings.Files_SearchError, App.FailureReason(ex) ?? Strings.Common_UnexpectedProblem)); } return; }
         if (cts.IsCancellationRequested) return;
         total = page.Total;
         listingFolder = page.Folder is not null;
-        foreach (var c in categories) c.SetCount(page.Counts?.GetValueOrDefault(c.Category));
-        if (page.Counts is null) _ = FetchCounts(q, cts);
+        // 分类数量第一页常常还没算好（null）：先留着上一次的数字，新的到了再换，不清空——
+        // 原来先清空再填，切分类、改排序、每打一个字，左边的数字都会闪一下（2026-11-26 用户报）
+        if (page.Counts is { } counts) { foreach (var c in categories) c.SetCount(counts.GetValueOrDefault(c.Category)); countsQuery = CountsKey(q); }
+        else if (countsQuery != CountsKey(q)) _ = FetchCounts(q, cts);
         Append(page.Items);
         Bind();
         int focus = focusPath is { } p ? rows.FindIndex(r => string.Equals(r.Hit.Path, p, StringComparison.OrdinalIgnoreCase)) : -1;
@@ -170,6 +275,10 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
     }
 
     // 分类数量服务在后台算（第一页先给 null，021），没有「算完了」的通知：每 100ms 用同一关键词再要一次（只要 1 条，读它的缓存），最多约 2.5 秒
+    string? countsQuery;   // 左边数字现在是哪个关键词的
+    // 数量只跟关键词和对话框的类型限定有关，和选中哪个分类、怎么排序无关
+    string CountsKey(string q) => $"{q}|{dialog?.FoldersOnly}|{(dialog?.Extensions is { } e ? string.Join(";", e) : "")}";
+
     async Task FetchCounts(string q, CancellationTokenSource cts)
     {
         for (int i = 0; i < 25 && search is not null; i++)
@@ -177,13 +286,17 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
             try
             {
                 await Task.Delay(100, cts.Token);   // 服务算数量约 0.2 秒（021 实测），每 100ms 读一次缓存，数字约 0.25 秒内出来
-                var page = await search.SearchAsync(new FileQuery(q, category, sort), 0, 1, cts.Token);
+                var page = await search.SearchAsync(Query(q), 0, 1, cts.Token);
                 if (cts != pending || page.Counts is null) continue;
                 foreach (var c in categories) c.SetCount(page.Counts.GetValueOrDefault(c.Category));
+                countsQuery = CountsKey(q);
                 return;
             }
-            catch (Exception) { return; }   // 取消（换了关键词）或出错：就不显示数字
+            catch (OperationCanceledException) { return; }   // 换了关键词：新的那次接着取
+            catch (Exception) { break; }
         }
+        // 出错或一直没算好：旧关键词的数字不能留着冒充，清掉
+        if (cts == pending) { foreach (var c in categories) c.SetCount(null); countsQuery = null; }
     }
 
     void Append(IEnumerable<FileHit> hits)
@@ -243,7 +356,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         var cts = pending;
         try
         {
-            var page = await search.SearchAsync(new FileQuery(Input.Text.Trim(), category, sort), rows.Count, Batch, cts?.Token ?? default);
+            var page = await search.SearchAsync(Query(Input.Text.Trim()), rows.Count, Batch, cts?.Token ?? default);
             if (cts != pending || cts?.IsCancellationRequested == true) return;
             int before = rows.Count;
             Append(page.Items);
@@ -270,6 +383,7 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
 
     void SelectCategory(FileCategory c, bool search = true)
     {
+        if (!categories.First(x => x.Category == c).Enabled) return;
         category = c;
         foreach (var item in categories) item.IsSelected = item.Category == c;
         MoveRailHighlight(animate: true);
@@ -314,13 +428,15 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
 
     void Select(int index, bool scroll = true)
     {
-        if (rows.Count == 0) { selected = -1; listHighlight.Hide(); UpdatePreview(); return; }
+        if (rows.Count == 0) { selected = -1; listHighlight.Hide(); UpdatePreview(); FillHints(); return; }
         index = Math.Clamp(index, 0, rows.Count - 1);
         bool had = selected >= 0 && selected < rows.Count;
         if (had) rows[selected].IsSelected = false;
         selected = index;
         rows[selected].IsSelected = true;
         if (List.TryGetElement(index) is FrameworkElement el) listHighlight.MoveTo(el, animate: had);
+        FillHints();
+        UpdateActions();
         if (!scroll) { UpdatePreview(); return; }
         // 行高固定：直接按下标算位置滚进视野
         double top = index * RowHeight, bottom = top + RowHeight, y = ListScroller.VerticalOffset, view = ListScroller.ViewportHeight;
@@ -409,12 +525,13 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
     async Task Run(Func<string, CancellationToken, Task> action, string what)
     {
         if (Current is not { } row || search is null) return;
+        if (Input.Text.Trim() is { Length: > 0 } q) Chosen?.Invoke(this, (q, row.Hit.Path));
         try { await action(row.Hit.Path, CancellationToken.None); }
         catch (Exception e) { if (App.FailureReason(e) is { } reason) Empty.Text = string.Format(Strings.Common_ActionFailed, (object?)(what), (object?)(reason)); }
     }
 
-    void OnOpenSelected(object sender, RoutedEventArgs e) => _ = Run(search!.OpenAsync, Strings.Common_Open);
-    void OnRevealSelected(object sender, RoutedEventArgs e) => _ = Run(search!.RevealAsync, Strings.Common_OpenContainingFolder);
+    void OnOpenSelected(object sender, RoutedEventArgs e) { if (dialog is not null) Pick(DialogActions(Current?.Hit) is { Length: > 0 } a ? a[0].How : How.Enter); else _ = Run(search!.OpenAsync, Strings.Common_Open); }
+    void OnRevealSelected(object sender, RoutedEventArgs e) { if (dialog is not null) { if (DialogActions(Current?.Hit) is { Length: > 1 } a) Pick(a[1].How); } else _ = Run(search!.RevealAsync, Strings.Common_OpenContainingFolder); }
     void OnCopyPath(object sender, RoutedEventArgs e) { if (Current is { } row) _ = output.CopyAsync(row.Hit.Path, CancellationToken.None); }
 
     void OnListTapped(object sender, TappedRoutedEventArgs e)
@@ -425,7 +542,9 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
 
     void OnListDoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
-        if (RowAt(e.OriginalSource) is { } row) { Select(row.Index); _ = Run(search!.OpenAsync, Strings.Common_Open); }
+        if (RowAt(e.OriginalSource) is not { } row) return;
+        Select(row.Index);
+        if (dialog is not null) Pick(How.Enter); else _ = Run(search!.OpenAsync, Strings.Common_Open);
     }
 
     // 拖出：按住移动超过几像素才开始拖（2026-10-31）。原来行上直接开 CanDrag，鼠标单击被拖放吞掉，点结果没反应
@@ -498,10 +617,13 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
             case VirtualKey.Up: Select(selected - 1); break;
             case VirtualKey.PageDown: Select(selected + (int)(ListScroller.ViewportHeight / RowHeight)); break;
             case VirtualKey.PageUp: Select(selected - (int)(ListScroller.ViewportHeight / RowHeight)); break;
+            case VirtualKey.Enter when Current is not null && dialog is not null: Pick(ctrl ? How.Ctrl : shift ? How.Shift : How.Enter); break;
             case VirtualKey.Enter when Current is not null: _ = Run(ctrl ? search!.RevealAsync : search!.OpenAsync, ctrl ? Strings.Common_OpenContainingFolder : Strings.Common_Open); break;
             case VirtualKey.Tab:
-                int i = categories.FindIndex(c => c.Category == category);
-                SelectCategory(categories[(i + (shift ? categories.Count - 1 : 1)) % categories.Count].Category);
+                // 只在可用的分类之间走（为「选择文件夹」选时只有文件夹）
+                var usable = categories.Where(c => c.Enabled).ToList();
+                int i = usable.FindIndex(c => c.Category == category);
+                SelectCategory(usable[(i + (shift ? usable.Count - 1 : 1) + usable.Count) % usable.Count].Category);
                 break;
             case VirtualKey.Escape:
                 // Esc：有输入先清空；输入已经是空的再按就关窗口（issue 11：原来只能点 X 或 Ctrl+W）
@@ -534,7 +656,8 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         double track = ScrollTrack.ActualHeight > 0 ? ScrollTrack.ActualHeight : view;
         double thumb = Math.Max(28, track * view / extent);
         ScrollThumb.Height = thumb;
-        ScrollThumb.Margin = new Thickness(0, (track - thumb) * ListScroller.VerticalOffset / (extent - view), 0, 0);
+        // 滑块贴右边画在列表的 8 像素留白里，离窗口边 2，不压选中高亮（2026-11-26 用户定）；可拖范围仍是整条 12 宽
+        ScrollThumb.Margin = new Thickness(0, (track - thumb) * ListScroller.VerticalOffset / (extent - view), 2, 0);
     }
 
     void ShowThumb()

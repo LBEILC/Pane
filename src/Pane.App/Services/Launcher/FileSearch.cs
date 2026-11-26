@@ -26,7 +26,7 @@ internal sealed class EverythingIpc:IEverythingIpc
         string name=info[0] switch{1=>"EVERYTHING_TASKBAR_NOTIFICATION",2=>"EVERYTHING_TASKBAR_NOTIFICATION_(1.5a)",_=>"-"};
         string status=result switch{1=>"success",0=>"not-running",-2=>"timeout",_=>"rejected"};
         try{lock(logLock){
-            var directory=Path.Combine(Environment.GetEnvironmentVariable("PANE_DATA_DIR")??Pane.Settings.SettingsStore.ProductionDirectory,"logs");
+            var directory=Path.Combine(Pane.Hosting.RuntimeMode.Current.DataDirectory,"logs");
             Directory.CreateDirectory(directory);
             var file=Path.Combine(directory,"everything.log");
             if(File.Exists(file)&&new FileInfo(file).Length>=65536)File.Move(file,file+".old",true);
@@ -54,7 +54,7 @@ internal sealed class EverythingIpc:IEverythingIpc
         return await work.WaitAsync(token).ConfigureAwait(false);
     }
 }
-internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,Func<string,CancellationToken,Task>? openFile=null):IFileSearch
+internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,Func<string,CancellationToken,Task>? openFile=null, Func<SearchMemory?>? memory=null):IFileSearch
 {
     internal static readonly IReadOnlyDictionary<FileCategory,string> Extensions=new Dictionary<FileCategory,string>{
         [FileCategory.Document]="doc docx odt rtf wps pages",
@@ -75,6 +75,61 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
         FileCategory.Folder=>"<"+text+"> folder:",
         _=>"<"+text+"> file: ext:"+Extensions[category].Replace(' ',';')
     };
+    internal static string Restrict(string text, IReadOnlyList<string>? extensions, bool foldersOnly)
+    {
+        if (foldersOnly) return Filter(text, FileCategory.Folder);
+        if (extensions == null) return text;
+        string list = string.Join(';',extensions.Where(ValidExtension).Distinct(StringComparer.OrdinalIgnoreCase));
+        return list.Length == 0 ? Filter(text,FileCategory.Folder) : $"<{text}> <folder:|<file: ext:{list}>>";
+    }
+    internal static bool ValidExtension(string ext) => ext.Length > 0 && ext.All(c => char.IsLetterOrDigit(c) || c is '_' or '-' or '+');
+
+    sealed class RankedPages(string key, string[] ids, FileRanking.Head head)
+    {
+        internal readonly string Key = key;
+        internal readonly string[] Ids = ids;
+        internal readonly long Created = Environment.TickCount64;
+        internal readonly FileRanking.Head Head = head;
+        internal readonly HashSet<string> Paths = head.Items.Select(h => h.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        internal int NextOffset = head.Items.Length, NextRaw;
+    }
+    RankedPages? cached;
+
+    async Task<EverythingPage> RankedPage(string text, Func<string,string> filter, int offset, int count, CancellationToken token)
+    {
+        string key = filter(text);
+        var ids = memory?.Invoke()?.FileIds(text) ?? [];
+        var pages = Volatile.Read(ref cached);
+        if (pages == null || pages.Key != key || !pages.Ids.SequenceEqual(ids) || Environment.TickCount64 - pages.Created >= 30000)
+        {
+            var head = await FileRanking.HeadAsync(ipc,text,filter,ids,token,3000,false).ConfigureAwait(false);
+            pages = new(key,ids,head);
+            Volatile.Write(ref cached,pages);
+        }
+        var h = pages.Head;
+        var items = h.Items.Skip(offset).Take(count).ToList();
+        if (items.Count == count || offset >= h.Total) return new(items,h.Total);
+        int logical = h.Items.Length, raw = 0;
+        lock (pages)
+        {
+            if (offset >= pages.NextOffset) (logical,raw) = (pages.NextOffset,pages.NextRaw);
+        }
+        while (raw < h.Total && items.Count < count)
+        {
+            int take = (int)Math.Clamp((long)offset - logical + count - items.Count, 1, 300);
+            var batch = await ipc.QueryAsync(key,raw,take,14,token).ConfigureAwait(false);
+            if (batch.Items.Count == 0) break;
+            foreach (var hit in batch.Items)
+            {
+                raw++;
+                if (pages.Paths.Contains(hit.Path)) continue;
+                if (logical++ >= offset) items.Add(FileRanking.Highlight(hit,text));
+                if (items.Count == count) break;
+            }
+        }
+        lock (pages) { if (logical >= pages.NextOffset) (pages.NextOffset,pages.NextRaw) = (logical,raw); }
+        return new(items,h.Total);
+    }
     // 和启动器文件结果共用名字的直接匹配规则；路径命中不高亮文件名。
     internal static IReadOnlyList<TextSpan>? Highlights(string name,string query){
         int index=name.IndexOf(query,StringComparison.OrdinalIgnoreCase);
@@ -90,7 +145,7 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
     async Task<FileHit?> FindFolderAsync(string text,CancellationToken token)
     {
         if(text.Length>=2&&text[0]=='"'&&text[^1]=='"')text=text[1..^1];
-        if(DirectSource.LocalPath(text) is not {} path)return null;
+        if(OpenTargetService.LocalPath(text) is not {} path)return null;
         path=Path.TrimEndingDirectorySeparator(path);
         try{
             return await Task.Run(()=>FolderProbe(path),token)
@@ -111,11 +166,17 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
         int childOffset=folder==null?offset:Math.Max(0,offset-1);
         int childCount=includeFolder?count-1:count;
         EverythingPage page;
-        try{page=await ipc.QueryAsync(Filter(search,query.Category),childOffset,childCount,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);}
+        bool rank = folder == null && query.Sort == FileSort.Relevance && FileRanking.Plain(text);
+        string Restricted(string q) => Restrict(q,query.Extensions,query.FoldersOnly);
+        string Filtered(string q) => Filter(Restricted(q),query.Category);
+        try{
+            page = rank ? await RankedPage(text,Filtered,offset,count,cancellationToken).ConfigureAwait(false)
+                : await ipc.QueryAsync(Filtered(search),childOffset,childCount,query.Sort==FileSort.Modified?14:1,cancellationToken).ConfigureAwait(false);
+        }
         catch(TimeoutException){throw new FileSearchUnavailableException(Strings.Launcher_EverythingTimeout);}
         IReadOnlyDictionary<FileCategory,int>? counts=null;
         if(offset==0){
-            var pending=CountsAsync(search,query.Category,page.Total);
+            var pending=CountsAsync(Restricted(search),query.Category,page.Total);
             if(pending.IsCompletedSuccessfully)counts=pending.Result;
         }
         cancellationToken.ThrowIfCancellationRequested();
@@ -123,7 +184,7 @@ internal sealed class FileSearch(IEverythingIpc ipc,ILauncherExecutor executor,F
             IReadOnlyList<FileHit> items=includeFolder?[folder,..page.Items]:page.Items;
             return new(items,page.Total+1,counts,folder.Path);
         }
-        return new(page.Items.Select(hit=>hit with{Highlights=Highlights(hit.Name,text)}).ToArray(),page.Total,counts);
+        return new(rank ? page.Items : page.Items.Select(hit=>hit with{Highlights=Highlights(hit.Name,text)}).ToArray(),page.Total,counts);
     }
     readonly object countsLock=new();
     CancellationTokenSource? countsBudget;

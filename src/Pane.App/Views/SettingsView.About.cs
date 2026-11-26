@@ -24,7 +24,7 @@ public sealed partial class SettingsView
     {
         var version = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion?.Split('+')[0] ?? Strings.Update_DevelopmentVersion;
         Group(null,
-            Row("Pane", Strings.Settings_About_DescriptionTagline, Chip(version)));
+            Row("Pane", Strings.Settings_About_DescriptionTagline, Chip(app.IsPortable ? $"{version} · {Strings.Settings_About_Portable}" : version)));   // 便携版（143）在版本号旁标出
         if (app.Updates is { } updates) RenderUpdate(updates);
         Group(Strings.Settings_About_Information,
             Row(Strings.Settings_About_License, Strings.Settings_About_LicenseDescription, Button(Strings.Common_Open, "external", () => OpenUrl(SourceUrl))),
@@ -48,6 +48,8 @@ public sealed partial class SettingsView
     // 卸载 Pane（2026-11-02，issue 11 / 051）：放在「数据位置」下面，按钮打开卸载程序的窗口（那里再确认、选是否删数据）；开发版灰掉并说明
     FrameworkElement UninstallRow()
     {
+        // 便携版（143）：没有卸载程序，删文件夹即可；提醒先关掉写注册表的两项
+        if (app.IsPortable) return Row(Strings.Settings_About_PortableRemove, Strings.Settings_About_PortableRemoveDescription);
         bool can = app.CanUninstall;
         var button = Button(Strings.Settings_About_UninstallButton, "trash", app.StartUninstall);
         Enable(button, can);
@@ -277,7 +279,8 @@ public sealed partial class SettingsView
         {
             case UpdateState.Available when latest is not null:
                 rows.Add(Row(string.Format(Strings.Update_AvailableVersion, (object?)(latest.Version)), ReleaseDetails(latest),
-                    Button(Strings.Update_Download, "plus", () => Run(u.DownloadAsync))));
+                    app.IsPortable ? Button(Strings.Update_OpenDownloadPage, "external", () => OpenUrl(latest.PageUrl))   // 便携版只提示，自己下载替换
+                                   : Button(Strings.Update_Download, "plus", () => Run(u.DownloadAsync))));
                 break;
             case UpdateState.Downloading when latest is not null:
                 rows.Add(Row(string.Format(Strings.Update_DownloadingVersion, (object?)(latest.Version)),
@@ -315,11 +318,11 @@ public sealed partial class SettingsView
         }
         rows.AddRange(SourceRows(u));
         var update = app.Store.Current.Update;
-        rows.Add(Row(Strings.Update_Automatic, Strings.Update_AutomaticDescription,
+        rows.Add(Row(app.IsPortable ? Strings.Update_AutomaticCheck : Strings.Update_Automatic, app.IsPortable ? Strings.Update_AutomaticCheckDescription : Strings.Update_AutomaticDescription,
             Switch(update.AutoUpdate, v => { app.Store.Save(app.Store.Current with { Update = app.Store.Current.Update with { AutoUpdate = v } }); Render(); })));
         var onStart = Switch(update.InstallOnStartup, v => app.Store.Save(app.Store.Current with { Update = app.Store.Current.Update with { InstallOnStartup = v } }));
         Enable(onStart, update.AutoUpdate);
-        rows.Add(Row(Strings.Update_InstallOnStartup, Strings.Update_InstallOnStartupDescription, onStart));
+        if (!app.IsPortable) rows.Add(Row(Strings.Update_InstallOnStartup, Strings.Update_InstallOnStartupDescription, onStart));
         // 更新日志：随安装包带着的历代说明，版本列表，点一行展开那一版（默认展开当前运行的版本）
         if (app.ReleaseHistory is { All.Count: > 0 } history)
         {

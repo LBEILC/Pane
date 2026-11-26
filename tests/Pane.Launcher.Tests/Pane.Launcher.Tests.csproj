@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <ItemGroup><Compile Include="../../src/Pane.App/Hosting/ShellHotkeyBindings.cs" Link="ShellHotkeyBindings.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/Pane.App/Hosting/RuntimeMode.cs" Link="RuntimeMode.cs" /><Compile Include="../../src/Pane.App/Hosting/ShellHotkeyBindings.cs" Link="ShellHotkeyBindings.cs" /></ItemGroup>
   <PropertyGroup>
     <HiddenDesktopSource>../../experiments/027-idle/HiddenDesktop.cs</HiddenDesktopSource>
     <DefineConstants Condition="Exists('$(HiddenDesktopSource)')">$(DefineConstants);PANE_HIDDEN_DESKTOP</DefineConstants>
@@ -12,6 +12,7 @@
     <Compile Include="../../src/Pane.App/Contracts/Update.cs" Link="Contracts/Update.cs" />
     <Compile Include="../../src/Pane.App/Contracts/ReleaseNotes.cs" Link="Contracts/ReleaseNotes.cs" />
     <Compile Include="../../src/Pane.App/DesignData/LauncherSampleSearch.cs" Link="DesignData/LauncherSampleSearch.cs" />
+    <Compile Include="../../src/Pane.App/Contracts/OpenTargets.cs" Link="Contracts/OpenTargets.cs" />
     <Compile Include="../../src/Pane.App/Contracts/FileIcons.cs" Link="Contracts/FileIcons.cs" />
     <Compile Include="../../src/Pane.App/Contracts/Files.cs" Link="Contracts/Files.cs" />
     <Compile Include="../../src/Pane.App/Contracts/DialogSearch.cs" Link="Contracts/DialogSearch.cs" />

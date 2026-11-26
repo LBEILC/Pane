@@ -15,6 +15,8 @@ internal partial class CloudJson : JsonSerializerContext { }
 internal sealed partial class AccountService : IAccountService, IAsyncDisposable
 {
     readonly SecretStore secrets;
+    readonly string devicePath;
+    readonly object deviceLock = new();
     readonly HttpClient http;
     readonly string cache;
     readonly Func<string?[]> hardware;
@@ -32,10 +34,13 @@ internal sealed partial class AccountService : IAccountService, IAsyncDisposable
     public CloudProfile? Profile { get; private set; }
     public event EventHandler? Changed;
 
-    internal AccountService(string data, string version, HttpMessageHandler? handler = null, Func<string?[]>? hardware = null)
+    internal AccountService(string data, string version, HttpMessageHandler? handler = null, Func<string?[]>? hardware = null, string? machine = null)
     {
         stopped = lifetime.Token;
-        secrets = new(Path.Combine(data, "cloud"));
+        string folder = Path.Combine(data, "cloud");
+        secrets = new(folder);
+        string hash = Pane.Settings.WindowsMachine.Key(machine);
+        devicePath = Path.Combine(folder, "device-" + hash + ".dpapi");
         cache = Path.Combine(data, "file-icons", "cloud");
         this.hardware = hardware ?? TrialHardware.Read;
         var address = new Uri((Environment.GetEnvironmentVariable("PANE_CLOUD_BASE") ??
@@ -57,13 +62,27 @@ internal sealed partial class AccountService : IAccountService, IAsyncDisposable
     }
     JsonObject Device()
     {
-        var id = secrets.Read("device.dpapi");
-        if (id == null)
+        lock (deviceLock)
         {
-            id = CloudKeys.Encode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
-            secrets.Write("device.dpapi", id);
+            string file = Path.GetFileName(devicePath);
+            var id = secrets.Read(file);
+            if (id == null)
+            {
+                // 首次升级时将旧设备记录归到本机，其他电脑继续保留各自的记录。
+                string legacy = Path.Combine(Path.GetDirectoryName(devicePath)!, "device.dpapi");
+                if (!File.Exists(devicePath) && secrets.Read("device.dpapi") is {} previous)
+                {
+                    File.Move(legacy, devicePath);
+                    id = previous;
+                }
+                else
+                {
+                    id = CloudKeys.Encode(System.Security.Cryptography.RandomNumberGenerator.GetBytes(16));
+                    secrets.Write(file, id);
+                }
+            }
+            return new() { ["id"] = id, ["name"] = Environment.MachineName };
         }
-        return new() { ["id"] = id, ["name"] = Environment.MachineName };
     }
     internal (string? Token,string? Key,string? Owner) SyncIdentity()
     {

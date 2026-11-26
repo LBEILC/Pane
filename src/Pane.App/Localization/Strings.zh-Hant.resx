@@ -147,6 +147,18 @@
   <data name="Common_Copy" xml:space="preserve"><value>複製</value></data>
   <data name="Common_CopyPath" xml:space="preserve"><value>複製路徑</value></data>
   <data name="Common_CrashLog" xml:space="preserve"><value>Pane 上次意外結束，記錄檔已儲存到 {0}</value></data>
+  <data name="Memo_ClipboardTagNote" xml:space="preserve"><value>選了會加到備忘錄標籤裡，之後兩邊各改各的</value></data>
+  <data name="Memo_ClipboardTags" xml:space="preserve"><value>從剪貼簿標籤新增</value></data>
+  <data name="Memo_LessTags" xml:space="preserve"><value>收起</value></data>
+  <data name="Memo_ManageTags" xml:space="preserve"><value>管理</value></data>
+  <data name="Memo_ManageTagsHint" xml:space="preserve"><value>在設定裡改名、改顏色、刪除</value></data>
+  <data name="Memo_MemoTags" xml:space="preserve"><value>備忘錄標籤</value></data>
+  <data name="Memo_MoreTags" xml:space="preserve"><value>還有 {0} 個</value></data>
+  <data name="Memo_TagEmpty" xml:space="preserve"><value>這個標籤下還沒有備忘錄</value></data>
+  <data name="Memo_TagHint" xml:space="preserve"><value>標籤（Ctrl+T）</value></data>
+  <data name="Settings_About_Portable" xml:space="preserve"><value>可攜版</value></data>
+  <data name="Settings_About_PortableRemove" xml:space="preserve"><value>不再使用</value></data>
+  <data name="Settings_About_PortableRemoveDescription" xml:space="preserve"><value>可攜版不用解除安裝，刪除整個資料夾即可。刪除前先關閉開機啟動和「用 Pane 取代 Win+V」，它們寫在這台電腦的登錄檔裡</value></data>
   <data name="Settings_Account" xml:space="preserve"><value>帳號</value></data>
   <data name="Settings_Account_NeedsSignIn" xml:space="preserve"><value>登入已失效，請重新登入</value></data>
   <data name="Settings_Account_NeedsSignInDescription" xml:space="preserve"><value>密碼或電子郵件在別處改過，或這台電腦已被移除。重新登入後同步接著進行</value></data>
@@ -308,6 +320,10 @@
   <data name="Settings_Account_ConfirmDelete" xml:space="preserve"><value>確認刪除</value></data>
   <data name="Settings_Account_DeleteNeedPassword" xml:space="preserve"><value>請輸入目前密碼</value></data>
   <data name="Settings_Account_Deleted" xml:space="preserve"><value>帳號已刪除</value></data>
+  <data name="Settings_Memo_Tags" xml:space="preserve"><value>標籤</value></data>
+  <data name="Settings_Memo_TagsEmpty" xml:space="preserve"><value>還沒有標籤，在備忘錄視窗裡按 Ctrl+T 新增</value></data>
+  <data name="Settings_Memo_TagsNote" xml:space="preserve"><value>刪除標籤只從備忘錄上移除它，不刪備忘錄；和剪貼簿的標籤是兩套</value></data>
+  <data name="Settings_Portable_RegistryNote" xml:space="preserve"><value>會寫入這台電腦的登錄檔，換電腦後要重新開啟</value></data>
   <data name="Settings_Sync" xml:space="preserve"><value>同步</value></data>
   <data name="Settings_Sync_Cloud" xml:space="preserve"><value>Pane 雲同步</value></data>
   <data name="Settings_Sync_SignedOut" xml:space="preserve"><value>登入 Pane 帳號後，可以在多台電腦之間同步設定、使用記錄和剪貼簿</value></data>
@@ -1610,6 +1626,8 @@
   <data name="Setup_Updating" xml:space="preserve"><value>正在更新…</value></data>
   <data name="Setup_UpdatingFiles" xml:space="preserve"><value>正在更新程式</value></data>
   <data name="Setup_Version" xml:space="preserve"><value>版本 {0}</value></data>
+  <data name="Startup_ElevatedInstance" xml:space="preserve"><value>Pane 正以管理員身份執行，無法從這裡開啟。請透過系統匣圖示使用，或從系統匣選單結束後重新開啟。</value></data>
+  <data name="Startup_PortableReadOnly" xml:space="preserve"><value>無法寫入 Pane 所在的資料夾（{0}），可攜版要把資料存在這裡。請把 Pane 放到可以寫入的位置，例如 D:\Pane。</value></data>
   <data name="SuperPanel_AutoTranslate" xml:space="preserve"><value>自動翻譯</value></data>
   <data name="SuperPanel_AutoTranslateTooLong" xml:space="preserve"><value>內容較長（約 {0:N0} 字），未自動翻譯</value></data>
   <data name="SuperPanel_ClipboardUnavailable" xml:space="preserve"><value>剪貼簿暫時無法使用，無法讀取選取的文字</value></data>
@@ -1664,6 +1682,8 @@
   <data name="Tray_Title" xml:space="preserve"><value>系統匣選單</value></data>
   <data name="Tray_UpdateReady" xml:space="preserve"><value>新版本 {0} 已下載完成</value></data>
   <data name="Update_Automatic" xml:space="preserve"><value>自動更新</value></data>
+  <data name="Update_AutomaticCheck" xml:space="preserve"><value>自動檢查更新</value></data>
+  <data name="Update_AutomaticCheckDescription" xml:space="preserve"><value>每天檢查一次，有新版本時在這裡提示；可攜版要自己下載新的壓縮檔取代</value></data>
   <data name="Update_AutomaticDescription" xml:space="preserve"><value>每天檢查一次，有新版本時在背景下載，完成後提示重新啟動更新；關閉後僅在此處手動檢查</value></data>
   <data name="Update_AvailableVersion" xml:space="preserve"><value>發現新版本 {0}</value></data>
   <data name="Update_CheckedHoursAgo" xml:space="preserve"><value>{0} 小時前檢查過</value></data>
@@ -1686,6 +1706,7 @@
   <data name="Update_JustChecked" xml:space="preserve"><value>剛剛檢查過</value></data>
   <data name="Update_NetworkFailed" xml:space="preserve"><value>無法連線 GitHub，請檢查網路後重試</value></data>
   <data name="Update_NeverChecked" xml:space="preserve"><value>尚未檢查</value></data>
+  <data name="Update_OpenDownloadPage" xml:space="preserve"><value>開啟下載頁面</value></data>
   <data name="Update_RateLimited" xml:space="preserve"><value>GitHub 暫時限制了檢查次數，請稍後重試</value></data>
   <data name="Update_ReadyNotification" xml:space="preserve"><value>Pane {0} 已下載完成，可在 設定 → 關於 中重新啟動更新</value></data>
   <data name="Update_ReadyVersion" xml:space="preserve"><value>{0} 已下載完成</value></data>
@@ -2007,6 +2028,13 @@
   <data name="DialogSearch_FillName" xml:space="preserve"><value>填入檔名</value></data>
   <data name="DialogSearch_SaveHere" xml:space="preserve"><value>儲存到此處</value></data>
   <data name="DialogSearch_UseName" xml:space="preserve"><value>使用此檔名</value></data>
+  <data name="DialogSearch_ViewAllHint" xml:space="preserve"><value>檢視全部</value></data>
+  <data name="Files_DialogTarget" xml:space="preserve"><value>「{0}」對話方塊 · {1}</value></data>
+  <data name="Files_DialogTargetNoApp" xml:space="preserve"><value>「{0}」對話方塊</value></data>
+  <data name="Files_DialogOpen" xml:space="preserve"><value>開啟</value></data>
+  <data name="Files_DialogSave" xml:space="preserve"><value>另存為</value></data>
+  <data name="Files_DialogFolder" xml:space="preserve"><value>選擇資料夾</value></data>
+  <data name="Files_ExitDialog" xml:space="preserve"><value>不再為對話方塊選擇</value></data>
   <data name="Settings_DialogSearch" xml:space="preserve"><value>搜尋</value></data>
   <data name="Settings_DialogSearch_Show" xml:space="preserve"><value>在對話方塊下方顯示搜尋框</value></data>
   <data name="Settings_DialogSearch_ShowDescription" xml:space="preserve"><value>「開啟 / 另存新檔」對話方塊出現時在其下方顯示搜尋框；對話方塊位於前景時，按啟動器熱鍵可直接開始搜尋</value></data>

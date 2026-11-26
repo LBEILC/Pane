@@ -208,6 +208,12 @@ public interface ISearchMemory
     /// <summary>记了多少个不同的输入（设置里显示用）。</summary>
     int Count { get; }
     void Clear();
+    /// <summary>
+    /// 记一次文件 / 文件夹的选择（任务 125）：对话框搜索里选了一项、文件窗口里打开或为对话框选了一项时，界面调用。
+    /// query 是当时输入框里的文字，path 是完整路径；记成和启动器文件结果同样的 Id（<c>file:</c> + 路径），启动器的「最佳结果」也认。
+    /// 规范化、不记的情况同启动器（空输入、LearnSelections 关着）。之后同样的输入搜文件时，选过的排最前。
+    /// </summary>
+    void RecordFile(string query, string path);
 }
 
 /// <summary>

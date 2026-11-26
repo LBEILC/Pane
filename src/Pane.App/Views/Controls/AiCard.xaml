@@ -35,10 +35,12 @@
 
         <!-- 结果；第一个字回来前，第一行位置显示等待状态（三个依次亮起的点 + 「正在等回复」，issue 12） -->
         <Grid>
-            <ScrollViewer x:Name="OutScroll" Margin="0,8,0,0" MaxHeight="300" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnOutScrolled">
-                <!-- 结果按 Markdown 排（Markdown.cs），流式生成时光标接在最后一段末尾 -->
-                <StackPanel x:Name="Out" Spacing="8"/>
-            </ScrollViewer>
+            <c:ScrollFade Thumb="False">
+                <ScrollViewer x:Name="OutScroll" Margin="0,8,0,0" MaxHeight="300" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnOutScrolled">
+                    <!-- 结果按 Markdown 排（Markdown.cs），流式生成时光标接在最后一段末尾 -->
+                    <StackPanel x:Name="Out" Spacing="8"/>
+                </ScrollViewer>
+            </c:ScrollFade>
             <!-- 往上翻过就不再自动滚到底；生成中出现「回到最新」，点了恢复跟随 -->
             <Button x:Name="JumpButton" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,0,4"
                     Height="{StaticResource PaneControlXs}" Padding="10,0,10,0" CornerRadius="12" Visibility="Collapsed" Click="OnJump" IsTabStop="False">

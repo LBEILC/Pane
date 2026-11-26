@@ -77,7 +77,11 @@ static partial class Program
                 var page=await normal.SearchAsync(all with{Text=input},0,50,default);
                 Check(page.Folder==null&&page.Total==123&&page.Items.Single().Name=="Test.TXT"&&ipc.Calls[0]==(input,0,50,1),"回到原关键词与分页");
             }
-            foreach(string input in new[]{file,Path.Combine(folder,"missing"),"test"})await CheckOrdinary(input);
+            foreach(string input in new[]{file,Path.Combine(folder,"missing")})await CheckOrdinary(input);
+
+            ipc.Calls.Clear();
+            var ordinary=await normal.SearchAsync(all with{Text="test"},0,1,default);
+            Check(ordinary.Folder==null && ordinary.Total==123 && ordinary.Items.Single().Name=="Test.TXT" && ipc.Calls[0]==("test",0,512,1) && ipc.Calls.Any(c=>c.Text.StartsWith("startwith:")),"普通关键词按相关度搜索");
 
             var released=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             normal.FolderProbe=path=>{released.Task.Wait(TimeSpan.FromSeconds(5));return children[0];};

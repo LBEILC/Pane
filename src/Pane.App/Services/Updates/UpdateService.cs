@@ -16,6 +16,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
     readonly HttpClient http;
     readonly Uri source;
     readonly string directory;
+    readonly bool portable;
     readonly Func<bool> automatic;
     readonly Action<string> install;
     readonly SemaphoreSlim gate = new(1);
@@ -37,8 +38,9 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
 
     // 测试源只由测试宿主显式注入；产品接线不读取任何更新源环境变量。
     public UpdateService(string version, string data, Func<bool> automatic, Action<string> install, Uri? testSource = null,
-        Func<UpdateSource>? selectedSource = null, Uri? testMirrorSource = null, string? testBaseline = null)
+        Func<UpdateSource>? selectedSource = null, Uri? testMirrorSource = null, string? testBaseline = null, bool portable = false)
     {
+        this.portable = portable;
         CurrentVersion = version; directory = Path.Combine(data, "updates");
         baseline = testBaseline ?? AppContext.BaseDirectory;
         this.automatic = automatic; this.install = install; source = testSource ?? ProductionSource;
@@ -49,7 +51,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
         http.Timeout = TimeSpan.FromMinutes(10);
         InitializeMirror(data, selectedSource, testMirrorSource);
         timer = new Timer(_ => _ = TickAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromHours(24));
-        RestoreReady();
+        if (!portable) RestoreReady();
     }
     async Task TickAsync() { if (!disposed && automatic()) await CheckOperation(lifetime.Token, true).ConfigureAwait(false); }
     void Set(UpdateState state, string? error = null) { State = state; Error = error; FailedStep = state == UpdateState.Failed ? activeStep : null; Changed?.Invoke(this, EventArgs.Empty); }
@@ -73,6 +75,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
             token.ThrowIfCancellationRequested();
             if (Latest == null) { if (State != UpdateState.Failed) Set(UpdateState.UpToDate); return; }
             Set(UpdateState.Available);
+            if (portable) return;
             if (TryReuseReady()) return;
             if (!automatic() || !allowAutomatic) return;
             var delay = availableAt - DateTimeOffset.UtcNow;
@@ -105,6 +108,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
     }
     public async Task DownloadAsync(CancellationToken cancellationToken)
     {
+        if (portable) throw new InvalidOperationException();
         if (disposed || !await gate.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return;
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lifetime.Token);
         try { if (Latest != null) await DownloadCore(cancel.Token).ConfigureAwait(false); }
@@ -273,6 +277,7 @@ internal sealed partial class UpdateService : IUpdateService, IDisposable
     };
     public void InstallAndRestart()
     {
+        if (portable) throw new InvalidOperationException();
         if (disposed || State != UpdateState.Ready || readyPath == null) return;
         activeStep = UpdateStep.Install;
         try { install(readyPath); }

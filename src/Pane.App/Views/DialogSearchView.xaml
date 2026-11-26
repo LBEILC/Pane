@@ -52,12 +52,14 @@
 
         <Grid x:Name="Body" Grid.Row="1" Visibility="Collapsed">
             <Border x:Name="BodyLine" Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
-            <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
-                <Grid x:Name="ListContent" Padding="6,4,6,6">
-                    <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
-                    <StackPanel x:Name="Rows"/>
-                </Grid>
-            </ScrollViewer>
+            <c:ScrollFade Thumb="False">
+                <ScrollViewer x:Name="Scroller" Margin="0,1,0,0" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" IsTabStop="False">
+                    <Grid x:Name="ListContent" Padding="6,4,6,6">
+                        <Canvas x:Name="HighlightLayer" IsHitTestVisible="False"/>
+                        <StackPanel x:Name="Rows"/>
+                    </Grid>
+                </ScrollViewer>
+            </c:ScrollFade>
         </Grid>
 
         <Grid x:Name="Foot" Grid.Row="2" Visibility="Collapsed">

@@ -174,7 +174,7 @@ internal sealed class FolderJumpService : IFolderJump, IDisposable
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern int PaneFolderJumpDiagnostics(nint service);
     [StructLayout(LayoutKind.Sequential)] internal struct Bounds { public int Left, Top, Right, Bottom; }
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-    internal delegate void DialogCallback(nint dialog, Bounds bounds, int flags, [MarshalAs(UnmanagedType.LPWStr)] string type);
+    internal delegate void DialogCallback(nint dialog, Bounds bounds, int flags, [MarshalAs(UnmanagedType.LPWStr)] string type, [MarshalAs(UnmanagedType.LPWStr)] string appName);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpApplySearch(nint service, int enabled, uint jumpMods, uint jumpKey, uint menuMods, uint menuKey, int automatic, DialogCallback? callback, int filter);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Unicode)] static extern int PaneDialogNavigate(nint dialog, string folder, string? name, int confirm, Microsoft.Win32.SafeHandles.SafeWaitHandle cancel);
     [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)] static extern void PaneFolderJumpEntriesFiltered(nint service, EntryCallback callback, int recent);

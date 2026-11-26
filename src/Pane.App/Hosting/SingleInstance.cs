@@ -1,3 +1,4 @@
+using Pane.Localization;
 using System.IO.Pipes;
 using System.Security.Cryptography;
 using System.Text;
@@ -12,27 +13,52 @@ internal static class SingleInstance
         mutex=new Mutex(true,"Local\\"+key,out bool first);
         if(first){if(command==LaunchCommand.Exit){Release();return false;}return true;}
         if(command==LaunchCommand.Autostart){mutex.Dispose();mutex=null;return false;}
-        var watch=System.Diagnostics.Stopwatch.StartNew();
         try {
-            using(var pipe=new NamedPipeClientStream(".",key,PipeDirection.InOut,PipeOptions.CurrentUserOnly)){
-                pipe.Connect(5000);
-                using var writer=new StreamWriter(pipe,leaveOpen:true){AutoFlush=true};writer.WriteLine(command==LaunchCommand.Exit?"exit":"show-launcher");
-                if(command==LaunchCommand.Exit){using var reader=new StreamReader(pipe,leaveOpen:true);var reply=reader.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(Math.Max(1,10000-watch.ElapsedMilliseconds))).GetAwaiter().GetResult();
-                    if(!int.TryParse(reply,out int pid))throw new IOException("实例响应无效"); // 不翻译：异常
-                    // 持有内核句柄直到退出；附着式 Process 对象在进程消失时不保证保留退出信息。
-                    using var process=OpenProcess(0x101000,false,pid);
-                    if(process.IsInvalid){if(Marshal.GetLastWin32Error()!=87)Environment.ExitCode=1;}
-                    else {
-                        uint wait=WaitForSingleObject(process,(uint)Math.Max(1,10000-watch.ElapsedMilliseconds));
-                        if(wait==258)throw new TimeoutException();
-                        if(wait!=0||!GetExitCodeProcess(process,out uint code)||code!=0)Environment.ExitCode=1;
-                    }
-                }
-            }
-        }catch(Exception e) when(e is IOException or TimeoutException){Environment.ExitCode=1;}
-        finally{mutex.Dispose();mutex=null;}
+            Environment.ExitCode = ContactExisting(command, Handshake,
+                () => MessageBoxW(0, Strings.Startup_ElevatedInstance, "Pane", 0x40),
+                error => new CrashLog(RuntimeMode.Current.DataDirectory).Write(error));
+        }
+        finally { mutex.Dispose(); mutex = null; }
         return false;
     }
+
+    internal static int ContactExisting(LaunchCommand command, Func<LaunchCommand, int> handshake,
+        Action showElevatedInstance, Action<Exception> logError)
+    {
+        try { return handshake(command); }
+        catch (UnauthorizedAccessException) {
+            if (command == LaunchCommand.Exit) return 1;
+            showElevatedInstance();
+            return 0;
+        }
+        catch (Exception error) when (error is IOException or TimeoutException) { return 1; }
+        catch (Exception error) { logError(error); return 1; }
+    }
+
+    static int Handshake(LaunchCommand command)
+    {
+        var watch=System.Diagnostics.Stopwatch.StartNew();
+        using(var pipe=new NamedPipeClientStream(".",key,PipeDirection.InOut,PipeOptions.CurrentUserOnly)){
+            pipe.Connect(5000);
+            using var writer=new StreamWriter(pipe,leaveOpen:true){AutoFlush=true};writer.WriteLine(command==LaunchCommand.Exit?"exit":"show-launcher");
+            if(command==LaunchCommand.Exit){using var reader=new StreamReader(pipe,leaveOpen:true);var reply=reader.ReadLineAsync().WaitAsync(TimeSpan.FromMilliseconds(Math.Max(1,10000-watch.ElapsedMilliseconds))).GetAwaiter().GetResult();
+                if(!int.TryParse(reply,out int pid))throw new IOException("实例响应无效"); // 不翻译：异常
+                // 持有内核句柄直到退出；附着式 Process 对象在进程消失时不保证保留退出信息。
+                using var process=OpenProcess(0x101000,false,pid);
+                if(process.IsInvalid){if(Marshal.GetLastWin32Error()!=87)return 1;}
+                else {
+                    uint wait=WaitForSingleObject(process,(uint)Math.Max(1,10000-watch.ElapsedMilliseconds));
+                    if(wait==258)throw new TimeoutException();
+                    if(wait!=0||!GetExitCodeProcess(process,out uint code)||code!=0)return 1;
+                }
+            }
+        }
+        return 0;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
+    static extern int MessageBoxW(nint window, string text, string caption, uint flags);
+
     public static async Task Listen(Action<string> command,CancellationToken cancel) {
         AutostartDiagnostics.Ready();
         while(!cancel.IsCancellationRequested) {

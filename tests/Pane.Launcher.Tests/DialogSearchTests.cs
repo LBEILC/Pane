@@ -17,7 +17,7 @@ static partial class Program
             bool folder = query.EndsWith("folder:");
             if (WaitFiles && !folder) await Task.Delay(Timeout.Infinite, token);
             FileHit hit = new(@"D:\fixture\match", "Match", folder ? FileCategory.Folder : FileCategory.Text, null, null);
-            return new(Enumerable.Repeat(hit, count + 1).ToList(), count + 1);
+            return new(Enumerable.Range(0,Math.Min(20,count)).Select(i => hit with { Path = hit.Path + i }).ToList(), 20);
         }
     }
     static async Task DialogSearchTests()
@@ -25,15 +25,15 @@ static partial class Program
         int before = checks;
         var endpoint = new DialogEndpoint();
         var service = new DialogSearchService(endpoint);
-        Check((await service.SearchAsync(" ", null, 3, default)).Count == 0 && endpoint.Calls.Count == 0, "空输入跳过 IPC");
-        var hits = await service.SearchAsync(" at ", ["png","jpg"], 3, default);
-        Check(endpoint.Calls.SequenceEqual([("<at> folder:",8),("<at> file: ext:png;jpg",3)]), "分组查询与扩展名条件");
+        Check((await service.SearchAsync(" ", null, 3, default)).Items.Count == 0 && endpoint.Calls.Count == 0, "空输入跳过 IPC");
+        var hits = (await service.SearchAsync(" at ", new(1,0,0,0,0,true,false,false,["png","jpg"],null), 3, default)).Items;
+        Check(endpoint.Calls.SequenceEqual([("<at> folder:",512),("<at> file: ext:png;jpg",512)]), "分组查询与扩展名条件");
         Check(hits.Count == 11 && hits.Take(8).All(x => x.Category == FileCategory.Folder) && hits.Skip(8).All(x => x.Category == FileCategory.Text), "组顺序和数量");
         Check(hits.All(x => x.Highlights!.SequenceEqual([new TextSpan(1,2)])), "匹配高亮");
         endpoint.WaitFiles = true;
         var watch = Stopwatch.StartNew();
-        hits = await service.SearchAsync("at", null, 3, default);
-        Check(hits.Count == 8 && watch.ElapsedMilliseconds is >= 850 and < 1600, "一秒后保留已取得的组");
+        var partial = await service.SearchAsync("at", null, 3, default);
+        Check(partial.Items.Count == 8 && partial.Total == 8 && watch.ElapsedMilliseconds is >= 850 and < 1600, "一秒后保留已取得的组");
         using var cancel = new CancellationTokenSource(50);
         watch.Restart();
         try { await service.SearchAsync("at", null, 3, cancel.Token); Check(false, "取消"); }

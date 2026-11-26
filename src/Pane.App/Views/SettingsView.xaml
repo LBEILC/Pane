@@ -30,13 +30,15 @@
                     <TextBlock Text="{x:Bind loc:Strings.Settings_Title}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextLg}" FontWeight="SemiBold"
                                Foreground="{ThemeResource PaneText1Brush}"/>
                 </StackPanel>
-                <!-- 2026-11-23：分组后项多了，放不下时导航自己滚动（不显示滚动条） -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Hidden" HorizontalScrollMode="Disabled">
-                    <Grid>
-                        <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
-                        <StackPanel x:Name="Nav" Spacing="2"/>
-                    </Grid>
-                </ScrollViewer>
+                <!-- 2026-11-23：分组后项多了，放不下时导航自己滚动（不显示滚动条）；2026-11-26 上下边缘渐隐 -->
+                <c:ScrollFade Grid.Row="1" Thumb="False">
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollMode="Disabled">
+                        <Grid>
+                            <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
+                            <StackPanel x:Name="Nav" Spacing="2"/>
+                        </Grid>
+                    </ScrollViewer>
+                </c:ScrollFade>
                 <TextBlock Grid.Row="2" Padding="8,12,8,0" TextWrapping="Wrap" LineHeight="19"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"
                            Text="{x:Bind loc:Strings.Settings_SaveDescription}"/>
@@ -49,7 +51,9 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
+            <!-- 页头收起（2026-11-26，原型 settings.html）：内容往下滚后说明收起、标题缩小一档、下面出现细分隔线 -->
             <Grid x:Name="Head" Padding="24,20,14,12" Background="Transparent">
+                <Border x:Name="HeadLine" Height="1" VerticalAlignment="Bottom" Margin="0,0,10,-12" Background="{ThemeResource PaneStrokeBrush}" Opacity="0" IsHitTestVisible="False"/>
                 <StackPanel Margin="0,0,40,0">
                     <TextBlock x:Name="SectionTitle" FontFamily="{StaticResource PaneFontDisplay}" FontSize="{StaticResource PaneTextTitle}" FontWeight="SemiBold" Foreground="{ThemeResource PaneText1Brush}"/>
                     <TextBlock x:Name="SectionDesc" Margin="0,4,0,0" TextWrapping="Wrap"
@@ -60,9 +64,11 @@
                     <c:PaneIcon Glyph="close" Width="16" Height="16" Foreground="{ThemeResource PaneText2Brush}"/>
                 </Button>
             </Grid>
-            <ScrollViewer x:Name="Scroller" Grid.Row="1" Padding="24,0,24,24" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" BringIntoViewOnFocusChange="False">
-                <StackPanel x:Name="Body"/>
-            </ScrollViewer>
+            <c:ScrollFade Grid.Row="1">
+                <ScrollViewer x:Name="Scroller" Padding="24,0,24,24" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" BringIntoViewOnFocusChange="False">
+                    <StackPanel x:Name="Body"/>
+                </ScrollViewer>
+            </c:ScrollFade>
         </Grid>
 
         <!-- 样板：代码从这些隐藏元素的强类型属性取样式、颜色和字体，不按名字查资源（NativeAOT） -->

@@ -14,9 +14,15 @@ namespace Pane.Contracts;
 /// Save：另存为对话框（否则是打开）。
 /// Extensions：对话框当前选中的文件类型限定的扩展名（小写、不带点，如 png）；「所有文件」、读不到或 FilterByType 关着时为 null。
 /// FilterName：那个文件类型的名字（如「图像文件」），读不到为 null。
+/// FoldersOnly（任务 125）：「选择文件夹」对话框（只能选文件夹，FOS_PICKFOLDERS 一类）；这时 Save 为 false、Extensions 为 null。
+/// AppName（任务 125）：弹出这个对话框的程序给人看的名字（exe 的文件说明，没有就用不带扩展名的文件名，如「画图」「Code」），读不到为 null。
+/// 文件窗口「为对话框选」时标在头部。
 /// </summary>
 public sealed record FileDialogInfo(nint Dialog, int Left, int Top, int Right, int Bottom, bool Foreground, bool Minimized, bool Save,
-    IReadOnlyList<string>? Extensions, string? FilterName);
+    IReadOnlyList<string>? Extensions, string? FilterName, bool FoldersOnly = false, string? AppName = null);
+
+/// <summary>对话框搜索的结果（任务 125）。Items：文件夹在前、文件在后，各自按相关度；Total：同样条件下一共有多少个（文件夹 + 文件），「查看全部 N 个」用。</summary>
+public sealed record DialogSearchResult(IReadOnlyList<FileHit> Items, int Total);
 
 public interface IDialogSearch
 {
@@ -31,11 +37,13 @@ public interface IDialogSearch
     FileDialogInfo? Current { get; }
 
     /// <summary>
-    /// 搜索：文件夹在前（最多 8 个），文件在后（最多 maxFiles 个），各自按 Everything 的相关度。text 为空返回空。
-    /// extensions 不为 null 时文件只给这些扩展名，文件夹照常。总耗时有上限（约 1 秒），超时返回已经拿到的部分。
+    /// 搜索：文件夹在前（最多 8 个），文件在后（最多 maxFiles 个），各自按相关度（同文件窗口，<see cref="FileSort.Relevance"/>）。text 为空返回空。
+    /// dialog 是当前对话框：Extensions 不为 null 时文件只给这些扩展名，文件夹照常；FoldersOnly 时只给文件夹。
+    /// Total 和文件窗口用同样条件（<see cref="FileQuery"/> 的 Extensions / FoldersOnly）搜「全部」分类的 Total 一致，界面写「查看全部 N 个」。
+    /// 总耗时有上限（约 1 秒），超时返回已经拿到的部分（Total 取不到时给已有的条数）。
     /// Everything 不可用抛 <see cref="FileSearchUnavailableException"/>。
     /// </summary>
-    Task<IReadOnlyList<FileHit>> SearchAsync(string text, IReadOnlyList<string>? extensions, int maxFiles, CancellationToken cancellationToken);
+    Task<DialogSearchResult> SearchAsync(string text, FileDialogInfo? dialog, int maxFiles, CancellationToken cancellationToken);
 
     /// <summary>
     /// 让对话框跳到 folder，跳完把对话框设回前台。

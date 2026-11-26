@@ -153,8 +153,10 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                 string memoSource=CurrentMemoFolder;
                 string memoTarget=NoteDisk.FolderFor(settings.DirectoryPath,destination);
                 bool moveNotes=!memoSource.Equals(memoTarget,StringComparison.OrdinalIgnoreCase) && Directory.Exists(memoSource);
-                var moving=moveNotes?NoteDisk.Scan(memoSource):[];
-                var existing=moveNotes?NoteDisk.Scan(memoTarget):[];
+                var sourceIndex=moveNotes?NoteDisk.ScanIndex(memoSource):new MemoIndex([],[]);
+                var targetIndex=moveNotes?NoteDisk.ScanIndex(memoTarget):new MemoIndex([],[]);
+                var moving=sourceIndex.Rows;
+                var existing=targetIndex.Rows;
                 if(existing.Select(r=>r.Id).Intersect(moving.Select(r=>r.Id)).Any())throw new IOException("目标目录含有相同 id 的备忘录");
                 var files=sources.Select(p=>new StorageMoveFile(p,Path.Combine(target,Path.GetFileName(p)))).Concat(moving.Select(r=>new StorageMoveFile(Path.Combine(memoSource,r.FileName),Path.Combine(memoTarget,r.FileName)))).ToArray();
                 if(files.Select(f=>f.Target).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=files.Length||files.Any(f=>File.Exists(f.Target)))throw new IOException();
@@ -175,7 +177,7 @@ internal sealed partial class DataStorage : IDataStorage, IDataTransfer
                                 if(source.Length!=destination.Length||!SHA256.HashData(source).SequenceEqual(SHA256.HashData(destination)))throw new IOException();
                                 progress?.Report((i+1d)/(files.Length+1));
                             }
-                            if(moveNotes)NoteDisk.Atomic(Path.Combine(memoTarget,NoteDisk.Index),NoteDisk.Encode(existing.Concat(moving)),true);
+                            if(moveNotes)NoteDisk.SaveIndex(memoTarget,NoteDisk.MergeIndex(existing.Concat(moving),targetIndex,sourceIndex));
                             token.ThrowIfCancellationRequested();disk.SaveIndex(index,state with{Entries=moved},_=>{});saveSettings();
                             foreach(var file in files)File.Delete(file.Source);
                             if(moveNotes)File.Delete(Path.Combine(memoSource,NoteDisk.Index));

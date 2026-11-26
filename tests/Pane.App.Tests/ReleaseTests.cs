@@ -49,7 +49,7 @@ internal static class ReleaseTests
             return count;
         }finally {Directory.Delete(root,true);}
     }
-    sealed class RegistryFake:IStartupRegistry
+    internal sealed class RegistryFake:IStartupRegistry
     {
         public string? Value;public int Writes,Reads;public bool FailWrite;
         public bool Disabled {get;set;}

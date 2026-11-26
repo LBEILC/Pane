@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <dwmapi.h>
 #pragma comment(lib,"dwmapi.lib")
+#pragma comment(lib,"version.lib")
 #include <exdisp.h>
 #include <shlobj.h>
 #include <shlwapi.h>
@@ -131,7 +132,7 @@ bool RegisterKey(int id,KeyBinding key={}){
     if(key.key>='A'&&key.key<='Z')name+=static_cast<wchar_t>(key.key);else name+=L"VK"+std::to_wstring(key.key);
     Diagnostic(L"RegisterHotKey failed key="+name+L" error="+std::to_wstring(error));return false;
 }
-using DialogCallback=void(__stdcall*)(HWND,RECT,int,const wchar_t*);
+using DialogCallback=void(__stdcall*)(HWND,RECT,int,const wchar_t*,const wchar_t*);
 struct Configuration {bool enabled=true,automatic=false;KeyBinding jump{},menu{MOD_CONTROL|MOD_SHIFT,'G'};DialogCallback dialogChanged=nullptr;bool filter=false;};
 struct ApplyRequest {Configuration config;HANDLE done;};
 struct DiagnosticRequest { HANDLE done; int bits=0; };

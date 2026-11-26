@@ -7,6 +7,7 @@ namespace Pane;
 
 public sealed partial class App
 {
+    public IOpenTargets OpenTargets { get; private set; } = null!;
     public IAppHotkeys? AppHotkeys => shell?.AppBindings;
     async void PressAppHotkey(string id)
     {
@@ -71,6 +72,8 @@ public sealed partial class App
     }
     async Task StartModules()
     {
+        OpenTargets = demo ? new DesignData.OpenTargetsSample() : new Services.Launcher.OpenTargetService(
+            new Services.Launcher.WindowsLauncherExecutor(c => queue.TryEnqueue(() => Command(c))));
         ClipboardHistory = clipboardBridge;
         secondaryActions = demo ? new Pane.DesignData.SelectionActionsSample() : new Pane.Services.SelectionActions();
         FileSelection = demo ? new Pane.DesignData.RenameSample() : new Pane.Services.FileSelection();
@@ -186,10 +189,10 @@ public sealed partial class App
         public override Task StartAsync(CancellationToken token)
         {
             var a = App; a.FileIcons=a.demo?new Pane.DesignData.FileIconsSample(a.Store.DirectoryPath):new Pane.Services.Icons.FileIcons(a.Store.DirectoryPath);
-            var everything = new Pane.Services.Launcher.EverythingSearch(); a.FileSearchStatus = everything;
+            var everything = new Pane.Services.Launcher.EverythingSearch(memory: () => a.launcherSearch?.SearchMemory); a.FileSearchStatus = everything;
             if (!a.demo)
             {
-                a.launcherSearch = new(a.Store, new Pane.Services.Launcher.WindowsAppCatalog(a.Store.DirectoryPath), everything, new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))));
+                a.launcherSearch = new(a.Store, new Pane.Services.Launcher.WindowsAppCatalog(a.Store.DirectoryPath), everything, new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.OpenTargets);
                 a.launcherSearch.HotkeyIndexChanged += a.AppIndexChanged;
                 a.launcherSearch.NoteProvider = () => a.Notes;
                 a.launcherSearch.PowerTimerProvider = () => a.PowerTimer; a.WebSuggestions = new Pane.Services.Launcher.WebSuggestions(() => a.Store.Current.Launcher.WebSuggestions);
@@ -202,7 +205,7 @@ public sealed partial class App
             }
             if(a.demo)a.WebSearchHistory=new Pane.DesignData.WebSearchHistorySample(()=>a.Store.Current.Launcher.RememberWebSearches);
             a.EngineIcons=new Pane.Services.Launcher.EngineIcons(a.Store.DirectoryPath,!a.demo);
-            a.Files = a.demo ? new Pane.DesignData.FileSearchSample() : new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(), new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.launcherSearch!.OpenFileAsync);
+            a.Files = a.demo ? new Pane.DesignData.FileSearchSample() : new Pane.Services.Launcher.FileSearch(new Pane.Services.Launcher.EverythingIpc(), new Pane.Services.Launcher.WindowsLauncherExecutor(c => a.queue.TryEnqueue(() => a.Command(c))), a.launcherSearch!.OpenFileAsync, () => a.launcherSearch?.SearchMemory);
             var view = new LauncherView((ILauncherSearch?)a.launcherSearch ?? new Pane.DesignData.LauncherSampleSearch { PinnedApps = () => a.Store.Current.Launcher.PinnedApps }, a.Ai, a.secondaryActions!,
                 a.demo ? new Pane.DesignData.LauncherAttachmentActionsSample() : new Pane.Services.Clipboard.ClipboardAttachmentActions(a.launcherSearch!),
                 new Pane.Services.Clipboard.LauncherClipboardHistory(a.ClipboardHistory, a.Store));
@@ -301,7 +304,7 @@ public sealed partial class App
             if (!App.demo)
             {
                 var folders = new Pane.Services.FolderJumpService();
-                App.DialogSearch = new Pane.Services.DialogSearchService(new Pane.Services.Launcher.EverythingIpc(), folders);
+                App.DialogSearch = new Pane.Services.DialogSearchService(new Pane.Services.Launcher.EverythingIpc(), folders, () => App.launcherSearch?.SearchMemory);
                 App.FolderJump = folders;
                 App.AttachDialogSearch(App.DialogSearch);
             }

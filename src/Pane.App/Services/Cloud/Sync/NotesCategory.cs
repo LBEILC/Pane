@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.Json;
 using Pane.Contracts;
 using Pane.Services.Memo;
 
@@ -34,8 +35,17 @@ internal sealed partial class SyncService
         public bool Enabled(SyncOptions options) => engine.NotesEnabled(options);
         NoteStore Store => engine.notes ?? throw new OperationCanceledException();
 
-        internal static string? TextHash(JsonObject? body) => body == null ? null :
+        internal static string? TextHash(JsonObject? body) => body?["text"] == null ? null :
             Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes((string)body["text"]!)));
+
+        static string DefinitionId(byte[] key,string name) => SyncCrypto.Id(key,"notes","tag/" + name.ToUpperInvariant());
+        static JsonObject TagBody(MemoTag tag) => new()
+        {
+            ["v"] = 2, ["definition"] = JsonSerializer.SerializeToNode(tag,MemoJson.Default.MemoTag)
+        };
+
+        static string[] TagNames(JsonObject body) => body["tags"] is JsonArray names
+            ? names.Select(n => (string)n!).ToArray() : [];
 
         static void CaptureOne(SyncJournal j,string device,string id,Note? note)
         {
@@ -49,8 +59,10 @@ internal sealed partial class SyncService
             }
             long created = note.Created.ToUnixTimeMilliseconds(), modified = note.Modified.ToUnixTimeMilliseconds();
             if (body != null && (string?)body["text"] == note.Text && (bool?)body["pinned"] == note.Pinned &&
-                (long?)body["created"] == created && (long?)body["modified"] == modified) return;
+                (long?)body["created"] == created && (long?)body["modified"] == modified &&
+                body["tags"] != null && TagNames(body).SequenceEqual(note.Tags)) return;
             body = Local(j,id,"notes",device).Body!;
+            body["tags"] = new JsonArray(note.Tags.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray());
             body["text"] = note.Text;
             body["pinned"] = note.Pinned;
             body["created"] = created;
@@ -61,6 +73,15 @@ internal sealed partial class SyncService
         {
             var all = Store.All;
             var seen = new HashSet<string>();
+            foreach (var tag in Store.Definitions)
+            {
+                string id = DefinitionId(key,tag.Name);
+                seen.Add(id);
+                var record = j.Records.GetValueOrDefault(id);
+                var body = TagBody(tag);
+                if (record?.Unknown == null && !JsonNode.DeepEquals(record?.Body,body))
+                    Local(j,id,Name,device).Body = body;
+            }
             foreach (var note in all)
             {
                 CaptureOne(j,device,note.Id,note);
@@ -75,6 +96,11 @@ internal sealed partial class SyncService
             var wire = new JsonObject { ["c"]=Name, ["id"]=id, ["base"]=record.Base };
             if (record.Body == null) { wire["deleted"]=true; return wire; }
             var body = record.Body.DeepClone().AsObject();
+            if (body["definition"] != null)
+            {
+                wire["data"] = SyncCrypto.Encrypt(key,Name,id,body.ToJsonString());
+                return wire;
+            }
             using var compressed = new MemoryStream();
             using (var zip = new DeflateStream(compressed,CompressionLevel.Fastest,true))
                 zip.Write(Encoding.UTF8.GetBytes((string)body["text"]!));
@@ -108,7 +134,7 @@ internal sealed partial class SyncService
 
         Note Materialize(string id,JsonObject b) => new(id,(string)b["text"]!, (bool)b["pinned"]!,
             DateTimeOffset.FromUnixTimeMilliseconds((long)b["created"]!),
-            DateTimeOffset.FromUnixTimeMilliseconds((long)b["modified"]!),From(b));
+            DateTimeOffset.FromUnixTimeMilliseconds((long)b["modified"]!),From(b)) { Tags = TagNames(b) };
 
         JsonObject Merge(SyncRecord local,JsonObject result,string? remoteHash,string device,out JsonObject? copy)
         {
@@ -130,6 +156,7 @@ internal sealed partial class SyncService
             {
                 var merged = (leftEdited ? left : result).DeepClone().AsObject();
                 var latest = newer ? left : result;
+                merged["tags"] = latest["tags"]?.DeepClone();
                 merged["pinned"] = latest["pinned"]!.DeepClone();
                 merged["modified"] = latest["modified"]!.DeepClone();
                 result = merged;
@@ -147,6 +174,18 @@ internal sealed partial class SyncService
             if ((bool?)wire["deleted"] != true)
             {
                 var body = JsonNode.Parse(SyncCrypto.Decrypt(key,Name,id,(string)wire["data"]!))!.AsObject();
+                if ((int?)body["v"] == 2 && body["definition"] is JsonObject definition)
+                {
+                    var tag = definition.Deserialize(MemoJson.Default.MemoTag) ?? throw new InvalidDataException();
+                    if (DefinitionId(key,tag.Name) != id || tag.Name.Length is 0 or > 30 || tag.Name.Trim() != tag.Name)
+                        throw new InvalidDataException();
+                    var winner = Store.MergeDefinition(tag,out var persisted);
+                    await persisted;
+                    remote.Body = TagBody(winner);
+                    remote.Dirty = winner != tag;
+                    j.Records[id] = remote;
+                    return;
+                }
                 if ((int?)body["v"] != 1) { remote.Unknown=wire.DeepClone().AsObject(); j.Records[id]=remote; return; }
                 if (body["richBlocks"] is JsonArray blocks)
                 {
@@ -171,6 +210,11 @@ internal sealed partial class SyncService
                 CaptureOne(j,engine.localDeviceId,id,current);
                 local = j.Records.GetValueOrDefault(id);
                 var result = remote.Body;
+                if (result != null && result["tags"] == null && current != null)
+                {
+                    result = result.DeepClone().AsObject();
+                    result["tags"] = new JsonArray(current.Tags.Select(n => (JsonNode?)JsonValue.Create(n)).ToArray());
+                }
                 JsonObject? copy = null;
                 if (local?.Dirty == true)
                 {

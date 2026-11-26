@@ -42,6 +42,7 @@ public sealed class ClipboardSample : IClipboardHistory
             T(ClipKind.Link, "https://learn.microsoft.com/windows/apps/winui/winui3/", "Edge", 14),
             T(ClipKind.Text, "| 项目 | 预算 | 负责人 |\n| --- | --- | --- |\n| 官网改版 | 12 万 | 设计组 |", "Edge", 22) with { Rich = true, Tags = ["工作"] },
             T(ClipKind.Text, "会议改到周四下午三点，地点不变，记得带上打印好的方案和预算表。", "微信", 31) with { Tags = ["工作"] },
+            T(ClipKind.Text, @"D:\设计", "资源管理器", 3600),   // 网址和路径（141）：文字是文件夹路径
             new((id++).ToString(), ClipKind.Files, null, [@"D:\设计\设计稿-v3.fig", @"D:\设计\图标导出.zip", @"D:\设计\说明.txt"], null, null, null,
                 "文件资源管理器", Sources["文件资源管理器"], now.AddMinutes(-48), false),
             T(ClipKind.Color, "#3B82F6", "Photoshop", 65),

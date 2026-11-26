@@ -48,18 +48,18 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     internal int CachedApps {get;private set;}
     internal string? CachedQuery {get;private set;}
     // 保留宿主已有接线；Shell 枚举只在子进程中调用。
-    public LauncherSearch(SettingsStore store,WindowsAppCatalog catalog,ILauncherFiles files,ILauncherExecutor executor)
-        :this(store,new ProcessLauncherIndex(store.DirectoryPath),files,executor) { }
-    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null,LauncherActionPlatform? actionPlatform=null)
+    public LauncherSearch(SettingsStore store,WindowsAppCatalog catalog,ILauncherFiles files,ILauncherExecutor executor,IOpenTargets openTargets)
+        :this(store,new ProcessLauncherIndex(store.DirectoryPath),files,executor,openTargets:openTargets) { }
+    public LauncherSearch(SettingsStore store,ILauncherIndex index,ILauncherFiles files,ILauncherExecutor executor,ILauncherEnvironment? environment=null,ILaunchProcess? process=null,TerminalPrograms? programs=null,LauncherActionPlatform? actionPlatform=null,IOpenTargets? openTargets=null)
     {
         var started=System.Diagnostics.Stopwatch.StartNew();
         this.store=store;this.index=index;this.executor=executor;lastFavorites=store.Current.Launcher.Favorites.ToArray();lastPortable=store.Current.Launcher.Portable.ToArray();
         environment??=new LauncherEnvironment();process??=new LaunchProcess();
         terminal=new(store,environment,process,programs);
-        WebSearchHistory=new(store); SearchMemory=new(store.DirectoryPath);
+        WebSearchHistory=new(store); SearchMemory=new(store.DirectoryPath, q => LearningQuery(q,store.Current.Launcher));
         portablePlatform=actionPlatform??new WindowsLauncherActionPlatform();
         actions=new(portablePlatform,executor,process);
-        sources=[new DirectSource(executor),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new NoteSource(() => NoteProvider()),new CommandSource(executor, () => NoteProvider() != null),new WebSource(executor)];
+        sources=[new DirectSource(openTargets ?? new OpenTargetService(executor)),new PowerTimerSource(() => PowerTimerProvider()),new SystemSettingsSource(executor,process,environment,RecordUse),new ExtraCommandSource(executor,environment),new CalculationSource(executor),new ApplicationSource(executor,RecordUse),new FavoriteSource(executor),new FileSource(files,executor),new NoteSource(() => NoteProvider()),new CommandSource(executor, () => NoteProvider() != null),new WebSource(executor)];
         store.LocalUsageReplaced += ReloadUsage;
         try{ReloadUsage();}
         catch(Exception e) when(e is IOException or JsonException or UnauthorizedAccessException){IndexError="usage:"+e.GetType().Name;}
@@ -158,7 +158,7 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         cancellationToken.ThrowIfCancellationRequested();if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
         var learningQuery=LearningQuery(query,context.Settings);
         var selected=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).ToArray();
-        var pending=selected.Select(s=>Task.Run(()=>SearchSource(s,context,cancellationToken),cancellationToken)).ToArray();
+        var pending=selected.Select(s=>Task.Run(()=>SearchSource(s,s is DirectSource && query != context.Query ? context with { Query = query } : context,cancellationToken),cancellationToken)).ToArray();
         IReadOnlyList<LauncherItem>[]? local = null;
         if (partial != null)
         {

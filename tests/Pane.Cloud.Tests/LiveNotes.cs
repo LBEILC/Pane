@@ -56,6 +56,31 @@ internal static partial class Program
         await Flush(sb,sa);
         Check(left.Find(note.Id) == undo,"另一台撤销删除");
 
+        left.CreateTag("分类",2);
+        left.SetTags(note.Id,["分类"]);
+        await Flush(sa,sb);
+        Check(right.Find(note.Id)!.Tags.SequenceEqual(["分类"]) && right.Tags.Contains(new("分类",2)),"A 打标签，B 收到定义和引用");
+        left.UpdateTag("分类","分类",5);
+        await Flush(sa,sb);
+        Check(right.Tags.Contains(new("分类",5)),"修改色点同步");
+
+        // 通过相同服务端提交旧版加密正文，显式省略 tags。
+        var oldBody = new JsonObject { ["v"]=1, ["text"]="旧设备修改", ["pinned"]=true,
+            ["created"]=note.Created.ToUnixTimeMilliseconds(), ["modified"]=DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() };
+        long seq = long.Parse(sql($"SELECT seq FROM pane_records WHERE id='{note.Id}'",true));
+        var oldChange = new JsonObject { ["c"]="notes", ["id"]=note.Id, ["base"]=seq,
+            ["data"]=SyncCrypto.Encrypt(aa.DataKey,"notes",note.Id,oldBody.ToJsonString()) };
+        var oldReply = await aa.SyncRequest("sync",new() { ["cursor"]=seq, ["changes"]=new JsonArray(oldChange) },"memo-a",ct);
+        Check(oldReply["accepted"]!.AsArray().Count==1,"服务端收到旧版记录");
+        await Flush(sb,sa);
+        Check(right.Find(note.Id) is {Text:"旧设备修改"} oldResult && oldResult.Tags.SequenceEqual(["分类"]),"旧版缺少标签字段保留 B 的标签");
+        await Offline();
+        right.UpdateTag("分类","分类",1);
+        left.DeleteTag("分类");
+        await Rejoin();
+        await Flush(sb,sa);
+        Check(left.Tags.Count==0 && right.Tags.Count==0 && right.Find(note.Id)!.Tags.Count==0,"删除定义后往返同步仍为空");
+
         string longText = Convert.ToBase64String(RandomNumberGenerator.GetBytes(96000));
         left.Update(note.Id,longText);
         await Flush(sa,sb);
@@ -80,10 +105,24 @@ internal static partial class Program
         await Offline();
         left.Update(note.Id,"A 的修改");
         right.Update(note.Id,"B 的修改");
+        left.SetTags(note.Id,["A 分类"]);
+        right.SetTags(note.Id,["B 分类"]);
         await Rejoin();
         foreach (var (store,own,other) in new[]{(left,"A","B"),(right,"B","A")})
             Check(store.All.Count==2 && store.All.Any(n=>n.Text==own+" 的修改" && n.From==null) &&
-                store.All.Any(n=>n.Text==other+" 的修改" && n.From==other),"正文冲突两份及对方电脑名 "+own);
+                store.All.Any(n=>n.Text==other+" 的修改" && n.From==other) &&
+                store.All.All(n=>n.Tags.SequenceEqual([n.Text[..1]+" 分类"])),"正文冲突两份、各自标签及对方电脑名 "+own);
+
+        await Offline();
+        left.UpdateTag("A 分类","A 分类",1);
+        left.SetTags(note.Id,["较早"]);
+        while (DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() <= left.Find(note.Id)!.Modified.ToUnixTimeMilliseconds())
+            await Task.Delay(1,ct);
+        right.UpdateTag("A 分类","A 分类",4);
+        right.SetTags(note.Id,["较晚"]);
+        await Rejoin();
+        Check(new[]{left,right}.All(s=>s.All.Count==2 && s.Find(note.Id)!.Tags.SequenceEqual(["较晚"]) &&
+            s.Tags.Contains(new("A 分类",4))),"只改标签和色点分别取较新版本");
 
         await Offline();
         left.SetPinned(note.Id,false);

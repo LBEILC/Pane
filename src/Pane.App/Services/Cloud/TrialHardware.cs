@@ -1,7 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Win32;
 
 namespace Pane.Services.Cloud;
 
@@ -9,7 +8,7 @@ internal static class TrialHardware
 {
     [DllImport("kernel32.dll")]
     static extern uint GetSystemFirmwareTable(uint provider, uint table, [Out] byte[]? buffer, uint size);
-    internal static string?[] Read() => [Hash(FirmwareId()), Hash(RegistryId())];
+    internal static string?[] Read() => [Hash(FirmwareId()), Hash(Pane.Settings.WindowsMachine.RegistryId())];
     internal static string? Hash(string? value)
     {
         if (!Guid.TryParse(value, out var id)) return null;
@@ -18,16 +17,6 @@ internal static class TrialHardware
             or "03000200-0400-0500-0006-000700080009" or "00020003-0004-0005-0006-000700080009"
             or "12345678-1234-5678-1234-567812345678") return null;
         return CloudKeys.Encode(SHA256.HashData(Encoding.UTF8.GetBytes("pane-trial-v1:" + value)));
-    }
-    static string? RegistryId()
-    {
-        try
-        {
-            using var root = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
-            using var key = root.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
-            return key?.GetValue("MachineGuid") as string;
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException) { return null; }
     }
     static string? FirmwareId()
     {

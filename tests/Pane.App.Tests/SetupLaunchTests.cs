@@ -16,7 +16,7 @@ internal static class SetupLaunchTests
                     calls.Add("shell"); Check(exe == paths.Exe, "外壳目标");
                     Check(args.SequenceEqual(background ? ["--autostart"] : Array.Empty<string>()), "外壳参数");
                     Check(foreground == !background, "前台权限请求"); return 0;
-                }, (_, _) => calls.Add("direct"), _ => calls.Add("log"));
+                }, (_, _) => calls.Add("direct"), (_, _) => calls.Add("log"));
             processes.Launch(background);
             Check(calls.SequenceEqual(["shell"]), "正式模式只走外壳");
 
@@ -27,9 +27,18 @@ internal static class SetupLaunchTests
                     Check(info.FileName == paths.Exe && info.ArgumentList.SequenceEqual(background ? ["--autostart"] : Array.Empty<string>()), "回退目标及参数");
                     Check(!info.UseShellExecute && info.CreateNoWindow && info.WorkingDirectory == paths.App, "回退进程选项");
                     Check(new[] { "PANE_DATA_DIR", "PANE_INSTANCE", "PANE_RESULT", "PANE_DEMO", "PANE_OBSERVE", "PANE_VERIFY", "PANE_DEV_HOTKEYS", "PANE_BIN_DIR" }.All(n => !info.Environment.ContainsKey(n)), "回退环境清理");
-                }, code => { calls.Add("log"); Check(code == unchecked((int)0x80004005), "记录原始 HRESULT"); });
+                }, (code, elevated) => { calls.Add("log"); Check(!elevated && code == unchecked((int)0x80004005), "记录普通权限回退和原始 HRESULT"); }, () => false);
             processes.Launch(background);
             Check(calls.SequenceEqual(["shell", "log", "direct"]), "失败先记日志再回退一次");
+
+            calls.Clear();
+            processes = new SetupProcesses(paths, false,
+                (_, _, _) => { calls.Add("shell"); return -1; },
+                (_, _) => calls.Add("direct"),
+                (code, elevated) => { calls.Add("log"); Check(elevated && code == -1, "记录管理员跳过启动和原始 HRESULT"); },
+                () => true);
+            processes.Launch(background);
+            Check(calls.SequenceEqual(["shell", "log"]), "管理员外壳启动失败后结束");
 
             calls.Clear();
             processes = new SetupProcesses(paths, true, (_, _, _) => throw new Exception("隔离不能调用外壳"),
@@ -37,7 +46,7 @@ internal static class SetupLaunchTests
                     calls.Add("direct"); Check(wait, "隔离等待探针结束");
                     Check(info.ArgumentList.SequenceEqual(["--setup-launch-probe", paths.Root]), "隔离探针参数");
                     Check(info.Environment["PANE_DATA_DIR"] == paths.Data && info.Environment["PANE_INSTANCE"] == paths.Root, "隔离环境");
-                }, _ => throw new Exception("隔离不能记回退"));
+                }, (_, _) => throw new Exception("隔离不能记回退"));
             processes.Launch(background);
             Check(calls.SequenceEqual(["direct"]), "隔离只走直接启动");
         }

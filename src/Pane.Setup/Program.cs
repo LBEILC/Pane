@@ -8,6 +8,7 @@ internal static class Program
 {
     [STAThread] static int Main(string[] args)
     {
+        if (File.Exists(Path.Combine(AppContext.BaseDirectory, "portable"))) return 2;
         string? temporary = null;
         string? isolated = null;
         string? readyEvent = null;

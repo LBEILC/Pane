@@ -58,12 +58,13 @@ public sealed partial class SettingsView
 
         // 导入
         var rows = new List<FrameworkElement>();
-        DataImportOutcome? last = null;
-        try { last = transfer.LastImport; } catch (Exception) { }   // 结果文件读不出就当没有
+        // 上次导入的结果：启动时已读出并清掉（只提示一次），这里只显示本次运行里留着的那份；演示数据仍从服务读
+        DataImportOutcome? last = ShownImport;
+        if (last is null && SettingsView.DataStorage is null) { try { last = transfer.LastImport; } catch (Exception) { } }
         if (last is { } outcome)
             rows.Add(Row(Strings.Settings_Data_LastImport, outcome.Error ?? string.Format(Strings.Settings_Data_ImportDone, (object?)outcome.Backup),
                 IconButton("folder", Strings.Settings_Data_OpenFolder, () => OpenFolder(Path.GetDirectoryName(outcome.Backup)!)),
-                IconButton("close", Strings.Common_Close, () => { try { transfer.AcknowledgeImport(); } catch (Exception) { } Render(); })));
+                IconButton("close", Strings.Common_Close, () => { ShownImport = null; try { transfer.AcknowledgeImport(); } catch (Exception) { } Render(); })));
 
         if (importInfo is { } info && importPath is { } path)
         {

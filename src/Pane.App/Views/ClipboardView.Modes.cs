@@ -147,6 +147,36 @@ public sealed partial class ClipboardView
         OpList.ItemsSource = ops;
         UpdateLayout();
         OpSelect(0);
+        menuTarget = null;
+        if (e.Kind is not (ClipKind.Files or ClipKind.Image)) _ = AddTargetOps(e);
+    }
+
+    // 网址和路径（任务 141）：文字条目整段是路径（或 www. 开头的网址）时，补上「打开」和「在资源管理器中显示」，排在「编辑」前面
+    OpenTarget? menuTarget;
+    async Task AddTargetOps(ClipEntry e)
+    {
+        OpenTarget? target;
+        try { target = await ((App)Application.Current).OpenTargets.DetectAsync(e, CancellationToken.None); }
+        catch (Exception) { return; }
+        if (target is null || mode != ClipMode.Menu || !ReferenceEquals(modeTarget, e)) return;
+        if (target.Kind == OpenTargetKind.Url && e.Kind == ClipKind.Link) return;   // 已经有「打开网址」
+        var extra = target.Kind switch
+        {
+            OpenTargetKind.Url => new List<(string Id, string Title, string Glyph)> { ("target-open", Strings.Clipboard_OpenLink, "external") },
+            OpenTargetKind.Folder => [("target-open", Strings.Clipboard_OpenFolder, "folder-open"), ("target-reveal", Strings.Clipboard_RevealInExplorer, "folder")],
+            _ => [("target-open", Strings.Common_Open, "external"), ("target-reveal", Strings.Clipboard_RevealInExplorer, "folder")],
+        };
+        menuTarget = target;
+        int at = ops.ToList().FindIndex(o => o.Id == "edit");
+        if (at < 0) at = Math.Min(ops.Count, 2);
+        var list = ops.Select(o => (o.Id, o.Title, o.Glyph, o.KeyText, o.Danger)).ToList();
+        list.InsertRange(at, extra.Select(x => ((string?)x.Id, x.Title, x.Glyph, "", false)));
+        int keep = opSel >= at ? opSel + extra.Count : opSel;
+        ops.Clear();
+        int n = 0;
+        foreach (var o in list) ops.Add(new ClipOp(o.Item1, o.Item2, o.Item3, o.Item4, ++n, o.Item5));
+        UpdateLayout();
+        OpSelect(Math.Max(keep, 0));
     }
 
     void RunOp(ClipOp op)
@@ -165,11 +195,19 @@ public sealed partial class ClipboardView
             case "tags": OpenTags(e); break;
             case "words": LeaveMode(); OpenWords?.Invoke(this, e); break;
             case "memo": LeaveMode(); SaveMemo?.Invoke(this, e); break;
+            case "target-open" or "target-reveal" when menuTarget is { } target:
+                LeaveQuiet(); AfterUse(); _ = OpenMenuTarget(target, op.Id == "target-reveal", op.Title); break;
             case "send": LeaveQuiet(); if (ForLauncher) UseInLauncher?.Invoke(this, e); else SendToLauncher?.Invoke(this, e); break;
             case "pin": history.SetPinned(e.Id, !e.Pinned); LeaveMode(); break;
             case "delete": LeaveMode(); history.Delete(e.Id); break;
             default: LeaveQuiet(); AfterUse(); ActionRequested?.Invoke(this, (e, op.Id!)); break;
         }
+    }
+
+    static async Task OpenMenuTarget(OpenTarget target, bool reveal, string title)
+    {
+        try { await ((App)Application.Current).OpenTargets.OpenAsync(target, reveal, CancellationToken.None); }
+        catch (Exception ex) { ((App)Application.Current).ReportFailure(title, ex); }
     }
 
     // 执行后面板要收起的：不重建列表，直接退出模式状态（收起时 OnHidden 会清掉列表）

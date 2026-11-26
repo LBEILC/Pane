@@ -272,6 +272,8 @@ public sealed partial class SettingsView
     /// <summary>扫描状态。工程在启动器能力装配时设（057）；没设时用演示数据。</summary>
     internal static IPortableAppsStatus? PortableApps { get; set; }
     internal static IDataStorage? DataStorage { get; set; }
+    /// <summary>启动时读出的上次导入结果（已从磁盘清掉，只在本次运行里显示）。</summary>
+    internal static DataImportOutcome? ShownImport { get; set; }
     internal static IAppAliases? AppAliases { get; set; }
     // 已隐藏的搜索条目（098，issue 49）：启动器能力启用时由宿主设（同 AppAliases），停用时清掉
     internal static ILauncherHiddenItems? HiddenItems { get; set; }

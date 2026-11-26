@@ -188,12 +188,13 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (attach is null && query is null && seconds > 0 && clipboard.Snapshot().OrderByDescending(e => e.CopiedAt).FirstOrDefault() is { } newest
             && DateTimeOffset.Now - newest.CopiedAt < TimeSpan.FromSeconds(seconds))
             attach = newest;
-        // 设计预览：PANE_DESIGN_ATTACH=text|image|files 带一个对应类型的附件
+        // 设计预览：PANE_DESIGN_ATTACH=text|image|files|path 带一个对应类型的附件
         if (Environment.GetEnvironmentVariable("PANE_DESIGN_ATTACH") is { Length: > 0 } kind)
             attach = clipboard.Snapshot().FirstOrDefault(e => kind switch
             {
                 "image" => e.Kind == ClipKind.Image,
                 "files" => e.Kind == ClipKind.Files,
+                "path" => e.Kind is ClipKind.Text && e.Text == @"D:\设计",   // 网址和路径（141）
                 _ => e.Kind is ClipKind.Text,
             }) ?? attach;
         SetAttachment(attach, animate: false);
@@ -252,6 +253,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     void SetAttachment(ClipEntry? entry, bool animate = true)
     {
         attachment = entry;
+        attachmentTarget = null;
+        if (entry is { Kind: not (ClipKind.Files or ClipKind.Image) }) _ = DetectAttachment(entry);
         if (entry is null)
         {
             AttachChip.Visibility = Visibility.Collapsed;
@@ -263,6 +266,33 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         AttachChip.Visibility = Visibility.Visible;
         Input.PlaceholderText = Strings.Launcher_AttachmentPlaceholder;
         if (animate) PlayAttachIn();
+    }
+
+    // 网址和路径（issue 76，任务 141）：带进来的文字整段是网址或存在的路径时，最上面给「打开」，默认选中
+    OpenTarget? attachmentTarget;
+    async Task DetectAttachment(ClipEntry entry)
+    {
+        OpenTarget? target;
+        try { target = await ((App)Application.Current).OpenTargets.DetectAsync(entry, CancellationToken.None); }
+        catch (Exception) { return; }
+        if (target is null || !ReferenceEquals(attachment, entry)) return;
+        attachmentTarget = target;
+        _ = Refresh(Input.Text);
+    }
+
+    List<LauncherItem> TargetItems(OpenTarget t) => t.Kind switch
+    {
+        OpenTargetKind.Url => [new("target:open", LauncherItemKind.Action, LauncherGroups.Direct, t.Value, Strings.Launcher_DirectOpenUrl, new("globe"))],
+        OpenTargetKind.Folder => [new("target:open", LauncherItemKind.Action, LauncherGroups.Direct, t.Value, Strings.Launcher_DirectOpenFolder, new("folder"))],
+        _ => [new("target:open", LauncherItemKind.Action, LauncherGroups.Direct, t.Value, Strings.Launcher_DirectOpenFile, new("doc")),
+              new("target:reveal", LauncherItemKind.Action, LauncherGroups.Direct, Strings.Clipboard_RevealInExplorer, System.IO.Path.GetFileName(t.Value), new("folder"))],
+    };
+
+    async Task OpenAttachmentTarget(OpenTarget t, bool reveal, string title)
+    {
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+        try { await ((App)Application.Current).OpenTargets.OpenAsync(t, reveal, CancellationToken.None); }
+        catch (Exception e) { ((App)Application.Current).ReportFailure(title, e); }
     }
 
     static string AttachmentLabel(ClipEntry e) => e.Kind switch
@@ -369,6 +399,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         else
         {
+            if (attachmentTarget is { } target) items.AddRange(TargetItems(target));
             foreach (var act in AiOn ? ai.Actions : [])
                 items.Add(new("ai:" + act.Id, LauncherItemKind.Ai, LauncherGroups.Ai, act.Name,
                     act.Id == "translate" ? Strings.Launcher_AttachmentTranslateDescription : Strings.Launcher_AttachmentActionDescription, new(act.Glyph)));
@@ -377,7 +408,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             items.Add(new("search-files", LauncherItemKind.Action, LauncherGroups.Other, Strings.Launcher_SearchFiles, Strings.Launcher_OpenFiles, new("folder")));
         }
         var q = query.Trim();
-        if (q.Length > 0) items = items.Where(i => i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (q.Length > 0) items = items.Where(i => (i.Group == LauncherGroups.Direct ? i.Subtitle ?? "" : i.Title).Contains(q, StringComparison.OrdinalIgnoreCase) || i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
         if (q.Length > 0 && AiOn && a.Kind != ClipKind.Image && a.Kind != ClipKind.Files)
             items.Add(new("ai:ask", LauncherItemKind.Ai, LauncherGroups.Ai, string.Format(Strings.Launcher_AskQuery, (object?)(q)), Strings.Launcher_SendWithAttachment, new("ai")));
         return items;
@@ -866,6 +897,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             LauncherCell.File => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open), (["Tab"], Strings.Launcher_ViewInFiles), (["Ctrl", "+", "K"], Strings.Launcher_MoreActions)]),
             LauncherCell.More => (string.Format(Strings.Launcher_SearchInFiles, (object?)(q)), [(["Enter"], Strings.Launcher_OpenFiles)]),
             LauncherCell.Action => ActionFoot(ActionId(item), item.Title, q),
+            LauncherCell.Attachment when item.Id == "target:open" => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
+            LauncherCell.Attachment when item.Id == "target:reveal" => (item.Title, [(["Enter"], Strings.Common_Open)]),
             LauncherCell.Attachment when item.Id == "search-files" => (string.Format(Strings.Launcher_SearchFilesTarget, (object?)(FileQuery(attachment))), [(["Enter"], Strings.Launcher_OpenFiles)]),
             _ => (item.Title, [(["Enter"], Strings.Common_Execute)]),
         };
@@ -1297,6 +1330,9 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 return;
             case LauncherCell.Attachment when item.Id == "search-files":
                 OpenFiles?.Invoke(FileQuery(attachment), null); return;
+            case LauncherCell.Attachment when item.Id.StartsWith("target:", StringComparison.Ordinal) && attachmentTarget is { } openTarget:
+                if (tab) { TabToFiles(q); return; }
+                await OpenAttachmentTarget(openTarget, item.Id == "target:reveal", item.Id == "target:reveal" ? item.Title : item.Subtitle ?? item.Title); return;
             case LauncherCell.Action:
                 var id = ActionId(item);
                 if (id == "files") { OpenFiles?.Invoke(q, null); return; }

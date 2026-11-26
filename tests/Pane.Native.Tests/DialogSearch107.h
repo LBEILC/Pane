@@ -1,11 +1,11 @@
 // 复用 038 的隐藏桌面、真实系统对话框和失败计数。前台查询是隐藏桌面唯一的替身。
-struct Notice107 { HWND window; RECT bounds; int flags; std::wstring type; };
+struct Notice107 { HWND window; RECT bounds; int flags; std::wstring type,appName; };
 std::mutex noticeMutex;
 std::vector<Notice107> notices;
 std::atomic<HWND> requestedForeground=nullptr;
 HWND WINAPI TestForeground107(){return requestedForeground.load();}
-void __stdcall Changed107(HWND window,RECT bounds,int flags,const wchar_t* type){
-    std::lock_guard<std::mutex> lock(noticeMutex);notices.push_back({window,bounds,flags,type});
+void __stdcall Changed107(HWND window,RECT bounds,int flags,const wchar_t* type,const wchar_t* appName){
+    std::lock_guard<std::mutex> lock(noticeMutex);notices.push_back({window,bounds,flags,type,appName});
 }
 template<typename Predicate> bool Await107(Predicate matches){
     for(int n=0;n<60;n++){
@@ -50,6 +50,12 @@ void SearchDialog107(bool legacy,bool save,int mode,const std::wstring& start,co
         Sleep(400);
         requestedForeground=window;apply(true,true);
         Check(Await107([&](auto& n){return n.window==window&&(n.flags&1)&&bool(n.flags&4)==save;}),"appearance, foreground and save kind");
+        if(mode>=3){
+            bool picker=mode==4;
+            Check(Await107([&](auto& n){return n.window==window&&bool(n.flags&8)==picker&&
+                bool(n.flags&4)==save&&n.appName==L"FolderJumpTests";}),"125 folder picker, save flag and process name");
+            PostMessageW(window,WM_CLOSE,0,0);return;
+        }
         if(mode==0){
             auto checkRect=[&]{auto bounds=Bounds107(window);return Await107([&](auto& n){return n.window==window&&EqualRect(&n.bounds,&bounds);});};
             Check(checkRect(),"initial physical bounds");
@@ -115,9 +121,10 @@ void SearchDialog107(bool legacy,bool save,int mode,const std::wstring& start,co
         ComPtr<IFileDialog> dialog;
         if(SUCCEEDED(CoCreateInstance(save?CLSID_FileSaveDialog:CLSID_FileOpenDialog,nullptr,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&dialog)))){
             ComPtr<IShellItem> folder;SHCreateItemFromParsingName(start.c_str(),nullptr,IID_PPV_ARGS(&folder));dialog->SetFolder(folder.Get());
-            dialog->SetOptions(FOS_DONTADDTORECENT|FOS_NOCHANGEDIR|FOS_FORCEFILESYSTEM);
+            dialog->SetOptions(FOS_DONTADDTORECENT|FOS_NOCHANGEDIR|FOS_FORCEFILESYSTEM|(mode==4?FOS_PICKFOLDERS:0));
             COMDLG_FILTERSPEC filters[]={{L"All (*.*)",L"*.*"},{L"Text (*.txt)",L"*.txt"},{L"Image (*.png;*.jpg)",L"*.png;*.jpg"}};
-            dialog->SetFileTypes(3,filters);auto events=new Events;DWORD cookie=0;dialog->Advise(events,&cookie);events->Release();
+            if(mode<3)dialog->SetFileTypes(3,filters);
+            auto events=new Events;DWORD cookie=0;dialog->Advise(events,&cookie);events->Release();
             if(SUCCEEDED(dialog->Show(nullptr))){
                 ComPtr<IShellItem> item;PWSTR path=nullptr;
                 if(SUCCEEDED(dialog->GetResult(&item))&&SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH,&path))){result=path;CoTaskMemFree(path);}
@@ -128,6 +135,11 @@ void SearchDialog107(bool legacy,bool save,int mode,const std::wstring& start,co
     driver.join();service.reset();DestroyWindow(search);
     Check(mode==2?Key(result)==Key(selected.wstring()):result.empty(),"dialog returned expected file only on confirmation");
     if(!save&&mode==2)std::filesystem::remove(selected);
+}
+int MetadataSuite(){
+    auto root=std::filesystem::temp_directory_path();
+    for(int kind=0;kind<3;++kind)SearchDialog107(false,kind==1,kind==2?4:3,root.wstring(),root.wstring());
+    logFile<<"assertions="<<assertions<<" failures="<<failures<<std::endl;return failures?1:0;
 }
 int SearchSuite(){
     auto root=std::filesystem::temp_directory_path()/(L"Pane107-"+std::to_wstring(GetCurrentProcessId()));

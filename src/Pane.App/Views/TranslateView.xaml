@@ -80,10 +80,12 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="28"/>
                 </Grid.RowDefinitions>
-                <ScrollViewer x:Name="OutScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <TextBlock x:Name="Out" TextWrapping="Wrap" IsTextSelectionEnabled="True" LineHeight="26.4"
-                               FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" Foreground="{ThemeResource PaneText1Brush}"/>
-                </ScrollViewer>
+                <c:ScrollFade>
+                    <ScrollViewer x:Name="OutScroller" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <TextBlock x:Name="Out" TextWrapping="Wrap" IsTextSelectionEnabled="True" LineHeight="26.4"
+                                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextLg}" Foreground="{ThemeResource PaneText1Brush}"/>
+                    </ScrollViewer>
+                </c:ScrollFade>
                 <Grid Grid.Row="1" ColumnSpacing="6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>

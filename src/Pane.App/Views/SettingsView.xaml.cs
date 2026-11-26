@@ -37,6 +37,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     public SettingsView()
     {
         InitializeComponent();
+        Scroller.ViewChanged += (_, _) => OnBodyScrolled();
         sections =
         [
             // 2026-11-23 用户定：按关联分四组（docs/design.md「设置页」导航分组）；通用拆出外观，原「图标」并进外观；加快捷键总览
@@ -278,11 +279,77 @@ public sealed partial class SettingsView : UserControl, IPanelView
         SectionDesc.Text = current.Desc;
         Body.Children.Clear();
         current.Render();
-        if (resetScroll) Scroller.ChangeView(null, 0, null, true);
+        if (resetScroll) { SetHeadCollapsed(false, animate: false); Scroller.ChangeView(null, 0, null, true); }
         else DispatcherQueue.TryEnqueue(() => Scroller.ChangeView(null, offset, null, true));
     }
 
     void OnClose(object sender, RoutedEventArgs e) => CloseRequested?.Invoke(this, EventArgs.Empty);
+
+    // ---------------- 页头收起（2026-11-26 用户定「渐隐 + 收起」，原型 settings.html） ----------------
+    // 滚过 4 px 收起：说明收起、标题 title → lg、下面出现细分隔线；回到 1 px 以内恢复。
+    // 收起后页头变矮、内容区变高，内容不够长时会滚不动又展开，来回跳：可滚动距离超过 48 才收。
+    bool headCollapsed;
+    Microsoft.UI.Xaml.Media.Animation.Storyboard? headMotion;
+
+    void OnBodyScrolled()
+    {
+        if (!headCollapsed && Scroller.VerticalOffset > 4 && Scroller.ScrollableHeight > 48) SetHeadCollapsed(true, animate: true);
+        else if (headCollapsed && Scroller.VerticalOffset <= 1) SetHeadCollapsed(false, animate: true);
+    }
+
+    void SetHeadCollapsed(bool collapsed, bool animate)
+    {
+        if (headCollapsed == collapsed && headMotion == null) return;
+        headCollapsed = collapsed;
+        headMotion?.Stop();
+        headMotion = null;
+        double title = (double)Application.Current.Resources[collapsed ? "PaneTextLg" : "PaneTextTitle"];
+        if (!animate)
+        {
+            SectionTitle.FontSize = title;
+            SectionDesc.MaxHeight = collapsed ? 0 : double.PositiveInfinity;
+            SectionDesc.Opacity = collapsed ? 0 : 1;
+            HeadLine.Opacity = collapsed ? 1 : 0;
+            return;
+        }
+        if (!collapsed && double.IsInfinity(SectionDesc.MaxHeight)) SectionDesc.MaxHeight = 0;
+        double from = double.IsInfinity(SectionDesc.MaxHeight) ? SectionDesc.ActualHeight : SectionDesc.MaxHeight;
+        var ms = TimeSpan.FromMilliseconds(200 * ((App)Application.Current).Glass.Current.MotionSpeed + 1);
+        var ease = new Microsoft.UI.Xaml.Media.Animation.CubicEase { EasingMode = Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseOut };
+        var board = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+        void Add(DependencyObject target, string property, double? start, double to, bool dependent)
+        {
+            var a = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation { To = to, Duration = ms, EasingFunction = ease, EnableDependentAnimation = dependent };
+            if (start is { } s0) a.From = s0;
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(a, target);
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(a, property);
+            board.Children.Add(a);
+        }
+        Add(SectionTitle, "FontSize", null, title, true);
+        Add(SectionDesc, "MaxHeight", from, collapsed ? 0 : DescHeight(), true);
+        Add(SectionDesc, "Opacity", null, collapsed ? 0 : 1, false);
+        Add(HeadLine, "Opacity", null, collapsed ? 1 : 0, false);
+        board.Completed += (_, _) =>
+        {
+            if (!ReferenceEquals(headMotion, board)) return;
+            headMotion = null;
+            SectionTitle.FontSize = title;
+            SectionDesc.Opacity = collapsed ? 0 : 1;
+            HeadLine.Opacity = collapsed ? 1 : 0;
+            SectionDesc.MaxHeight = collapsed ? 0 : double.PositiveInfinity;
+        };
+        headMotion = board;
+        board.Begin();
+    }
+
+    // 说明文字完整显示时的高度（可能折成两行）
+    double DescHeight()
+    {
+        // 收起时 MaxHeight 是 0，量它自己量不出来：用同样字体的临时文字块量
+        var probe = new TextBlock { Text = SectionDesc.Text, TextWrapping = TextWrapping.Wrap, FontFamily = SectionDesc.FontFamily, FontSize = SectionDesc.FontSize };
+        probe.Measure(new Size(Math.Max(1, SectionDesc.ActualWidth > 0 ? SectionDesc.ActualWidth : Head.ActualWidth - Head.Padding.Left - Head.Padding.Right - 40), double.PositiveInfinity));
+        return probe.DesiredSize.Height > 0 ? probe.DesiredSize.Height : 20;
+    }
 
     // ================= IPanelView =================
 

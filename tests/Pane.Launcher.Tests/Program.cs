@@ -12,15 +12,20 @@ static partial class Program
     static async Task Main(string[] args)
     {
         if(args.FirstOrDefault()=="--launcher-index"){Environment.ExitCode=FixtureWorker(args);return;}
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_DATA_DIR")))
+            Environment.SetEnvironmentVariable("PANE_DATA_DIR",TestResults.NewDirectory("launcher-data-"));
         try{await Run(args);if(Environment.ExitCode==0)TestResults.Pass();}catch(Exception e){Console.Error.WriteLine(e);Environment.ExitCode=1;}
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--141")){await OpenTargets141Tests();return;}
         if(args.Contains("--123")){await Memo123Tests();return;}
         if(args.Contains("--122")){await AppHotkeyTests();return;}
 #if PANE_HIDDEN_DESKTOP
         if(args.FirstOrDefault()=="--122-hidden"){await HiddenAppHotkeyTest(args[1]);return;}
 #endif
+        if(args.Contains("--125")){await RankingTests125();return;}
+        if(args.Contains("--125-perf")){await RankingPerf125();return;}
         if(args.Contains("--121")){await SearchLearning121Tests();return;}
         if(args.Contains("--120")){await FolderListing120Tests();return;}
         if(args.Contains("--104-broad")){await BroadQuery(args.Contains("--files-only"));return;}

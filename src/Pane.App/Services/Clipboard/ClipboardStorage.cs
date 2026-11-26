@@ -16,14 +16,36 @@ internal sealed class ClipboardStorage:IClipboardStorage
         try{
             using var file=File.OpenRead(index);
             using var doc=JsonDocument.Parse(file);
+            ClipboardIndex? state;
             if(doc.RootElement.ValueKind==JsonValueKind.Array){
                 var legacy=doc.RootElement.Deserialize(ClipboardJson.Default.StoredClipArray)??throw new InvalidDataException();
-                return new(2,[],legacy.Select(c=>c with{FormatId=null,Entry=c.Entry with{Tags=[],Rich=false}}).ToArray());
+                state = new(2,[],legacy.Select(c=>c with{FormatId=null,Entry=c.Entry with{Tags=[],Rich=false}}).ToArray());
             }
-            var state=doc.RootElement.Deserialize(ClipboardJson.Default.ClipboardIndex);
-            return state is {Version:2,Entries:not null,Tags:not null}?state:throw new InvalidDataException("历史索引版本或内容无效");
+            else state=doc.RootElement.Deserialize(ClipboardJson.Default.ClipboardIndex);
+            if (state is not {Version:2,Entries:not null,Tags:not null}) throw new InvalidDataException("历史索引版本或内容无效");
+            string folder = Path.GetDirectoryName(index)!;
+            for (int i = 0; i < state.Entries.Length; i++)
+            {
+                var clip = state.Entries[i];
+                var entry = clip.Entry;
+                if (!Guid.TryParseExact(entry.Id, "N", out _)) continue;
+                var full = MovedImage(folder, entry.ContentPath, entry.Id + ".png");
+                var thumb = MovedImage(folder, entry.Thumbnail?.Path, entry.Id + ".thumb.png");
+                if (full != entry.ContentPath || thumb != entry.Thumbnail?.Path)
+                    state.Entries[i] = clip with { Entry = entry with { ContentPath = full, Thumbnail = thumb == null ? null : new(thumb) } };
+            }
+            return state;
         }catch(FileNotFoundException){return new(2,[],[]);}catch(DirectoryNotFoundException){return new(2,[],[]);}
     }
+    // 旧索引记绝对路径。便携目录搬家后，先认回索引旁同一条记录的图片，避免启动清理将其误删。
+    static string? MovedImage(string folder, string? path, string name)
+    {
+        if (path == null || !Path.IsPathFullyQualified(path) ||
+            !string.Equals(Path.GetFileName(path),name,StringComparison.OrdinalIgnoreCase)) return path;
+        string local = Path.Combine(folder,name);
+        return !string.Equals(local,path,StringComparison.OrdinalIgnoreCase) && File.Exists(local) ? local : path;
+    }
+
     public void Save(string index,StoredClip[] entries,Action<string> step)=>SaveIndex(index,new(2,[],entries),step);
     public void SaveIndex(string index,ClipboardIndex state,Action<string> step)
     {

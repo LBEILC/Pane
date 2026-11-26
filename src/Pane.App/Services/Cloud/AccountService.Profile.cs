@@ -74,7 +74,7 @@ internal sealed partial class AccountService
     public Task<CloudResult> RemoveDeviceAsync(string deviceId, CancellationToken ct) => Action(ct, async t =>
     {
         await Send(HttpMethod.Delete, DevicePath(deviceId), t);
-        if (deviceId == secrets.Read("device.dpapi")) Forget();
+        if (deviceId == DeviceId) Forget();
         else await Refresh(t);
     });
     public Task<CloudResult<CloudPlans>> GetPlansAsync(CancellationToken ct) => Run<CloudPlans>(ct, async t =>

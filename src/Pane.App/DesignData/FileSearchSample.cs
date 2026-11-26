@@ -40,6 +40,15 @@ public sealed class FileSearchSample : IFileSearch
             throw new FileSearchUnavailableException("Everything 没有运行，打开它之后就能搜文件");
         var q = query.Text.Trim();
         if (q.Length == 0) return new([], 0, null);
+        // 为对话框选（125）：用对话框搜索的假数据，照 Extensions / FoldersOnly 筛
+        if (query.Extensions is not null || query.FoldersOnly)
+        {
+            var dialog = new FileDialogInfo(0, 0, 0, 0, 0, true, false, false, query.Extensions, null, query.FoldersOnly);
+            var all = DialogSearchSample.Hits(q, dialog).ToList();
+            var byCategory = Enum.GetValues<FileCategory>().ToDictionary(c => c, c => c == FileCategory.All ? all.Count : all.Count(h => h.Category == c));
+            var inCategory = all.Where(h => query.Category == FileCategory.All || h.Category == query.Category).ToList();
+            return new(inCategory.Skip(offset).Take(count).ToList(), inCategory.Count, byCategory);
+        }
         var hits = Files.Where(f => f.Name.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
         var counts = Enum.GetValues<FileCategory>().ToDictionary(c => c, c => c == FileCategory.All ? hits.Count : hits.Count(h => h.Category == c));
         var shown = hits.Where(h => query.Category == FileCategory.All || h.Category == query.Category);

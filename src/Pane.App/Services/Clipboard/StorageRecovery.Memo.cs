@@ -10,14 +10,16 @@ internal static partial class StorageRecovery
         string source = Path.Combine(data,"clipboard",NoteDisk.DirectoryName);
         if (!Directory.Exists(source)) return;
         string target = NoteDisk.FolderFor(data,null);
-        var incoming = NoteDisk.Scan(source);
+        var sourceData = NoteDisk.ScanIndex(source);
+        var incoming = sourceData.Rows;
         if (!Directory.Exists(target))
         {
             Directory.Move(source,target);
             return;
         }
 
-        var merged = NoteDisk.Scan(target).ToDictionary(row => row.Id);
+        var targetData = NoteDisk.ScanIndex(target);
+        var merged = targetData.Rows.ToDictionary(row => row.Id);
         var occupied = Directory.EnumerateFileSystemEntries(target).Select(Path.GetFileName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (occupied.Count == 0)
@@ -57,7 +59,7 @@ internal static partial class StorageRecovery
             try
             {
                 foreach (var move in moves) File.Move(move.Source,move.Target);
-                NoteDisk.SaveIndex(target,merged.Values.ToArray());
+                NoteDisk.SaveIndex(target,NoteDisk.MergeIndex(merged.Values,targetData,sourceData));
                 File.Delete(sourceIndex);
                 Complete(data);
             }
