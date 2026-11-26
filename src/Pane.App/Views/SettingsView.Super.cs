@@ -49,7 +49,107 @@ public sealed partial class SettingsView
             Render();
         })));
         Group(Strings.Settings_Super_ExcludedPrograms, programs.ToArray(), Strings.Settings_Super_ExcludedProgramsDescription);
+        RenderSuperApps(p);
         RenderSuperActions(p);
+    }
+
+    // 常用应用（148，issue 88，原型 settings.js spAppsGroup）：没选中内容时常用面板列出的应用，最多 8 个，和启动器首页固定分开。
+    // 列表（上移、移除）→「添加应用」就地搜索 →「从启动器首页添加」小片（首页固定了、这里还没有的）
+    string? superAppQuery;   // null = 没在添加
+    StackPanel? superAppResults;
+
+    void RenderSuperApps(SuperPanelSettings p)
+    {
+        var catalog = app.AppIcons.Apps().GroupBy(a => a.Id).ToDictionary(g => g.Key, g => g.First());
+        var ids = (p.Apps ?? []).ToList();
+        bool full = ids.Count >= SuperPanelSettings.MaxApps;
+        var rows = new List<FrameworkElement>();
+        for (int i = 0; i < ids.Count; i++)
+        {
+            var id = ids[i];
+            int pos = i;
+            catalog.TryGetValue(id, out var info);
+            var tools = new List<FrameworkElement>();
+            if (pos > 0) tools.Add(IconButton("U", Strings.Common_MoveUp, () => { SaveSuper(x => { var list = (x.Apps ?? []).ToList(); if (pos < list.Count) (list[pos - 1], list[pos]) = (list[pos], list[pos - 1]); return x with { Apps = list.ToArray() }; }); Render(); }));
+            tools.Add(IconButton("close", Strings.Common_Remove, () => { SaveSuper(x => x with { Apps = (x.Apps ?? []).Where(a => a != id).ToArray() }); Render(); }));
+            rows.Add(ListRow(AppIcon(info?.Icon), Text(info?.Name ?? id, LabelProto), info == null ? Strings.SuperPanel_AppMissing : string.Format(Strings.Settings_Super_AppKey, (object?)(pos + 1)), false, tools.ToArray()));
+        }
+        if (full) rows.Add(AddRow(Text(Strings.Settings_Super_AppsFull, DescProto)));
+        else rows.Add(superAppQuery == null
+            ? AddRow(Button(Strings.Settings_Super_AddApp, "plus", () => { superAppQuery = ""; Render(); }))
+            : SuperAppSearch(catalog.Values, ids));
+        // 从启动器首页添加：首页固定里的应用（app:），这里还没有的
+        var home = app.Store.Current.Launcher.PinnedApps.Where(id => id.StartsWith("app:", StringComparison.Ordinal) && !ids.Contains(id) && catalog.ContainsKey(id)).ToList();
+        if (home.Count > 0)
+        {
+            var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6 };
+            foreach (var id in home)
+            {
+                var info = catalog[id];
+                var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+                var icon = AppIcon(info.Icon);
+                icon.Width = icon.Height = 18;
+                content.Children.Add(icon);
+                content.Children.Add(Text(info.Name, SmallProto));
+                var chip = new Border
+                {
+                    Height = PaneTokens.ControlSm, CornerRadius = new CornerRadius(PaneTokens.ControlSm / 2), Padding = new Thickness(8, 0, 12, 0), BorderThickness = new Thickness(1),
+                    Background = FillProto.Background, BorderBrush = FillProto.BorderBrush, Opacity = full ? 0.4 : 1, Child = content,
+                };
+                if (!full) chip.Tapped += (_, _) => { SaveSuper(x => (x.Apps ?? []).Contains(id) || (x.Apps?.Length ?? 0) >= SuperPanelSettings.MaxApps ? x : x with { Apps = [.. x.Apps ?? [], id] }); Render(); };
+                chips.Children.Add(chip);
+            }
+            rows.Add(Row(Strings.Settings_Super_FromHome, Strings.Settings_Super_FromHomeDescription, chips));
+        }
+        Group(Strings.Settings_Super_Apps, rows.ToArray(), Strings.Settings_Super_AppsDescription);
+    }
+
+    // 「添加应用」：同图标分区的就地搜索（只刷新结果，不重建整页，否则输入框会丢焦点）
+    FrameworkElement SuperAppSearch(IEnumerable<AppIconInfo> all, List<string> taken)
+    {
+        var box = Field(Strings.Settings_Super_AppSearchPlaceholder, 260);
+        box.Text = superAppQuery ?? "";
+        superAppResults = new StackPanel { Spacing = 2 };
+        var candidates = all.Where(a => !taken.Contains(a.Id)).ToList();
+        void Fill()
+        {
+            superAppResults!.Children.Clear();
+            var q = (superAppQuery ?? "").Trim();
+            if (q.Length == 0) return;
+            foreach (var a in candidates.Where(a => a.Name.Contains(q, StringComparison.CurrentCultureIgnoreCase)).Take(6))
+            {
+                var pick = new Grid { ColumnSpacing = 10, Padding = new Thickness(8, 6, 8, 6), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
+                pick.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                pick.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                var icon = AppIcon(a.Icon);
+                icon.Width = icon.Height = 24;
+                pick.Children.Add(icon);
+                var name = Text(a.Name, LabelProto);
+                Grid.SetColumn(name, 1);
+                pick.Children.Add(name);
+                pick.PointerEntered += (_, _) => pick.Background = SelectedProto.Background;
+                pick.PointerExited += (_, _) => pick.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+                pick.Tapped += (_, _) =>
+                {
+                    SaveSuper(x => (x.Apps ?? []).Contains(a.Id) || (x.Apps?.Length ?? 0) >= SuperPanelSettings.MaxApps ? x : x with { Apps = [.. x.Apps ?? [], a.Id] });
+                    superAppQuery = (app.Store.Current.SuperPanel.Apps?.Length ?? 0) >= SuperPanelSettings.MaxApps ? null : "";
+                    Render();
+                };
+                superAppResults.Children.Add(pick);
+            }
+            if (superAppResults.Children.Count == 0) superAppResults.Children.Add(Text(Strings.Common_NotFound, DescProto));
+        }
+        box.TextChanged += (_, _) => { superAppQuery = box.Text; Fill(); };
+        box.KeyDown += (_, e) => { if (e.Key == Windows.System.VirtualKey.Escape) { superAppQuery = null; Render(); e.Handled = true; } };
+        box.Loaded += (_, _) => { box.Focus(FocusState.Programmatic); box.StartBringIntoView(); };
+        Fill();
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        head.Children.Add(Wrap(box));
+        head.Children.Add(Button(Strings.Common_Cancel, null, () => { superAppQuery = null; Render(); }));
+        var panel = new StackPanel { Spacing = 6, Padding = new Thickness(14, 10, 14, 10) };
+        panel.Children.Add(head);
+        panel.Children.Add(superAppResults);
+        return panel;
     }
 
     // 面板里的动作（2026-10-30，原型 settings.js「面板里的动作」）：照启动器动作行，显示的在前、按顺序，可上移；关掉的排在后面。
@@ -129,9 +229,7 @@ public sealed partial class SettingsView
     // 选一个程序（.exe），返回完整路径（引擎按完整路径匹配）
     async Task<string?> PickProgram()
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-        picker.FileTypeFilter.Add(".exe");
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-        return (await picker.PickSingleFileAsync())?.Path;
+        try { return await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Common_FilterPrograms, "*.exe")]); }   // 原生选择框（146）
+        catch (Exception e) { app.ReportFailure(Strings.Common_ChooseFile, e); return null; }
     }
 }

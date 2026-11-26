@@ -334,29 +334,23 @@ public sealed partial class SettingsView
         if (current.Id == "launcher") Render();
     }
 
-    // 程序选择框：只认 .exe 和快捷方式（系统选择框选快捷方式时一般直接给目标程序）
+    // 程序选择框：只认 .exe 和快捷方式。原生选择框（146）过滤里有 *.lnk 时保留快捷方式本身（带参数和工作目录），便携应用两种都认
     async Task<string?> PickPortableProgram()
     {
-        var owner = Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId);
-        var open = new Windows.Storage.Pickers.FileOpenPicker();
-        open.FileTypeFilter.Add(".exe");
-        open.FileTypeFilter.Add(".lnk");
-        WinRT.Interop.InitializeWithWindow.Initialize(open, owner);
-        return (await open.PickSingleFileAsync())?.Path;
+        try { return await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Common_FilterPrograms, "*.exe;*.lnk")]); }
+        catch (Exception e) { app.ReportFailure(Strings.Settings_Launcher_AddProgram, e); return null; }
     }
 
     // 系统的文件 / 文件夹选择框，以设置窗口为所有者
     async Task<FavoriteEntry?> PickFavorite(bool folder)
     {
         var owner = Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId);
-        if (folder)
+        try
         {
-            return await FolderPicker.PickFolderAsync(owner, null, null) is { } path ? new FavoriteEntry(path, true) : null;
+            if (folder) return await FolderPicker.PickFolderAsync(owner, null, null) is { } path ? new FavoriteEntry(path, true) : null;
+            return await FolderPicker.PickFileAsync(owner, null) is { } f ? new FavoriteEntry(f, false) : null;   // 原生选择框（146）
         }
-        var open = new Windows.Storage.Pickers.FileOpenPicker();
-        open.FileTypeFilter.Add("*");
-        WinRT.Interop.InitializeWithWindow.Initialize(open, owner);
-        return await open.PickSingleFileAsync() is { } f ? new FavoriteEntry(f.Path, false) : null;
+        catch (Exception e) { app.ReportFailure(folder ? Strings.Common_ChooseFolder : Strings.Common_ChooseFile, e); return null; }
     }
 
     // 「添加搜索站点」：就地展开一行表单（名称、关键字、地址），保存前校验

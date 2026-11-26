@@ -79,6 +79,7 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
         items = normal;
         Actions.ItemsSource = items;
         highlight = new SlidingHighlight(ActionHighlightLayer);
+        sceneHighlight = new SlidingHighlight(SceneHighlightLayer);
         Actions.PointerMoved += OnActionsPointerMoved;
         Actions.Tapped += OnActionsTapped;
         KeyDown += OnKeyDown;
@@ -126,11 +127,17 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
         // 设计预览：PANE_DESIGN_SELECTION 指定选中文字（"-" 表示没读到）；宿主没给选区时用演示文字
         var preview = Environment.GetEnvironmentVariable("PANE_DESIGN_SELECTION");
         var sel = selection ?? (preview == "-" ? new SelectionResult(null, 0, SelectionFailure.Empty)
+                              : preview == "elevated" ? new SelectionResult(null, 0, SelectionFailure.Elevated)
+                              : preview == "dialog" ? new SelectionResult(null, 0, SelectionFailure.None) { Dialog = DemoDialog }
                               : preview == "files" ? new SelectionResult(null, 0, SelectionFailure.None) { Files = RenameSample.Photos }
                                               : new SelectionResult(string.IsNullOrEmpty(preview) ? DemoSelection : preview, 0, SelectionFailure.None));
         selection = null; // 每次呼出由宿主重新给
         current = sel;
         files = sel.Files is { Count: > 0 } f ? f : null;
+        // 按场景变（148）：选中文件 → 对话框 → 选中文字 → 常用面板
+        if (files is null && sel.Dialog is { } dialogInfo) { ShowDialogScene(dialogInfo); return; }
+        if (files is null && string.IsNullOrWhiteSpace(sel.Text)) { ShowHomeScene(sel.Failure); return; }
+        SetScene(Scene.Selection);
         QuoteBox.Visibility = files is null ? Visibility.Visible : Visibility.Collapsed;
         FileBox.Visibility = files is null ? Visibility.Collapsed : Visibility.Visible;
         if (files is not null)
@@ -226,7 +233,7 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
 
     // 永久销毁时由宿主调用（GlassPanel.Dispose，055 起能力停用、二级窗口关闭都会销毁视图）。
     // 不能只靠 Unloaded：内容岛直接释放时它不一定来。退订常驻对象的事件、停计时器、取消任务、释放附着的合成视觉
-    public void Dispose() { OnHidden(); Card.Release(); highlight.Dispose(); Actions.ItemsSource = null; }
+    public void Dispose() { OnHidden(); Card.Release(); highlight.Dispose(); sceneHighlight.Dispose(); Actions.ItemsSource = null; }
 
     // ---------------- 自动翻译 ----------------
 
@@ -370,7 +377,9 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
         {
             PanelKey.Left => HandleKey(VirtualKey.Left, false),
             PanelKey.Right => HandleKey(VirtualKey.Right, false),
-            PanelKey.Digit when press.Number is >= 1 and <= 6 => HandleKey(VirtualKey.Number1 + (press.Number - 1), false),
+            PanelKey.Up => HandleKey(VirtualKey.Up, false),       // 文件夹列表 / 常用面板（148，SuperGrid）
+            PanelKey.Down => HandleKey(VirtualKey.Down, false),
+            PanelKey.Digit when press.Number is >= 1 and <= 9 => HandleKey(VirtualKey.Number1 + (press.Number - 1), false),
             PanelKey.Enter => HandleKey(VirtualKey.Enter, false),
             PanelKey.Copy => HandleKey(VirtualKey.C, true),
             PanelKey.Retry => HandleKey(VirtualKey.R, true),
@@ -382,6 +391,7 @@ public sealed partial class SuperView : UserControl, IPanelView, IDisposable
 
     bool HandleKey(VirtualKey key, bool ctrl)
     {
+        if (scene != Scene.Selection) return SceneKey(key, ctrl);
         var hasResult = ResultArea.Visibility == Visibility.Visible && Card.Result.Length > 0;
         switch (key)
         {

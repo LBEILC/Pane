@@ -85,7 +85,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     List<MenuEntry> menuEntries = [];
 
     /// <summary>操作列表的一行：Pin 是界面自己做的固定 / 取消固定（issue 27）；否则 Action 为服务给的操作，为空是「打开」。</summary>
-    readonly record struct MenuEntry(LauncherItemAction? Action = null, bool Pin = false, bool Hotkey = false);
+    readonly record struct MenuEntry(LauncherItemAction? Action = null, bool Pin = false, bool Hotkey = false, bool Admin = false);
     /// <summary>应用快捷键（122）：Ctrl+K「设置快捷键」，宿主加进设置并打开 设置 → 快捷键。</summary>
     public event Action<LauncherItem>? SetAppHotkey;
 
@@ -1415,7 +1415,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         Disarm();
         menuItem = row.Item;
         bool hotkey = pinnable && row.Item.Id.StartsWith("app:", StringComparison.Ordinal) && SetAppHotkey is not null;   // 应用快捷键（122）：只给应用
-        menuEntries = [new(), .. pinnable ? [new MenuEntry(Pin: true)] : Array.Empty<MenuEntry>(), .. hotkey ? [new MenuEntry(Hotkey: true)] : Array.Empty<MenuEntry>(), .. list.Select(a => new MenuEntry(a))];
+        menuEntries = [new(), .. pinnable ? [new MenuEntry(Pin: true)] : Array.Empty<MenuEntry>(), .. hotkey ? [new MenuEntry(Hotkey: true)] : Array.Empty<MenuEntry>(), .. list.SelectMany(a => a == LauncherItemAction.RunAsAdmin && pinnable ? [new MenuEntry(a), new MenuEntry(Admin: true)] : new[] { new MenuEntry(a) })];   // 「总是以管理员身份运行」紧跟在「以管理员身份运行」后面（146）
         var s = new LauncherSection(row.Item.Title, LauncherSectionKind.List, []);
         sections = [s];
         rows = [];
@@ -1439,6 +1439,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     static (string Title, string Glyph) MenuLabel(MenuEntry entry, LauncherItem item) => entry.Pin
         ? IsPinned(item) ? (Strings.Launcher_UnpinFromHome, "pin-off") : (Strings.Launcher_PinToHome, "pin")
         : entry.Hotkey ? (Strings.Launcher_SetAppHotkey, "keyboard")
+        : entry.Admin ? (IsAlwaysAdmin(item) ? Strings.Launcher_StopAlwaysRunAsAdmin : Strings.Launcher_AlwaysRunAsAdmin, "shield")
         : entry.Action switch
     {
         null => (Strings.Common_Open, "external"),
@@ -1468,6 +1469,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     {
         if (menuItem is not { } item || row.Index >= menuEntries.Count) return;
         if (menuEntries[row.Index].Pin) { await TogglePin(row, item); return; }
+        if (menuEntries[row.Index].Admin) { await ToggleAlwaysAdmin(row, item); return; }
         if (menuEntries[row.Index].Hotkey) { menuItem = null; Disarm(); CloseRequested?.Invoke(this, EventArgs.Empty); SetAppHotkey?.Invoke(item); return; }
         var action = menuEntries[row.Index].Action;
         if (action == LauncherItemAction.EditAliases) { EnterAlias(item); return; }
@@ -1502,6 +1504,27 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         int back = rows.FindIndex(r => r.Item.Id == item.Id);
         if (back >= 0) Select(back);
         FootWhat.Text = pin ? Strings.Launcher_PinnedToHome : Strings.Launcher_UnpinnedFromHome;
+    }
+
+    // 总是以管理员身份运行（146，issue 92）：存进 LauncherSettings.AdminApps，之后 Enter、点击、图块、应用快捷键都提权启动。
+    // 同「固定到首页」：不收起，回到结果选回这一项，提示栏说一声
+    static bool IsAlwaysAdmin(LauncherItem item) => ((App)Application.Current).Store.Current.Launcher.AdminApps.Contains(item.Id, StringComparer.Ordinal);
+
+    async Task ToggleAlwaysAdmin(LauncherRow row, LauncherItem item)
+    {
+        var store = ((App)Application.Current).Store;
+        var launcher = store.Current.Launcher;
+        bool on = !IsAlwaysAdmin(item);
+        string[] ids = on ? [.. launcher.AdminApps, item.Id] : [.. launcher.AdminApps.Where(id => !string.Equals(id, item.Id, StringComparison.Ordinal))];
+        try { store.Save(store.Current with { Launcher = launcher with { AdminApps = ids } }); }
+        catch (Exception e) { ShowFailure(row, App.FailureReason(e) ?? Strings.Settings_SaveFailed); return; }
+        menuItem = null;
+        Disarm();
+        await Refresh(Input.Text);
+        if (menuItem is not null) return;
+        int back = rows.FindIndex(r => r.Item.Id == item.Id);
+        if (back >= 0) Select(back);
+        FootWhat.Text = on ? Strings.Launcher_AlwaysRunAsAdminOn : Strings.Launcher_AlwaysRunAsAdminOff;
     }
 
     // ---------------- 搜索别名（078 / issue 33） ----------------

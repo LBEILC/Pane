@@ -31,7 +31,7 @@ internal interface ISelectionPlatform
     void Restore(object snapshot);
     void Release(object snapshot);
 }
-internal sealed class SelectionReader(ISelectionPlatform platform,Func<bool> fallback,SelectionLog? log=null,FileSelection? files=null) : ISelectionReader
+internal sealed class SelectionReader(ISelectionPlatform platform,Func<bool> fallback,SelectionLog? log=null,FileSelection? files=null,Func<nint,FileDialogInfo?>? readDialog=null) : ISelectionReader
 {
     readonly SemaphoreSlim gate=new(1);
     readonly SelectionLog? logger=log??(platform is WindowsSelectionPlatform?new SelectionLog(Pane.Hosting.RuntimeMode.Current.DataDirectory):null);
@@ -53,6 +53,11 @@ internal sealed class SelectionReader(ISelectionPlatform platform,Func<bool> fal
         SelectionResult Finish(SelectionResult value){final=value.Failure;length=value.Text?.Length??0;return value;}
         try{
         var selected=files?.Read(window,true);token.ThrowIfCancellationRequested();if(selected is {Count:>0})return Finish(new(null,window,SelectionFailure.None){Files=selected});
+        var dialog=readDialog?.Invoke(window);token.ThrowIfCancellationRequested();
+        if(dialog!=null){
+            if(platform.Foreground!=window)return Finish(new(null,window,SelectionFailure.Timeout));
+            return Finish(new(null,window,SelectionFailure.None){Dialog=dialog});
+        }
         var result=Measure("uia",()=>platform.Direct(window));trace.Append($" uia={result.Failure}");token.ThrowIfCancellationRequested();
         if(result.Failure is SelectionFailure.None or SelectionFailure.Elevated or SelectionFailure.Timeout||!fallback())return Finish(result);
         object? saved=null;bool copying=false;uint before=platform.Sequence;

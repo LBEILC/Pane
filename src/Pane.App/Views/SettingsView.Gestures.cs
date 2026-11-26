@@ -265,10 +265,7 @@ public sealed partial class SettingsView
             {
                 try
                 {
-                    var picker = new Windows.Storage.Pickers.FileOpenPicker();
-                    foreach (var ext in new[] { ".wg2", ".wg", ".wgb" }) picker.FileTypeFilter.Add(ext);
-                    WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-                    if (await picker.PickSingleFileAsync() is { } file) Load(file.Path);
+                    if (await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Settings_Gestures_ConfigFilter, "*.wg2;*.wg;*.wgb")]) is { } file) Load(file);   // 原生选择框（146）
                 }
                 catch (Exception e) { importStatus = string.Format(Strings.Settings_Gestures_PickConfigError, App.FailureReason(e) ?? e.Message); importOk = false; Render(); }
             });

@@ -139,10 +139,10 @@ public sealed partial class SettingsView
     // 换图标：复制一份到数据目录（原图移走、删掉也不影响），文件名带时间，内容变了缓存键跟着变
     async Task<bool> PickIcon(string id)
     {
-        var picker = new Windows.Storage.Pickers.FileOpenPicker();
-        foreach (var ext in new[] { ".png", ".ico", ".jpg", ".jpeg", ".bmp" }) picker.FileTypeFilter.Add(ext);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-        if ((await picker.PickSingleFileAsync())?.Path is not { } source) return false;
+        string? source;
+        try { source = await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Common_FilterImages, "*.png;*.ico;*.jpg;*.jpeg;*.bmp")]); }   // 原生选择框（146）
+        catch (Exception e) { app.ReportFailure(Strings.Settings_Icons_ChangeImage, e); return false; }
+        if (source == null) return false;
         var dir = Path.Combine(app.Store.DirectoryPath, "custom-icons");
         Directory.CreateDirectory(dir);
         var stem = IconFileStem(id);

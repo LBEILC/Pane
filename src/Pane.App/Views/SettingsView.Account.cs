@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Pane.Contracts;
+using Pane.Hosting;
 using Pane.Localization;
 using Pane.Views.Controls;
 using Windows.ApplicationModel.DataTransfer;
@@ -785,11 +786,13 @@ public sealed partial class SettingsView
 
     async Task AcSaveRecovery(string code)
     {
-        var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = "Pane 恢复码" };
-        picker.FileTypeChoices.Add("Text", [".txt"]);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-        var file = await picker.PickSaveFileAsync();
-        if (file == null) return;
-        await Windows.Storage.FileIO.WriteTextAsync(file, $"Pane 恢复码\r\n{code}\r\n\r\n忘记密码时，在重设密码页填写它可保留云端数据。不要发给任何人。\r\n");
+        try
+        {
+            // 原生另存为（147）：WinRT 的在管理员身份下用不了
+            var file = await FolderPicker.PickSaveAsync(Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId), "Pane 恢复码", "txt", [(Strings.Common_FilterText, "*.txt")]);
+            if (file == null) return;
+            await File.WriteAllTextAsync(file, $"Pane 恢复码\r\n{code}\r\n\r\n忘记密码时，在重设密码页填写它可保留云端数据。不要发给任何人。\r\n");
+        }
+        catch (Exception e) { app.ReportFailure(Strings.Settings_Account_RecoverySaveFile, e); }
     }
 }

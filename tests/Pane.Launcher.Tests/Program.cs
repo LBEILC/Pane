@@ -18,6 +18,8 @@ static partial class Program
     }
     static async Task Run(string[] args)
     {
+        if(args.Contains("--148")){await SuperPanel148Tests();return;}
+        if(args.Contains("--146")){await AdminApps146Tests();return;}
         if(args.Contains("--141")){await OpenTargets141Tests();return;}
         if(args.Contains("--123")){await Memo123Tests();return;}
         if(args.Contains("--122")){await AppHotkeyTests();return;}

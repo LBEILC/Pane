@@ -46,7 +46,7 @@ public sealed class SettingsStore
             // 源生成反序列化会为缺失的 init 布尔属性传入 false，显式保留旧文件默认开启。
             if(document.RootElement.TryGetProperty("Launcher",out var launcher)&&!launcher.TryGetProperty("RememberOpenedPrograms",out _))
                 value=value with{Launcher=value.Launcher with{RememberOpenedPrograms=true}};
-            bool migrate=value.Ai.ApiEndpoint==null;
+            bool migrate=value.Ai.ApiEndpoint==null || value.SuperPanel.Apps is null or { Length: > SuperPanelSettings.MaxApps };
             value=Normalize(value);Validate(value);Current=value;
             if(migrate)SaveCore(value);
         }
@@ -114,7 +114,13 @@ public sealed class SettingsStore
         Ai=value.Ai.Migrate() with {Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
         Launcher=value.Launcher with {Portable=value.Launcher.Portable.DistinctBy(e=>e.Path,StringComparer.OrdinalIgnoreCase).ToArray()},
         Clipboard=value.Clipboard with {Enabled=value.Modules?.GetValueOrDefault("clipboard",true)??value.Clipboard.Enabled},
-        SuperPanel=value.SuperPanel with {Enabled=value.Modules?.GetValueOrDefault("super-panel",true)??value.SuperPanel.Enabled},
+        SuperPanel=value.SuperPanel with {
+            Apps=value.SuperPanel.Apps switch {
+                null => value.Launcher.PinnedApps.Where(id=>id?.StartsWith("app:",StringComparison.Ordinal)==true).Take(SuperPanelSettings.MaxApps).ToArray(),
+                { Length: > SuperPanelSettings.MaxApps } apps => apps[..SuperPanelSettings.MaxApps],
+                var apps => apps
+            },
+            Enabled=value.Modules?.GetValueOrDefault("super-panel",true)??value.SuperPanel.Enabled},
         FolderJump=NormalizeFolderJump(value.FolderJump) with {Enabled=value.Modules?.GetValueOrDefault("folder-jump",true)??value.FolderJump.Enabled} };
     internal static FolderJumpSettings NormalizeFolderJump(FolderJumpSettings value)
     {

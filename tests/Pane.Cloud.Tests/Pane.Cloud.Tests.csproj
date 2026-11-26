@@ -30,4 +30,4 @@
     <None Update="kdf-vectors.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Import Project="../Localization.targets" />
-</Project>
+<ItemGroup><Compile Include="../../src/Pane.App/Contracts/DialogSearch.cs;../../src/Pane.App/Contracts/Files.cs" /></ItemGroup></Project>

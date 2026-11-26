@@ -1,4 +1,4 @@
-param([switch]$DialogSearch,[switch]$Metadata)
+param([switch]$DialogSearch,[switch]$Metadata,[switch]$SuperPanel)
 $ErrorActionPreference='Stop'
 $repo=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $repo 'scripts/find-build-tools.ps1')
@@ -12,6 +12,7 @@ if($LASTEXITCODE -ne 0){throw 'Folder jump tests build failed'}
 Add-Type -Path (Join-Path $repo 'experiments/027-idle/HiddenDesktop.cs')
 $log=Join-Path $out $(if($DialogSearch){'dialog-search.log'}else{'hidden.log'})
 $arguments=@($log)
+if($SuperPanel){$arguments+='--148'}
 if($Metadata){$arguments+='--125'}
 if($DialogSearch){$arguments+='--107'}
 $code=[HiddenDesktop027]::Run((Join-Path $out 'FolderJumpTests.exe'),$arguments,$repo,240000)

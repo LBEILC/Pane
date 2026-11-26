@@ -334,6 +334,13 @@ int wmain(int argc,wchar_t** argv){
     if(argc!=2&&argc!=3)return 2;wchar_t desktop[256]{};DWORD needed=0;
     if(!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,desktop,sizeof(desktop),&needed)||wcsncmp(desktop,L"Pane027-",8)!=0)return 2;
     logFile.open(argv[1]);Apartment apartment;
+    if(argc==3&&std::wstring(argv[2])==L"--148"){
+        auto root=std::filesystem::temp_directory_path()/(L"Pane148-"+std::to_wstring(GetCurrentProcessId()));
+        auto target=root/L"target";std::filesystem::create_directories(target);
+        RealDialog(5,root.wstring(),target.wstring());
+        std::filesystem::remove(target);std::filesystem::remove(root);
+        logFile<<"assertions="<<assertions<<" failures="<<failures<<std::endl;return failures?1:0;
+    }
     if(argc==3)return std::wstring(argv[2])==L"--107"?SearchSuite():std::wstring(argv[2])==L"--125"?MetadataSuite():2;
     Policy();
     wchar_t temp[MAX_PATH]{};GetTempPathW(MAX_PATH,temp);auto root=std::wstring(temp)+L"Pane038-"+std::to_wstring(GetCurrentProcessId());auto target=root+L"\\目标目录";

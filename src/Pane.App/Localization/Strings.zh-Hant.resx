@@ -135,6 +135,12 @@
   <data name="Common_Change" xml:space="preserve"><value>更改</value></data>
   <data name="Common_ChooseFile" xml:space="preserve"><value>選擇檔案</value></data>
   <data name="Common_ChooseFolder" xml:space="preserve"><value>選擇資料夾</value></data>
+  <data name="Common_FilterAllFiles" xml:space="preserve"><value>所有檔案</value></data>
+  <data name="Common_FilterPrograms" xml:space="preserve"><value>程式</value></data>
+  <data name="Common_FilterImages" xml:space="preserve"><value>圖片</value></data>
+  <data name="Common_FilterZip" xml:space="preserve"><value>ZIP 壓縮檔</value></data>
+  <data name="Common_FilterText" xml:space="preserve"><value>文字檔案</value></data>
+  <data name="Settings_Gestures_ConfigFilter" xml:space="preserve"><value>WGestures 設定</value></data>
   <data name="Common_Clear" xml:space="preserve"><value>清空</value></data>
   <data name="Common_ClearValue" xml:space="preserve"><value>清除</value></data>
   <data name="Common_ClickToRecord" xml:space="preserve"><value>點擊此處後按下按鍵</value></data>
@@ -1494,7 +1500,7 @@
   <data name="Settings_Startup" xml:space="preserve"><value>啟動</value></data>
   <data name="Settings_Super_ActionHidden" xml:space="preserve"><value>不顯示</value></data>
   <data name="Settings_Super_ActionPosition" xml:space="preserve"><value>第 {0} 個</value></data>
-  <data name="Settings_Super_Actions" xml:space="preserve"><value>面板中的動作</value></data>
+  <data name="Settings_Super_Actions" xml:space="preserve"><value>選取文字時的動作</value></data>
   <data name="Settings_Super_ActionsDescription" xml:space="preserve"><value>選取非中文文字且開啟自動翻譯時，面板顯示翻譯專用的動作，不受此處設定影響。AI 動作的名稱和提示詞在「AI」中修改</value></data>
   <data name="Settings_Super_ActionsFull" xml:space="preserve"><value>最多 6 個，請先關閉一個</value></data>
   <data name="Settings_Super_AddProgram" xml:space="preserve"><value>新增程式</value></data>
@@ -1516,7 +1522,7 @@
   <data name="Settings_Super_Trigger" xml:space="preserve"><value>觸發鍵</value></data>
   <data name="Settings_Super_TriggerDescription" xml:space="preserve"><value>長按時彈出，短按保持原有功能（後退 / 前進 / 中鍵點選）。同一按鍵也用於手勢時：按住拖曳觸發手勢，按住不動觸發超級面板</value></data>
   <data name="Settings_SuperPanel" xml:space="preserve"><value>超級面板</value></data>
-  <data name="Settings_SuperPanel_Description" xml:space="preserve"><value>選取文字後長按滑鼠側鍵叫出，就地翻譯、總結；短按側鍵照常後退 / 前進</value></data>
+  <data name="Settings_SuperPanel_Description" xml:space="preserve"><value>長按滑鼠側鍵叫出：選取文字時翻譯、總結，選取檔案時重新命名，在檔案對話方塊裡跳到資料夾，其餘時候開啟常用應用程式</value></data>
   <data name="Settings_Theme" xml:space="preserve"><value>主題</value></data>
   <data name="Settings_Theme_Dark" xml:space="preserve"><value>深色</value></data>
   <data name="Settings_Theme_Light" xml:space="preserve"><value>淺色</value></data>
@@ -1645,6 +1651,19 @@
   <data name="SuperPanel_SelectionEmpty" xml:space="preserve"><value>未讀取到選取的文字</value></data>
   <data name="SuperPanel_SelectionPermission" xml:space="preserve"><value>該視窗以管理員權限執行，無法讀取選取的文字</value></data>
   <data name="SuperPanel_SelectionTimeout" xml:space="preserve"><value>讀取逾時，未取得選取的文字</value></data>
+  <data name="SuperPanel_AppMissing" xml:space="preserve"><value>找不到這個應用程式，可能已解除安裝</value></data>
+  <data name="SuperPanel_NoApps" xml:space="preserve"><value>還沒有常用應用程式</value></data>
+  <data name="SuperPanel_NewMemo" xml:space="preserve"><value>新增備忘錄</value></data>
+  <data name="SuperPanel_FileSearch" xml:space="preserve"><value>檔案搜尋</value></data>
+  <data name="Common_Add" xml:space="preserve"><value>新增</value></data>
+  <data name="Settings_Super_Apps" xml:space="preserve"><value>常用應用程式</value></data>
+  <data name="Settings_Super_AppsDescription" xml:space="preserve"><value>沒有選取內容時，超級面板列出這些應用程式，按 1～8 直接開啟。最多 8 個，和啟動器首頁的釘選分開設定</value></data>
+  <data name="Settings_Super_AddApp" xml:space="preserve"><value>新增應用程式</value></data>
+  <data name="Settings_Super_AppSearchPlaceholder" xml:space="preserve"><value>搜尋應用程式</value></data>
+  <data name="Settings_Super_FromHome" xml:space="preserve"><value>從啟動器首頁新增</value></data>
+  <data name="Settings_Super_FromHomeDescription" xml:space="preserve"><value>啟動器首頁已釘選、這裡還沒有的應用程式，點一下新增</value></data>
+  <data name="Settings_Super_AppsFull" xml:space="preserve"><value>已有 8 個，先移除一個再新增</value></data>
+  <data name="Settings_Super_AppKey" xml:space="preserve"><value>按 {0} 開啟</value></data>
   <data name="SuperPanel_TranslateError" xml:space="preserve"><value>翻譯失敗：{0}</value></data>
   <data name="SuperPanel_TranslateWindow" xml:space="preserve"><value>翻譯視窗</value></data>
   <data name="SuperPanel_WebSearch" xml:space="preserve"><value>網頁搜尋</value></data>
@@ -1727,6 +1746,10 @@
   <data name="Launcher_UnpinFromHome" xml:space="preserve"><value>取消固定</value></data>
   <data name="Launcher_PinnedToHome" xml:space="preserve"><value>已固定到首頁</value></data>
   <data name="Launcher_UnpinnedFromHome" xml:space="preserve"><value>已取消固定</value></data>
+  <data name="Launcher_AlwaysRunAsAdmin" xml:space="preserve"><value>總是以管理員身份執行</value></data>
+  <data name="Launcher_StopAlwaysRunAsAdmin" xml:space="preserve"><value>取消總是以管理員身份執行</value></data>
+  <data name="Launcher_AlwaysRunAsAdminOn" xml:space="preserve"><value>已設為總是以管理員身份執行</value></data>
+  <data name="Launcher_AlwaysRunAsAdminOff" xml:space="preserve"><value>已取消總是以管理員身份執行</value></data>
   <data name="Launcher_WebAppName" xml:space="preserve"><value>{0}（網頁應用程式）</value></data>
   <data name="Settings_Modules" xml:space="preserve"><value>能力</value></data>
   <data name="Settings_Modules_Description" xml:space="preserve"><value>只啟用需要的能力。停用的能力不佔用熱鍵、不在背景執行，其設定也會從左側移除</value></data>

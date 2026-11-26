@@ -81,7 +81,9 @@ public sealed partial class App
     }
 
     // 超级面板：自动翻译 / 翻译结果按 Tab 到翻译窗口；「问 AI」打开对话窗口并带上选中文字；选中文件时「批量重命名」
-    void WireSuper(SuperView super){super.OpenTranslate+=text=>ShowTranslate(text);super.OpenChat+=text=>ShowChatDraft(text);super.OpenRename+=files=>ShowRename(files,0);}
+    void WireSuper(SuperView super){super.OpenTranslate+=text=>ShowTranslate(text);super.OpenChat+=text=>ShowChatDraft(text);super.OpenRename+=files=>ShowRename(files,0);
+        // 常用面板的小工具和「添加」（148）
+        super.OpenTool+=id=>{switch(id){case "clipboard":Command("show-clipboard");break;case "launcher":Command("show-launcher");break;case "memo":ShowMemo(null,true);break;case "files":ShowFiles("",null);break;case "settings":OpenSettings("superpanel");break;}};}
 
     /// <param name="at">新建窗口时放到这里（物理像素，玻璃左上角），代替上次记下的位置（分词：剪贴板原来的位置、鼠标附近）。</param>
     void Present(SecondaryId id,string name,Func<Microsoft.UI.Xaml.Controls.UserControl> make,Action<IPanelView> open,(int X,int Y)? at=null)

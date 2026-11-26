@@ -5,6 +5,8 @@
   动作：平时是 翻译 总结 润色 解释 搜索 复制；自动翻译时换成 复制译文 翻译窗口 问 AI 总结 复制原文 搜索（原型 launcher.html #sp）。
   选中的是文件（资源管理器 / 桌面，040）：引用换成叠放的文件图标 + 数量和名字，动作换成 批量重命名 复制路径 复制名称（原型 rename.html #sp）。
   长按鼠标侧键出现在鼠标右下方（宿主放置）。
+  按场景变（148，issue 88，docs/design.md「超级面板按场景变」，原型 index.html 参数「超级面板场景」）：
+  前台是文件对话框 → 文件夹列表（DialogHead + SceneArea）；没选中 / 读不到 → 常用面板（NoteText + SceneArea：常用应用 4 × 2 + 小工具）。逻辑在 SuperView.Scenes.cs。
 -->
 <UserControl
     x:Class="Pane.Views.SuperView"
@@ -26,6 +28,24 @@
     </UserControl.Resources>
 
     <StackPanel x:Name="Root" Width="360" Padding="12" VerticalAlignment="Top"><!-- 顶对齐：否则被面板撑高后量出来的就是面板高度，结果卡片收起后不会变矮 -->
+        <!-- 常用面板顶上的说明（读不到选区时，148）：xs text-3，下 8 -->
+        <TextBlock x:Name="NoteText" Visibility="Collapsed" Margin="2,0,2,8" TextWrapping="Wrap" LineHeight="16"
+                   FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+        <!-- 文件夹列表的头：「「另存为」对话框 · 记事本」（148） -->
+        <Grid x:Name="DialogHead" Visibility="Collapsed" Padding="4,0,4,6" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <c:PaneIcon Glyph="folder-open" Width="16" Height="16" VerticalAlignment="Center" Foreground="{ThemeResource PaneText3Brush}"/>
+            <TextBlock x:Name="DialogText" Grid.Column="1" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                       FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText2Brush}"/>
+        </Grid>
+        <!-- 文件夹列表 / 常用面板（148）：内容在代码里拼，选中用同一套滑动高亮 -->
+        <Grid x:Name="SceneArea" Visibility="Collapsed">
+            <Canvas x:Name="SceneHighlightLayer" IsHitTestVisible="False"/>
+            <Grid x:Name="SceneHost"/>
+        </Grid>
         <!-- 选中的文字 -->
         <Border x:Name="QuoteBox" Padding="10,2,0,2" BorderThickness="2,0,0,0" BorderBrush="{ThemeResource PaneText3Brush}">
             <TextBlock x:Name="QuoteText" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" LineHeight="19"
@@ -98,7 +118,7 @@
         </Border>
 
         <!-- 动作 -->
-        <Grid Margin="0,12,0,0">
+        <Grid x:Name="ActionsArea" Margin="0,12,0,0">
             <Canvas x:Name="ActionHighlightLayer" IsHitTestVisible="False"/>
             <ItemsControl x:Name="Actions" ItemTemplate="{StaticResource ActionTemplate}" IsTabStop="False">
                 <ItemsControl.ItemsPanel>
@@ -114,5 +134,13 @@
             <Border Height="1" VerticalAlignment="Top" Background="{ThemeResource PaneStrokeBrush}"/>
             <c:AiCard x:Name="Card" Margin="2,8,2,0"/>
         </Grid>
+
+        <!-- 样板（NativeAOT 下不按名字查资源） -->
+        <StackPanel Visibility="Collapsed">
+            <TextBlock x:Name="Text1Proto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextMd}" Foreground="{ThemeResource PaneText1Brush}"/>
+            <TextBlock x:Name="Text2Proto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+            <TextBlock x:Name="Text3Proto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <Border x:Name="FillProto" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}"/>
+        </StackPanel>
     </StackPanel>
 </UserControl>

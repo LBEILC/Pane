@@ -292,6 +292,15 @@ API void* PaneFolderJumpStart(Trigger trigger){
 API void PaneFolderJumpStop(void* value){delete static_cast<Service*>(value);}
 using EntryCallback=void(__stdcall*)(const wchar_t*,const wchar_t*,int);
 API void PaneFolderJumpEntries(void* value,EntryCallback callback){try{for(const auto& e:Entries(static_cast<Service*>(value)))callback(e.path.c_str(),e.name.c_str(),e.recent?1:0);}catch(...){}}
+API void PaneReadDialog(HWND window,int filter,DialogCallback callback){
+    try{
+        if(!window||!callback||!Filename(window))return;
+        DialogTracker snapshot;
+        snapshot.Describe(window);snapshot.callback=callback;
+        if(filter&&!snapshot.foldersOnly)snapshot.ReadType();
+        snapshot.Flush(window);
+    }catch(...){ /* 外部窗口消失或无法读取时沿用原选区流程。 */ }
+}
 API int PaneFolderJumpTo(HWND dialog,const wchar_t* path){try{return Jump(dialog,path)?1:0;}catch(...){return 0;}}
 API int PaneDialogNavigate(HWND dialog,const wchar_t* path,const wchar_t* name,int confirm,HANDLE cancel){
     Navigation navigation{name,confirm!=0,cancel};

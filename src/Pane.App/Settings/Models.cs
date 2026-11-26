@@ -57,6 +57,12 @@ public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton Trig
     public string[]? Actions { get; init; }
     public const int MaxActions=6;
     public static string[] DefaultActions(IEnumerable<string> aiActionIds)=>[.. aiActionIds.Select(id=>"ai:"+id).Append("search").Append("copy").Take(MaxActions)];
+    /// <summary>
+    /// 常用面板的应用（148，设计加，2026-11-26，issue 88）：应用 id（同 <c>LauncherSettings.PinnedApps</c> 里的 app:…），按显示顺序，最多 <see cref="MaxApps"/> 个。
+    /// 和启动器首页固定是两套。null = 还没设过：设置读入时（Normalize）拷一份 <c>Launcher.PinnedApps</c> 里 app: 开头的前 8 个写回，之后各管各的。
+    /// </summary>
+    public string[]? Apps { get; init; }
+    public const int MaxApps=8;
 }
 public sealed record GlassThemeParameters(double TintOpacity, double LuminosityOpacity, double Saturation, double Highlight, double Shadow, double ExtraBlur);
 public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } /* 界面语言（设计加，2026-11-02，任务 048）：null = 跟随系统（繁体系统用繁体，其余用简体）；"zh-Hans" / "zh-Hant"，以后加 "en"。重启后生效 */ public string? UiLanguage { get; init; } }
@@ -103,6 +109,10 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
     AppHotkey[] appHotkeys=[];
     public AppHotkey[] AppHotkeys { get=>appHotkeys; init=>appHotkeys=value??[]; }
+    // 设计加（2026-11-26，issue 92，任务 146）：「总是以管理员身份运行」的应用 id（启动器 Ctrl+K 里开关）。
+    // 这些应用按 Enter、点击、最佳结果、应用快捷键打开时都走以管理员身份运行（系统照常弹 UAC，点「否」静默）
+    string[] adminApps=[];
+    public string[] AdminApps { get=>adminApps; init=>adminApps=value??[]; }
     AppAliasEntry[] appAliases=[];
     public AppAliasEntry[] AppAliases { get=>appAliases; init=>appAliases=value??[]; }
     SearchEngine[] searchEngines=DefaultSearchEngines();

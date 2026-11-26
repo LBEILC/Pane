@@ -66,6 +66,10 @@ struct DialogTracker {
         std::wstring name=PathFindFileNameW(path.c_str());
         auto dot=name.rfind(L'.');return name.substr(0,dot);
     }
+    void Describe(HWND window){
+        dialog=window;foldersOnly=IsFolderPicker(window);save=!foldersOnly&&IsSave(window);
+        appName=AppName(window);
+    }
     static void CALLBACK Event(HWINEVENTHOOK hook,DWORD,HWND window,LONG object,LONG child,DWORD,DWORD){
         auto self=active;
         if(!self||!self->dialog)return;
@@ -117,8 +121,7 @@ struct DialogTracker {
         if(recognized&&dialog!=recognized){
             // 直接从旧目标切到新目标；null 仅表示关闭。
             callback=nullptr;Stop(false);callback=config.dialogChanged;
-            dialog=recognized;active=this;foldersOnly=IsFolderPicker(dialog);save=!foldersOnly&&IsSave(dialog);
-            appName=AppName(dialog);
+            Describe(recognized);active=this;
             location=Hook(EVENT_OBJECT_LOCATIONCHANGE,EVENT_OBJECT_LOCATIONCHANGE);
             minimize=Hook(EVENT_SYSTEM_MINIMIZESTART,EVENT_SYSTEM_MINIMIZEEND);
             state=Hook(EVENT_OBJECT_STATECHANGE,EVENT_OBJECT_STATECHANGE);

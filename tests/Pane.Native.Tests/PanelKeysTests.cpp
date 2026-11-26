@@ -177,6 +177,19 @@ int main(int argc,char** argv){
   for(unsigned vk:{0x37u,0x38u,0x39u,0x41u,8u})check(key(vk,true)==0&&key(vk,false)==0,"super callback passes typing");
   pump(5);check(notices==0&&!panelkeys::state.typing,"super callback never posts Type");
   PanePanelKeysEnd();check(!PanePanelKeysInstalled(),"super end unhooks");notices=0;
+  check(PanePanelKeysBegin(window,WM_APP+59,1,3)&&PanePanelKeysActive(),"grid begin");
+  for(unsigned vk:{0x25u,0x26u,0x27u,0x28u,13u,27u,0x31u,0x32u,0x33u,0x34u,0x35u,0x36u,0x37u,0x38u,0x39u}){
+   notices=0;check(key(vk,true)==1&&key(vk,false)==1,"grid swallows pair");pump(5);
+   const auto expected=vk==VK_LEFT?pane::PanelLeft:vk==VK_RIGHT?pane::PanelRight:vk==VK_UP?pane::PanelUp:
+    vk==VK_DOWN?pane::PanelDown:vk==VK_RETURN?pane::PanelEnter:vk==VK_ESCAPE?pane::PanelEscape:pane::PanelDigit;
+   check(notices==1&&lastNotice==(expected|(expected==pane::PanelDigit?static_cast<int>(vk-'0')<<8:0)),"grid notification");
+  }
+  notices=0;
+  for(unsigned vk:{9u,0x41u,0x43u,0x67u}){
+   keys[VK_LCONTROL]=vk=='C';check(key(vk,true)==0&&key(vk,false)==0,"grid passes other keys");
+  }
+  keys[VK_LCONTROL]=false;pump(5);check(notices==0&&!panelkeys::state.typing,"grid passes without replay");
+  PanePanelKeysEnd();
   begin();check(key(VK_DOWN,true)==1,"callback swallows down");pump(5);check(notices==1&&lastNotice==pane::PanelDown,"post notification");
   PanePanelKeysEnd();check(PanePanelKeysInstalled(),"end retains swallowed release");check(key(VK_DOWN,false)==1,"release swallowed after end");SendMessageW(panelkeys::commandWindow,WM_NULL,0,0);pump(5);check(!PanePanelKeysInstalled(),"last release unhooks");
   keys[VK_LMENU]=true;begin();PanePanelKeysEnd();keys[VK_LMENU]=false;sent.clear();check(key(VK_LMENU,false)==1,"alt release held for mask");SendMessageW(panelkeys::commandWindow,WM_NULL,0,0);pump(5);

@@ -279,6 +279,14 @@ internal static partial class Program
     }
     static async Task Main(string[] args)
     {
+        if(args is ["--148"]){
+            var original=Defaults();
+            var settings=original with {SuperPanel=original.SuperPanel with {Apps=["app:b","app:a"]}};
+            var patch=SyncData.Leaves(settings);
+            Check(patch["SuperPanel.Apps"] is JsonArray,"云设置包含应用数组");
+            Check(SyncData.Apply(original,patch).SuperPanel.Apps!.SequenceEqual(settings.SuperPanel.Apps!),"同步保留顺序");
+            Console.WriteLine($"PASS 148 sync assertions={checks}");return;
+        }
         if (args is ["--updates"])
         {
             try { await CloudUpdates(); }

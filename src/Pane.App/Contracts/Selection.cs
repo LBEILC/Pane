@@ -17,6 +17,14 @@ public sealed record SelectionResult(string? Text, nint SourceWindow, SelectionF
     /// 这时 Text 为 null、Failure 为 None，超级面板换成文件动作。其他情况为 null。
     /// </summary>
     public IReadOnlyList<string>? Files { get; init; }
+
+    /// <summary>
+    /// 前台是文件对话框（148，设计加，2026-11-26，docs/design.md「超级面板按场景变」）：「打开」「另存为」「选择文件夹」这类标准对话框
+    /// （认法同 038 / 107）在前台、且「文件对话框」能力开着时给它的状态，**这时不读选区**：Text、Files 为 null，Failure 为 None。
+    /// 超级面板据此列文件夹（<see cref="IFolderJump.Entries"/>），选了用 <see cref="IFolderJump.JumpAsync"/> 跳。其他情况为 null。
+    /// 选中文件（Files）优先于它：桌面 / 资源管理器不是对话框，二者不会同时有值。
+    /// </summary>
+    public FileDialogInfo? Dialog { get; init; }
 }
 
 /// <summary>读资源管理器 / 桌面里选中的文件（040，设计加），不借用剪贴板，不需要那个窗口在前台。</summary>

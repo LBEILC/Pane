@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Pane.Contracts;
 using Pane.Services.Launcher;
 
@@ -40,12 +41,28 @@ internal sealed class DialogSearchService : IDialogSearch
         return (name.Length > 0 ? name : null, extensions.Distinct().ToArray());
     }
 
+    [DllImport("Pane.Native.dll", CallingConvention = CallingConvention.Cdecl)]
+    static extern void PaneReadDialog(nint window, int filter, FolderJumpService.DialogCallback callback);
+
+    internal static FileDialogInfo? ReadDialog(nint window, bool filter)
+    {
+        FileDialogInfo? result = null;
+        PaneReadDialog(window, filter ? 1 : 0, (dialog, bounds, flags, type, app) =>
+            result = Describe(dialog, bounds, flags, type, app));
+        return result;
+    }
+
+    static FileDialogInfo? Describe(nint dialog, FolderJumpService.Bounds bounds, int flags, string type, string appName)
+    {
+        var (name, extensions) = ParseType(type);
+        return dialog == 0 ? null : new FileDialogInfo(dialog, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom,
+            (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0, extensions, name, (flags & 8) != 0, string.IsNullOrEmpty(appName) ? null : appName);
+    }
+
     // 原生回调在同一消息线程串行。订阅者可能重新应用设置，不可在原生回调栈内执行。
     void Update(nint dialog, FolderJumpService.Bounds bounds, int flags, string type, string appName)
     {
-        var (name, extensions) = ParseType(type);
-        var next = dialog == 0 ? null : new FileDialogInfo(dialog, bounds.Left, bounds.Top, bounds.Right, bounds.Bottom,
-            (flags & 1) != 0, (flags & 2) != 0, (flags & 4) != 0, extensions, name, (flags & 8) != 0, string.IsNullOrEmpty(appName) ? null : appName);
+        var next = Describe(dialog, bounds, flags, type, appName);
         Volatile.Write(ref current, next);
         if (flags < 0) { Interlocked.Increment(ref generation); return; }
         long version = Interlocked.Read(ref generation);

@@ -260,10 +260,10 @@ public sealed partial class SettingsView
                 row.Children.Add(Wrap(box));
                 row.Children.Add(Button(Strings.Common_ChooseFile, "folder", async () =>
                 {
-                    var picker = new Windows.Storage.Pickers.FileOpenPicker();
-                    picker.FileTypeFilter.Add("*");
-                    WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-                    if ((await picker.PickSingleFileAsync())?.Path is { } path) { d.Command = new G.OpenCommand(path); if (d.Name.Length == 0) d.Name = "打开 " + Path.GetFileNameWithoutExtension(path); Render(); } // 不翻译：用户数据
+                    string? path;
+                    try { path = await FolderPicker.PickFileAsync(SettingsWindow, null); }   // 原生选择框（146）
+                    catch (Exception e) { app.ReportFailure(Strings.Common_ChooseFile, e); return; }
+                    if (path != null) { d.Command = new G.OpenCommand(path); if (d.Name.Length == 0) d.Name = "打开 " + Path.GetFileNameWithoutExtension(path); Render(); } // 不翻译：用户数据
                 }));
                 return row;
             }

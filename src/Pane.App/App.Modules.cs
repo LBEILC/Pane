@@ -78,7 +78,9 @@ public sealed partial class App
         secondaryActions = demo ? new Pane.DesignData.SelectionActionsSample() : new Pane.Services.SelectionActions();
         FileSelection = demo ? new Pane.DesignData.RenameSample() : new Pane.Services.FileSelection();
         selectionReader = new Pane.Services.SelectionReader(new Pane.Services.WindowsSelectionPlatform(),
-            () => Store.Current.SuperPanel.ClipboardFallback, files: FileSelection as Pane.Services.FileSelection);
+            () => Store.Current.SuperPanel.ClipboardFallback, files: FileSelection as Pane.Services.FileSelection,
+            readDialog: window => Store.Current.FolderJump.Enabled
+                ? Pane.Services.DialogSearchService.ReadDialog(window, Store.Current.FolderJump.FilterByType) : null);
         // 新能力只需新增一个类，在此登记；显示顺序由这个列表决定。
         cloudModule = new(() => demo ? new DesignData.CloudSample() : new Services.Cloud.AccountService(Store.DirectoryPath, Settings.SettingsStore.CurrentVersion()), Store);
         var host = new ModuleHost([new LauncherModule(this), new ClipboardModule(this), new GesturesModule(this),
@@ -296,6 +298,7 @@ public sealed partial class App
         public override Task StartAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(true); return Task.CompletedTask; }
         public override Task StopAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(false); App.RemoveSecondary(SecondaryId.Translate, SecondaryId.Chat); return Task.CompletedTask; }
     }
+    public IAppLauncher? AppLauncher => launcherSearch;
     public IDialogSearch? DialogSearch { get; set; }
     sealed class FolderJumpModule(App app) : Capability(app, ModuleIds.FolderJump, ModuleCategory.Files, "folder-input")
     {

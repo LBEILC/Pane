@@ -7,6 +7,7 @@ using Pane.Localization;
 using Microsoft.UI.Xaml;
 using Pane.Contracts;
 using Pane.DesignData;
+using Pane.Hosting;
 
 namespace Pane.Views;
 
@@ -109,11 +110,10 @@ public sealed partial class SettingsView
         string path;
         try
         {
-            var picker = new Windows.Storage.Pickers.FileSavePicker { SuggestedFileName = string.Format(Strings.Settings_Data_ExportFileName, DateTime.Now.ToString("yyyy-MM-dd")) };
-            picker.FileTypeChoices.Add(Strings.Settings_Data_ZipFileType, [".zip"]);
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, SettingsWindow);
-            if (await picker.PickSaveFileAsync() is not { } file) return;
-            path = file.Path;
+            // 原生另存为（147）
+            if (await FolderPicker.PickSaveAsync(SettingsWindow, string.Format(Strings.Settings_Data_ExportFileName, DateTime.Now.ToString("yyyy-MM-dd")), "zip",
+                    [(Strings.Settings_Data_ZipFileType, "*.zip")]) is not { } file) return;
+            path = file;
         }
         catch (Exception e) { exportNote = string.Format(Strings.Data_ExportFailed, App.FailureReason(e) ?? e.Message); exportedPath = null; Render(); return; }
 
@@ -143,11 +143,9 @@ public sealed partial class SettingsView
         string path;
         try
         {
-            var picker = new Windows.Storage.Pickers.FileOpenPicker();
-            picker.FileTypeFilter.Add(".zip");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, SettingsWindow);
-            if (await picker.PickSingleFileAsync() is not { } file) return;
-            path = file.Path;
+            // 原生选择框（146）：WinRT 的在管理员身份下用不了
+            if (await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Common_FilterZip, "*.zip")]) is not { } file) return;
+            path = file;
         }
         catch (Exception e) { importNote = App.FailureReason(e) ?? e.Message; Render(); return; }
 

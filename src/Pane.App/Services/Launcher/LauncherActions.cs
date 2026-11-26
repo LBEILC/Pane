@@ -1,13 +1,14 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Xml.Linq;
 using Microsoft.Win32;
 using Pane.Contracts;
 using Pane.Localization;
 
 namespace Pane.Services.Launcher;
 
-internal sealed record ActionTarget(string Path,string[] Arguments) { public string? RawArguments {get;init;} }
+internal sealed record ActionTarget(string Path,string[] Arguments) { public string? RawArguments {get;init;} public bool AliasOnly {get;init;} }
 internal sealed record UninstallEntry(string Id,string? Location,string? Icon,string? Command,bool SystemComponent,string? QuietCommand=null);
 
 internal static class UninstallMatching
@@ -63,12 +64,48 @@ internal static class UninstallMatching
 internal abstract class LauncherActionPlatform
 {
     internal abstract ActionTarget? Resolve(string launch);
+    internal virtual string? ExecutionAlias(string appId) => null;
     internal abstract IReadOnlyList<UninstallEntry> ReadUninstall();
     internal abstract Task PropertiesAsync(string path,CancellationToken token);
 }
 
 internal sealed class WindowsLauncherActionPlatform:LauncherActionPlatform
 {
+    internal override string? ExecutionAlias(string appId)
+    {
+        int bang = appId.IndexOf('!');
+        if (bang < 1) return null;
+        var package = new StringBuilder(32768);
+        if (LauncherNative.PaneLauncherPackagePath(appId, package, package.Capacity) != 1) return null;
+        string aliases = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Microsoft", "WindowsApps", appId[..bang]);
+        try
+        {
+            var manifest = XElement.Load(Path.Combine(package.ToString(), "AppxManifest.xml"));
+            var application = manifest.Descendants().FirstOrDefault(e => e.Name.LocalName == "Application" &&
+                (string?)e.Attribute("Id") == appId[(bang + 1)..]);
+            if (application == null) return null;
+            foreach (var extension in application.Descendants().Where(e =>
+                (string?)e.Attribute("Category") == "windows.appExecutionAlias"))
+            {
+                // 仅桌面进程可用 runas；扩展可以覆盖应用的入口和信任级别。
+                var entry = (string?)(extension.Attribute("EntryPoint") ?? application.Attribute("EntryPoint"));
+                var trust = (extension.Attributes().Concat(application.Attributes())
+                    .FirstOrDefault(a => a.Name.LocalName == "TrustLevel"))?.Value;
+                if (trust != null ? trust != "mediumIL" : entry != "Windows.FullTrustApplication") continue;
+                foreach (var alias in extension.Descendants().Where(e => e.Name.LocalName == "ExecutionAlias"))
+                {
+                    string? name = (string?)alias.Attribute("Alias");
+                    if (name == null || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                        !name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) continue;
+                    string path = Path.Combine(aliases, name);
+                    if (File.Exists(path) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint)) return path;
+                }
+            }
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or System.Xml.XmlException) { }
+        return null;
+    }
     [DllImport("shell32.dll",CharSet=CharSet.Unicode,SetLastError=true)] static extern nint CommandLineToArgvW(string command,out int count);
     [DllImport("kernel32.dll")] static extern nint LocalFree(nint memory);
     [DllImport("ole32.dll")] static extern int CoInitializeEx(nint reserved,uint flags);
@@ -132,13 +169,16 @@ internal sealed class WindowsLauncherActionPlatform:LauncherActionPlatform
 internal sealed class LauncherActions(LauncherActionPlatform platform,ILauncherExecutor executor,ILaunchProcess process)
 {
     internal ActionTarget? Target(LauncherItem item,IndexedApp? app)=>item.Kind switch {
-        LauncherItemKind.App=>app is {Packaged:false}?platform.Resolve(app.Launch):null,
+        LauncherItemKind.App when app is {Packaged:true} => platform.ExecutionAlias(app.Launch) is {} alias
+            ? new(alias, []) { AliasOnly = true } : null,
+        LauncherItemKind.App=>app != null ? platform.Resolve(app.Launch) : null,
         LauncherItemKind.File or LauncherItemKind.Folder=>UninstallMatching.Normalize(item.Id.StartsWith("favorite:")?item.Id[9..]:item.Id.StartsWith("file:")?item.Id[5..]:item.Id.StartsWith("direct:path:",StringComparison.Ordinal)?OpenTargetService.LocalPath(item.Id[12..]):null,false) is {} path?new(path,[]):null,
         _=>null
     };
     internal IReadOnlyList<LauncherItemAction> Get(LauncherItem item,ActionTarget? target,bool portable=false)
     {
         if(target==null)return [];
+        if(target.AliasOnly)return [LauncherItemAction.RunAsAdmin];
         var result=new List<LauncherItemAction>();
         if(item.Kind==LauncherItemKind.App)result.Add(LauncherItemAction.RunAsAdmin);
         result.AddRange([LauncherItemAction.OpenLocation,LauncherItemAction.CopyPath,LauncherItemAction.Properties]);
@@ -148,6 +188,8 @@ internal sealed class LauncherActions(LauncherActionPlatform platform,ILauncherE
     internal async Task Run(LauncherItem item,ActionTarget? target,LauncherItemAction action,CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
+        if(target?.AliasOnly == true && action != LauncherItemAction.RunAsAdmin)
+            throw new LauncherActionException(Strings.Launcher_ActionUnavailable);
         if(target==null||!Enum.IsDefined(action)||item.Kind!=LauncherItemKind.App&&action is LauncherItemAction.RunAsAdmin or LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);
         switch(action){
             case LauncherItemAction.RunAsAdmin:await process.StartAsync(new(target.Path,target.Arguments,Path.GetDirectoryName(target.Path)!,true),token);break;
@@ -175,7 +217,25 @@ internal sealed partial class LauncherSearch
     public async Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken)
     {
         if(action==LauncherItemAction.EditAliases)throw new NotSupportedException(nameof(LauncherItemAction.EditAliases));
-        try{await Task.Run(async()=>{cancellationToken.ThrowIfCancellationRequested();if(action==LauncherItemAction.HideFromSearch){Hide(item);return;}if(action==LauncherItemAction.RemoveFromRecent){RemoveRecent(item);return;}if(action==LauncherItemAction.RemoveFromApps){RemovePortable(item);return;}var app=ActionApp(item);if(app?.PortablePath!=null&&action==LauncherItemAction.Uninstall)throw new LauncherActionException(Strings.Launcher_ActionUnavailable);await actions.Run(item,actions.Target(item,app),action,cancellationToken).ConfigureAwait(false);if(action==LauncherItemAction.RunAsAdmin)RecordSelection(item);},cancellationToken).ConfigureAwait(false);}
+        try
+        {
+            await Task.Run(async () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (action == LauncherItemAction.HideFromSearch) { Hide(item); return; }
+                if (action == LauncherItemAction.RemoveFromRecent) { RemoveRecent(item); return; }
+                if (action == LauncherItemAction.RemoveFromApps) { RemovePortable(item); return; }
+                var app = ActionApp(item);
+                if (app?.PortablePath != null && action == LauncherItemAction.Uninstall)
+                    throw new LauncherActionException(Strings.Launcher_ActionUnavailable);
+                await actions.Run(item, actions.Target(item, app), action, cancellationToken).ConfigureAwait(false);
+                if (action == LauncherItemAction.RunAsAdmin)
+                {
+                    RecordUse(item.Id);
+                    RecordSelection(item);
+                }
+            }, cancellationToken).ConfigureAwait(false);
+        }
         catch(Win32Exception e) when(e.NativeErrorCode==1223){}
         catch(OperationCanceledException){throw;}
         catch(LauncherActionException){throw;}

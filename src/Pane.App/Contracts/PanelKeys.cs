@@ -57,6 +57,12 @@ public enum PanelKeyMode
     /// 不报 Type：打字照常落到原窗口。其余键照常落到原窗口。
     /// </summary>
     Super,
+    /// <summary>
+    /// 超级面板的文件夹列表 / 常用面板（148，设计加，2026-11-26）：拦 ← → ↑ ↓ Digit(1～9) Enter Escape。
+    /// 不报 Type、不拦 Copy / Retry / Tab：打字和其余键照常落到原窗口（对话框场景里原窗口就是对话框）。
+    /// 宿主按场景选：选中文字 / 文件用 <see cref="Super"/>，文件夹列表和常用面板用这个。
+    /// </summary>
+    SuperGrid,
 }
 
 /// <summary>Number 只在 Quick 时有值（1～9），其余为 0。</summary>

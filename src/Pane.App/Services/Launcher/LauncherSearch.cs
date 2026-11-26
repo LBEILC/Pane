@@ -14,7 +14,7 @@ internal sealed record LauncherSnapshot(IndexedApp[] Apps,SearchEntry[] Favorite
     public string? IconSettingsKey {get;init;}
     public Dictionary<string,string> Aliases {get;init;}=[];
 }
-internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
+internal sealed partial class LauncherSearch:IAppLauncher,ILauncherItemActions,ILauncherSearch,ILauncherAttachmentActions,IAppIconCatalog,IDisposable
 {
     internal event EventHandler? HotkeyIndexChanged;
     internal IndexedApp? FindHotkeyApp(string id){
@@ -22,9 +22,15 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
         string canonical=current.Aliases.GetValueOrDefault(id,id);
         return current.Apps.FirstOrDefault(app=>app.Id==canonical);
     }
-    internal Task PressHotkeyAsync(IndexedApp app){
+    public Task LaunchAsync(string appId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var app = FindHotkeyApp(appId) ?? throw new LauncherActionException(Pane.Localization.Strings.SuperPanel_AppMissing);
+        return ExecuteAsync(ApplicationSource.Item(app, LauncherGroups.Applications), cancellationToken);
+    }
+    internal Task PressHotkeyAsync(IndexedApp app, Func<IndexedApp,Func<Task>,Task>? switchOrLaunch = null){
         if(!app.Packaged && string.IsNullOrEmpty(app.Target))app=app with{Target=IndexedTarget(app)?.Path};
-        return AppHotkeyWindows.OpenAsync(app,()=>ExecuteAsync(ApplicationSource.Item(app,LauncherGroups.Applications),lifetime.Token));
+        return (switchOrLaunch ?? AppHotkeyWindows.OpenAsync)(app,()=>ExecuteAsync(ApplicationSource.Item(app,LauncherGroups.Applications),lifetime.Token));
     }
     internal Func<INoteStore?> NoteProvider { get; set; } = () => null;
     internal Func<IPowerTimer?> PowerTimerProvider { get; set; } = () => null;
@@ -197,6 +203,11 @@ internal sealed partial class LauncherSearch:ILauncherItemActions,ILauncherSearc
     internal static string BuildUrl(SearchEngine engine,string text)=>engine.UrlTemplate.Replace("{query}",Uri.EscapeDataString(text),StringComparison.Ordinal);
     public async Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
     {
+        if (item.Kind == LauncherItemKind.App && store.Current.Launcher.AdminApps.Contains(item.Id))
+        {
+            await RunAsync(item, LauncherItemAction.RunAsAdmin, cancellationToken).ConfigureAwait(false);
+            return;
+        }
         cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename"){RecordSelection(item);return;}if(item.Id=="power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         await source.ExecuteAsync(item,Context(""),cancellationToken).ConfigureAwait(false);
         RecordSelection(item);

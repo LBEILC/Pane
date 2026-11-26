@@ -7,6 +7,8 @@ static partial class Program
     sealed class ActionPlatform:LauncherActionPlatform
     {
         internal int Reads,Resolves;internal string? Property;
+        internal Dictionary<string,string> ExecutionAliases = [];
+        internal override string? ExecutionAlias(string appId) => ExecutionAliases.GetValueOrDefault(appId);
 
         internal IReadOnlyList<UninstallEntry> Entries=[new("one",@"C:\Fixture",null,"MsiExec.exe /X{fixture}",false)];
         internal override ActionTarget? Resolve(string launch){Resolves++;return launch=="missing"?null:new(@"C:\Fixture\app.exe",["--profile","a b"]);}

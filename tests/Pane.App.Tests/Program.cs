@@ -8,6 +8,7 @@ static class Program
  static int checks;
  static void Check(bool condition,string name){checks++;if(!condition)throw new Exception(name);}
  static async Task Main(string[] args){
+  if(args is ["--148"]){await Selection148();return;}
   if(args is ["--desktop-shell-probe",var probe]){SetupLaunchTests.Probe(probe);return;}
   if(args.Length==4 && args[0]=="--uninstall-child-fixture"){File.WriteAllText(args[1],JsonSerializer.Serialize(args.Skip(2).ToArray()));Environment.ExitCode=7;return;}
   if(args.Length is 3 or 4 && args[0]=="--verify-release") { await ReleaseVerification.Run(args[1],args[2],args.Length==4 && args[3]=="--fake-server");return; }
@@ -65,6 +66,30 @@ static class Program
   checks+=await ReleaseNotes062Tests.Run(settings);
   Console.WriteLine($"PASS app assertions={checks}; systemClipboard=0; input=0");
   TestResults.Pass();
+ }
+ sealed class SceneFiles : IFileSelectionPlatform {
+  public string[] Paths=[];
+  public bool Editing(nint window)=>false;
+  public IReadOnlyList<string> Read(nint window)=>Paths;
+ }
+ static async Task Selection148(){
+  var platform=new Fake{Failure=SelectionFailure.None};
+  var files=new SceneFiles();
+  var dialog=new FileDialogInfo(123,1,2,3,4,true,false,false,null,null,true,"Fixture");
+  bool enabled=true;int probes=0;
+  var reader=new SelectionReader(platform,()=>true,files:new(files),readDialog:window=>{
+   probes++;return enabled&&window==dialog.Dialog?dialog:null;
+  });
+  var selected=await reader.ReadAsync(default);
+  Check(selected is {Failure:SelectionFailure.None, Text:null, Files:null, SourceWindow:123} &&
+   selected.Dialog==dialog&&platform.Calls.Count==0,"dialog bypasses text and clipboard");
+  files.Paths=[@"D:\fixture.txt"];
+  selected=await reader.ReadAsync(default);
+  Check(selected.Files==files.Paths&&selected.Dialog==null&&probes==1&&platform.Calls.Count==0,"files take priority");
+  files.Paths=[];enabled=false;
+  selected=await reader.ReadAsync(default);
+  Check(selected.Dialog==null&&selected.Text=="direct"&&platform.Calls.SequenceEqual(["direct"]),"disabled reads selection");
+  Console.WriteLine($"PASS 148 selection assertions={checks}");
  }
  sealed class Fake:ISelectionPlatform {
   public List<string> Calls=[];public SelectionFailure Failure=SelectionFailure.Unsupported;public bool Changes=true,SnapshotFails;public int DirectDelay;public string Data="original-all-formats";uint sequence;

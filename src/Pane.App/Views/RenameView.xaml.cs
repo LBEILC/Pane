@@ -146,11 +146,9 @@ public sealed partial class RenameView : UserControl, ISecondaryView, IDisposabl
     {
         try
         {
-            var picker = new Windows.Storage.Pickers.FileOpenPicker();
-            picker.FileTypeFilter.Add("*");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-            var picked = await picker.PickMultipleFilesAsync();
-            if (picked is { Count: > 0 }) AddFiles(picked.Select(f => f.Path));
+            // 原生选择框（147）：WinRT 的在管理员身份下用不了
+            var picked = await FolderPicker.PickFilesAsync(Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId), null);
+            if (picked.Count > 0) AddFiles(picked);
         }
         catch (Exception ex) { Host.ReportFailure(Strings.Rename_AddFiles, ex); }
     }
@@ -163,13 +161,11 @@ public sealed partial class RenameView : UserControl, ISecondaryView, IDisposabl
     {
         try
         {
-            var picker = new Windows.Storage.Pickers.FolderPicker();
-            picker.FileTypeFilter.Add("*");
-            WinRT.Interop.InitializeWithWindow.Initialize(picker, Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId));
-            if (await picker.PickSingleFolderAsync() is not { } folder) return;
-            var list = await renamer.ListFolderAsync(folder.Path, CancellationToken.None);
+            // 原生选择框（146）：WinRT 的在管理员身份下用不了
+            if (await FolderPicker.PickFolderAsync(Microsoft.UI.Win32Interop.GetWindowFromWindowId(XamlRoot.ContentIslandEnvironment.AppWindowId), null, null) is not { } folder) return;
+            var list = await renamer.ListFolderAsync(folder, CancellationToken.None);
             AddFiles(list.Direct);
-            ShowFolderNote(folder.Name, list);
+            ShowFolderNote(System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(folder)) is { Length: > 0 } name ? name : folder, list);
         }
         catch (Exception ex) { Host.ReportFailure(Strings.Rename_AddFolder, ex); }
     }

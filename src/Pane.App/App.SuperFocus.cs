@@ -17,7 +17,7 @@ public sealed partial class App
         if(foreground==0)return false;
         GetWindowThreadProcessId(foreground,out uint pid);
         if(pid==(uint)Environment.ProcessId)return false;
-        if(!keys.Begin(foreground,PanelKeyMode.Super))return false;
+        if(!keys.Begin(foreground,((SuperView)panel.View).KeyMode))return false;   // 148：文件夹列表 / 常用面板用 SuperGrid（多拦 ↑ ↓ 7～9）
         clipboardKeys=false;   // 接管换给了超级面板（钉住的剪贴板可能还开着，2026-11-25）
         if(!ReferenceEquals(superWiredPanel,panel))
         {

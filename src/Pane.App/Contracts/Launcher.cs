@@ -63,6 +63,16 @@ public interface ILauncherSearch
 }
 
 /// <summary>
+/// 按应用 id 打开（148，设计加，2026-11-26）：超级面板常用面板用。id 同 <c>LauncherItem.Id</c>（app:…，也就是 <see cref="AppIconInfo.Id"/>）。
+/// 行为同启动器里 Enter 这个应用：记使用次数、在 <c>LauncherSettings.AdminApps</c> 里就提权（146），UAC 点「否」静默。
+/// 索引里找不到这个 id 时抛 <see cref="LauncherActionException"/>（消息给人看，如「找不到这个应用」）。
+/// </summary>
+public interface IAppLauncher
+{
+    Task LaunchAsync(string appId, CancellationToken cancellationToken);
+}
+
+/// <summary>
 /// 终端命令（037）：输入以 > 开头时，SearchAsync 先给「在终端里运行」，后面跟最多 6 条补全（最近运行过的命令、PATH 里的程序名），
 /// 补全项 Id 写成 "complete:&lt;完整命令&gt;"、Group 为 LauncherGroups.Completion；界面按 Tab 把它填进输入框，Enter 直接运行它（走 ExecuteAsync）。
 /// 「在终端里运行」那一项 Group 为 LauncherGroups.Terminal、副标题是命令本身；输入只有 > 时给一条提示项，Id 写成 "terminal:hint"、Group 为 LauncherGroups.Terminal、
