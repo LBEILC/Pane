@@ -21,18 +21,31 @@ internal sealed partial class SyncService
                 foreach(var (path,value) in SyncData.Leaves(edit.After))
                     if (!before.TryGetPropertyValue(path,out var old) || !JsonNode.DeepEquals(value,old)) editTimes[path] = edit.At;
             }
-            var leaves = SyncData.Leaves(store.Current);
+            var settings = store.Current;
+            var leaves = SyncData.Leaves(settings);
+            long migration = settings.LauncherSwitchesRestoredAt > j.LauncherSwitchesRestoredAt ? settings.LauncherSwitchesRestoredAt : 0;
             foreach (var (path,value) in leaves)
             {
-                if (j.Settings.TryGetPropertyValue(path,out var old) && JsonNode.DeepEquals(old,value)) continue;
+                bool known = j.Settings.TryGetPropertyValue(path,out var old);
+                long restoredAt = path is "Launcher.RememberOpenedPrograms" or "Launcher.RememberWebSearches" or
+                    "Launcher.SearchSystemSettings" or "Launcher.LearnSelections" ? migration : 0;
+                bool unchanged = known && JsonNode.DeepEquals(old,value);
+                if (unchanged && restoredAt == 0) continue;
                 var id = SyncCrypto.Id(key,"settings",path);
-                if (j.Records.GetValueOrDefault(id)?.Unknown != null) continue;
+                var previous = j.Records.GetValueOrDefault(id);
+                if (previous?.Unknown != null) continue;
+                if (unchanged && (long?)previous?.Body?["at"] >= restoredAt) continue;
                 var rec = Local(j,id,"settings",device);
                 rec.Body!["k"] = path;
                 rec.Body["val"] = WithExtensions(value,old,rec.Body["val"]);
-                rec.Body["at"] = j.Settings.ContainsKey(path) ? Math.Max(EditTime(path), (long?)rec.Body["at"] + 1 ?? 0) : 0;
+                // 即使没有同步基线，恢复也算当时的一次本机编辑。
+                long at = known || restoredAt > 0 ? EditTime(path) : 0;
+                if (restoredAt > 0 && (bool?)value == true)
+                    at = Math.Max(restoredAt, editTimes.GetValueOrDefault(path));
+                rec.Body["at"] = known ? Math.Max(at, (long?)rec.Body["at"] + 1 ?? 0) : at;
             }
             j.Settings = leaves;
+            j.LauncherSwitchesRestoredAt = settings.LauncherSwitchesRestoredAt;
         }
         if (options.Usage)
         {

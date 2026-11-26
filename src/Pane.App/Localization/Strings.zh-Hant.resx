@@ -1979,6 +1979,8 @@
   <data name="Settings_Hotkeys" xml:space="preserve"><value>快速鍵</value></data>
   <data name="Settings_Hotkeys_Description" xml:space="preserve"><value>集中管理全部快速鍵，可直接修改；重複或被佔用時顯示提示</value></data>
   <data name="Settings_Hotkeys_Activation" xml:space="preserve"><value>全域</value></data>
+  <data name="Settings_Hotkeys_DoubleTapFullscreen" xml:space="preserve"><value>全螢幕程式中不回應連按兩下</value></data>
+  <data name="Settings_Hotkeys_DoubleTapFullscreenDescription" xml:space="preserve"><value>遊戲、影片全螢幕時，連按兩下修飾鍵不呼出；組合鍵照常</value></data>
   <data name="Settings_Hotkeys_ActivationNote" xml:space="preserve"><value>在任意程式中均可使用；與其他程式的快速鍵衝突時顯示佔用情況</value></data>
   <data name="Settings_Hotkeys_Dialog" xml:space="preserve"><value>檔案對話方塊</value></data>
   <data name="Settings_Hotkeys_DialogNote" xml:space="preserve"><value>僅在「開啟 / 另存新檔」對話方塊位於前景時生效，可與全域快速鍵相同</value></data>

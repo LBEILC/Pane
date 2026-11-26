@@ -24,6 +24,7 @@ std::atomic<bool> policyPending=false;
 std::atomic<intptr_t> pforeground=0;
 std::atomic<ULONG_PTR> pclass=0;
 std::atomic<int> geometry[9]{};
+std::atomic<bool> publishedMaximized=false;
 PolicyGeometry preparingGeometry{};
 ReadSnapshot<PressPolicy> pressPolicy;
 std::unique_ptr<PressPolicy> preparingPressPolicy;
@@ -101,7 +102,7 @@ void CALLBACK windowEvent(HWINEVENTHOOK,DWORD event,HWND window,LONG object,LONG
  if(event==EVENT_SYSTEM_FOREGROUND||(window&&object==OBJID_WINDOW&&child==CHILDID_SELF&&
   (event==EVENT_OBJECT_CREATE||event==EVENT_OBJECT_DESTROY||event==EVENT_OBJECT_SHOW||event==EVENT_OBJECT_HIDE||event==EVENT_OBJECT_REORDER||event==EVENT_OBJECT_LOCATIONCHANGE||event==EVENT_OBJECT_STATECHANGE)))invalidatePolicy();
 }
-PolicyGeometry publishedGeometry(){PolicyGeometry g{};g.window=reinterpret_cast<HWND>(pw.load());g.pid=pp;g.foreground=reinterpret_cast<HWND>(pforeground.load());g.windowClass=pclass;g.rect={geometry[0],geometry[1],geometry[2],geometry[3]};g.monitor={geometry[4],geometry[5],geometry[6],geometry[7]};g.dpi=geometry[8];g.valid=true;return g;}
+PolicyGeometry publishedGeometry(){PolicyGeometry g{};g.window=reinterpret_cast<HWND>(pw.load());g.pid=pp;g.foreground=reinterpret_cast<HWND>(pforeground.load());g.windowClass=pclass;g.rect={geometry[0],geometry[1],geometry[2],geometry[3]};g.monitor={geometry[4],geometry[5],geometry[6],geometry[7]};g.dpi=geometry[8];g.maximized=publishedMaximized;g.valid=true;return g;}
 void emit(Event e){unsigned h=head.load(),t=tail.load(std::memory_order_acquire);unsigned free=(t+8192-h-1)%8192;
  if(e.kind==pane::Point&&free<32)return;
  if(!free){overflow=1;capture.cancelled=true;}else{ring[h]=e;ringEpoch[h]=safetyEpoch.load();head.store((h+1)%8192,std::memory_order_release);}
@@ -187,7 +188,7 @@ API void PanePressPolicyCommit(){
 API void PanePolicy(intptr_t window,uint32_t pid,int x,int y,int dpi,int blocked,int enabled,int timeout){
  version.fetch_add(1);pw=window;pp=pid;px=x;py=y;pdpi=dpi;pblocked=blocked;penabled=enabled;ptimeout=timeout;
  pforeground=reinterpret_cast<intptr_t>(preparingGeometry.foreground);pclass=preparingGeometry.windowClass;auto& g=preparingGeometry;
- geometry[0]=g.rect.left;geometry[1]=g.rect.top;geometry[2]=g.rect.right;geometry[3]=g.rect.bottom;geometry[4]=g.monitor.left;geometry[5]=g.monitor.top;geometry[6]=g.monitor.right;geometry[7]=g.monitor.bottom;geometry[8]=g.dpi;
+ geometry[0]=g.rect.left;geometry[1]=g.rect.top;geometry[2]=g.rect.right;geometry[3]=g.rect.bottom;geometry[4]=g.monitor.left;geometry[5]=g.monitor.top;geometry[6]=g.monitor.right;geometry[7]=g.monitor.bottom;geometry[8]=g.dpi;publishedMaximized=g.maximized;
  version.fetch_add(1,std::memory_order_release);
 }
 API uint64_t PanePolicyBegin(){policyAccepted=0;policyPending=false;auto revision=policyRevision.load();POINT p{};GetCursorPos(&p);preparingGeometry=policyGeometry(p);refreshIdentities(preparingGeometry.pid,p);return revision;}

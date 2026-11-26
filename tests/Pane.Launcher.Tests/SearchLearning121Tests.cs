@@ -23,6 +23,11 @@ static partial class Program
         string root = TestResults.NewDirectory("121-");
         Directory.CreateDirectory(root);
         var store = new SettingsStore(root, Defaults());
+        var old = JsonSerializer.SerializeToNode(store.Current, SettingsJson.Default.PaneSettings)!;
+        old["Launcher"]!.AsObject().Remove("LearnSelections");
+        File.WriteAllText(Path.Combine(root, "settings.json"), old.ToJsonString());
+        store.Load();
+        Check(store.Current.Launcher.LearnSelections, "旧设置缺少字段时默认学习");
         var path = Path.Combine(root, "名字.psd");
         File.WriteAllText(path, "");
         var files = new Files121(path);
@@ -52,7 +57,29 @@ static partial class Program
             promoted.Highlights!.SequenceEqual(original.Highlights!)), "最佳保留字段");
         Check(Best(result) == original.Id && result.Items.Count(i => i.Id == original.Id) == 1 &&
             result.Items.Any(i => i.Title == "dymail" && i.Group == LauncherGroups.Applications), "抖音提升且去重");
-        await Pick("dy", original.Id);
+        await search.ExecuteAsync(partial!.Items[0] with { Icon = new("app") }, default);
+        string memoryPath = Path.Combine(root, "search-memory.json");
+        async Task<bool> Written()
+        {
+            // 等目标文件足以容纳三条记录再打开，避免轮询读句柄与 Windows 的原子替换竞争。
+            var shortest = new Selection(original.Id, DateTimeOffset.UnixEpoch);
+            int minimumBytes = JsonSerializer.SerializeToUtf8Bytes(new Dictionary<string,Selection[]> {
+                ["dy"] = [shortest, shortest, shortest]
+            }, SearchMemoryJson.Default.DictionaryStringSelectionArray).Length;
+            for (int attempt = 0; attempt < 200; attempt++)
+            {
+                if (new FileInfo(memoryPath) is { Exists: true } file && file.Length >= minimumBytes)
+                {
+                    using var stream = new FileStream(memoryPath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                    var saved = JsonSerializer.Deserialize(stream, SearchMemoryJson.Default.DictionaryStringSelectionArray);
+                    if (saved?.GetValueOrDefault("dy") is { Length: 3 } selections && selections.All(s => s.Id == original.Id))
+                        return true;
+                }
+                await Task.Delay(25);
+            }
+            return false;
+        }
+        Check(await Written(), "最终结果替换后执行重建的首批行，运行中三次选择均写盘");
         await Pick("dy", "app:dymail");
         result = await Find("dy");
         Check(Best(result) == original.Id && result.Items.First(i => i.Group == LauncherGroups.Applications).Title == "dymail", "三比一及同组前移");
@@ -128,6 +155,10 @@ static partial class Program
         }
         using var restored = new SearchMemory(dir);
         Check(restored.Count == 2000 && restored.Ranked("dy")[0] == "app:b", "落盘后保留限制和排序");
+        string blocked = Path.Combine(root, "blocked");
+        Directory.CreateDirectory(Path.Combine(blocked, "search-memory.json.tmp"));
+        using (var memory = new SearchMemory(blocked)) memory.Record("dy", "app:a");
+        Check(File.Exists(Path.Combine(blocked, "search-memory.log")), "写入临时文件失败时留日志");
     }
 
     static async Task SearchTiming121(LauncherSearch search, Files121 files, Action<bool> enabled)

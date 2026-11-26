@@ -89,10 +89,11 @@ internal static class SetupFiles
         return Version.TryParse(value, out var version) ? $"{version.Major}.{version.Minor}.{version.Build}" : null;
     }
     public static int CompareVersions(string first, string second) => Parse(first).CompareTo(Parse(second));
+    internal static Version ReleaseVersion(Version version) => new(version.Major, version.Minor, Math.Max(0, version.Build));
     static Version Parse(string text)
     {
         var version = Version.Parse(text.Split('+')[0]);
-        return new(version.Major, version.Minor, Math.Max(0, version.Build), Math.Max(0, version.Revision));
+        return ReleaseVersion(version);
     }
 }
 

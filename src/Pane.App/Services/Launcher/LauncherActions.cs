@@ -214,7 +214,9 @@ internal sealed partial class LauncherSearch
         catch(OperationCanceledException){throw;}
         catch(Exception){throw new LauncherActionException(Strings.Launcher_ActionFailed);}
     }
-    public async Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken)
+    public Task RunAsync(LauncherItem item,LauncherItemAction action,CancellationToken cancellationToken) =>
+        RunCoreAsync(item, action, action == LauncherItemAction.RunAsAdmin ? SelectionQuery(item) : null, cancellationToken);
+    async Task RunCoreAsync(LauncherItem item,LauncherItemAction action,string? query,CancellationToken cancellationToken)
     {
         if(action==LauncherItemAction.EditAliases)throw new NotSupportedException(nameof(LauncherItemAction.EditAliases));
         try
@@ -232,7 +234,7 @@ internal sealed partial class LauncherSearch
                 if (action == LauncherItemAction.RunAsAdmin)
                 {
                     RecordUse(item.Id);
-                    RecordSelection(item);
+                    RecordSelection(query,item);
                 }
             }, cancellationToken).ConfigureAwait(false);
         }
@@ -248,9 +250,9 @@ internal sealed partial class LauncherSearch
         SearchMemory.Remove(item.Id);
         SaveUsage();
     }
-    async Task ExecuteAppElevatedAsync(LauncherItem item,CancellationToken token)
+    async Task ExecuteAppElevatedAsync(LauncherItem item,string? query,CancellationToken token)
     {
-        if((await GetActionsAsync(item,token).ConfigureAwait(false)).Contains(LauncherItemAction.RunAsAdmin))await RunAsync(item,LauncherItemAction.RunAsAdmin,token).ConfigureAwait(false);
-        else await ExecuteAsync(item,token).ConfigureAwait(false);
+        if((await GetActionsAsync(item,token).ConfigureAwait(false)).Contains(LauncherItemAction.RunAsAdmin))await RunCoreAsync(item,LauncherItemAction.RunAsAdmin,query,token).ConfigureAwait(false);
+        else await ExecuteCoreAsync(item,query,token).ConfigureAwait(false);
     }
 }

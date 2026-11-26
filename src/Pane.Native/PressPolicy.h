@@ -67,7 +67,7 @@ inline int programMatchRank(const std::wstring& rule,const std::wstring& target)
  return target.size()>end&&target[end]==L'\\'&&samePrefix(rule,target,end)?static_cast<int>(end):0;
 }
 inline bool pressFullscreen(const PolicyGeometry& g,const wchar_t* name){
- return g.valid&&wcscmp(name,L"Progman")!=0&&wcscmp(name,L"WorkerW")!=0
+ return g.valid&&!g.maximized&&wcscmp(name,L"Progman")!=0&&wcscmp(name,L"WorkerW")!=0
   &&g.rect.left<=g.monitor.left&&g.rect.top<=g.monitor.top&&g.rect.right>=g.monitor.right&&g.rect.bottom>=g.monitor.bottom;
 }
 struct PressDecision {int enabled,superButton;};

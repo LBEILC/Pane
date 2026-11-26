@@ -1979,6 +1979,8 @@
   <data name="Settings_Hotkeys" xml:space="preserve"><value>快捷键</value></data>
   <data name="Settings_Hotkeys_Description" xml:space="preserve"><value>集中管理全部快捷键，可直接修改；重复或被占用时显示提示</value></data>
   <data name="Settings_Hotkeys_Activation" xml:space="preserve"><value>全局</value></data>
+  <data name="Settings_Hotkeys_DoubleTapFullscreen" xml:space="preserve"><value>全屏程序中不响应连按两下</value></data>
+  <data name="Settings_Hotkeys_DoubleTapFullscreenDescription" xml:space="preserve"><value>游戏、视频全屏时，连按两下修饰键不呼出；组合键照常</value></data>
   <data name="Settings_Hotkeys_ActivationNote" xml:space="preserve"><value>在任意程序中均可使用；与其他程序的快捷键冲突时显示占用情况</value></data>
   <data name="Settings_Hotkeys_Dialog" xml:space="preserve"><value>文件对话框</value></data>
   <data name="Settings_Hotkeys_DialogNote" xml:space="preserve"><value>仅在「打开 / 另存为」对话框位于前台时生效，可与全局快捷键相同</value></data>

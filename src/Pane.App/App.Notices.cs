@@ -2,6 +2,7 @@
 // 已下载好：服务 Ready、不是忽略过的版本；更新后：运行的版本比看过的新、这一版有重点条目，最多在 3 次呼出里出现。两种都满足时只显示已下载好。
 using System.Reflection;
 using Pane.Contracts;
+using Pane.Services.Setup;
 using Pane.Views;
 using Pane.Views.Controls;
 namespace Pane;
@@ -61,5 +62,5 @@ public sealed partial class App
 
     // seen 为 null（工程迁移前）当作已看过，避免新装的用户也看到「已更新到」
     static bool Newer(string running, string? seen) =>
-        seen != null && Version.TryParse(running, out var r) && (seen == "0" || Version.TryParse(seen, out var s) && r > s);
+        seen != null && Version.TryParse(running, out var r) && (seen == "0" || Version.TryParse(seen, out var s) && SetupFiles.ReleaseVersion(r) > SetupFiles.ReleaseVersion(s));
 }

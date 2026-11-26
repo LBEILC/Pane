@@ -98,7 +98,8 @@ static partial class Program
         Check(PortableCatalog.Id(first)==PortableCatalog.Id(first.ToUpperInvariant()),"057 稳定Id不受大小写影响");
         Check(PortableCatalog.DisplayName(first,"Application")=="Alpha"&&PortableCatalog.DisplayName(first,"  ")=="Alpha"&&PortableCatalog.DisplayName(first,"Alpha Editor")=="Alpha Editor","057 显示名回退与版本说明");
         var store=new SettingsStore(Path.Combine(root,"settings"),Defaults());
-        store.Save(Defaults() with{Launcher=Defaults().Launcher with{Portable=[Portable057(first),Portable057(first.ToUpperInvariant())],RememberOpenedPrograms=false}});store.Load();
+        store.Load();
+        store.Save(store.Current with{Launcher=store.Current.Launcher with{Portable=[Portable057(first),Portable057(first.ToUpperInvariant())],RememberOpenedPrograms=false}});store.Load();
         Check(store.Current.Launcher.Portable.Length==1&&!store.Current.Launcher.RememberOpenedPrograms&&store.Current.Launcher.Portable[0].Kind==PortableKind.Program,"057 设置读写与路径去重");
         string json=File.ReadAllText(Path.Combine(store.DirectoryPath,"settings.json"));
         Check(json.Contains("\"Program\""),"057 枚举沿用字符串存储");

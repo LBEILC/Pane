@@ -8,4 +8,17 @@
     <!-- NativeAOT 的 PE 调试目录只记录符号文件名，不记录构建机目录。 -->
     <LinkerArg Include="/PDBALTPATH:%_PDB%" />
   </ItemGroup>
+  <!-- 固定自包含运行时和 NativeAOT 编译器以修补 Brotli 漏洞；构建 SDK 的默认服务版本达到 10.0.15 后可移除此目标。 -->
+  <Target Name="PinPaneRuntimePacks" BeforeTargets="ProcessFrameworkReferences"
+          Condition="'$(TargetFrameworkVersion)' == 'v10.0' and '$(RuntimeIdentifier)' == 'win-x64'">
+    <PropertyGroup>
+      <PaneRuntimeVersion>10.0.15</PaneRuntimeVersion>
+    </PropertyGroup>
+    <ItemGroup>
+      <KnownFrameworkReference Condition="'%(KnownFrameworkReference.TargetFramework)' == 'net10.0'" LatestRuntimeFrameworkVersion="$(PaneRuntimeVersion)" />
+      <KnownRuntimePack Condition="'%(KnownRuntimePack.TargetFramework)' == 'net10.0' and '%(KnownRuntimePack.Identity)' == 'Microsoft.NETCore.App'" LatestRuntimeFrameworkVersion="$(PaneRuntimeVersion)" />
+      <KnownAppHostPack Condition="'%(KnownAppHostPack.TargetFramework)' == 'net10.0'" AppHostPackVersion="$(PaneRuntimeVersion)" />
+      <KnownILCompilerPack Condition="'%(KnownILCompilerPack.TargetFramework)' == 'net10.0'" ILCompilerPackVersion="$(PaneRuntimeVersion)" />
+    </ItemGroup>
+  </Target>
 </Project>

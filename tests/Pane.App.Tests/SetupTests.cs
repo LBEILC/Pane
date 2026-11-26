@@ -153,6 +153,9 @@ internal static class SetupTests
             Check(!Directory.Exists(paths.Data) && !File.Exists(Path.Combine(root, "run.txt")), "删除数据及指向本安装的 Run 项");
             Check(SetupFiles.CompareVersions("0.1.9", "0.1.10") < 0, "数字版本比较");
             Check(SetupFiles.CompareVersions("1.2.0", "1.2") == 0 && SetupFiles.CompareVersions("1.2.0.0", "1.2.0+abc") == 0, "规范化版本比较");
+            string[] versions = ["0.1.814", "1.0.0", "1.0.1", "1.1.0", "1.10.0"];
+            Check(versions.Zip(versions.Skip(1)).All(p => SetupFiles.CompareVersions(p.First, p.Second) < 0), "跨主次版本按数字排序");
+            Check(SetupFiles.CompareVersions("1.0.0.831", "1.0.0") == 0, "提交数不参与升级判断");
             Check(SetupFiles.CompareVersions("2.0.0", "1.99.99") > 0, "主版本比较");
             await CheckAutostart(root, paths, source, defaults, Check);
         }

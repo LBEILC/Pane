@@ -25,6 +25,10 @@ public sealed partial class SettingsView
             try { global.Add(PauseHotkeyRow(app.GestureConfig.Settings.PauseHotkey)); }
             catch (Exception) { }   // 手势配置读不出来时这一行不列，手势分区里有说明
         }
+        // 全屏程序中不响应连按两下（issue 80，任务 154）：只管连按两下修饰键，有启动器或剪贴板时列在全局组末尾
+        if (ModuleGate.On(ModuleIds.Launcher) || ModuleGate.On(ModuleIds.Clipboard))
+            global.Add(Row(Strings.Settings_Hotkeys_DoubleTapFullscreen, Strings.Settings_Hotkeys_DoubleTapFullscreenDescription,
+                Switch(s.General.DoubleTapPauseInFullscreen, v => SaveGeneral(g => g with { DoubleTapPauseInFullscreen = v }))));
         if (global.Count > 0) Group(Strings.Settings_Hotkeys_Activation, global.ToArray(), Strings.Settings_Hotkeys_ActivationNote);
         if (ModuleGate.On(ModuleIds.FolderJump)) Group(Strings.Settings_Hotkeys_Dialog, FolderJumpHotkeyRows(), Strings.Settings_Hotkeys_DialogNote);
         if (ModuleGate.On(ModuleIds.Launcher)) Group(Strings.Settings_Hotkeys_Apps, AppHotkeyRows(), Strings.Settings_Hotkeys_AppsNote);

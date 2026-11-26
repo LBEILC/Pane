@@ -79,7 +79,6 @@ internal static class Win
     [StructLayout(LayoutKind.Sequential)] internal struct NativeEvent {public int Kind,X,Y,Value;public nint Window;public uint Pid,Dpi;}
     [StructLayout(LayoutKind.Sequential)] internal struct Point {public int X,Y;}
     [StructLayout(LayoutKind.Sequential)] internal struct Rect {public int Left,Top,Right,Bottom;}
-    [StructLayout(LayoutKind.Sequential)] internal struct Monitor {public uint Size;public Rect Bounds,Work;public uint Flags;}
     [StructLayout(LayoutKind.Sequential)] internal struct Message {public nint Window;public uint Id;public nuint W;public nint L;public uint Time;public Point Point;public uint Private;}
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point point);
     [DllImport("user32.dll")] internal static extern nint WindowFromPoint(Point point);
@@ -96,7 +95,7 @@ internal static class Win
     [DllImport("user32.dll")] internal static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] internal static extern short VkKeyScanW(char character);
     [DllImport("user32.dll")] internal static extern nint MonitorFromPoint(Point point,uint flags);
-    [DllImport("user32.dll")] internal static extern bool GetMonitorInfoW(nint monitor,ref Monitor info);
+    [DllImport(Dll,CharSet=CharSet.Unicode,ExactSpelling=true)] internal static extern int PaneWindowFullscreen(nint window,nint monitor,string windowClass);
     [DllImport("shcore.dll")] internal static extern int GetDpiForMonitor(nint monitor,int kind,out uint x,out uint y);
     [DllImport("user32.dll")] internal static extern bool RegisterHotKey(nint window,int id,uint modifiers,uint key);
     [DllImport("user32.dll")] internal static extern bool UnregisterHotKey(nint window,int id);
@@ -125,9 +124,7 @@ public static class WindowTargets
             while(h!=0 && (!Win.IsWindowVisible(h)||!Win.GetWindowRect(h,out var r)||p.X<r.Left||p.X>=r.Right||p.Y<r.Top||p.Y>=r.Bottom))h=Win.GetWindow(h,2);
         }
         var target=Describe(h,new(p.X,p.Y),new(p.X,p.Y));var monitor=Win.MonitorFromPoint(p,2);Win.GetDpiForMonitor(monitor,0,out uint dpi,out _);
-        var info=new Win.Monitor{Size=(uint)Marshal.SizeOf<Win.Monitor>()};bool full=false;
-        if(target.WindowClass is not ("Progman" or "WorkerW")&&Win.GetMonitorInfoW(monitor,ref info)&&Win.GetWindowRect(h,out var rect))
-            full=rect.Left<=info.Bounds.Left&&rect.Top<=info.Bounds.Top&&rect.Right>=info.Bounds.Right&&rect.Bottom>=info.Bounds.Bottom;
+        bool full=Win.PaneWindowFullscreen(h,monitor,target.WindowClass)!=0;
         return (target,(int)(dpi==0?96:dpi),full);
     }
 }

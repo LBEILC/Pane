@@ -26,11 +26,11 @@ internal sealed partial class LauncherSearch:IAppLauncher,ILauncherItemActions,I
     {
         cancellationToken.ThrowIfCancellationRequested();
         var app = FindHotkeyApp(appId) ?? throw new LauncherActionException(Pane.Localization.Strings.SuperPanel_AppMissing);
-        return ExecuteAsync(ApplicationSource.Item(app, LauncherGroups.Applications), cancellationToken);
+        return ExecuteCoreAsync(ApplicationSource.Item(app, LauncherGroups.Applications), null, cancellationToken);
     }
     internal Task PressHotkeyAsync(IndexedApp app, Func<IndexedApp,Func<Task>,Task>? switchOrLaunch = null){
         if(!app.Packaged && string.IsNullOrEmpty(app.Target))app=app with{Target=IndexedTarget(app)?.Path};
-        return (switchOrLaunch ?? AppHotkeyWindows.OpenAsync)(app,()=>ExecuteAsync(ApplicationSource.Item(app,LauncherGroups.Applications),lifetime.Token));
+        return (switchOrLaunch ?? AppHotkeyWindows.OpenAsync)(app,()=>ExecuteCoreAsync(ApplicationSource.Item(app,LauncherGroups.Applications),null,lifetime.Token));
     }
     internal Func<INoteStore?> NoteProvider { get; set; } = () => null;
     internal Func<IPowerTimer?> PowerTimerProvider { get; set; } = () => null;
@@ -161,8 +161,10 @@ internal sealed partial class LauncherSearch:IAppLauncher,ILauncherItemActions,I
     public Task<LauncherResult> SearchAsync(string query,Action<LauncherResult> partial,CancellationToken cancellationToken)=>SearchCoreAsync(query,partial,cancellationToken);
     async Task<LauncherResult> SearchCoreAsync(string query,Action<LauncherResult>? partial,CancellationToken cancellationToken)
     {
-        cancellationToken.ThrowIfCancellationRequested();if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
-        var learningQuery=LearningQuery(query,context.Settings);
+        cancellationToken.ThrowIfCancellationRequested();
+        var batch = new SelectionBatch(LearningQuery(query,store.Current.Launcher));
+        currentBatch = batch;
+        if(query.StartsWith('>'))return terminal.Search(query);RefreshIndex();var context=Context(query);
         var selected=sources.Where(s=>s is not WebSource).OrderBy(s=>s.Order).ToArray();
         var pending=selected.Select(s=>Task.Run(()=>SearchSource(s,s is DirectSource && query != context.Query ? context with { Query = query } : context,cancellationToken),cancellationToken)).ToArray();
         IReadOnlyList<LauncherItem>[]? local = null;
@@ -172,25 +174,25 @@ internal sealed partial class LauncherSearch:IAppLauncher,ILauncherItemActions,I
             cancellationToken.ThrowIfCancellationRequested();
             if (pending.Any(t => !t.IsCompleted))
             {
-                partial(await Result(local, context, learningQuery, false, cancellationToken).ConfigureAwait(false));
+                partial(await Result(local, context, batch, false, cancellationToken).ConfigureAwait(false));
                 local = null;
             }
         }
         var groups = await Task.WhenAll(pending).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        var result = Result(groups, context, learningQuery, true, cancellationToken);
+        var result = Result(groups, context, batch, true, cancellationToken);
         if (local != null && !result.IsCompleted)
-            partial!(await Result(local, context, learningQuery, false, cancellationToken).ConfigureAwait(false));
+            partial!(await Result(local, context, batch, false, cancellationToken).ConfigureAwait(false));
         return await result.ConfigureAwait(false);
     }
-    async Task<LauncherResult> Result(IReadOnlyList<LauncherItem>[] groups, SourceContext context, string? learningQuery, bool final, CancellationToken token)
+    async Task<LauncherResult> Result(IReadOnlyList<LauncherItem>[] groups, SourceContext context, SelectionBatch batch, bool final, CancellationToken token)
     {
         var rows=groups.SelectMany(g=>g).Where(item=>store.Current.Clipboard.Enabled||item.Id!="command:clipboard").ToArray();
         bool dark=Pane.Services.Icons.IconTheme.IsDark(store.Current.General.Theme);
         var apps=context.Snapshot.Apps.ToDictionary(a=>a.Id);
         if(context.Snapshot.IconSettingsKey==lastIcons)
             for(int i=0;i<rows.Length;i++)if(apps.TryGetValue(rows[i].Id,out var app)){var path=dark?app.DarkIcon:app.LightIcon;if(path!=null&&File.Exists(path))rows[i]=rows[i] with{Icon=new("app",path)};}
-        rows=await ApplyLearningAsync(rows,learningQuery,context,final,token).ConfigureAwait(false);
+        rows=await ApplyLearningAsync(rows,batch,context,final,token).ConfigureAwait(false);
         return new(rows,context.Query.Length==0,groups.OfType<LauncherFileRows>().FirstOrDefault()?.Total??0);
     }
     static async Task<IReadOnlyList<LauncherItem>> SearchSource(ILauncherSource source,SourceContext context,CancellationToken token){
@@ -201,20 +203,22 @@ internal sealed partial class LauncherSearch:IAppLauncher,ILauncherItemActions,I
     }
     internal static SearchEngine DefaultEngine(LauncherSettings settings)=>settings.SearchEngines.First(e=>string.Equals(e.Keyword,settings.DefaultEngine,StringComparison.OrdinalIgnoreCase));
     internal static string BuildUrl(SearchEngine engine,string text)=>engine.UrlTemplate.Replace("{query}",Uri.EscapeDataString(text),StringComparison.Ordinal);
-    public async Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken)
+    public Task ExecuteAsync(LauncherItem item,CancellationToken cancellationToken) =>
+        ExecuteCoreAsync(item, SelectionQuery(item), cancellationToken);
+    async Task ExecuteCoreAsync(LauncherItem item,string? query,CancellationToken cancellationToken)
     {
         if (item.Kind == LauncherItemKind.App && store.Current.Launcher.AdminApps.Contains(item.Id))
         {
-            await RunAsync(item, LauncherItemAction.RunAsAdmin, cancellationToken).ConfigureAwait(false);
+            await RunCoreAsync(item, LauncherItemAction.RunAsAdmin, query, cancellationToken).ConfigureAwait(false);
             return;
         }
-        cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename"){RecordSelection(item);return;}if(item.Id=="power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
+        cancellationToken.ThrowIfCancellationRequested();if(item.Id=="rename"){RecordSelection(query,item);return;}if(item.Id=="power:panel")return;if(TerminalService.Owns(item)){await terminal.ExecuteAsync(item,false,cancellationToken);return;}var source=sources.FirstOrDefault(s=>s.Owns(item))??throw new NotSupportedException(item.Id);
         await source.ExecuteAsync(item,Context(""),cancellationToken).ConfigureAwait(false);
-        RecordSelection(item);
+        RecordSelection(query,item);
         if(item.Kind==LauncherItemKind.Web&&item.Id.StartsWith("web:",StringComparison.Ordinal))WebSearchHistory.RecordUrl(store.Current.Launcher.SearchEngines,item.Id[4..]);
         if(item.Kind==LauncherItemKind.File&&item.Id.StartsWith("file:",StringComparison.Ordinal))await RememberOpenedAsync(item.Id[5..]).ConfigureAwait(false);
     }
-    public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,token):ExecuteAsync(item,token);
+    public Task ExecuteElevatedAsync(LauncherItem item,CancellationToken token)=>TerminalService.Owns(item)?terminal.ExecuteAsync(item,true,token):item.Kind==LauncherItemKind.App?ExecuteAppElevatedAsync(item,SelectionQuery(item),token):ExecuteAsync(item,token);
     readonly SemaphoreSlim usageWriter=new(1,1);
     void RecordUseCore(string id){var use=uses.GetValueOrDefault(id);uses[id]=new(Math.Min((use?.Count??0),int.MaxValue-1)+1,DateTimeOffset.UtcNow);}
     void RecordUse(string id){lock(sync)RecordUseCore(id);SaveUsage();}

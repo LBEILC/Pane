@@ -28,7 +28,7 @@ internal static class IncrementalUpdateTests
             if (!condition) throw new Exception("111: " + description);
             count++;
         }
-        const string from = "0.1.99", to = "0.1.100";
+        const string from = "0.1.814", to = "1.0.0";
         byte[] app = [1, 2], helper = [3, 4], data = [5], obsolete = [6];
         var original = Manifest(from, ("Pane.App.exe", app), ("Pane.Maintenance.exe", helper), ("old.dll", obsolete));
         var manifest = Manifest(to, ("Pane.App.exe", app), ("Pane.Maintenance.exe", helper), ("new.dll", data));

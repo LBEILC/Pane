@@ -13,19 +13,14 @@ Invoke-Delta @('manifest',$Stage,$Version,$manifest)
 $manifest
 $cache=Join-Path $Dist 'payloads'
 New-Item -ItemType Directory -Path $cache -Force | Out-Null
-$target=Join-Path $cache $Version
-if(!(Test-Path -LiteralPath $target)){
-    $temporary=Join-Path $cache ([guid]::NewGuid().ToString('N'))
-    Copy-Item -LiteralPath $Stage -Destination $temporary -Recurse
-    Move-Item -LiteralPath $temporary -Destination $target
-}
+# 同一发布号可有多次候选构建，历史基线只缓存校验过的公开包。
 if($SkipHistory){return}
 try {
-    $releases=& gh @('release','list','--repo','LBEILC/Pane','--exclude-drafts','--exclude-pre-releases','--limit','100','--json','tagName,publishedAt')
+    $releases=& gh @('release','list','--repo','LBEILC/Pane','--exclude-drafts','--exclude-pre-releases','--limit','100','--json','tagName')
     if($LASTEXITCODE){throw '无法列出公开版本'}
     $history=@(($releases -join '') | ConvertFrom-Json | ForEach-Object { $_ } | Where-Object {
         $_.tagName -match '^v\d+\.\d+\.\d+$' -and [version]$_.tagName.Substring(1) -lt [version]$Version
-    } | Sort-Object publishedAt -Descending | Select-Object -First 5)
+    } | Sort-Object { [version]$_.tagName.Substring(1) } -Descending | Select-Object -First 5)
 } catch {Write-Warning "跳过历史补丁：$($_.Exception.Message)";return}
 # 同时生成两个补丁，限制 MSDelta 处理大型可执行文件时的峰值内存。
 $pending=[Collections.Generic.List[object]]::new()

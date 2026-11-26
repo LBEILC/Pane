@@ -124,15 +124,15 @@ internal sealed class SearchMemory : ISearchMemory, IDisposable
         dirty = true;
         writer = writer.ContinueWith(_ =>
         {
-            Dictionary<string,Selection[]> snapshot;
-            lock (gate) { snapshot = new(history); dirty = false; }
             try
             {
+                Dictionary<string,Selection[]> snapshot;
+                lock (gate) { dirty = false; snapshot = new(history); }
                 Directory.CreateDirectory(Path.GetDirectoryName(path)!);
                 File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(snapshot, SearchMemoryJson.Default.DictionaryStringSelectionArray));
                 File.Move(path + ".tmp", path, true);
             }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log(e); }
+            catch (Exception e) { Log(e); }
         }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
     }
 

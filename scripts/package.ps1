@@ -1,6 +1,8 @@
-﻿param([switch]$NoBuild,[string]$PolicyPath,[switch]$SkipPatchHistory)
+﻿param([switch]$NoBuild,[string]$PolicyPath,[switch]$SkipPatchHistory,[string]$VersionOverride)
 $ErrorActionPreference='Stop'
 $repo=Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'release-version.ps1')
+$version=Get-PaneReleaseVersion (Join-Path $repo 'src/Pane.App/ReleaseNotes') $VersionOverride
 . (Join-Path $PSScriptRoot 'forbidden-scan.ps1')
 # 公开副本不携带内部政策；在副本打包时须显式提供政策文件。
 if(!$PolicyPath){$PolicyPath=Join-Path $repo 'docs/internal.md'}
@@ -29,13 +31,14 @@ if($NoBuild){
 }
 else {
     # 每次发布到新目录，防止旧元包留下的 SDK 文件混入组件包输出。
-    & "$repo/src/Pane.App/scripts/build.ps1" -Mode aot -OutputRoot "$work/app-build"
+    & "$repo/src/Pane.App/scripts/build.ps1" -Mode aot -VersionOverride $VersionOverride -OutputRoot "$work/app-build"
     if($LASTEXITCODE -ne 0){throw '应用构建失败'}
     $source=Join-Path $work 'app-build/aot'
 }
 if(!(Test-Path -LiteralPath "$source/Pane.App.exe")){throw '缺少 AOT 构建'}
 $v=[Diagnostics.FileVersionInfo]::GetVersionInfo("$source/Pane.App.exe")
-$version="$($v.FileMajorPart).$($v.FileMinorPart).$($v.FileBuildPart)"
+$builtVersion="$($v.FileMajorPart).$($v.FileMinorPart).$($v.FileBuildPart)"
+if($builtVersion -ne $version){throw "应用版本 $builtVersion 与待打包版本 $version 不一致，请重新构建"}
 $stage=Join-Path $work 'payload'
 New-Item -ItemType Directory -Path $stage | Out-Null
 foreach($file in Get-ChildItem -LiteralPath $source -File -Recurse){

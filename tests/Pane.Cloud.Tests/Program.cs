@@ -277,8 +277,66 @@ internal static partial class Program
         await host.ApplyAsync(host.Preview("cloud",false),default);
         Console.WriteLine($"HTTP calls={calls}, disabled=0, signed-out idle=0");
     }
+    static async Task ExcludedApps152()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "Pane-152-" + Guid.NewGuid().ToString("N"));
+        string path = Path.Combine(root, "settings.json");
+        var store = new SettingsStore(root, Defaults());
+        string[] previous = ["rdpclip.exe", "SunloginClient.exe", "ToDesk.exe", "AnyDesk.exe", "TeamViewer.exe", "rustdesk.exe", "parsecd.exe"];
+        const string remote = SettingsStore.RemoteAppExe;
+        try
+        {
+            store.Load();
+            void LoadLegacy(string[]? apps)
+            {
+                var doc = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+                doc.Remove(nameof(PaneSettings.RemoteAppExclusionMigrated));
+                doc["SyncOptions"]!["ExcludedApps"] = apps == null ? null : new JsonArray(apps.Select(s => (JsonNode?)JsonValue.Create(s)).ToArray());
+                File.WriteAllText(path, doc.ToJsonString());
+                store.Load();
+            }
+            LoadLegacy(null);
+            Check(store.Current.SyncOptions is { Clipboard: false, ExcludedApps: null } && !store.Current.RemoteAppExclusionMigrated, "未启用时保留空值");
+            await using var account = new AccountService(root, "1", new Fake());
+            await using var sync = new SyncService(store, account);
+            await sync.ApplyAsync(sync.Options with { Enabled = true, Clipboard = true }, default);
+            string[] expected = [.. previous, remote];
+            Check(sync.Options.ExcludedApps!.SequenceEqual(expected) && store.Current.RemoteAppExclusionMigrated, "首次启用给出八项");
+
+            LoadLegacy(previous);
+            Check(sync.Options.ExcludedApps!.SequenceEqual(expected), "旧名单补成八项");
+            store.Load();
+            Check(store.Current.RemoteAppExclusionMigrated && sync.Options.ExcludedApps!.SequenceEqual(expected), "重读后迁移已完成");
+            string program = Path.GetFileName(Path.Combine("bin", remote));
+            Check(sync.Options.ExcludedApps!.Contains(program, StringComparer.OrdinalIgnoreCase), "写入方主模块文件名命中排除名单");
+            var cloud = SyncData.Apply(store.Current, new JsonObject {
+                ["SyncOptions.ExcludedApps"] = new JsonArray(), [nameof(PaneSettings.RemoteAppExclusionMigrated)] = false });
+            Check(cloud.RemoteAppExclusionMigrated && cloud.SyncOptions.ExcludedApps!.SequenceEqual(expected), "云端旧值不能覆盖本机迁移");
+            await sync.ApplyAsync(sync.Options with { ExcludedApps = previous }, default);
+            store.Load();
+            Check(sync.Options.ExcludedApps!.SequenceEqual(previous), "用户删除后不补回");
+            string[] lowercase = [.. previous, remote.ToLowerInvariant()];
+            LoadLegacy(lowercase);
+            Check(sync.Options.ExcludedApps!.SequenceEqual(lowercase) && store.Current.RemoteAppExclusionMigrated, "忽略大小写去重并保留原拼写");
+        }
+        finally { if (Directory.Exists(root)) Directory.Delete(root, true); }
+    }
+
     static async Task Main(string[] args)
     {
+        if (args is ["--153"])
+        {
+            MissingSettingDefaults153();
+            await RestoreLauncher153();
+            Console.WriteLine($"PASS 153 assertions={checks}");
+            return;
+        }
+        if (args is ["--152"])
+        {
+            await ExcludedApps152();
+            Console.WriteLine($"PASS 152 assertions={checks}");
+            return;
+        }
         if(args is ["--148"]){
             var original=Defaults();
             var settings=original with {SuperPanel=original.SuperPanel with {Apps=["app:b","app:a"]}};

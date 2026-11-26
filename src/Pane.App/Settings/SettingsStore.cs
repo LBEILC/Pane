@@ -5,10 +5,12 @@ namespace Pane.Settings;
 [JsonSerializable(typeof(PaneSettings))]
 [JsonSerializable(typeof(GlassCommand))]
 [JsonSerializable(typeof(RenameSettings))]
-[JsonSourceGenerationOptions(WriteIndented=true, UseStringEnumConverter=true)]
+[JsonSourceGenerationOptions(WriteIndented=true, UseStringEnumConverter=true,
+    Converters=[typeof(LauncherDefaultsConverter),typeof(AiDefaultsConverter),typeof(IconDefaultsConverter),typeof(RenameRuleDefaultsConverter)])]
 internal partial class SettingsJson : JsonSerializerContext { }
 public sealed class SettingsStore
 {
+    internal const string RemoteAppExe = "GameViewer.exe";
     public static string ProductionDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Pane");
     public static string DevelopmentDirectory {
         get {
@@ -37,16 +39,30 @@ public sealed class SettingsStore
         StorageRecovery.RecoverAll(DirectoryPath);
         Directory.CreateDirectory(DirectoryPath);
         var path=Path.Combine(DirectoryPath,"settings.json");
-        if(!File.Exists(path)) { Save(Current with{Update=Current.Update with{SeenVersion=CurrentVersion()}}); return; }
+        if(!File.Exists(path)) { Save(Current with{LauncherSwitchesRestored=true,Update=Current.Update with{SeenVersion=CurrentVersion()}}); return; }
         try {
             using var document=JsonDocument.Parse(File.ReadAllText(path));
             var value=document.RootElement.Deserialize(SettingsJson.Default.PaneSettings)??throw new JsonException();
             if(!document.RootElement.TryGetProperty("Update",out var update)||!update.TryGetProperty("SeenVersion",out _))
                 value=value with{Update=value.Update with{SeenVersion="0"}};
-            // 源生成反序列化会为缺失的 init 布尔属性传入 false，显式保留旧文件默认开启。
-            if(document.RootElement.TryGetProperty("Launcher",out var launcher)&&!launcher.TryGetProperty("RememberOpenedPrograms",out _))
-                value=value with{Launcher=value.Launcher with{RememberOpenedPrograms=true}};
             bool migrate=value.Ai.ApiEndpoint==null || value.SuperPanel.Apps is null or { Length: > SuperPanelSettings.MaxApps };
+            if (!value.LauncherSwitchesRestored)
+            {
+                value = value with {
+                    Launcher = value.Launcher with { RememberOpenedPrograms = true, RememberWebSearches = true,
+                        SearchSystemSettings = true, LearnSelections = true },
+                    LauncherSwitchesRestored = true,
+                    LauncherSwitchesRestoredAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                };
+                migrate = true;
+            }
+            if (!value.RemoteAppExclusionMigrated && value.SyncOptions.ExcludedApps is {} apps)
+            {
+                if (!apps.Contains(RemoteAppExe, StringComparer.OrdinalIgnoreCase))
+                    value = value with { SyncOptions = value.SyncOptions with { ExcludedApps = [.. apps, RemoteAppExe] } };
+                value = value with { RemoteAppExclusionMigrated = true };
+                migrate = true;
+            }
             value=Normalize(value);Validate(value);Current=value;
             if(migrate)SaveCore(value);
         }

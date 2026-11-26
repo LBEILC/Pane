@@ -136,10 +136,10 @@ internal sealed partial class SyncService : ISyncService, IClipboardCloud, IAsyn
             {
                 var apps = s.SyncOptions.ExcludedApps;
                 if (apps == null && !s.SyncOptions.Clipboard && next.Clipboard)
-                    apps = ["rdpclip.exe", "SunloginClient.exe", "ToDesk.exe", "AnyDesk.exe", "TeamViewer.exe", "rustdesk.exe", "parsecd.exe"];
+                    apps = ["rdpclip.exe", "SunloginClient.exe", "ToDesk.exe", "AnyDesk.exe", "TeamViewer.exe", "rustdesk.exe", "parsecd.exe", SettingsStore.RemoteAppExe];
                 next = next with { ExcludedApps = apps };
             }
-            return s with { SyncOptions = next };
+            return s with { SyncOptions = next, RemoteAppExclusionMigrated = s.RemoteAppExclusionMigrated || next.ExcludedApps != null };
         });
         Restart();
     },ct);

@@ -4,6 +4,9 @@ public enum ThemeMode { System, Light, Dark }
 public sealed record PaneSettings(int Version, GeneralSettings General, LauncherSettings Launcher, ClipboardSettings Clipboard) { AiSettings ai=new(); public AiSettings Ai { get=>ai; init=>ai=value??new(); } IconSettings icons=new(); public IconSettings Icons { get=>icons; init=>icons=value??new(); } SuperPanelSettings superPanel=new(); public SuperPanelSettings SuperPanel { get=>superPanel; init=>superPanel=value??new(); } UpdateSettings update=new(); public UpdateSettings Update { get=>update; init=>update=value??new(); } RenameSettings rename=new(); public RenameSettings Rename { get=>rename; init=>rename=value??new(); } FolderJumpSettings folderJump=new(); public FolderJumpSettings FolderJump { get=>folderJump; init=>folderJump=value??new(); }
     Pane.Contracts.SyncOptions syncOptions = new();
     public Pane.Contracts.SyncOptions SyncOptions { get => syncOptions; init => syncOptions = value ?? new(); }
+    public bool RemoteAppExclusionMigrated { get; init; }
+    public bool LauncherSwitchesRestored { get; init; }
+    public long LauncherSwitchesRestoredAt { get; init; }
     WordsSettings words=new(); public WordsSettings Words { get=>words; init=>words=value??new(); }
     // 备忘录（设计加，2026-11-25，任务 123，docs/design.md「备忘录」）
     MemoSettings memo=new(); public MemoSettings Memo { get=>memo; init=>memo=value??new(); }
@@ -65,7 +68,10 @@ public sealed record SuperPanelSettings(bool Enabled=true, SuperPanelButton Trig
     public const int MaxApps=8;
 }
 public sealed record GlassThemeParameters(double TintOpacity, double LuminosityOpacity, double Saturation, double Highlight, double Shadow, double ExtraBlur);
-public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } /* 界面语言（设计加，2026-11-02，任务 048）：null = 跟随系统（繁体系统用繁体，其余用简体）；"zh-Hans" / "zh-Hant"，以后加 "en"。重启后生效 */ public string? UiLanguage { get; init; } }
+public sealed record GeneralSettings(bool StartWithWindows, bool ShowTrayIcon, ThemeMode Theme, string AccentColor, double PanelRadius, double MotionSpeed, GlassThemeParameters GlassLight, GlassThemeParameters GlassDark,
+    // 设计加（2026-11-26，issue 80，任务 154）：前台是全屏程序时，连按两下修饰键不呼出（组合键照常）。默认开，同手势 / 超级面板的「全屏程序中暂停」；
+    // 「全屏」= 窗口铺满整块显示器且不是最大化窗口（任务栏自动隐藏或副屏上的最大化窗口不算）
+    bool DoubleTapPauseInFullscreen=true) { /* 界面字体（设计加，2026-10-30）：本机字体的字族名；null = 默认（MiSans VF，没装时微软雅黑）。重启后生效 */ public string? UiFont { get; init; } /* 界面语言（设计加，2026-11-02，任务 048）：null = 跟随系统（繁体系统用繁体，其余用简体）；"zh-Hans" / "zh-Hant"，以后加 "en"。重启后生效 */ public string? UiLanguage { get; init; } }
 // DoubleTap（设计加，2026-11-04，054，issue 18）：true = 连按两下单个修饰键呼出，这时 Modifiers = None，
 // VirtualKey 只能是左右区分的修饰键 VK_LSHIFT / VK_RSHIFT / VK_LCONTROL / VK_RCONTROL / VK_LMENU / VK_RMENU（0xA0～0xA5）。
 // 只有启动器和剪贴板的热键允许这样设；不能用 RegisterHotKey 注册，宿主改用键盘钩子识别，没选时不挂钩子

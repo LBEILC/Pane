@@ -10,6 +10,7 @@ using Pane.Contracts;
 using Pane.DesignData;
 using Pane.Hosting;
 using Pane.Settings;
+using Pane.Services.Setup;
 using Pane.Views.Controls;
 using Windows.Foundation;
 using G = Pane.Gestures;
@@ -71,7 +72,7 @@ public sealed partial class SettingsView
     /// <summary>提示条「已更新到 x」点了「查看」：打开关于页时展开更新日志并选中这一版（062）。</summary>
     internal static string? PendingChangelog { get; set; } = Environment.GetEnvironmentVariable("PANE_DESIGN_CHANGELOG");   // 设计预览：直接展开更新日志的某一版
 
-    internal static bool SameVersion(string a, string b) => System.Version.TryParse(a, out var x) && System.Version.TryParse(b, out var y) ? x == y : a == b;
+    internal static bool SameVersion(string a, string b) => System.Version.TryParse(a, out var x) && System.Version.TryParse(b, out var y) ? SetupFiles.ReleaseVersion(x) == SetupFiles.ReleaseVersion(y) : a == b;
 
     // 更新说明（组件库 .release-notes）：按 新增 / 改进 / 修复 分组，小标题带图标，下面是条目；limit 之外收成「还有 N 条」
     FrameworkElement NotesBlock(ReleaseNotes notes, int limit, Action? more)
@@ -308,13 +309,15 @@ public sealed partial class SettingsView
                     plain.Children.Add(NoteLine(line));
                 block = plain;
             }
-            // 上面有更新内容时紧接着标题行（上边距 2）；没有更新内容（比如 Pane 云源取不到说明）时按钮单独一块，上下都留 12，不顶到分隔线
-            var tail = new StackPanel { Spacing = 10, Padding = new Thickness(14, block != null ? 2 : 12, 14, 12) };
+            // 紧接着标题行（上边距 2，同更新日志展开的一版）；没有更新内容（比如 Pane 云源取不到说明）时只有按钮
+            var tail = new StackPanel { Spacing = 10, Padding = new Thickness(14, 2, 14, 12) };
             if (block != null) tail.Children.Add(block);
             var link = Button(Strings.Update_ViewOnGitHub, "external", () => OpenUrl(latest.PageUrl));
             link.HorizontalAlignment = HorizontalAlignment.Left;
             tail.Children.Add(link);
-            rows.Add(tail);
+            // 和标题行放在同一行里、中间不画分隔线（同更新日志展开的一版）：原来单独一行，分组在上面画了线，「新增」贴在线下只有 2（2026-11-26 用户提）
+            if (rows.Count > 0) { var item = new StackPanel(); item.Children.Add(rows[^1]); item.Children.Add(tail); rows[^1] = item; }
+            else rows.Add(tail);
         }
         rows.AddRange(SourceRows(u));
         var update = app.Store.Current.Update;

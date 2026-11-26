@@ -7,6 +7,13 @@ internal sealed partial class LauncherSearch
 {
     public SearchMemory SearchMemory { get; }
     readonly ConditionalWeakTable<LauncherItem, string> selectionQueries = new();
+    // 同一次搜索的首批和最终结果共用 Id 集合，晚到的旧搜索只更新自己的集合。
+    sealed class SelectionBatch(string? query)
+    {
+        public string? Query { get; } = query;
+        public HashSet<string> Ids { get; } = new(StringComparer.Ordinal);
+    }
+    volatile SelectionBatch currentBatch = new(null);
     readonly SemaphoreSlim pathChecks = new(4);
 
     static string? LearningQuery(string raw, LauncherSettings settings)
@@ -29,14 +36,22 @@ internal sealed partial class LauncherSearch
     static bool CanLearn(LauncherItem row) => row.Group is LauncherGroups.Applications or LauncherGroups.Settings
         or LauncherGroups.Favorites or LauncherGroups.Files or LauncherGroups.Commands or LauncherGroups.Best;
 
-    void RecordSelection(LauncherItem item)
+    string? SelectionQuery(LauncherItem item)
     {
-        if (store.Current.Launcher.LearnSelections && selectionQueries.TryGetValue(item, out var query))
-            SearchMemory.Record(query, item.Id);
+        if (!CanLearn(item) || !store.Current.Launcher.LearnSelections) return null;
+        if (selectionQueries.TryGetValue(item, out var original)) return original;
+        var batch = currentBatch;
+        lock (batch.Ids) return batch.Ids.Contains(item.Id) ? batch.Query : null;
     }
 
-    async Task<LauncherItem[]> ApplyLearningAsync(LauncherItem[] rows, string? query, SourceContext context, bool final, CancellationToken token)
+    void RecordSelection(string? query, LauncherItem item)
     {
+        if (query != null && store.Current.Launcher.LearnSelections) SearchMemory.Record(query, item.Id);
+    }
+
+    async Task<LauncherItem[]> ApplyLearningAsync(LauncherItem[] rows, SelectionBatch batch, SourceContext context, bool final, CancellationToken token)
+    {
+        var query = batch.Query;
         if (query == null || !store.Current.Launcher.LearnSelections ||
             rows.Any(r => r.Group is LauncherGroups.Calculation or LauncherGroups.Direct ||
                 r.Group == LauncherGroups.Timer && r.Id != "power:panel")) return rows;
@@ -72,6 +87,7 @@ internal sealed partial class LauncherSearch
             rows[i] = rows[i] with { };
             selectionQueries.Add(rows[i], query);
         }
+        lock (batch.Ids) batch.Ids.UnionWith(rows.Where(CanLearn).Select(row => row.Id));
         return rows;
     }
 

@@ -85,6 +85,9 @@ void unit(){
  }
  PolicyGeometry g{};g.valid=true;g.rect=g.monitor={0,0,1920,1080};
  check(pressFullscreen(g,L"Game"),"shared fullscreen rule");check(!pressFullscreen(g,L"Progman")&&!pressFullscreen(g,L"WorkerW"),"desktop excluded");
+ g.maximized=true;check(!pressFullscreen(g,L"Game"),"maximized covering monitor");
+ g.rect.bottom-=48;check(!pressFullscreen(g,L"Game"),"maximized within work area");
+ g.maximized=false;
  g.rect.right=1000;check(!pressFullscreen(g,L"Game"),"windowed allowed");
 }
 unsigned delivered=0,observedKeys=0;bool validCommand=true;
@@ -133,7 +136,22 @@ int main(int argc,char** argv){
   {pane::SimulationScope simulation;for(unsigned i=0;i<4;i++){KBDLLHOOKSTRUCT e{};e.vkCode=VK_LCONTROL;keyboard(0,i%2?WM_KEYUP:WM_KEYDOWN,reinterpret_cast<LPARAM>(&e));}pump(1);check(delivered==0,"simulation excluded by callback");}
   forcedForeground=window;MONITORINFO monitor{sizeof(MONITORINFO),{},{},0};GetMonitorInfoW(MonitorFromWindow(window,MONITOR_DEFAULTTONEAREST),&monitor);
   SetWindowPos(window,nullptr,monitor.rcMonitor.left,monitor.rcMonitor.top,monitor.rcMonitor.right-monitor.rcMonitor.left,monitor.rcMonitor.bottom-monitor.rcMonitor.top,SWP_NOACTIVATE);
-  for(unsigned i=0;i<4;i++){KBDLLHOOKSTRUCT e{};e.vkCode=VK_LCONTROL;e.time=i;check(keyboard(0,i%2?WM_KEYUP:WM_KEYDOWN,reinterpret_cast<LPARAM>(&e))==12345,"callback always returns downstream value");}pump(1);check(delivered==0,"foreground fullscreen suppresses native dispatch");forcedForeground=nullptr;
+  for(bool maximized:{true,false}){
+   SetWindowLongPtrW(window,GWL_STYLE,WS_POPUP|(maximized?WS_MAXIMIZE:0));
+   RECT bounds{};check(GetWindowRect(window,&bounds)&&EqualRect(&bounds,&monitor.rcMonitor)&&!!IsZoomed(window)==maximized,"fixture covers monitor with requested maximize state");
+   for(bool pause:{true,false}){
+    check(PaneKeyboardStart(window,WM_APP+54,7,VK_LCONTROL,0,0,0,pause)==0,"apply fullscreen setting");
+    PaneKeyboardStop();
+    auto queries=foregroundQueries;
+    for(unsigned i=0;i<4;i++){
+     KBDLLHOOKSTRUCT e{};e.vkCode=VK_LCONTROL;e.time=i;
+     check(keyboard(0,i%2?WM_KEYUP:WM_KEYDOWN,reinterpret_cast<LPARAM>(&e))==12345,"callback always returns downstream value");
+    }
+    pump(1);check(validCommand&&delivered==(maximized||!pause?1u:0u),"launcher message follows fullscreen setting");
+    check(foregroundQueries-queries==(pause?1u:0u),"disabled pause skips foreground query");delivered=0;
+   }
+  }
+  forcedForeground=nullptr;
   log<<"PASS core assertions="<<checks<<"; keyhook=0; worker=0; clipboard=0"<<std::endl;
   if(argc==2){DestroyWindow(window);return 0;}
   directCallback=false;

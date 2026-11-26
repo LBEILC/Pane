@@ -34,6 +34,7 @@ internal sealed class SyncJournal
     public long Cursor { get; set; }
     public bool NotesEnabled { get; set; }
     public bool SettingsEnabled { get; set; }
+    public long LauncherSwitchesRestoredAt { get; set; }
     public bool ClipboardEnabled { get; set; }
     public bool UsageEnabled { get; set; }
     public bool Initialized { get; set; }

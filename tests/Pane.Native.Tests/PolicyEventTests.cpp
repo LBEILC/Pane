@@ -12,6 +12,8 @@ int main(){try{
  auto revision=PanePolicyBegin();windowEvent(nullptr,EVENT_SYSTEM_FOREGROUND,fixture.window,0,0,0,0);PanePolicy(123,456,0,0,96,0,1,0);PanePolicyCommit(revision);check(PanePolicyDirty()!=0,"event during refresh cannot be acknowledged");publish();
  fixture.foreground=reinterpret_cast<HWND>(987);raw(WM_RBUTTONDOWN);check(!capture.active&&PanePolicyDirty(),"foreground change before event delivery rejects");publish();raw(WM_RBUTTONDOWN);check(capture.active,"foreground refresh recovers");reset();
  fixture.rect=fixture.monitor;raw(WM_RBUTTONDOWN);check(!capture.active&&PanePolicyDirty(),"fullscreen geometry change before event rejects");publish(1,0);raw(WM_RBUTTONDOWN);check(!capture.active,"fullscreen policy blocks");
+ fixture.maximized=true;raw(WM_RBUTTONDOWN);check(!capture.active&&PanePolicyDirty(),"maximize state alone invalidates fullscreen snapshot");
+ publish();raw(WM_RBUTTONDOWN);check(capture.active,"maximized snapshot accepted at unchanged bounds");reset();fixture.maximized=false;
  fixture.rect={0,0,600,400};windowEvent(nullptr,EVENT_OBJECT_LOCATIONCHANGE,fixture.window,OBJID_WINDOW,0,0,0);publish();raw(WM_RBUTTONDOWN);check(capture.active,"fullscreen exit restores");reset();
  fixture.window=reinterpret_cast<HWND>(234);fixture.pid=567;raw(WM_RBUTTONDOWN);check(!capture.active,"new program before event delivery rejects");publish(1,0);raw(WM_RBUTTONDOWN);check(!capture.active,"disabled program stays blocked");publish();
  fixture.windowClass=99;raw(WM_RBUTTONDOWN);check(!capture.active&&PanePolicyDirty(),"reused window with changed class rejects");publish();
