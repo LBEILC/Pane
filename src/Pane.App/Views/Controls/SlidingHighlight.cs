@@ -101,3 +101,13 @@ public sealed class SlidingHighlight
         shape.StrokeBrush = compositor.CreateColorBrush(hover ? Microsoft.UI.Colors.Transparent : (Windows.UI.Color)theme["PaneStrokeColor"]);
     }
 }
+
+/// <summary>悬停层用：PointerExited 会从子元素冒泡上来，只在鼠标真的离开了整个列表时才收起悬停块。</summary>
+public static class PaneHover
+{
+    public static bool Inside(FrameworkElement list, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        var p = e.GetCurrentPoint(list).Position;
+        return p.X >= 0 && p.Y >= 0 && p.X < list.ActualWidth && p.Y < list.ActualHeight;
+    }
+}

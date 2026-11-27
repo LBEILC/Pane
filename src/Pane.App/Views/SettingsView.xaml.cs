@@ -27,8 +27,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
     readonly App app = (App)Application.Current;
     readonly List<Section> sections;
     readonly List<Grid> navItems = [];
-    readonly SlidingHighlight navHighlight;
-    readonly Microsoft.UI.Dispatching.DispatcherQueueTimer rerender;
+    readonly SlidingHighlight navHighlight, navHover;
+    readonly Microsoft.UI.Dispatching.DispatcherQueueTimer rerender, navBuild;
+    bool navReset;
     Section current;
     string lookKey = "";
     bool glassOpen, navPlaced;
@@ -68,6 +69,27 @@ public sealed partial class SettingsView : UserControl, IPanelView
                 ToolTipService.SetToolTip(CloseButton, tip);
                 tip.IsOpen = true;
             };
+        // 设计测量（只在演示模式，2026-11-27 issue 93「来回点很卡」）：PANE_DESIGN_NAVTIMING=输出文件，
+        // 打开后把每个分区切三轮，记下建页 + 排版的毫秒数
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_NAVTIMING") is { Length: > 0 } timingFile)
+            Loaded += (_, _) =>
+            {
+                var lines = new List<string>();
+                var start = current;
+                for (int round = 0; round < 3; round++)
+                    foreach (var sec in sections.Where(Visible).ToList())
+                    {
+                        var watch = System.Diagnostics.Stopwatch.StartNew();
+                        Show(sec);
+                        UpdateLayout();
+                        lines.Add($"{round}\t{sec.Id}\t{watch.Elapsed.TotalMilliseconds:F1}\t{Body.Children.Count}");
+                    }
+                Show(start);
+                File.WriteAllLines(timingFile, lines);
+            };
+        // 设计预览（只在演示模式）：PANE_DESIGN_NAVHOVER=第几项（从 0 数），把悬停态停在导航这一项上（后台截图拍不到真实悬停）
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && int.TryParse(Environment.GetEnvironmentVariable("PANE_DESIGN_NAVHOVER"), out var hoverAt))
+            Loaded += async (_, _) => { await Task.Delay(400); if (hoverAt < navItems.Count) { navHover.MoveTo(navItems[hoverAt]); NavColors(navItems[hoverAt], true); } };
         // 设计预览：PANE_DESIGN_SETTINGS=分区 Id（可加 @像素 先滚下去，如 gesture@700），或 glass（通用页展开「玻璃参数（高级）」并滚到底）
         var design = Environment.GetEnvironmentVariable("PANE_DESIGN_SETTINGS");
         if (design?.Split('@') is [var id, var px] && double.TryParse(px, out var y))
@@ -126,6 +148,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             foreach (var modId in off.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 if (app.Modules.Modules.Any(m => m.Id == modId)) _ = app.Modules.ApplyAsync(app.Modules.Preview(modId, false), CancellationToken.None);
         navHighlight = new SlidingHighlight(NavLayer);
+        navHover = new SlidingHighlight(NavHoverLayer, hover: true);
         BuildNav();
         var logo = Path.Combine(AppContext.BaseDirectory, "Assets", "pane-app.svg");
         if (File.Exists(logo)) Logo.Source = new SvgImageSource(new Uri(logo));
@@ -137,6 +160,12 @@ public sealed partial class SettingsView : UserControl, IPanelView
         rerender = DispatcherQueue.CreateTimer();
         rerender.IsRepeating = false;
         rerender.Tick += OnRerender;
+        // 点导航：高亮和字色马上变，建页晚一点（2026-11-27 issue 93「来回点很卡」）。
+        // 高亮是合成动画，先提交出去，建页时界面线程忙也照样滑；连着点只建最后点的那一页
+        navBuild = DispatcherQueue.CreateTimer();
+        navBuild.IsRepeating = false;
+        navBuild.Interval = TimeSpan.FromMilliseconds(30);
+        navBuild.Tick += OnNavBuild;
         // 主题、主题色、圆角变了要整页重建（代码建的元素拿的是旧主题的画刷）；
         // 等分段 / 开关的动画播完再建（原型 rerenderAfterAnim）
         lookKey = LookKey();
@@ -178,7 +207,9 @@ public sealed partial class SettingsView : UserControl, IPanelView
         app.SetHotkeysSuspended(false);
         rerender.Stop();
         rerender.Tick -= OnRerender;
-        navHighlight.Dispose();
+        navBuild.Stop();
+        navBuild.Tick -= OnNavBuild;
+        navHighlight.Dispose(); navHover.Dispose();
         Body.Children.Clear();
         Nav.Children.Clear();
         Logo.Source = null;
@@ -207,6 +238,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
     {
         Nav.Children.Clear();
         navItems.Clear();
+        navHover.Hide();
         if (!Visible(current)) current = sections.First(s => s.Id == "modules");
         navPlaced = false;
         string? last = null;
@@ -232,15 +264,54 @@ public sealed partial class SettingsView : UserControl, IPanelView
         row.Children.Add(text);
         var item = new Grid { Height = 32, Padding = new Thickness(10, 0, 10, 0), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent), Tag = s };
         item.Children.Add(row);
-        item.Tapped += (_, _) => Show(s);
+        item.Tapped += (_, _) => Navigate(s);
+        // 悬停（2026-11-27 issue 93：原来只有点中才有反馈）：淡底滑到这一项，没选中的字和图标提亮（同原型 .nav button:hover）
+        item.PointerEntered += (_, _) => { navHover.MoveTo(item); NavColors(item, true); };
+        item.PointerExited += (_, _) => NavColors(item, false);
         item.SizeChanged += (_, _) => { if (!navPlaced && ReferenceEquals(item.Tag, current)) { navPlaced = true; navHighlight.MoveTo(item, false); } };
         navItems.Add(item);
         return item;
     }
 
+    // 子项的 PointerExited 会冒泡上来：还在导航范围里（项之间的缝）不收，免得滑动变成闪
+    void OnNavPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!PaneHover.Inside(Nav, e)) navHover.Hide();
+    }
+
+    void NavColors(Grid item, bool hovered)
+    {
+        bool on = ReferenceEquals(item.Tag, current);
+        var row = (StackPanel)item.Children[0];
+        var brush = on || hovered ? LabelProto.Foreground : SmallProto.Foreground;
+        ((PaneIcon)row.Children[0]).Foreground = brush;
+        var text = (TextBlock)row.Children[1];
+        text.Foreground = brush;
+        text.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
+    }
+
+    void Navigate(Section s)
+    {
+        navReset |= s != current;
+        current = s;
+        if (navPlaced && navItems.Find(i => ReferenceEquals(i.Tag, s)) is { } item) navHighlight.MoveTo(item);
+        foreach (var i in navItems) NavColors(i, false);
+        navBuild.Stop();
+        navBuild.Start();
+    }
+
+    void OnNavBuild(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+    {
+        bool reset = navReset;
+        navReset = false;
+        Render(resetScroll: reset);
+    }
+
     void Show(Section s)
     {
-        bool changed = s != current;
+        bool changed = s != current || navReset;
+        navBuild.Stop();
+        navReset = false;
         current = s;
         if (navPlaced && navItems.Find(i => ReferenceEquals(i.Tag, s)) is { } item) navHighlight.MoveTo(item);
         Render(resetScroll: changed);
@@ -266,15 +337,7 @@ public sealed partial class SettingsView : UserControl, IPanelView
             return;
         }
         double offset = Scroller.VerticalOffset;
-        foreach (var item in navItems)
-        {
-            bool on = ReferenceEquals(item.Tag, current);
-            var row = (StackPanel)item.Children[0];
-            ((PaneIcon)row.Children[0]).Foreground = on ? LabelProto.Foreground : SmallProto.Foreground;
-            var text = (TextBlock)row.Children[1];
-            text.Foreground = on ? LabelProto.Foreground : SmallProto.Foreground;
-            text.FontWeight = on ? FontWeights.SemiBold : FontWeights.Normal;
-        }
+        foreach (var item in navItems) NavColors(item, false);
         SectionTitle.Text = current.Name;
         SectionDesc.Text = current.Desc;
         Body.Children.Clear();

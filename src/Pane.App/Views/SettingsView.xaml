@@ -34,8 +34,10 @@
                 <c:ScrollFade Grid.Row="1" Thumb="False">
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollMode="Disabled">
                         <Grid>
+                            <!-- 悬停层在下、选中层在上，都是滑动高亮（同文件窗口左侧分类；2026-11-27 issue 93） -->
+                            <Canvas x:Name="NavHoverLayer" IsHitTestVisible="False"/>
                             <Canvas x:Name="NavLayer" IsHitTestVisible="False"/>
-                            <StackPanel x:Name="Nav" Spacing="2"/>
+                            <StackPanel x:Name="Nav" Spacing="2" PointerExited="OnNavPointerExited"/>
                         </Grid>
                     </ScrollViewer>
                 </c:ScrollFade>

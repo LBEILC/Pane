@@ -1,7 +1,9 @@
 // 滚动区边缘渐隐 + 细滑块（设计负责人，2026-11-26，用户定）。原型 ui/scroll-fade.css、scrollbar.js。
 // 1. 渐隐：哪一边还有内容没露出来，哪一边最后 24 px 渐隐成透明；滚到顶 / 底、内容不够长时那一边不渐隐。
-//    WinUI 3 没有 OpacityMask：内容照常布局和命中测试，但它的合成层由一张 VisualSurface 画出来，
-//    外面套一个渐变遮罩（CompositionMaskBrush）；原内容所在的那层透明度设成 0，只负责输入。
+//    WinUI 3 没有 OpacityMask：要渐隐的那条边（24 px）由一张 VisualSurface 截出来、套渐变遮罩（CompositionMaskBrush）画，
+//    原内容在这条边上用 InsetClip 裁掉；中间部分照常直接画。
+//    2026-11-27 改（任务 158）：原来整个滚动区都经 VisualSurface 重画，岛里的圆角全部失去抗锯齿（用户：选中块圆角有毛刺）。
+//    现在只有正在渐隐的边条离屏，滚到顶 / 底时那条边连离屏也撤掉，顶上的选中块等直接画、边缘平滑。
 // 2. 细滑块：系统滚动条隐藏（鼠标移上去会展开成带箭头的宽条，和玻璃不搭），右侧画一条宽 4 的细条，
 //    滚动或鼠标进来时出现，0.9 秒没动静淡出；移到细条上变宽 6，可以拖、点轨道跳转、滚轮照常。同文件窗口的 ScrollThumb。
 //    细条贴右边、离边 2 画在留白里，不压选中高亮（2026-11-26）；可拖的范围仍是 12 宽，透明地伸进内容一点。
@@ -29,9 +31,13 @@ public sealed partial class ScrollFade : Grid
     UIElement? content;
     ScrollViewer? scroller;
     Compositor? compositor;
-    CompositionVisualSurface? surface;
-    SpriteVisual? sprite;
-    CompositionColorGradientStop? top0, top1, bottom0, bottom1;
+    ContainerVisual? strips;
+    CompositionVisualSurface? topSurface, bottomSurface;
+    SpriteVisual? topStrip, bottomStrip;
+    InsetClip? clip;
+    CompositionColorGradientStop? top0, bottom0;
+    float edge = Edge;
+    int topGeneration, bottomGeneration;
     bool topOn, bottomOn, overThumb, dragging, maskFailed;
     double thumbOpacity, dragStartY, dragStartOffset;
     DispatcherQueueTimer? fadeTimer;
@@ -111,26 +117,20 @@ public sealed partial class ScrollFade : Grid
 
     void EnsureMask()
     {
-        if (sprite != null || maskFailed) return;
+        if (strips != null || maskFailed) return;
         try
         {
             var visual = ElementCompositionPreview.GetElementVisual(source);
             var c = compositor = visual.Compositor;
-            surface = c.CreateVisualSurface();
-            surface.SourceVisual = visual;
-            var gradient = c.CreateLinearGradientBrush();
-            gradient.StartPoint = Vector2.Zero; gradient.EndPoint = new Vector2(0, 1);
-            top0 = c.CreateColorGradientStop(0, Opaque); top1 = c.CreateColorGradientStop(0.1f, Opaque);
-            bottom1 = c.CreateColorGradientStop(0.9f, Opaque); bottom0 = c.CreateColorGradientStop(1, Opaque);
-            gradient.ColorStops.Add(top0); gradient.ColorStops.Add(top1); gradient.ColorStops.Add(bottom1); gradient.ColorStops.Add(bottom0);
-            var mask = c.CreateMaskBrush();
-            mask.Source = c.CreateSurfaceBrush(surface);
-            mask.Mask = gradient;
-            sprite = c.CreateSpriteVisual();
-            sprite.Brush = mask;
-            ElementCompositionPreview.SetElementChildVisual(surfaceHost, sprite);
-            // 原内容只负责布局和输入；画面由遮罩后的那张图出
-            ElementCompositionPreview.GetElementVisual(hidden).Opacity = 0;
+            topStrip = Strip(c, visual, atTop: true, out topSurface, out top0);
+            bottomStrip = Strip(c, visual, atTop: false, out bottomSurface, out bottom0);
+            strips = c.CreateContainerVisual();
+            strips.Children.InsertAtTop(topStrip);
+            strips.Children.InsertAtTop(bottomStrip);
+            ElementCompositionPreview.SetElementChildVisual(surfaceHost, strips);
+            // 原内容直接画；正在渐隐的边条那一段裁掉，由上面的边条画
+            clip = c.CreateInsetClip();
+            ElementCompositionPreview.GetElementVisual(hidden).Clip = clip;
             Resize();
             Update();
         }
@@ -138,21 +138,46 @@ public sealed partial class ScrollFade : Grid
         {
             // 合成不可用（极少见）：退回不渐隐，内容照常显示
             maskFailed = true;
-            try { ElementCompositionPreview.GetElementVisual(hidden).Opacity = 1; } catch (Exception) { }
+            try { ElementCompositionPreview.GetElementVisual(hidden).Clip = null; } catch (Exception) { }
         }
+    }
+
+    // 一条边：截内容的这一段，套「边上透明 → 里面不透明」的渐变；平时不显示
+    static SpriteVisual Strip(Compositor c, Visual visual, bool atTop, out CompositionVisualSurface surface, out CompositionColorGradientStop outer)
+    {
+        surface = c.CreateVisualSurface();
+        surface.SourceVisual = visual;
+        var gradient = c.CreateLinearGradientBrush();
+        gradient.StartPoint = Vector2.Zero; gradient.EndPoint = new Vector2(0, 1);
+        outer = c.CreateColorGradientStop(atTop ? 0 : 1, Opaque);
+        var inner = c.CreateColorGradientStop(atTop ? 1 : 0, Opaque);
+        gradient.ColorStops.Add(atTop ? outer : inner);
+        gradient.ColorStops.Add(atTop ? inner : outer);
+        var mask = c.CreateMaskBrush();
+        mask.Source = c.CreateSurfaceBrush(surface);
+        mask.Mask = gradient;
+        var sprite = c.CreateSpriteVisual();
+        sprite.Brush = mask;
+        sprite.IsVisible = false;
+        return sprite;
     }
 
     static readonly Windows.UI.Color Opaque = Windows.UI.Color.FromArgb(255, 255, 255, 255), Clear = Windows.UI.Color.FromArgb(0, 255, 255, 255);
 
     void Resize()
     {
-        if (surface == null || sprite == null) return;
-        var size = new Vector2((float)source.ActualWidth, (float)source.ActualHeight);
-        surface.SourceSize = size;
-        sprite.Size = size;
-        float f = size.Y > 0 ? Math.Min(0.5f, Edge / size.Y) : 0.1f;
-        top1!.Offset = f;
-        bottom1!.Offset = 1 - f;
+        if (strips == null) return;
+        float w = (float)source.ActualWidth, h = (float)source.ActualHeight;
+        edge = Math.Max(0, Math.Min(Edge, h / 2));
+        topSurface!.SourceOffset = Vector2.Zero;
+        topSurface.SourceSize = new Vector2(w, edge);
+        topStrip!.Size = new Vector2(w, edge);
+        bottomSurface!.SourceOffset = new Vector2(0, h - edge);
+        bottomSurface.SourceSize = new Vector2(w, edge);
+        bottomStrip!.Offset = new Vector3(0, h - edge, 0);
+        bottomStrip.Size = new Vector2(w, edge);
+        clip!.TopInset = topStrip.IsVisible ? edge : 0;
+        clip.BottomInset = bottomStrip.IsVisible ? edge : 0;
     }
 
     void Update()
@@ -160,17 +185,36 @@ public sealed partial class ScrollFade : Grid
         UpdateThumb();
         if (scroller is not { } sv || top0 == null) return;
         bool top = sv.VerticalOffset > 0.5, bottom = sv.VerticalOffset < sv.ScrollableHeight - 0.5;
-        if (top != topOn) { topOn = top; AnimateStop(top0, top); }
-        if (bottom != bottomOn) { bottomOn = bottom; AnimateStop(bottom0!, bottom); }
+        if (top != topOn) { topOn = top; SetEdge(atTop: true, top); }
+        if (bottom != bottomOn) { bottomOn = bottom; SetEdge(atTop: false, bottom); }
     }
 
-    void AnimateStop(CompositionColorGradientStop stop, bool fade)
+    // 开始渐隐：先把边条（此时不透明，和原内容一样）摆上、原内容裁掉这一段，再把外沿淡成透明。
+    // 结束渐隐：外沿淡回不透明，播完再撤掉边条、原内容恢复整块直接画
+    void SetEdge(bool atTop, bool fade)
     {
         var c = compositor!;
+        var strip = atTop ? topStrip! : bottomStrip!;
+        var stop = atTop ? top0! : bottom0!;
+        int generation = atTop ? ++topGeneration : ++bottomGeneration;
+        if (fade)
+        {
+            strip.IsVisible = true;
+            if (atTop) clip!.TopInset = edge; else clip!.BottomInset = edge;
+        }
         var animation = c.CreateColorKeyFrameAnimation();
         animation.InsertKeyFrame(1, fade ? Clear : Opaque);
         animation.Duration = TimeSpan.FromMilliseconds(120);
+        var batch = c.CreateScopedBatch(CompositionBatchTypes.Animation);
         stop.StartAnimation("Color", animation);
+        batch.End();
+        if (fade) return;
+        batch.Completed += (_, _) =>
+        {
+            if (generation != (atTop ? topGeneration : bottomGeneration) || strips == null) return;
+            strip.IsVisible = false;
+            if (atTop) clip!.TopInset = 0; else clip!.BottomInset = 0;
+        };
     }
 
     // ---------------- 细滑块 ----------------

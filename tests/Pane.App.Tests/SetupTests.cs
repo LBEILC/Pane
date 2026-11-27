@@ -5,7 +5,7 @@ using Pane.Services;
 using Pane.Services.Setup;
 using Pane.Settings;
 using System.Text.Json;
-internal static class SetupTests
+internal static partial class SetupTests
 {
     public static async Task<int> Run(PaneSettings defaults)
     {
@@ -56,7 +56,7 @@ internal static class SetupTests
             {
                 var fields = registration.RootElement;
                 Check(fields.GetProperty("DisplayName").GetString() == "Pane" && fields.GetProperty("DisplayVersion").GetString() == "0.1.123", "名称版本");
-                Check(fields.GetProperty("Publisher").GetString() == "Pane" && fields.GetProperty("DisplayIcon").GetString() == paths.Exe, "发布者图标");
+                Check(fields.GetProperty("Publisher").GetString() == "LBEILC" && fields.GetProperty("DisplayIcon").GetString() == paths.Exe, "发布者图标");
                 Check(fields.GetProperty("InstallLocation").GetString() == paths.Root && fields.GetProperty("EstimatedSize").GetInt32() == 1, "安装位置及 KiB 大小");
                 Check(fields.GetProperty("UninstallString").GetString() == $"\"{paths.Uninstaller}\"", "卸载命令引号");
                 Check(File.ReadAllText(paths.Uninstaller) == "uninstaller", "根目录独立卸载程序");

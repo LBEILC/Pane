@@ -16,7 +16,7 @@
 
     <UserControl.Resources>
         <DataTemplate x:Key="CategoryTemplate" x:DataType="files:CategoryItem">
-            <Grid Height="32" Padding="10,0,10,0" Margin="0,0,0,2" Background="Transparent" CornerRadius="{StaticResource PaneRadiusControl}">
+            <Grid Height="32" Padding="10,0,10,0" Margin="0,0,0,2" Background="Transparent" CornerRadius="{StaticResource PaneRadiusControl}" PointerEntered="OnRailItemEntered">
                 <TextBlock Text="{x:Bind Name}" VerticalAlignment="Center" FontWeight="{x:Bind Weight, Mode=OneWay}" Opacity="{x:Bind TextOpacity, Mode=OneWay}"
                            FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
                 <TextBlock Text="{x:Bind CountText, Mode=OneWay}" HorizontalAlignment="Right" VerticalAlignment="Center"
@@ -135,7 +135,7 @@
                             <Canvas x:Name="RailHover" IsHitTestVisible="False"/>
                             <Canvas x:Name="RailHighlight" IsHitTestVisible="False"/>
                             <ItemsControl x:Name="Rail" ItemTemplate="{StaticResource CategoryTemplate}" IsTabStop="False" Tapped="OnRailTapped"
-                                          PointerMoved="OnRailPointerMoved" PointerExited="OnRailPointerExited"/>
+                                          PointerExited="OnRailPointerExited"/>
                         </Grid>
                     </ScrollViewer>
                 </c:ScrollFade>

@@ -101,22 +101,11 @@ internal sealed record SetupPaths(string Root, string Data)
 {
     public SetupPaths ResolveInstalled(string? isolatedRoot = null)
     {
-        string? location;
-        if (isolatedRoot != null)
-        {
-            string file = Path.Combine(isolatedRoot, "uninstall.json");
-            if (!File.Exists(file)) return this;
-            using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(file));
-            location = json.RootElement.TryGetProperty("InstallLocation", out var value) ? value.GetString() : null;
-            if (!string.IsNullOrEmpty(location) && !SetupFiles.Full(location).StartsWith(SetupFiles.Full(isolatedRoot) + "\\", StringComparison.OrdinalIgnoreCase)
-                && !SetupFiles.Full(location).Equals(SetupFiles.Full(isolatedRoot), StringComparison.OrdinalIgnoreCase))
-                throw new IOException("自测安装位置必须在隔离根目录内"); // 不翻译：诊断异常
-        }
-        else
-        {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pane");
-            location = key?.GetValue("InstallLocation") as string;
-        }
+        string? location = SetupRegistration.Installed(this, isolatedRoot)?.GetValueOrDefault("InstallLocation") as string;
+        if (isolatedRoot != null && !string.IsNullOrEmpty(location)
+            && !SetupFiles.Full(location).StartsWith(SetupFiles.Full(isolatedRoot) + "\\", StringComparison.OrdinalIgnoreCase)
+            && !SetupFiles.Full(location).Equals(SetupFiles.Full(isolatedRoot), StringComparison.OrdinalIgnoreCase))
+            throw new IOException("自测安装位置必须在隔离根目录内"); // 不翻译：诊断异常
         return string.IsNullOrEmpty(location) ? this : this with { Root = SetupFiles.Full(location) };
     }
     public string App => Path.Combine(Root, "app");
@@ -131,5 +120,72 @@ internal sealed record SetupPaths(string Root, string Data)
             throw new IOException("自测根目录必须是临时目录下的 Pane-018-* 独立目录"); // 不翻译：诊断异常
         SetupFiles.Check(root);
         return new(root, Path.Combine(root, "data"));
+    }
+}
+
+internal static class SetupRegistration
+{
+    // 发布脚本也从本定义读取固定的产品标识。
+    internal const string ProductCode = "{03C4C620-F0FD-437A-BED3-DFE6C3DBBDB3}";
+    internal const string Legacy = "Pane";
+    internal static string Key(string name) => @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + name;
+    internal static string FileName(string root, string name) =>
+        Path.Combine(root, name == Legacy ? "uninstall-legacy.json" : "uninstall.json");
+
+    internal static Dictionary<string, object>? Read(string name, string? root)
+    {
+        if (root == null)
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Key(name));
+            return key?.GetValueNames().ToDictionary(n => n, n => key.GetValue(n)!, StringComparer.OrdinalIgnoreCase);
+        }
+        string file = FileName(root, name);
+        if (!File.Exists(file)) return null;
+        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(file));
+        return json.RootElement.EnumerateObject().ToDictionary(p => p.Name, p =>
+            p.Value.ValueKind == System.Text.Json.JsonValueKind.Number ? (object)p.Value.GetInt32() : p.Value.GetString()!,
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    static bool SamePath(string? path, string target)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return false;
+        try { return SetupFiles.Full(path).Equals(SetupFiles.Full(target), StringComparison.OrdinalIgnoreCase); }
+        catch (Exception e) when (e is ArgumentException or NotSupportedException or IOException) { return false; }
+    }
+
+    static bool CommandMatches(Dictionary<string, object> fields, SetupPaths target)
+    {
+        if (fields.GetValueOrDefault("UninstallString") is not string command) return false;
+        command = command.Trim();
+        string executable;
+        if (command.StartsWith('"'))
+        {
+            int end = command.IndexOf('"', 1);
+            if (end < 1 || (end + 1 < command.Length && !char.IsWhiteSpace(command[end + 1]))) return false;
+            executable = command[1..end];
+        }
+        else executable = command.Split([' ', '\t'], 2)[0];
+        return SamePath(executable, target.Uninstaller) || SamePath(executable, target.Exe);
+    }
+
+    static bool IsCustomPaneLocation(Dictionary<string, object> fields, SetupPaths candidate) =>
+        SamePath(fields.GetValueOrDefault("DisplayIcon") as string, candidate.Exe) && CommandMatches(fields, candidate);
+
+    internal static bool Matches(Dictionary<string, object> fields, SetupPaths target) =>
+        SamePath(fields.GetValueOrDefault("InstallLocation") as string, target.Root) || CommandMatches(fields, target);
+
+    internal static Dictionary<string, object>? Installed(SetupPaths target, string? root)
+    {
+        var current = Read(ProductCode, root);
+        if (current != null) return current;
+        var old = Read(Legacy, root);
+        if (old == null) return null;
+        // 自选位置需由 Pane 图标路径和卸载命令共同佐证，避免采用同名软件的安装目录。
+        if (old.GetValueOrDefault("InstallLocation") is string location && Path.IsPathFullyQualified(location)
+            && (SamePath(location, target.Root) || IsCustomPaneLocation(old, target with { Root = location }))) return old;
+        if (!CommandMatches(old, target)) return null;
+        old["InstallLocation"] = target.Root;
+        return old;
     }
 }

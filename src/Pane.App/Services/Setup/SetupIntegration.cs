@@ -7,25 +7,23 @@ namespace Pane.Services.Setup;
 
 internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, string? isolatedRoot = null, IStartupRegistry? registry = null) : ISetupIntegration
 {
-    const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\Pane";
     readonly IStartupRegistry startup = registry ?? (isolatedRoot == null ? new WindowsStartupRegistry() : new FileStartupRegistry(isolatedRoot));
     string Menu => Path.Combine(isolatedRoot == null ? Environment.GetFolderPath(Environment.SpecialFolder.Programs) : Path.Combine(isolatedRoot, "menu"), "Pane.lnk");
     string Desktop => Path.Combine(isolatedRoot == null ? Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory) : Path.Combine(isolatedRoot, "desktop"), "Pane.lnk");
     string SettingsFile => Path.Combine(paths.Data, "settings.json");
-    string FakeRegistration => Path.Combine(isolatedRoot!, "uninstall.json");
+    string RegistrationPath(string name) => isolatedRoot == null ? @"HKCU\" + SetupRegistration.Key(name) : SetupRegistration.FileName(isolatedRoot, name);
     public void SetPaths(SetupPaths value) => paths = value;
-    public string? InstallLocation => ReadRegistration()?.GetValueOrDefault("InstallLocation") as string;
-    public string? InstalledVersion => ReadRegistration()?.GetValueOrDefault("DisplayVersion") as string;
+    public string? InstallLocation => SetupRegistration.Installed(paths, isolatedRoot)?.GetValueOrDefault("InstallLocation") as string;
+    public string? InstalledVersion => SetupRegistration.Installed(paths, isolatedRoot)?.GetValueOrDefault("DisplayVersion") as string;
     public bool StartWithWindows => AutostartService.PointsTo(startup.Read(), paths.Exe) && !startup.Disabled;
     public static Dictionary<string, object> Registration(SetupPaths paths, string version, long bytes) => new()
     {
-        // TODO(design): 发布者暂用产品名 Pane，待确定发布主体后替换。
-        ["DisplayName"] = "Pane", ["DisplayVersion"] = version, ["Publisher"] = "Pane",
+        ["DisplayName"] = "Pane", ["DisplayVersion"] = version, ["Publisher"] = "LBEILC",
         ["DisplayIcon"] = paths.Exe, ["InstallLocation"] = paths.Root,
         ["EstimatedSize"] = (int)Math.Min(int.MaxValue, (bytes + 1023) / 1024),
         ["UninstallString"] = $"\"{paths.Uninstaller}\"", ["NoModify"] = 1, ["NoRepair"] = 1
     };
-    sealed record Snapshot(string? Startup, Dictionary<string, object>? Registration, Dictionary<string, byte[]?> Files);
+    sealed record Snapshot(string? Startup, Dictionary<string, object>? Registration, Dictionary<string, object>? OwnedLegacy, Dictionary<string, byte[]?> Files);
     public object Capture()
     {
         // 只记录操作和路径，不记录注册表值、快捷方式内容或设置内容。
@@ -35,11 +33,13 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
             catch (Exception error) { UninstallChain.Log(operation, "failed", error, path); throw; }
         }
         var run = Read("capture-startup", isolatedRoot == null ? @"HKCU\Software\Microsoft\Windows\CurrentVersion\Run" : Path.Combine(isolatedRoot, "run.txt"), startup.Read);
-        var registration = Read("capture-registration", isolatedRoot == null ? "HKCU\\" + UninstallKey : FakeRegistration, ReadRegistration);
+        Dictionary<string, object>? CaptureKey(string name) => Read("capture-registration", RegistrationPath(name), () => SetupRegistration.Read(name, isolatedRoot));
+        var registration = CaptureKey(SetupRegistration.ProductCode);
+        var legacy = CaptureKey(SetupRegistration.Legacy);
         var files = new Dictionary<string, byte[]?>();
         foreach (string path in new[] { Menu, Desktop, SettingsFile, SettingsFile + ".tmp" })
             files[path] = Read("capture-file", path, () => ReadBytes(path));
-        return new Snapshot(run, registration, files);
+        return new Snapshot(run, registration, legacy != null && SetupRegistration.Matches(legacy, paths) ? legacy : null, files);
     }
     static byte[]? ReadBytes(string path) => File.Exists(path) ? File.ReadAllBytes(path) : null;
     public void Restore(object snapshot)
@@ -47,7 +47,9 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
         var value = (Snapshot)snapshot;
         try { if (value.Startup == null) startup.Delete(); else startup.Write(value.Startup); }
         catch (Exception error) when (AutostartService.AccessDenied(error)) { UninstallChain.Log("restore-startup", "skipped", error); }
-        WriteRegistration(value.Registration);
+        WriteRegistration(SetupRegistration.ProductCode, value.Registration);
+        if (value.OwnedLegacy != null && SetupRegistration.Read(SetupRegistration.Legacy, isolatedRoot) == null)
+            WriteRegistration(SetupRegistration.Legacy, value.OwnedLegacy);
         foreach (var item in value.Files)
         {
             SetupFiles.Check(item.Key);
@@ -67,7 +69,8 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
             blocked = options.StartWithWindows;
             UninstallChain.Log(blocked ? "write-startup" : "delete-startup", "skipped", error);
         });
-        WriteRegistration(Registration(paths, version, bytes));
+        WriteRegistration(SetupRegistration.ProductCode, Registration(paths, version, bytes));
+        RemoveLegacy();
         Shortcut(Menu);
         if (options.DesktopShortcut) Shortcut(Desktop); else { SetupFiles.Check(Desktop); File.Delete(Desktop); }
         return blocked;
@@ -76,40 +79,39 @@ internal sealed class SetupIntegration(SetupPaths paths, PaneSettings defaults, 
     {
         if (AutostartService.PointsTo(startup.Read(), paths.Exe)) startup.Delete();
         SetupFiles.Check(Menu); SetupFiles.Check(Desktop);
-        File.Delete(Menu); File.Delete(Desktop); WriteRegistration(null);
+        File.Delete(Menu); File.Delete(Desktop);
+        WriteRegistration(SetupRegistration.ProductCode, null);
+        RemoveLegacy();
     }
     public static PaneSettings ReadSettings(string data, PaneSettings fallback)
     {
         try { return JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(data, "settings.json")), SettingsJson.Default.PaneSettings) ?? fallback; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException or NotSupportedException) { return fallback; }
     }
-    Dictionary<string, object>? ReadRegistration()
+    void RemoveLegacy()
     {
-        if (isolatedRoot != null)
-        {
-            if (!File.Exists(FakeRegistration)) return null;
-            using var json = JsonDocument.Parse(File.ReadAllText(FakeRegistration));
-            return json.RootElement.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.ValueKind == JsonValueKind.Number ? (object)p.Value.GetInt32() : p.Value.GetString()!);
-        }
-        using var key = Registry.CurrentUser.OpenSubKey(UninstallKey);
-        return key?.GetValueNames().ToDictionary(n => n, n => key.GetValue(n)!);
+        var legacy = SetupRegistration.Read(SetupRegistration.Legacy, isolatedRoot);
+        if (legacy == null) return;
+        if (SetupRegistration.Matches(legacy, paths)) WriteRegistration(SetupRegistration.Legacy, null);
+        else UninstallChain.Log("remove-legacy-registration", "skipped", path: RegistrationPath(SetupRegistration.Legacy), details: "安装目标不一致");
     }
-    void WriteRegistration(Dictionary<string, object>? fields)
+    void WriteRegistration(string name, Dictionary<string, object>? fields)
     {
         if (isolatedRoot != null)
         {
-            SetupFiles.Check(FakeRegistration);
-            if (fields == null) { File.Delete(FakeRegistration); return; }
+            string file = RegistrationPath(name);
+            SetupFiles.Check(file);
+            if (fields == null) { File.Delete(file); return; }
             Directory.CreateDirectory(isolatedRoot);
-            using var stream = File.Create(FakeRegistration);
+            using var stream = File.Create(file);
             using var writer = new Utf8JsonWriter(stream);
             writer.WriteStartObject();
             foreach (var field in fields) { if (field.Value is int number) writer.WriteNumber(field.Key, number); else writer.WriteString(field.Key, (string)field.Value); }
             writer.WriteEndObject(); return;
         }
-        Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, false);
+        Registry.CurrentUser.DeleteSubKeyTree(SetupRegistration.Key(name), false);
         if (fields == null) return;
-        using var key = Registry.CurrentUser.CreateSubKey(UninstallKey);
+        using var key = Registry.CurrentUser.CreateSubKey(SetupRegistration.Key(name));
         foreach (var field in fields) key.SetValue(field.Key, field.Value);
     }
     void Shortcut(string path)

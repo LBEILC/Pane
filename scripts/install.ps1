@@ -18,6 +18,7 @@ $wasRunning=Test-PaneRunning (Join-Path $app 'Pane.App.exe');$stopped=$false
 $createdRoot=!(Test-Path -LiteralPath $Root);$movedCurrent=$false;$movedOld=$false;$activated=$false;$started=$null
 $journal=[Collections.Generic.List[string]]::new()
 $registration=Get-PaneRegistration
+$legacy=Get-PaneRegistration -Legacy
 $registrationChanged=$false
 $uninstaller=Join-Path $Root 'Uninstall Pane.exe'
 Assert-PanePath $uninstaller $Root
@@ -51,7 +52,10 @@ try {
 }catch {
     $failure=$_
     if($uninstallerChanged){if($null -eq $uninstallerBefore){Remove-Item -LiteralPath $uninstaller -ErrorAction SilentlyContinue}else{[IO.File]::WriteAllBytes($uninstaller,$uninstallerBefore)}}
-    if($registrationChanged){Set-PaneRegistration $registration}
+    if($registrationChanged){
+        Set-PaneRegistration $registration
+        if((Test-PaneRegistrationTarget $legacy) -and $null -eq (Get-PaneRegistration -Legacy)){Set-PaneRegistration $legacy -Legacy}
+    }
     if($started -and !$started.HasExited){Invoke-PaneProcess "$app/Pane.App.exe" @('--exit') -Wait}
     if($activated){Move-PaneTree $app $(if($Rollback){$old}else{$stage}) $Root}
     if($movedCurrent){Move-PaneTree $(if($Rollback){$stage}else{$old}) $app $Root}

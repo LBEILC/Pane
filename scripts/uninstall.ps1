@@ -20,6 +20,7 @@ if(!$Isolated){
 $registration=Get-PaneRegistration
 $location=if($registration -is [string]){($registration | ConvertFrom-Json).InstallLocation}elseif($registration){$registration['InstallLocation']}
 if($location -and [string]::Equals([IO.Path]::GetFullPath($location),$Root,[StringComparison]::OrdinalIgnoreCase)){Set-PaneRegistration $null}
+Remove-PaneLegacyRegistration
 foreach($name in @('app','app.old')){Remove-PaneTree (Join-Path $Root $name) $Root}
 $uninstaller=Join-Path $Root 'Uninstall Pane.exe'
 Assert-PanePath $uninstaller $Root

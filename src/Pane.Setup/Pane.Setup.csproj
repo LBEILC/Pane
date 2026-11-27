@@ -4,7 +4,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier><PublishAot>true</PublishAot><SelfContained>true</SelfContained>
     <Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationIcon>../Pane.App/Assets/pane.ico</ApplicationIcon>
-    <Product>Pane 安装程序</Product><AssemblyTitle>Pane 安装程序</AssemblyTitle><Description>Pane 安装程序</Description><Company>Pane</Company>
+    <Product>Pane 安装程序</Product><AssemblyTitle>Pane 安装程序</AssemblyTitle><Description>Pane 安装程序</Description><Company>LBEILC</Company>
     <AssemblyName Condition="'$(AssemblyName)' == ''">Pane.Setup</AssemblyName>
     <Description Condition="'$(AssemblyName)' == 'Uninstall Pane'">Pane 卸载程序</Description>
     <AssemblyTitle Condition="'$(AssemblyName)' == 'Uninstall Pane'">Pane 卸载程序</AssemblyTitle>

@@ -395,13 +395,18 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         if (Rail.ContainerFromIndex(categories.FindIndex(x => x.Category == category)) is FrameworkElement el) railHighlight.MoveTo(el, animate);
     }
 
-    void OnRailPointerMoved(object sender, PointerRoutedEventArgs e)
+    // 悬停（2026-11-27 issue 93 改）：每一项自己接 PointerEntered，滑到这一项的容器（和选中块同一个元素、同样大小）；
+    // 原来在整个列表上接 PointerMoved、往上找带 CategoryItem 的容器，找不到就没有反馈
+    void OnRailItemEntered(object sender, PointerRoutedEventArgs e)
     {
-        for (var d = e.OriginalSource as DependencyObject; d is not null && d != Rail; d = VisualTreeHelper.GetParent(d))
-            if (d is ContentPresenter { DataContext: CategoryItem } el) { railHover.MoveTo(el); return; }
+        if (sender is FrameworkElement item) railHover.MoveTo(VisualTreeHelper.GetParent(item) as FrameworkElement ?? item);
     }
 
-    void OnRailPointerExited(object sender, PointerRoutedEventArgs e) => railHover.Hide();
+    // PointerExited 会从子元素冒泡上来：鼠标还在列表范围里（项之间的缝、字和底之间移动）不收，真离开列表才收
+    void OnRailPointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (!PaneHover.Inside(Rail, e)) railHover.Hide();
+    }
 
     void OnRailTapped(object sender, TappedRoutedEventArgs e)
     {

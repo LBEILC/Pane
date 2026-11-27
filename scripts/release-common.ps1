@@ -95,30 +95,60 @@ function Test-PaneStartupCommand([object]$Value,[string]$Exe){
 }
 
 # 脚本安装与图形安装使用同一个卸载登记位置；隔离测试只写文件。
-function Get-PaneRegistration {
+function Get-PaneProductCode {
+    $source=Join-Path $repo 'src/Pane.App/Services/Setup/SetupFiles.cs'
+    $match=[regex]::Match([IO.File]::ReadAllText($source),'(?m)^\s*internal const string ProductCode = "(\{[A-F0-9-]+\})";')
+    if(!$match.Success){throw '找不到安装产品标识'}
+    return ([guid]::Parse($match.Groups[1].Value)).ToString('B').ToUpperInvariant()
+}
+function Get-PaneRegistrationFile([switch]$Legacy) {
+    if($Legacy){return Join-Path $Root 'uninstall-legacy.json'}
+    return Join-Path $Root 'uninstall.json'
+}
+function Get-PaneRegistrationKey([switch]$Legacy) {
+    $leaf=if($Legacy){'Pane'}else{Get-PaneProductCode}
+    return "Software\Microsoft\Windows\CurrentVersion\Uninstall\$leaf"
+}
+function Get-PaneRegistration([switch]$Legacy) {
     if($Isolated){
-        $file=Join-Path $Root 'uninstall.json'
+        $file=Get-PaneRegistrationFile -Legacy:$Legacy
         if(Test-Path -LiteralPath $file){return [IO.File]::ReadAllText($file)}
         return $null
     }
-    $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Uninstall\Pane')
+    $key=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey((Get-PaneRegistrationKey -Legacy:$Legacy))
     if(!$key){return $null}
     try {$fields=@{};foreach($name in $key.GetValueNames()){$fields[$name]=$key.GetValue($name)};return $fields}
     finally {$key.Dispose()}
 }
-function Set-PaneRegistration($Fields) {
+function Set-PaneRegistration($Fields,[switch]$Legacy) {
     if($Isolated){
-        $file=Join-Path $Root 'uninstall.json'
+        $file=Get-PaneRegistrationFile -Legacy:$Legacy
         if($null -eq $Fields){if(Test-Path -LiteralPath $file){Remove-Item -LiteralPath $file};return}
         $json=if($Fields -is [string]){$Fields}else{$Fields | ConvertTo-Json}
         [IO.File]::WriteAllText($file,$json,[Text.UTF8Encoding]::new($false));return
     }
-    $name='Software\Microsoft\Windows\CurrentVersion\Uninstall\Pane'
+    $name=Get-PaneRegistrationKey -Legacy:$Legacy
     [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($name,$false)
     if($null -eq $Fields){return}
     $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($name)
     try {foreach($field in $Fields.Keys){$key.SetValue($field,$Fields[$field])}}
     finally {$key.Dispose()}
+}
+function Test-PaneRegistrationTarget($Fields) {
+    if($null -eq $Fields){return $false}
+    if($Fields -is [string]){$Fields=$Fields | ConvertFrom-Json}
+    $location=$Fields.InstallLocation
+    if($location -and [IO.Path]::IsPathRooted($location)){
+        try {if([IO.Path]::GetFullPath($location).TrimEnd('\') -eq $Root.TrimEnd('\')){return $true}}catch [ArgumentException]{}
+    }
+    return (Test-PaneStartupCommand $Fields.UninstallString (Join-Path $Root 'Uninstall Pane.exe')) -or
+        (Test-PaneStartupCommand $Fields.UninstallString (Join-Path $Root 'app/Pane.App.exe'))
+}
+function Remove-PaneLegacyRegistration {
+    $legacy=Get-PaneRegistration -Legacy
+    if($null -eq $legacy){return}
+    if(Test-PaneRegistrationTarget $legacy){Set-PaneRegistration $null -Legacy}
+    else{Write-Warning '保留旧卸载登记，安装目标不一致'}
 }
 function Register-PaneInstallation {
     $exe=Join-Path $Root 'app/Pane.App.exe'
@@ -127,8 +157,9 @@ function Register-PaneInstallation {
     $version=[Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
     $bytes=(Get-ChildItem -LiteralPath (Join-Path $Root 'app') -File -Recurse | Measure-Object Length -Sum).Sum
     Set-PaneRegistration @{
-        DisplayName='Pane';DisplayVersion="$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)";Publisher='Pane'
+        DisplayName='Pane';DisplayVersion="$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart)";Publisher='LBEILC'
         DisplayIcon=$exe;InstallLocation=$Root;EstimatedSize=[int][Math]::Min([int]::MaxValue,[Math]::Ceiling($bytes/1024))
         UninstallString=$uninstallCommand;NoModify=1;NoRepair=1
     }
+    Remove-PaneLegacyRegistration
 }

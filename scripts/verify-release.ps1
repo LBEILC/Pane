@@ -11,3 +11,5 @@ $arguments=@('run','--project',(Join-Path $repo 'tests/Pane.App.Tests/Pane.App.T
 if($FakeServer){$arguments+='--fake-server'}
 & dotnet @arguments
 if($LASTEXITCODE -ne 0){throw '发布核对失败'}
+# 发布核对同时覆盖发布脚本的卸载登记与旧版迁移，全部使用隔离目录。
+& (Join-Path $repo "tests/Pane.App.Probes/verify-setup-registration.ps1")

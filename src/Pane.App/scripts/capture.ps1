@@ -1,13 +1,18 @@
-﻿param([ValidateSet('jit','aot')][string]$Mode='aot',[ValidateSet('Light','Dark','System')][string]$Theme='Dark',[ValidateSet('launcher','clipboard','super','settings','glass','resize','cycle','positions','drag','pointer','gesture','window','all')][string]$Shot='all',[string]$Title='',[switch]$NoShot,[ValidateSet('gdi','dxgi','both')][string]$CaptureBackend='gdi')
+﻿param([ValidateSet('jit','aot')][string]$Mode='aot',[ValidateSet('Light','Dark','System')][string]$Theme='Dark',[ValidateSet('launcher','clipboard','super','settings','glass','resize','cycle','positions','drag','pointer','gesture','window','all')][string]$Shot='all',[string]$Title='',[switch]$NoShot,[ValidateSet('gdi','dxgi','both','content')][string]$CaptureBackend='gdi')
 . "$PSScriptRoot/common.ps1"
 . "$PSScriptRoot/capture-native.ps1"
 . "$PSScriptRoot/capture-functions.ps1"
 Add-Type -AssemblyName System.Drawing
-if(!$NoShot -and $CaptureBackend -ne 'gdi'){. "$PSScriptRoot/capture-dxgi.ps1"}
+if(!$NoShot -and $CaptureBackend -in @('dxgi','both')){. "$PSScriptRoot/capture-dxgi.ps1"}
 $repo=Split-Path (Split-Path $root -Parent) -Parent
 $out=Join-Path $repo 'docs/research/refs/011';New-Item -ItemType Directory -Force $out|Out-Null
 $name="$Mode-$Theme";$prefix=Join-Path $out ($name+'-'+[Guid]::NewGuid().ToString('N'));$process=$null
-$settings=@{PANE_THEME=$Theme;PANE_WALLPAPER=$(if($NoShot){''}else{([Uri](Join-Path $repo 'prototype/wallpapers/shapes.svg')).AbsoluteUri});PANE_CYCLE_CAPTURE=([int](!$NoShot)).ToString()};$old=@{}
+# 单窗口后台截图只取内容 HWND，适合查岛内像素。玻璃与阴影在另一个 HWND。
+$contentOnly=$CaptureBackend -eq 'content'
+if($contentOnly -and $Shot -notin @('settings','launcher','clipboard')){throw '内容截图仅支持设置、启动器和剪贴板'}
+$windowCapture=Join-Path $repo 'experiments/158-aa/bin/WindowCapture.exe'
+if($contentOnly -and !(Test-Path -LiteralPath $windowCapture)){throw '请先运行 experiments/158-aa/build.ps1'}
+$settings=@{PANE_THEME=$Theme;PANE_WALLPAPER=$(if($NoShot -or $contentOnly){''}else{([Uri](Join-Path $repo 'prototype/wallpapers/shapes.svg')).AbsoluteUri});PANE_CYCLE_CAPTURE=([int](!$NoShot)).ToString()};$old=@{}
 function Send-Demo([string]$command,[string]$ack,[string]$text=''){Send-Control $process $prefix $command $ack $text 90}
 function Panel-Window([string]$title) {
     $found=@([Observe009]::Windows($process.Id)|Where-Object {[Observe009]::Title($_)-eq $title -and [Observe009]::IsWindowVisible($_)})
@@ -36,6 +41,11 @@ function Raise-All {
 function Capture-Panel([string]$title,[string]$suffix) {
     if($NoShot){return}
     $win=Panel-Window $title
+    if($contentOnly){
+        & $windowCapture @($win.ToInt64(),$process.Id,(Join-Path $out "$name-$suffix-content.png"))
+        if($LASTEXITCODE){throw "内容窗口截图失败，退出码 $LASTEXITCODE"}
+        return
+    }
     $windows=@([Observe009]::Windows($process.Id)|ForEach-Object {
         $r=New-Object Observe009+Rect;[void][Observe009]::GetWindowRect($_,[ref]$r)
         "hwnd=$_;title=$([Observe009]::Title($_));visible=$([Observe009]::IsWindowVisible($_));ex=$([Observe009]::GetWindowLong($_,-20));above=$([Z]::GetWindow($_,3));below=$([Z]::GetWindow($_,2));owner=$([Z]::GetWindow($_,4));rect=$($r.Left),$($r.Top),$($r.Right),$($r.Bottom)"
@@ -52,7 +62,7 @@ try {
     foreach($key in $settings.Keys){$old[$key]=[Environment]::GetEnvironmentVariable($key);[Environment]::SetEnvironmentVariable($key,$settings[$key])}
     $process=Start-Pane $Mode $prefix $true;Wait-Ready $process $prefix
     $bounds=New-Object Observe009+Rect
-    if(!$NoShot){
+    if(!$NoShot -and !$contentOnly){
         $backs=@([Observe009]::Windows($process.Id)|Where-Object {[Observe009]::Title($_)-eq 'Pane 011 实验背景'})
         if($backs.Count-ne 1){throw '未找到背景夹具'};$back=$backs[0]
         [void][Observe009]::GetWindowRect($back,[ref]$bounds)
