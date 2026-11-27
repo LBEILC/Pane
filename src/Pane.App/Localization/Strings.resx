@@ -1222,7 +1222,7 @@
   <data name="Settings_Gestures_HookFailed" xml:space="preserve"><value>鼠标手势启动失败，请重启 Pane 后重试</value></data>
   <data name="Settings_Gestures_HotkeyDescription" xml:space="preserve"><value>快捷键 {0}</value></data>
   <data name="Settings_Gestures_HotkeyUnset" xml:space="preserve"><value>未设置</value></data>
-  <data name="Settings_Gestures_ImportDescription" xml:space="preserve"><value>读取 WGestures 的手势、程序规则和轨迹颜色；不会改动 WGestures 本身</value></data>
+  <data name="Settings_Gestures_ImportDescription" xml:space="preserve"><value>读取 WGestures（含 WGestures 2 导出的配置）的手势、程序规则和轨迹颜色；不会改动 WGestures 本身</value></data>
   <data name="Settings_Gestures_Imported" xml:space="preserve"><value>已导入 {0} 个手势</value></data>
   <data name="Settings_Gestures_ImportError" xml:space="preserve"><value>导入失败：{0}</value></data>
   <data name="Settings_Gestures_ImportNotFound" xml:space="preserve"><value>未找到 WGestures 的配置</value></data>
@@ -1230,6 +1230,10 @@
   <data name="Settings_Gestures_ImportSummary" xml:space="preserve"><value>找到 WGestures {0} 的配置：{1} 个手势、{2} 条程序规则、{3} 个禁用程序。导入将替换 Pane 当前的手势和程序设置</value></data>
   <data name="Settings_Gestures_ImportSummaryUnsupported" xml:space="preserve"><value>找到 WGestures {0} 的配置：{1} 个手势、{2} 条程序规则、{3} 个禁用程序；{4} 项不支持，将跳过。导入将替换 Pane 当前的手势和程序设置</value></data>
   <data name="Settings_Gestures_ImportTitle" xml:space="preserve"><value>从 WGestures 导入</value></data>
+  <data name="Settings_Gestures_ImportSkipped" xml:space="preserve"><value>将跳过</value></data>
+  <data name="Settings_Gestures_ImportApproximated" xml:space="preserve"><value>按方向近似转换</value></data>
+  <data name="Settings_Gestures_ImportApproximatedDescription" xml:space="preserve"><value>以下手势在 WGestures 2 里是手画的形状，已折算成方向，导入后请试一下</value></data>
+  <data name="Settings_Gestures_ImportMore" xml:space="preserve"><value>还有 {0} 项</value></data>
   <data name="Settings_Gestures_IncreaseVolume" xml:space="preserve"><value>加</value></data>
   <data name="Settings_Gestures_InvalidConfiguration" xml:space="preserve"><value>配置无效</value></data>
   <data name="Settings_Gestures_LeftClick" xml:space="preserve"><value>按住时点击左键</value></data>
@@ -2075,4 +2079,19 @@
   <data name="Clipboard_OriginalNotSynced" xml:space="preserve"><value>原图未同步，只能在{0}上粘贴</value></data>
   <data name="Clipboard_OriginalQuota" xml:space="preserve"><value>本月流量已用完，下月 1 日后可下载原图</value></data>
   <data name="Clipboard_OtherDevice" xml:space="preserve"><value>其他设备</value></data>
+  <data name="Image_Title" xml:space="preserve"><value>识别图片</value></data>
+  <data name="Image_OpenHint" xml:space="preserve"><value>识别图片（Ctrl+B）</value></data>
+  <data name="Image_FromLauncher" xml:space="preserve"><value>来自启动器</value></data>
+  <data name="Image_Ocr" xml:space="preserve"><value>识别文字</value></data>
+  <data name="Image_OcrPrompt" xml:space="preserve"><value>识别图片里的全部文字，按原有的段落和顺序输出；表格整理成 Markdown 表格；不要解释，不要加标题。</value></data>
+  <data name="Image_Describe" xml:space="preserve"><value>描述图片</value></data>
+  <data name="Image_DescribePrompt" xml:space="preserve"><value>用中文简洁地描述这张图片：是什么、有哪些要点。</value></data>
+  <data name="Image_AddAction" xml:space="preserve"><value>添加</value></data>
+  <data name="Image_ActionName" xml:space="preserve"><value>名称</value></data>
+  <data name="Image_ActionPrompt" xml:space="preserve"><value>提示词，原样发给模型，比如：把图里的表格整理成 Markdown 表格</value></data>
+  <data name="Image_EditTip" xml:space="preserve"><value>右键修改</value></data>
+  <data name="Image_Empty" xml:space="preserve"><value>点下面的动作，或者直接问关于这张图的问题
+关闭窗口后不再保留</value></data>
+  <data name="Image_QuestionPlaceholder" xml:space="preserve"><value>问点关于这张图的…</value></data>
+  <data name="Launcher_RecognizeImageDescription" xml:space="preserve"><value>用 AI 识别文字、描述图片</value></data>
 </root>

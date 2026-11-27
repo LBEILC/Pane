@@ -7,7 +7,7 @@ namespace Pane.Services.Ai;
 
 internal static class AnthropicProtocol
 {
-    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,AiReasoningEffort effort,bool test=false)
+    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,AiReasoningEffort effort,bool test=false, IReadOnlyDictionary<string,AiImage>? images=null)
     {
         using var stream=new MemoryStream();
         using(var w=new Utf8JsonWriter(stream)){
@@ -22,10 +22,22 @@ internal static class AnthropicProtocol
             // 合并相邻同角色消息，确保发送给 Messages 的角色交替。
             for(int i=0;i<messages.Count;i++){
                 var role=messages[i].Role;
+                int start=i;
                 string text=messages[i].Text;
                 while(i+1<messages.Count&&messages[i+1].Role==role)text+="\n\n"+messages[++i].Text;
                 w.WriteStartObject();w.WriteString("role",role switch{AiChatRole.User=>"user",AiChatRole.Assistant=>"assistant",_=>throw new AiCredentialException(Strings.Ai_InvalidChatRole)});
-                w.WriteString("content",text);w.WriteEndObject();
+                if (images != null && messages.Skip(start).Take(i-start+1).Any(m => m.Images is { Count: > 0 }))
+                {
+                    w.WriteStartArray("content");
+                    for (int j=start; j<=i; j++)
+                    {
+                        foreach (var path in messages[j].Images ?? []) images[path].Write(w, false, true);
+                        AiImage.WriteText(w, messages[j].Text, false);
+                    }
+                    w.WriteEndArray();
+                }
+                else w.WriteString("content",text);
+                w.WriteEndObject();
             }
             w.WriteEndArray();w.WriteEndObject();
         }

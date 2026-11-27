@@ -4,7 +4,10 @@
 void publish(int blocked=0,int enabled=1){auto revision=PanePolicyBegin();PanePolicy(reinterpret_cast<intptr_t>(fixture.window),fixture.pid,0,0,96,blocked,enabled,0);PanePolicyCommit(revision);}
 void raw(WPARAM message,int x=0,int y=0,DWORD data=0){MSLLHOOKSTRUCT value{};value.pt={x,y};value.mouseData=data;hook(HC_ACTION,message,reinterpret_cast<LPARAM>(&value));}
 void reset(){capture={};updateTimer();head=tail=0;}
-int main(){try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+try{
  check(schedulingMain()==0,"existing scheduling tests");
  running=true;observe=false;PaneSuperPolicy(0,400);publish();
  Sleep(100);raw(WM_RBUTTONDOWN);check(capture.active,"stationary snapshot survives old 75ms deadline");raw(WM_RBUTTONUP);Event e{};PanePoll(&e);check(PanePoll(&e)&&e.kind==pane::Replay,"ordinary right click replay");reset();

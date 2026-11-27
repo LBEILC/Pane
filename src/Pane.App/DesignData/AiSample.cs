@@ -1,3 +1,4 @@
+using Pane.Localization;
 // 界面开发用的 AI 假服务：照原型 prototype/data.js 的 aiCanned，逐字吐出写好的结果。不联网。
 // 环境变量 PANE_DESIGN_AI=notconfigured / error 用来预览「未配置」「出错」两种卡片；PANE_DESIGN_AI_INSTANT=1 一次吐完（截图用）。
 // 问题里带「公式」或「Markdown」时给一段含标题、公式、表格、引用、嵌套列表、代码块、链接的回答，看 Markdown 排版。
@@ -83,7 +84,12 @@ public sealed class AiSample : IAiService
             throw new AiNetworkException("连不上 AI 服务，请检查网络后重试。");
         var q = messages.LastOrDefault(m => m.Role == AiChatRole.User)?.Text ?? "";
         string answer;
-        if (q.Contains("玻璃") || q.Contains("清晰") || q.Contains("glass", StringComparison.OrdinalIgnoreCase))
+        // 识别图片（162）：演示图是原型 samples/ocr-notice.svg 那张群公告
+        if (messages.Any(m => m.Images is { Count: > 0 }) && q == Strings.Image_OcrPrompt)
+            answer = "**周四评审安排**\n发布于 11 月 26 日 18:20\n\n时间：11 月 28 日（周四）下午 3:00\n地点：3 楼大会议室，线上同步开腾讯会议\n议题：\n\n1. 启动器新版交互走查（20 分钟）\n2. 剪贴板图片识别方案（15 分钟）\n3. 下周排期（10 分钟）\n\n请各位提前看一遍原型，问题写在文档评论里。";
+        else if (messages.Any(m => m.Images is { Count: > 0 }) && q == Strings.Image_DescribePrompt)
+            answer = "这是一张群公告的截图：设计组通知 **11 月 28 日（周四）下午 3:00** 在 3 楼大会议室开评审，线上同步开腾讯会议。\n\n- 议题三项：启动器交互走查、剪贴板图片识别方案、下周排期；\n- 要求提前看原型，问题写在文档评论里；\n- 底部有一个「我知道了」按钮。";
+        else if (q.Contains("玻璃") || q.Contains("清晰") || q.Contains("glass", StringComparison.OrdinalIgnoreCase))
             answer = "让玻璃上的文字保持清晰，主要靠三件事：背景要糊、底色要压、文字要够实。\n\n- 模糊半径不低于 30 像素，背后的细节糊掉，文字才不打架；\n- 深色主题加一层深色着色（约 40%），亮壁纸也压得住；\n- 正文用不透明的文字色，`主题色` 只用在小面积的强调上。";
         else if (q.Contains("代码") || q.Contains("函数") || q.Contains("防抖"))
             answer = "可以用一个简单的防抖函数：每次输入都重新计时，停手 600 毫秒后才真正执行。\n\n```\nfunction debounce(fn, ms = 600) {\n  let t;\n  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };\n}\n```";

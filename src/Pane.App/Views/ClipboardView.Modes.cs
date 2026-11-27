@@ -137,6 +137,7 @@ public sealed partial class ClipboardView
             if (row.CanSplit) list.Add(Op("words", Strings.Words_Open, "words", "Ctrl+B"));
             if (ModuleGate.On(ModuleIds.Memo) && !string.IsNullOrWhiteSpace(e.Text)) list.Add(Op("memo", Strings.Memo_SaveAs, "note"));   // 备忘录（123）
         }
+        if (row.CanRecognize) list.Add(Op("image", Strings.Image_Title, "image", "Ctrl+B"));   // 识别图片（162）
         if (ModuleGate.On(ModuleIds.Launcher)) list.Add(Op("send", Strings.Clipboard_SendToLauncher, "R", "Tab"));
         list.Add(Op("tags", Strings.Clipboard_TagsAction, "tag", "Ctrl+T"));
         list.Add(Op("pin", e.Pinned ? Strings.Clipboard_Unpin : Strings.Clipboard_Pin, e.Pinned ? "pin-off" : "pin", "Ctrl+P"));
@@ -194,6 +195,7 @@ public sealed partial class ClipboardView
             case "edit": StartEdit(e); break;
             case "tags": OpenTags(e); break;
             case "words": LeaveMode(); OpenWords?.Invoke(this, e); break;
+            case "image": LeaveMode(); OpenImage?.Invoke(this, e); break;
             case "memo": LeaveMode(); SaveMemo?.Invoke(this, e); break;
             case "target-open" or "target-reveal" when menuTarget is { } target:
                 LeaveQuiet(); AfterUse(); _ = OpenMenuTarget(target, op.Id == "target-reveal", op.Title); break;

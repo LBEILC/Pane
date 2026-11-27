@@ -7,7 +7,10 @@
 
 int checks=0;
 void check(bool value,const char* label){++checks;if(!value)throw std::runtime_error(label);}
-int main(){try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+try{
  using namespace pane;
  using A=LauncherOpenAction;
  check(wcscmp(launcherOpenVerb(A::Open),L"open")==0,"first verb is open");

@@ -102,9 +102,14 @@ public sealed partial class LauncherRow : INotifyPropertyChanged
 
     /// <summary>动作格子的序号（1～7）：按住 Alt 时显示，Alt+数字直接触发。</summary>
     public string? Number { get; }
-    bool showNumber;
-    public bool ShowNumber { get => showNumber; set { if (showNumber == value || Number is null) return; showNumber = value; Changed(nameof(NumberVisibility)); } }
-    public Visibility NumberVisibility => showNumber ? Visibility.Visible : Visibility.Collapsed;
+    // 左上角的序号徽章：按住 Alt 时动作格子显示 Number；按住 Ctrl 时前 9 个结果显示 1～9（issue 75，Ctrl+数字直接打开）
+    string? badge;
+    public string? Badge => badge;
+    public bool ShowNumber { get => badge is not null && badge == Number; set => SetBadge(value ? Number : null); }
+    public void SetBadge(string? text) { if (badge == text) return; badge = text; Changed(nameof(Badge)); Changed(nameof(NumberVisibility)); }
+    public Visibility NumberVisibility => badge is null ? Visibility.Collapsed : Visibility.Visible;
+    /// <summary>算在「结果」里、可以用 Ctrl+数字打开的行：应用、命令、文件（动作格子归 Alt；算式卡片没地方放徽章，「查看全部」和附件也不算）。</summary>
+    public bool IsResult => Cell is LauncherCell.App or LauncherCell.Command or LauncherCell.File;
 
     // 同一个图标只解码一次；按 2 倍显示尺寸解码（行 32、格子 40 DIP），图标缓存是 256px，不按原尺寸解码省内存
     static readonly Dictionary<string, BitmapImage> pictures = new(StringComparer.OrdinalIgnoreCase);

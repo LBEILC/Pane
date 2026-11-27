@@ -8,7 +8,7 @@ $values=@{PANE_OBSERVE='1';PANE_VERIFY='1';PANE_DEV_HOTKEYS='launcher=Ctrl+Alt+S
 $saved=@{};$rows=@()
 try {
  foreach($key in $values.Keys){$saved[$key]=[Environment]::GetEnvironmentVariable($key);[Environment]::SetEnvironmentVariable($key,$values[$key])}
- $serverExe=Join-Path $repo 'tests/Pane.Ai.Tests/bin/Release/net10.0-windows/Pane.Ai.Tests.exe'
+ $serverExe=Join-Path $repo 'tests/Pane.Ai.Tests/bin/Release/net10.0-windows10.0.26100.0/Pane.Ai.Tests.exe'
  $server=Start-Process -FilePath $serverExe -ArgumentList @('server',$prefixBase) -WindowStyle Hidden -PassThru
  $deadline=[DateTime]::UtcNow.AddSeconds(15)
  while(!(Test-Path -LiteralPath "$prefixBase.url")){if($server.HasExited-or [DateTime]::UtcNow-gt $deadline){throw '假服务未就绪'};Start-Sleep -Milliseconds 50}

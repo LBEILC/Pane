@@ -15,6 +15,7 @@ internal sealed class FakeServer:IAsyncDisposable
     public string Url {get;}
     public string Mode="normal",Nonce="";
     public string? LastBody,LastPath;
+    public byte[] LastBodyBytes=[];
     public int Refreshes,Revocations;
     public bool RefreshFails;
     public bool ModelsAsChat;
@@ -38,7 +39,7 @@ internal sealed class FakeServer:IAsyncDisposable
             while(await stream.ReadAsync(one,stop.Token)>0){bytes.Add(one[0]);if(bytes.Count>=4&&bytes.TakeLast(4).SequenceEqual(new byte[]{13,10,13,10}))break;if(bytes.Count>65536)return;}
             var headers=Encoding.ASCII.GetString(bytes.ToArray()).Split("\r\n");var path=headers[0].Split(' ')[1];int length=0;
             foreach(var h in headers)if(h.StartsWith("Content-Length:",StringComparison.OrdinalIgnoreCase))length=int.Parse(h.Split(':')[1]);
-            var body=new byte[length];await stream.ReadExactlyAsync(body,stop.Token);LastBody=Encoding.UTF8.GetString(body);LastPath=path;
+            var body=new byte[length];await stream.ReadExactlyAsync(body,stop.Token);LastBodyBytes=body;LastBody=Encoding.UTF8.GetString(body);LastPath=path;
             LastHeaders=headers;Requests.Add((path,LastBody));
             if(Fixture?.Invoke(path,LastBody) is {} fixture){await Reply(stream,fixture.Status,fixture.Body,fixture.ContentType);return;}
             if(Mode=="probe-timeout"){await Task.Delay(Timeout.Infinite,stop.Token);return;}

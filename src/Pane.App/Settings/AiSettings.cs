@@ -8,6 +8,11 @@ public enum AiProxyMode { System, None, Custom }
 /// <summary>思考程度（042）：Default = 不传这个参数，用服务的默认；模型不支持时服务自动去掉。</summary>
 public enum AiReasoningEffort { Default, Low, Medium, High }
 public sealed record AiActionSettings(string Id, string Name, string Glyph, string PromptTemplate);
+/// <summary>
+/// 识别图片窗口里用户自己加的动作（162，2026-11-27 设计加）：Id 形如 "img-" + 8 位小写十六进制，生成后不变；
+/// Name 1～12 字；Prompt 1～2000 字，原样发给模型（没有变量）。内置的「识别文字」「描述图片」不在这里（Id "ocr" / "describe"，提示词是界面资源）。
+/// </summary>
+public sealed record AiImageAction(string Id, string Name, string Prompt);
 
 /// <summary>第三方 API 的接口格式（2026-11-06 用户定）：OpenAI 兼容（/chat/completions）或 Anthropic Messages（/messages）。</summary>
 public enum AiApiFormat { OpenAi, Anthropic }
@@ -74,6 +79,10 @@ public sealed record AiSettings
     public AiProxyMode? ProxyMode { get; init; }
     /// <summary>实际的代理方式：没存过的，填过 ProxyUrl 当作 Custom，没填的跟随系统。</summary>
     [JsonIgnore] public AiProxyMode Proxy => ProxyMode ?? (ProxyUrl != null ? AiProxyMode.Custom : AiProxyMode.System);
+    /// <summary>识别图片的自定义动作（162），按添加顺序；null 当作空；最多 12 个。跟 <see cref="Actions"/> 一样同步。</summary>
+    public AiImageAction[]? ImageActions { get; init; }
+    /// <summary>识别图片窗口上次用的动作 Id（"ocr" / "describe" / 自定义的 Id）；打开窗口时自动跑它。null 或找不到 = "ocr"。本机设置，不同步。</summary>
+    public string? LastImageAction { get; init; }
     /// <summary>思考程度（042），对话、动作、翻译都按它带参数。</summary>
     public AiReasoningEffort Reasoning { get; init; }
     public AiActionSettings[] Actions { get; init; }=[

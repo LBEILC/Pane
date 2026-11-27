@@ -193,18 +193,41 @@ public sealed partial class SettingsView
 
     static string GestureSub(G.GestureBinding g)
     {
+        var parts = PatternParts(g.Pattern);
+        parts.Add(CommandText(g.Command));
+        return string.Join(" · ", parts);
+    }
+
+    // 触发键（右键不写）和修饰动作的文字；手势行副标题和导入预览共用
+    static List<string> PatternParts(G.GesturePattern pattern)
+    {
         var parts = new List<string>();
-        if (g.Pattern.Button != G.GestureButton.Right)
-            parts.Add(g.Pattern.Button switch { G.GestureButton.Middle => Strings.Settings_Gestures_MiddleButton, G.GestureButton.X1 => Strings.Settings_Gestures_BackButton, G.GestureButton.X2 => Strings.Settings_Gestures_ForwardButton, _ => g.Pattern.Button.ToString() });
-        if (g.Pattern.Modifier != G.GestureModifier.None)
-            parts.Add(g.Pattern.Modifier switch
+        if (pattern.Button != G.GestureButton.Right)
+            parts.Add(pattern.Button switch { G.GestureButton.Middle => Strings.Settings_Gestures_MiddleButton, G.GestureButton.X1 => Strings.Settings_Gestures_BackButton, G.GestureButton.X2 => Strings.Settings_Gestures_ForwardButton, _ => pattern.Button.ToString() });
+        if (pattern.Modifier != G.GestureModifier.None)
+            parts.Add(pattern.Modifier switch
             {
                 G.GestureModifier.WheelUp => Strings.Settings_Gestures_WheelUp, G.GestureModifier.WheelDown => Strings.Settings_Gestures_WheelDown,
                 G.GestureModifier.LeftClick => Strings.Settings_Gestures_LeftClick, G.GestureModifier.MiddleClick => Strings.Settings_Gestures_MiddleClick,
                 G.GestureModifier.X1Click => Strings.Settings_Gestures_BackClick, G.GestureModifier.X2Click => Strings.Settings_Gestures_ForwardClick, _ => "",
             });
-        parts.Add(CommandText(g.Command));
+        return parts;
+    }
+
+    // 导入预览里的一条手势：方向写成箭头字符（列表是纯文字），后面接触发键和修饰动作
+    static readonly string[] ArrowText = ["↑", "↗", "→", "↘", "↓", "↙", "←", "↖"]; // 顺序同 GestureDirection
+    static string PatternText(G.GesturePattern p)
+    {
+        var parts = PatternParts(p);
+        parts.Insert(0, p.Directions.Count > 0 ? string.Concat(p.Directions.Select(d => ArrowText[(int)d])) : Strings.Settings_Gestures_NoDirection);
         return string.Join(" · ", parts);
+    }
+
+    // 导入预览的明细（161）：最多列 12 条，其余说「还有 N 项」
+    static string ImportList(IEnumerable<string> lines)
+    {
+        var all = lines.ToList();
+        return string.Join("\n", all.Take(12)) + (all.Count > 12 ? "\n" + string.Format(Strings.Settings_Gestures_ImportMore, (object?)(all.Count - 12)) : "");
     }
 
     static string CommandText(G.GestureCommand c) => c switch
@@ -230,8 +253,15 @@ public sealed partial class SettingsView
 
     IReadOnlyList<string> importSearched = [];
     // 从 WGestures 导入：先预览（只读它的配置文件），确认后整套替换
+    bool designImportShown;
     void RenderImport()
     {
+        // 设计预览（只在演示模式）：PANE_DESIGN_WG_IMPORT=配置文件路径，打开时直接显示这份配置的导入预览（看 161 的明细排版）
+        if (!designImportShown && Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_WG_IMPORT") is { Length: > 0 } wgFile)
+        {
+            designImportShown = true;
+            try { importPreview = app.PreviewWGestures(wgFile); } catch (Exception e) { importStatus = e.Message; importOk = false; }
+        }
         FrameworkElement row;
         if (importPreview is { } p)
         {
@@ -245,6 +275,15 @@ public sealed partial class SettingsView
                     importPreview = null;
                     Render();
                 }));
+            // 明细（161）：跳过哪些、哪些手画形状按方向近似转换了，导入前看得到，不悄悄丢掉
+            var details = new StackPanel();
+            details.Children.Add(row);
+            if (p.Unsupported.Count > 0)
+                details.Children.Add(Row(Strings.Settings_Gestures_ImportSkipped, ImportList(p.Unsupported.Select(u => $"{u.Where} · {u.GestureText}：{u.Reason}"))));
+            if (p.Approximated is { Count: > 0 } approximated)
+                details.Children.Add(Row(Strings.Settings_Gestures_ImportApproximated,
+                    Strings.Settings_Gestures_ImportApproximatedDescription + "\n" + ImportList(approximated.Select(a => $"{a.Where} · {a.Name}：{PatternText(a.Pattern)}"))));
+            if (details.Children.Count > 1) row = details;
         }
         else
         {
@@ -260,12 +299,12 @@ public sealed partial class SettingsView
                 Render();
             }
             var find = Button(Strings.Settings_Gestures_FindConfig, "search", () => Load(null));
-            // 找不到时手动选（043）：WGestures 数据目录里的 gestures.wg2 / gestures.wg，或在 WGestures 里「导出」的 .wgb
+            // 找不到时手动选（043）：WGestures 数据目录里的 gestures.wg2 / gestures.wg，或在 WGestures 里「导出」的 .wgb；161 起加 WGestures 2 导出的 .wg28bw
             var pick = Button(Strings.Settings_Gestures_ChooseConfig, "folder", async () =>
             {
                 try
                 {
-                    if (await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Settings_Gestures_ConfigFilter, "*.wg2;*.wg;*.wgb")]) is { } file) Load(file);   // 原生选择框（146）
+                    if (await FolderPicker.PickFileAsync(SettingsWindow, [(Strings.Settings_Gestures_ConfigFilter, "*.wg2;*.wg;*.wgb;*.wg28bw")]) is { } file) Load(file);   // 原生选择框（146）
                 }
                 catch (Exception e) { importStatus = string.Format(Strings.Settings_Gestures_PickConfigError, App.FailureReason(e) ?? e.Message); importOk = false; Render(); }
             });

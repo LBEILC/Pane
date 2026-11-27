@@ -16,12 +16,20 @@ function Instrument($file,$pairs){
     }
     [IO.File]::WriteAllText("$out/$file",$source)
 }
+# 旧版在条件末尾直接收起；当前版在钉住分支后收起。只在实际收起时记录。
+$blur=if($Baseline){
+    @('&&(HideOnBlur?.Invoke()??true))Hide();','&&(HideOnBlur?.Invoke()??true)){Probe119.Log("blur " + l);Hide();}')
+}else{
+    @('            else Hide();','            else {Probe119.Log("blur " + l);Hide();}')
+}
 Instrument 'GlassPanel.cs' @(
     ,@('Native.SetForegroundWindow(Input)','Probe119.Foreground(Input)')
     ,@('outsideButtons=MouseButtonsDown();','Probe119.Shown(Input,Visual,Passive,Shown);outsideButtons=MouseButtonsDown();')
-    ,@('&&(HideOnBlur?.Invoke()??true))Hide();','&&(HideOnBlur?.Invoke()??true)){Probe119.Log("blur " + l);Hide();}')
+    ,$blur
 )
 Instrument 'ShellHost.cs' @(,@('keyboardGeneration++;StopKeyboardHook();','keyboardGeneration++;Probe119.Log("generation " + keyboardGeneration);StopKeyboardHook();'))
-$args119=@('publish',"$repo/src/Pane.App/Pane.App.csproj",'-c','Release','-r','win-x64','-p:PublishAot=false','-p:IntermediateOutputPath=obj/Foreground119/','-p:OutputPath=bin/Foreground119/',"-p:CustomAfterMicrosoftCommonTargets=$PSScriptRoot/probe.targets","-p:ProbeDirectory=$out",'--source',"$env:USERPROFILE/.nuget/packages",'-p:NuGetAudit=false','-o',"$out/jit")
+. "$repo/scripts/release-version.ps1"
+$version=Get-PaneReleaseVersion "$repo/src/Pane.App/ReleaseNotes"
+$args119=@('publish',"$repo/src/Pane.App/Pane.App.csproj",'-c','Release','-r','win-x64','-p:PublishAot=false',"-p:Version=$version",'-p:IntermediateOutputPath=obj/Foreground119/','-p:OutputPath=bin/Foreground119/',"-p:CustomAfterMicrosoftCommonTargets=$PSScriptRoot/probe.targets","-p:ProbeDirectory=$out",'--source',"$env:USERPROFILE/.nuget/packages",'-p:NuGetAudit=false','-o',"$out/jit")
 & dotnet $args119
 if($LASTEXITCODE){throw '探针构建失败'}

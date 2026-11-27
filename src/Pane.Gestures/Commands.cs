@@ -32,9 +32,12 @@ public sealed class CommandExecutor(ISystemOperations system) : IDisposable
             case HotkeyCommand hotkey: WithTarget(target,()=>WithKeys(() => { foreach (var chord in hotkey.Chords) {Chord(chord);Thread.Sleep(10);} })); break;
             case SendTextCommand text:
                 var strokes = SendKeysParser.Parse(text.Sequence);
+                // 带延时的按键序列常用于菜单助记键，普通字母也要发送对应虚拟键。
+                bool timedKeys = strokes.Any(s => s.DelayMs.HasValue);
                 WithTarget(target,()=>WithKeys(() => { foreach (var s in strokes) {
-                    if (s.Key != 0) Chord(new(s.Modifiers, s.Key));
-                    else if (s.Modifiers != KeyModifiers.None) { var mapped = system.MapCharacter(s.Character); Chord(new(s.Modifiers | mapped.Modifiers, mapped.Key)); }
+                    if (s.DelayMs is int delay) Thread.Sleep(delay);
+                    else if (s.Key != 0) Chord(new(s.Modifiers, s.Key));
+                    else if (timedKeys || s.Modifiers != KeyModifiers.None) { var mapped = system.MapCharacter(s.Character); Chord(new(s.Modifiers | mapped.Modifiers, mapped.Key)); }
                     else { try { system.Character(s.Character, true); } finally { system.Character(s.Character, false); } }
                 } })); break;
             case WebSearchCommand web:

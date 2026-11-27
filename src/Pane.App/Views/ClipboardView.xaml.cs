@@ -462,7 +462,7 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
                 break;
             case PanelKey.Pin: if (SelectedRow is { } p) TogglePin(p); break;
             case PanelKey.Send: if (SelectedRow is { } t && ModuleGate.On(Contracts.ModuleIds.Launcher)) Send(t); break;
-            case PanelKey.Words: if (SelectedRow is { CanSplit: true } w) Words(w); break;
+            case PanelKey.Words: if (SelectedRow is { } w && (w.CanSplit || w.CanRecognize)) Words(w); break;
             case PanelKey.Escape:
                 if (Input.Text.Length > 0) Input.Text = string.Empty;
                 else CloseRequested?.Invoke(this, EventArgs.Empty);
@@ -609,7 +609,9 @@ public sealed partial class ClipboardView : UserControl, IPanelView, IClipRowAct
     public event EventHandler<ClipEntry>? OpenWords;
     /// <summary>操作列表「存为备忘录」（123）：文字条目存成一条新备忘录。</summary>
     public event EventHandler<ClipEntry>? SaveMemo;
-    public void Words(ClipRow row) => OpenWords?.Invoke(this, row.Entry);
+    public void Words(ClipRow row) { if (row.CanRecognize) OpenImage?.Invoke(this, row.Entry); else OpenWords?.Invoke(this, row.Entry); }
+    /// <summary>识别图片（162）：图片条目的行尾按钮、操作列表、Ctrl+B。</summary>
+    public event EventHandler<ClipEntry>? OpenImage;
 
     public void TogglePin(ClipRow row) => history.SetPinned(row.Entry.Id, !row.Entry.Pinned);
 

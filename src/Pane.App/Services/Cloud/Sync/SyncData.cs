@@ -68,7 +68,7 @@ internal static class SyncData
         "Version", "SuperPanel.DisabledPrograms", "Modules", "General.UiFont", "Clipboard.KeepHotkeyWithWinV",
         "Launcher.Width", "Launcher.Portable", "Launcher.Favorites", "Launcher.PinnedApps",
         "Launcher.AppAliases", "Launcher.HiddenItems", "Icons.CustomIcons", "Icons.Overrides",
-        "Ai.ProxyMode", "Ai.ProxyUrl", "Ai.ApiEndpoint", "Ai.Endpoints", "Ai.ApiBaseUrl", "Ai.ApiModel",
+        "Ai.LastImageAction", "Ai.ProxyMode", "Ai.ProxyUrl", "Ai.ApiEndpoint", "Ai.Endpoints", "Ai.ApiBaseUrl", "Ai.ApiModel",
         "Update.Source", "Update.IgnoredVersion", "Update.NewsShown", "Update.AutoInstallFailedVersion", "Update.SeenVersion",
         "Ai.Disabled", "SuperPanel.Enabled", "FolderJump.Enabled", "Clipboard.Enabled"
     ];

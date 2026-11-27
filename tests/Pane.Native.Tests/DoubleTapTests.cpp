@@ -95,7 +95,10 @@ LRESULT CALLBACK windowProc(HWND h,UINT m,WPARAM w,LPARAM l){if(m==WM_APP+54){va
 LRESULT CALLBACK observer(int code,WPARAM w,LPARAM l){if(code>=0)observedKeys++;return CallNextHookEx(nullptr,code,w,l);}
 void pump(unsigned ms){auto end=GetTickCount64()+ms;MSG m{};do{while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){TranslateMessage(&m);DispatchMessageW(&m);}Sleep(1);}while(GetTickCount64()<end);}
 void sendPair(uintptr_t tag=0){INPUT keys[4]{};for(int i=0;i<4;i++){keys[i].type=INPUT_KEYBOARD;keys[i].ki.wVk=VK_LCONTROL;keys[i].ki.dwFlags=i%2?KEYEVENTF_KEYUP:0;keys[i].ki.dwExtraInfo=tag;}SetLastError(0);auto sent=SendInput(4,keys,sizeof(INPUT));if(sent!=4)throw std::runtime_error("SendInput on hidden desktop: sent="+std::to_string(sent)+" error="+std::to_string(GetLastError()));checks++;pump(100);}
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(int argc,char** argv){
+    pane::diagnostics::Initialize();
+
  if(argc<2)return 2;std::ofstream log(argv[1]);HHOOK next=nullptr;HWND window=nullptr;
  try{
   unit();log<<"unit assertions="<<checks<<std::endl;

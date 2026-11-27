@@ -8,7 +8,13 @@ using Pane.Contracts;
 
 internal static class Program
 {
-    [STAThread] static void Main(){ApplicationConfiguration.Initialize();Application.Run(new Fixture());if(Environment.ExitCode==0)TestResults.Pass();}
+    [STAThread] static void Main()
+    {
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+        ApplicationConfiguration.Initialize();
+        Application.Run(new Fixture());
+        if (Environment.ExitCode == 0) TestResults.Pass();
+    }
     sealed class Fixture:Form
     {
         readonly WebView2 web=new(){Dock=DockStyle.Fill};

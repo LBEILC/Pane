@@ -13,6 +13,12 @@ static partial class Program
     static GestureBinding Binding(string name,GestureDirection[] dirs,GestureModifier modifier=0,bool immediate=false,GestureCommand? command=null)=>new(name,new(GestureButton.Right,dirs,modifier),command??new DoNothingCommand(),immediate);
     static void Main(string[] args)
     {
+        if (args is ["--preview-wg2", var archive])
+        {
+            var preview = new WGesturesImporter().Preview(archive)!;
+            Console.WriteLine($"WG2 global={preview.GlobalCount}; apps={preview.AppRuleCount}; unsupported={preview.Unsupported.Count}; approximated={preview.Approximated!.Count}");
+            return;
+        }
         if(args is ["--101-command",var directory]){
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory,"gesture fixture.cmd"),"@echo off\r\n>gesture.tmp echo %~1 %WG_PROCID%\r\nmove /y gesture.tmp gesture.txt >nul\r\n");
@@ -32,7 +38,7 @@ static partial class Program
         // 013 只运行纯逻辑测试，禁止真实导入和外部命令执行。
         bool unitOnly=args.Contains("--unit-only");
         string output=args.Length>0&&!unitOnly?args[0]:Path.Combine(AppContext.BaseDirectory,"results");Directory.CreateDirectory(output);
-        Recognizer();Matching();Sessions();Commands();QueueTests();Config(output);Defaults(output);Import(output);ImportCompatibility(output);if(!unitOnly){RealImport(output);HarmlessCommand(output);}
+        Recognizer();Matching();Sessions();Commands();QueueTests();Config(output);Defaults(output);Import(output);ImportCompatibility(output);ImportWG2(output);if(!unitOnly){RealImport(output);HarmlessCommand(output);}
         Console.WriteLine($"PASS managed assertions={checks}; realInput=0; clipboard=0; volume=0");
     }
     static GestureDirection[] Recognize(GesturePoint[] points,double dpi=96,bool diagonal=false)

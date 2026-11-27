@@ -10,7 +10,10 @@ struct FixtureData:SavedData {
   auto memory=GlobalLock(m->hGlobal);memset(memory,0,32);memcpy(memory,L"fixture",16);GlobalUnlock(m->hGlobal);return S_OK;
  }
 };
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(){
+    pane::diagnostics::Initialize();
+
  Apartment apartment;int checks=0;
  auto check=[&](bool ok){checks++;if(!ok){std::cerr<<"FAIL assertion="<<checks<<"\n";exit(1);}};
  auto optional=static_cast<CLIPFORMAT>(RegisterClipboardFormatW(L"Pane019OptionalFixture"));

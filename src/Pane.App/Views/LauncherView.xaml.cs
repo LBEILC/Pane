@@ -103,6 +103,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     public event Func<string, bool>? SaveMemo;
     /// <summary>AI 对话窗口：要直接发出的问题，或带过去的一问一答（「继续对话」）。</summary>
     public event Action<string?, IReadOnlyList<AiChatMessage>?>? OpenChat;
+    /// <summary>识别图片（162）：图片附件 + 输入的文字（没输入为 null）。</summary>
+    public event Action<ClipEntry, string?>? OpenImage;
     /// <summary>文件格 Ctrl+Enter「打开所在文件夹」用；宿主设置（021 之前演示模式用假服务）。</summary>
     public IFileSearch? Files { get; set; }
 
@@ -394,6 +396,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         else if (a.Kind == ClipKind.Image)
         {
+            if (AiOn && ChatView.ImagePathOf(a) is not null)
+                items.Add(new("recognize-image", LauncherItemKind.Action, LauncherGroups.Images, Strings.Image_Title, Strings.Launcher_RecognizeImageDescription, new("ai")));
             items.Add(new("save-image", LauncherItemKind.Action, LauncherGroups.Images, Strings.Common_SaveAs, AttachmentLabel(a), new("image")));
             items.Add(new("copy-image", LauncherItemKind.Action, LauncherGroups.Images, Strings.Launcher_CopyImage, Strings.Launcher_RestoreClipboard, new("clipboard")));
         }
@@ -409,6 +413,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         }
         var q = query.Trim();
         if (q.Length > 0) items = items.Where(i => (i.Group == LauncherGroups.Direct ? i.Subtitle ?? "" : i.Title).Contains(q, StringComparison.OrdinalIgnoreCase) || i.Title.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+        // 图片附件输入了文字：第一项变成「问 AI（附带图片）」，回车把文字当第一个问题打开识别图片窗口（162）
+        if (q.Length > 0 && AiOn && a.Kind == ClipKind.Image && ChatView.ImagePathOf(a) is not null)
+        {
+            items.RemoveAll(i => i.Id == "recognize-image");
+            items.Insert(0, new("recognize-image", LauncherItemKind.Action, LauncherGroups.Images, string.Format(Strings.Launcher_AskQuery, (object?)(q)), Strings.Launcher_SendWithAttachment, new("ai")));
+        }
         if (q.Length > 0 && AiOn && a.Kind != ClipKind.Image && a.Kind != ClipKind.Files)
             items.Add(new("ai:ask", LauncherItemKind.Ai, LauncherGroups.Ai, string.Format(Strings.Launcher_AskQuery, (object?)(q)), Strings.Launcher_SendWithAttachment, new("ai")));
         return items;
@@ -842,7 +852,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         Select(kept >= 0 ? kept : DefaultSelection(), scroll: false);
         UpdateBadge(attachmentMode ? null : KeywordEngine(query));
         RequestHeight();
+        // 设计预览（只在演示模式）：PANE_DESIGN_RESULT_NUMBERS=1 结果一出来就显示 Ctrl 序号（后台截图按不了 Ctrl）
+        if (DesignResultNumbers) ShowResultNumbers(true);
     }
+    static readonly bool DesignResultNumbers = Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_RESULT_NUMBERS") == "1";
 
     // 默认选中：算式 > 第一个应用 > 第一个文件 > 第一个动作（翻译）。动作行位置固定，不因为默认选中挪位置
     int DefaultSelection()
@@ -1065,6 +1078,29 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
 
     void ShowNumbers(bool show) { foreach (var r in rows) r.ShowNumber = show; }
 
+    // 按住 Ctrl 稍停（350 ms）：前 9 个结果出 1～9，Ctrl+数字直接打开（issue 75，同 Listary）。
+    // 不立刻出：Ctrl+V、Ctrl+Enter、Ctrl+K 这类组合键一按就松，徽章不该跟着闪一下。没出徽章时 Ctrl+数字照样能用
+    Microsoft.UI.Dispatching.DispatcherQueueTimer? ctrlTimer;
+    IEnumerable<LauncherRow> ResultRows() => rows.Where(r => r.IsResult).Take(9);
+    void ArmResultNumbers()
+    {
+        if (ctrlTimer is null)
+        {
+            ctrlTimer = DispatcherQueue.CreateTimer();
+            ctrlTimer.Interval = TimeSpan.FromMilliseconds(350);
+            ctrlTimer.IsRepeating = false;
+            ctrlTimer.Tick += (_, _) => { if (Down(VirtualKey.Control) && !Down(VirtualKey.Menu)) ShowResultNumbers(true); };
+        }
+        ctrlTimer.Stop();
+        ctrlTimer.Start();
+    }
+    void ShowResultNumbers(bool show)
+    {
+        if (!show) ctrlTimer?.Stop();
+        int n = 0;
+        foreach (var r in rows) if (r.IsResult) r.SetBadge(show && n < 9 ? (++n).ToString(System.Globalization.CultureInfo.InvariantCulture) : null);
+    }
+
     // ---------------- 键盘与鼠标 ----------------
 
     static bool Down(VirtualKey k) => InputKeyboardSource.GetKeyStateForCurrentThread(k).HasFlag(CoreVirtualKeyStates.Down);
@@ -1136,6 +1172,16 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             return;
         }
 
+        // 按住 Ctrl：结果出数字（稍停才出，长按的自动重复不重新计时）；Ctrl+数字直接打开第 N 个结果
+        if (e.Key == VirtualKey.Control) { if (!e.KeyStatus.WasKeyDown) ArmResultNumbers(); return; }
+        ctrlTimer?.Stop();
+        if (ctrl && !Down(VirtualKey.Shift) && e.Key is >= VirtualKey.Number1 and <= VirtualKey.Number9)
+        {
+            if (ResultRows().ElementAtOrDefault(e.Key - VirtualKey.Number1) is { } hit) { ShowResultNumbers(false); Select(hit.Index); _ = Execute(hit.Index, false, false); }
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case VirtualKey.K when ctrl: _ = OpenMenu(selected); break;
@@ -1163,9 +1209,10 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
     void OnInputKeyUp(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key == VirtualKey.Menu) { ShowNumbers(false); e.Handled = true; }
+        if (e.Key == VirtualKey.Control) ShowResultNumbers(false);
     }
 
-    void OnInputLostFocus(object sender, RoutedEventArgs e) => ShowNumbers(false);
+    void OnInputLostFocus(object sender, RoutedEventArgs e) { ShowNumbers(false); ShowResultNumbers(false); }
 
     void OnResultsPointerMoved(object sender, PointerRoutedEventArgs e)
     {
@@ -1373,6 +1420,12 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         if (item.Kind == LauncherItemKind.Ai) { RunAi(item.Id.StartsWith("ai:", StringComparison.Ordinal) ? item.Id[3..] : item.Id); return; }
         try
         {
+            if (attachment is { } image && item.Id == "recognize-image")
+            {
+                CloseRequested?.Invoke(this, EventArgs.Empty);
+                OpenImage?.Invoke(image, Input.Text.Trim() is { Length: > 0 } question ? question : null);
+                return;
+            }
             if (attachment is { } a && item.Kind == LauncherItemKind.Action)
             {
                 CloseRequested?.Invoke(this, EventArgs.Empty);

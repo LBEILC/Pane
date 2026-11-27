@@ -45,7 +45,10 @@ static void CALLBACK tick(HWND, UINT, UINT_PTR, DWORD) {
     EnumThreadWindows(GetCurrentThreadId(), handleDialog, 0);
 }
 
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int wmain() {
+    pane::diagnostics::Initialize();
+
     wchar_t desktop[128]{};
     DWORD needed{};
     if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME,

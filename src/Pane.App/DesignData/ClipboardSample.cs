@@ -76,7 +76,7 @@ public sealed class ClipboardSample : IClipboardHistory
             {
                 var p = item.Split('|');
                 entries.Add(new((id++).ToString(), ClipKind.Image, null, null, new ClipPicture(p[0]), int.Parse(p[1]), int.Parse(p[2]),
-                    "截图工具", Sources["截图工具"], now.AddMinutes(-ago++), true));   // 固定，排在最前面
+                    "截图工具", Sources["截图工具"], now.AddMinutes(-ago++), true, ContentPath: p[0]));   // 固定，排在最前面；完整图片就用这张（识别图片 162 要）
             }
         }
     }

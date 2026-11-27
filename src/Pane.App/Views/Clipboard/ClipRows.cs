@@ -111,7 +111,11 @@ public sealed partial class ClipRow : INotifyPropertyChanged
     public Visibility SourcePictureVisibility => V(SourcePicture is not null);
     public Visibility HotkeyVisibility => V(Number > 0);
     public Visibility SendVisibility => V(ModuleGate.On(Contracts.ModuleIds.Launcher));   // 启动器停用时没有「交给启动器」（055）
-    public Visibility WordsVisibility => V(CanSplit);   // 分词（093）：只给普通文字条目，分词能力开着时
+    public Visibility WordsVisibility => V(CanSplit || CanRecognize);   // 分词（093）：只给普通文字条目，分词能力开着时；图片条目同一个位置是「识别图片」（162）
+    /// <summary>识别图片（162）：图片条目、复制的文件里有图片的条目，AI 能力开着时。和分词共用行尾按钮、操作列表和 Ctrl+B。</summary>
+    public bool CanRecognize => Entry.Kind is ClipKind.Image or ClipKind.Files && ModuleGate.On(Contracts.ModuleIds.Ai) && ChatView.ImagePathOf(Entry) is not null;
+    public string WordsGlyph => CanRecognize ? "image" : "words";
+    public string WordsTip => CanRecognize ? Strings.Image_OpenHint : Strings.Words_OpenHint;
     public bool CanSplit => Entry.Kind == ClipKind.Text && !string.IsNullOrWhiteSpace(Entry.Text) && ModuleGate.On(Contracts.ModuleIds.Words);
     public bool Pinned => Entry.Pinned;
     public string PinTip => Entry.Pinned ? Strings.Clipboard_UnpinHint : Strings.Clipboard_PinHint;

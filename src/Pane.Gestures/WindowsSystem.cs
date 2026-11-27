@@ -22,7 +22,8 @@ public sealed class WindowsSystem(Action pause,Func<bool>? isActive=null) : ISys
     public bool IsKeyDown(ushort key) => (Win.GetAsyncKeyState(key) & 0x8000)!=0;
     public void Key(ushort key,bool down) { if(Win.PaneKey(key,down?1:0,0)==0) throw new InvalidOperationException("发送按键失败，可能受 UIPI 权限限制"); }
     public void Character(char character,bool down) { if(Win.PaneKey(character,down?1:0,1)==0) throw new InvalidOperationException("发送文字失败"); }
-    public (ushort Key,KeyModifiers Modifiers) MapCharacter(char character)
+    public (ushort Key,KeyModifiers Modifiers) MapCharacter(char character) => CharacterKey(character);
+    internal static (ushort Key,KeyModifiers Modifiers) CharacterKey(char character)
     {
         short k=Win.VkKeyScanW(character);if(k==-1)throw new NotSupportedException("当前键盘布局不能映射带修饰的字符");
         return ((ushort)(k&255), ((k&0x100)!=0?KeyModifiers.Shift:0)|((k&0x200)!=0?KeyModifiers.Ctrl:0)|((k&0x400)!=0?KeyModifiers.Alt:0));

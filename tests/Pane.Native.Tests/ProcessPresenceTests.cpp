@@ -1,4 +1,4 @@
-﻿#include <windows.h>
+#include <windows.h>
 #include <iostream>
 #include <stdexcept>
 #include "../../src/Pane.Native/ProcessPresence.h"
@@ -12,7 +12,10 @@ NTSTATUS NTAPI fakeQuery(SYSTEM_INFORMATION_CLASS kind,PVOID data,ULONG size,PUL
 }
 int checks=0;
 void check(bool value,const char* name){checks++;if(!value)throw std::runtime_error(name);}
-int main(){try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+try{
  check(wgesturesPresent(fakeQuery)==0,"other process absent");fixture=L"WGesturesHelper.exe";check(wgesturesPresent(fakeQuery)==0,"exact executable only");fixture=L"wGESTURES.EXE";check(wgesturesPresent(fakeQuery)==1,"case insensitive match");
  malformed=true;check(wgesturesPresent(fakeQuery)==-1,"malformed name is not absence");malformed=false;failure=static_cast<NTSTATUS>(0xC0000003L);check(wgesturesPresent(fakeQuery)==-1,"old Windows requests managed fallback");failure=static_cast<NTSTATUS>(0xC0000022L);check(wgesturesPresent(fakeQuery)==-1,"access failure is not absence");check(wgesturesPresent(nullptr)==-1,"missing API requests fallback");check(calls==6,"one query per check");
  std::cout<<"PASS process presence assertions="<<checks<<"; realProcessChanges=0\n";return 0;

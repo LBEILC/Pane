@@ -7,7 +7,10 @@
 extern "C" __declspec(dllimport) int PaneSelectionFixture(HWND,HWND,wchar_t*,int);
 std::atomic<int> status=-1;HWND edit{};
 LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){if(m==WM_CLOSE||m==WM_KEYDOWN&&w==VK_ESCAPE){DestroyWindow(h);return 0;}if(m==WM_DESTROY){PostQuitMessage(0);return 0;}return DefWindowProcW(h,m,w,l);}
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(){
+    pane::diagnostics::Initialize();
+
  auto module=LoadLibraryW(L"Msftedit.dll");if(!module)return 1;
  WNDCLASSW wc{};wc.lpfnWndProc=proc;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"Pane012SelectionTest";RegisterClassW(&wc);
  HWND window=CreateWindowExW(WS_EX_TOOLWINDOW,wc.lpszClassName,L"Pane selection test - Esc exits",WS_OVERLAPPEDWINDOW,60,60,420,150,nullptr,nullptr,wc.hInstance,nullptr);

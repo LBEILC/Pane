@@ -14,4 +14,7 @@
   <ItemGroup><Compile Include="../Pane.App/Services/Setup/PayloadPatch.cs" Link="PayloadPatch.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../Pane.App/Services/Setup/UninstallChain.cs" Link="UninstallChain.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../../tests/Pane.App.Probes/SetupFailureProbe.cs" Link="SetupFailureProbe.cs" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../Pane.App/Hosting/ProcessErrorMode.cs" />
+  </ItemGroup>
 </Project>

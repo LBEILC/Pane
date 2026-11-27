@@ -3,6 +3,7 @@
   AI 对话窗口（二级窗口，设计负责人）。照原型 prototype/launcher.html #cw（docs/design.md「AI 对话窗口」）。
   默认 780 × 620，可改大小（最小 520 × 420）。顶栏 56：模型切换、新对话（Ctrl+N）；中间对话；底部输入框（自动长高，最高 140）。
   Enter 发送、Shift+Enter 换行；生成中发送键变停止键；Esc 先停止生成、再清空输入（不关窗口）；Ctrl+W 关。只保留这一次对话。
+  识别图片（162，issue 37，docs/design.md「识别图片」）是同一个视图的图片模式：左边一栏图片（宽 340），输入框上方一排动作小片和自定义动作的编辑行。
 -->
 <UserControl
     x:Class="Pane.Views.ChatView"
@@ -18,9 +19,14 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="ImageColumn" Width="0"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <Grid x:Name="Head" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
+        <Grid x:Name="Head" Grid.ColumnSpan="2" Padding="18,0,10,0" ColumnSpacing="10" Background="Transparent" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="0,0,0,1">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -31,39 +37,53 @@
             <Border Height="28" Padding="8,0,10,0" CornerRadius="14" VerticalAlignment="Center"
                     Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:PaneIcon Glyph="ai" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
-                    <TextBlock Text="{x:Bind loc:Strings.Common_AiChat}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <c:PaneIcon x:Name="KindIcon" Glyph="ai" Width="15" Height="15" VerticalAlignment="Center" Foreground="{ThemeResource PaneText2Brush}"/>
+                    <TextBlock x:Name="KindText" Text="{x:Bind loc:Strings.Common_AiChat}" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText2Brush}"/>
                 </StackPanel>
             </Border>
-            <Button x:Name="ModelButton" Grid.Column="1" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="10,0,8,0" CornerRadius="14" Click="OnModel"
+            <!-- 来源小字（识别图片：来自剪贴板 / 来自启动器） -->
+            <TextBlock x:Name="SourceText" Grid.Column="1" Visibility="Collapsed" VerticalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+            <Button x:Name="ModelButton" Grid.Column="2" Style="{StaticResource PaneIconButton}" Width="NaN" Height="{StaticResource PaneControlSm}" Padding="10,0,8,0" CornerRadius="14" Click="OnModel"
                     ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_ChangeModel}">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <TextBlock x:Name="ModelText" VerticalAlignment="Center" MaxWidth="200" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"/>
                     <c:PaneIcon x:Name="ModelChevron" Glyph="chev-d" Width="13" Height="13" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_NewChatHint}" VerticalAlignment="Center">
+            <Button Grid.Column="4" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Click="OnNew" ToolTipService.ToolTip="{x:Bind loc:Strings.Ai_Chat_NewChatHint}" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal" Spacing="4">
                     <c:PaneIcon Glyph="plus" Width="13" Height="13" VerticalAlignment="Center" Foreground="{ThemeResource PaneText1Brush}"/>
                     <TextBlock Text="{x:Bind loc:Strings.Ai_Chat_NewChat}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="PinButton" Grid.Column="4" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
+            <Button x:Name="PinButton" Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnPin" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_AlwaysOnTop}">
                 <c:PaneIcon x:Name="PinIcon" Glyph="pin" Width="16" Height="16"/>
             </Button>
-            <Button Grid.Column="5" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
+            <Button Grid.Column="6" Style="{StaticResource PaneIconButton}" Width="{StaticResource PaneControlMd}" Height="{StaticResource PaneControlMd}" Click="OnClose" ToolTipService.ToolTip="{x:Bind loc:Strings.Common_CloseWindowHint}">
                 <c:PaneIcon Glyph="close" Width="16" Height="16"/>
             </Button>
         </Grid>
 
+        <!-- 识别图片：左栏图片（圆角底板里等比缩放）+ 下面一行原图尺寸 -->
+        <Grid x:Name="ImagePane" Grid.Row="1" Grid.RowSpan="2" Visibility="Collapsed" Padding="14,14,0,14" RowSpacing="8">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <Border Padding="10" CornerRadius="{StaticResource PaneRadiusItem}" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <Image x:Name="Picture" Stretch="Uniform"/>
+            </Border>
+            <TextBlock x:Name="PictureSize" Grid.Row="1" HorizontalAlignment="Center" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextXs}" Foreground="{ThemeResource PaneText3Brush}"/>
+        </Grid>
+
         <!-- 对话 -->
-        <c:ScrollFade Grid.Row="1">
+        <c:ScrollFade Grid.Row="1" Grid.Column="1">
             <ScrollViewer x:Name="ChatScroller" Padding="22,18,22,8" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" IsTabStop="False" ViewChanged="OnChatScrolled">
                 <StackPanel x:Name="Messages" Spacing="16"/>
             </ScrollViewer>
         </c:ScrollFade>
         <!-- 往上翻过就不再自动滚到底；生成中出现「回到最新」，点了恢复跟随 -->
-        <Button x:Name="JumpButton" Grid.Row="1" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
+        <Button x:Name="JumpButton" Grid.Row="1" Grid.Column="1" Style="{StaticResource PaneTextButton}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,8"
                 Height="{StaticResource PaneControlSm}" Padding="12,0,12,0" CornerRadius="14" Visibility="Collapsed" Click="OnJump" IsTabStop="False">
             <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:PaneIcon Glyph="chev-d" Width="13" Height="13" VerticalAlignment="Center"/>
@@ -71,23 +91,53 @@
             </StackPanel>
         </Button>
         <!-- 空状态：两个示例问题 -->
-        <StackPanel x:Name="EmptyState" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
-            <TextBlock TextAlignment="Center" LineHeight="24" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"
+        <StackPanel x:Name="EmptyState" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10">
+            <TextBlock x:Name="EmptyText" TextAlignment="Center" LineHeight="24" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText3Brush}"
                        Text="{x:Bind loc:Strings.Ai_Chat_Empty}"/>
-            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+            <StackPanel x:Name="Suggestions" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
                 <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Ai_Chat_ExampleClarity}" Click="OnSuggestion"/>
                 <Button Style="{StaticResource PaneTextButton}" CornerRadius="14" Content="{x:Bind loc:Strings.Ai_Chat_ExampleDebounce}" Click="OnSuggestion"/>
             </StackPanel>
         </StackPanel>
 
         <!-- 模型菜单（原型 controls.js 下拉框的简化版：玻璃上的中性浮层，选中项加粗带勾） -->
-        <Border x:Name="ModelMenu" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="96,-6,0,0" MinWidth="200" Padding="4" Visibility="Collapsed"
+        <Border x:Name="ModelMenu" Grid.Row="1" Grid.ColumnSpan="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="96,-6,0,0" MinWidth="200" Padding="4" Visibility="Collapsed"
                 CornerRadius="{StaticResource PaneRadiusItem}" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
             <StackPanel x:Name="ModelList" Spacing="2"/>
         </Border>
 
         <!-- 输入 -->
-        <StackPanel Grid.Row="2">
+        <StackPanel Grid.Row="2" Grid.Column="1">
+            <!-- 识别图片：自定义动作的编辑行（＋ 添加，或右键自定义的小片） -->
+            <Grid x:Name="ActionEditor" Visibility="Collapsed" Margin="14,2,14,6" Padding="10" RowSpacing="8" ColumnSpacing="6"
+                  CornerRadius="{StaticResource PaneRadiusItem}" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Border Grid.ColumnSpan="3" Width="160" HorizontalAlignment="Left" CornerRadius="{StaticResource PaneRadiusControl}" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <TextBox x:Name="ActionName" MaxLength="12" Height="{StaticResource PaneControlMd}" Padding="10,6,10,0" PlaceholderText="{x:Bind loc:Strings.Image_ActionName}"
+                             FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" IsSpellCheckEnabled="False" TextChanged="OnActionTextChanged"/>
+                </Border>
+                <Border Grid.Row="1" Grid.ColumnSpan="3" CornerRadius="{StaticResource PaneRadiusControl}" Background="{ThemeResource PaneFillSelectedBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
+                    <TextBox x:Name="ActionPrompt" MaxLength="2000" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="160" Padding="10,6,10,6"
+                             PlaceholderText="{x:Bind loc:Strings.Image_ActionPrompt}" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}"
+                             IsSpellCheckEnabled="False" ScrollViewer.VerticalScrollBarVisibility="Auto" TextChanged="OnActionTextChanged"/>
+                </Border>
+                <Button x:Name="DeleteAction" Grid.Row="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" HorizontalAlignment="Left" Click="OnDeleteAction">
+                    <TextBlock Text="{x:Bind loc:Strings.Common_Delete}" Foreground="{StaticResource PaneDangerBrush}"/>
+                </Button>
+                <Button Grid.Row="2" Grid.Column="1" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Content="{x:Bind loc:Strings.Common_Cancel}" Click="OnCancelAction"/>
+                <Button x:Name="SaveAction" Grid.Row="2" Grid.Column="2" Style="{StaticResource PaneTextButton}" Height="{StaticResource PaneControlSm}" CornerRadius="14" Content="{x:Bind loc:Strings.Common_Save}" Click="OnSaveAction"/>
+            </Grid>
+            <!-- 识别图片：动作小片（内置两个 + 自定义的 + ＋ 添加） -->
+            <c:WrapPanel x:Name="ImageActions" Visibility="Collapsed" Margin="14,2,14,0" HorizontalSpacing="6" VerticalSpacing="6"/>
             <Grid Margin="14,6,14,6" Padding="14,8,8,8" ColumnSpacing="8" CornerRadius="18"
                   Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1">
                 <Grid.ColumnDefinitions>
@@ -125,6 +175,8 @@
             <Border x:Name="StopProto" Background="{ThemeResource PaneText1Brush}"/>
             <Border x:Name="KbdProto" Style="{StaticResource PaneKbdBorder}"><TextBlock Style="{StaticResource PaneKbdText}"/></Border>
             <Button x:Name="IconButtonProto" Style="{StaticResource PaneIconButton}"/>
+            <Button x:Name="ChipProto" Style="{StaticResource PaneTextButton}"/>
+            <TextBlock x:Name="ChipTextProto" FontFamily="{StaticResource PaneFontUi}" FontSize="{StaticResource PaneTextSm}" Foreground="{ThemeResource PaneText1Brush}"/>
         </StackPanel>
     </Grid>
 </UserControl>

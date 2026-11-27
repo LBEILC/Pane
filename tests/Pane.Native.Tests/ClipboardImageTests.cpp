@@ -86,7 +86,10 @@ static void Benchmark(){
   std::sort(times.begin(),times.end());std::cout<<"4K "<<(mode==0?"scan+repair":mode==1?"scan-last-nonzero":"scan-first-nonzero")<<" medianMs="<<times[50]<<" p95Ms="<<times[94]<<" samples=100\n";
  }
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(int argc,char** argv){
+    pane::diagnostics::Initialize();
+
  Apartment apartment;auto f=Factory();if(!f)return 1;bool baseline=argc>1&&std::string(argv[1])=="--baseline";
  const std::vector<BYTE> zero={25,75,150,0,200,100,50,0},opaque={25,75,150,255,200,100,50,255},mixed={25,75,150,0,200,100,50,128};
  for(bool v5:{false,true}){auto png=Capture(v5?CF_DIBV5:CF_DIB,Dib(v5,false,zero));auto actual=Pixels(f.Get(),png);std::cout<<(v5?"DIBV5":"DIB")<<" alpha="<<static_cast<int>(actual[3])<<","<<static_cast<int>(actual[7])<<"\n";if(!baseline)Check(actual==opaque,"zero alpha becomes opaque, colors preserved");}

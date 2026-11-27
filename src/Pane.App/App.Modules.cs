@@ -298,7 +298,7 @@ public sealed partial class App
     sealed class AiModule(App app) : Capability(app, ModuleIds.Ai, ModuleCategory.Ai, "sparkles")
     {
         public override Task StartAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(true); return Task.CompletedTask; }
-        public override Task StopAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(false); App.RemoveSecondary(SecondaryId.Translate, SecondaryId.Chat); return Task.CompletedTask; }
+        public override Task StopAsync(CancellationToken token) { App.aiService?.SetModuleEnabled(false); App.RemoveSecondary(SecondaryId.Translate, SecondaryId.Chat, SecondaryId.Image); return Task.CompletedTask; }
     }
     public IAppLauncher? AppLauncher => launcherSearch;
     public IDialogSearch? DialogSearch { get; set; }

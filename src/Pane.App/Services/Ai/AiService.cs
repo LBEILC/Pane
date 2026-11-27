@@ -124,7 +124,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         catch(JsonException){return default;}
         catch(IOException){throw new AiNetworkException(Strings.Ai_StreamInterrupted);}
     }
-    async Task<HttpResponseMessage> Authorized(AiSettings settings,string path,byte[]? body,CancellationToken ct,Func<JsonElement,byte[]?>? retryBody=null)
+    async Task<HttpResponseMessage> Authorized(AiSettings settings,string path,byte[]? body,CancellationToken ct,Func<JsonElement,byte[]?>? retryBody=null, bool hasImages=false)
     {
         bool chat=settings.Provider==AiProvider.ChatGpt;
         bool anthropic=!chat&&settings.CurrentEndpoint.Format==AiApiFormat.Anthropic;
@@ -143,6 +143,8 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
             if(response.IsSuccessStatusCode)return response;
             using(response){if(chat&&response.StatusCode==HttpStatusCode.Unauthorized&&!refreshed){refreshed=true;await Access(settings,ct,true);continue;}
                 var bodyError=await Json(response,ct);
+                if (hasImages && (int)response.StatusCode is >=400 and <500 && AiProtocol.UnsupportedImages(bodyError))
+                    throw new AiUnsupportedInputException("当前模型不支持识别图片，换一个支持识图的模型再试");
                 if((response.StatusCode==HttpStatusCode.BadRequest||!anthropic&&(int)response.StatusCode==422)&&retryBody!=null){var replacement=retryBody(bodyError);retryBody=null;if(replacement!=null){body=replacement;continue;}}
                 if(chat&&bodyError.ValueKind==JsonValueKind.Object&&bodyError.TryGetProperty("error",out var detail)&&AiProtocol.String(detail,"code")=="subscription_sharing_user_not_eligible"){
                     lock(gate)SaveLogin(login with{PlanDenied=true});Notify();
@@ -186,12 +188,13 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
         if(string.IsNullOrWhiteSpace(model))throw new AiCredentialException(Strings.Ai_ModelRequired);
         var capability=(settings.Provider,chat?endpoints.Api:ModelSource(settings),model);
         AiReasoningEffort effort;lock(gate)effort=test||unsupportedReasoning.Contains(capability)?AiReasoningEffort.Default:settings.Reasoning;
-        byte[] Body(AiReasoningEffort value)=>anthropic?AnthropicProtocol.Body(model,messages,value,test):AiProtocol.Body(model,messages,chat,value);
+        var images = await AiImage.Prepare(messages, ct);
+        byte[] Body(AiReasoningEffort value)=>anthropic?AnthropicProtocol.Body(model,messages,value,test,images):AiProtocol.Body(model,messages,chat,value,images);
         using var response=await Authorized(settings,chat?"/responses":anthropic?"/messages":"/chat/completions",Body(effort),ct,error=>{
             if(effort==AiReasoningEffort.Default||!(anthropic?AnthropicProtocol.UnsupportedThinking(error):AiProtocol.UnsupportedReasoning(error)))return null;
             lock(gate)unsupportedReasoning.Add(capability);
             return Body(AiReasoningEffort.Default);
-        });
+        }, hasImages: images != null);
         using var stream=await response.Content.ReadAsStreamAsync(ct);using var reader=new StreamReader(stream,Encoding.UTF8);
         var frame=new StringBuilder();bool firstText=true;
         while(true){

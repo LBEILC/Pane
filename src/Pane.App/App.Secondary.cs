@@ -17,7 +17,7 @@ public sealed partial class App
     public IWebSuggestions? WebSuggestions {get;set;}
     /// <summary>终端命令历史（037）：设置页「清空」用。工程赋真实实现。</summary>
     public ITerminalHistory? TerminalHistory {get;set;}
-    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder, Words, Memo }   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
+    enum SecondaryId { Files, Translate, Chat, Rename, Timer, Reminder, Words, Memo, Image }   // Image：识别图片（162），AI 对话窗口的图片模式，和 AI 对话分开   // Reminder：定时关机的到点前提醒（058），不是二级窗口，借这张表逐帧推进和释放
     readonly Dictionary<SecondaryId,GlassPanel> secondaries=[];
     readonly Dictionary<SecondaryId,(int X,int Y,double W,double H)> secondaryBounds=[];
     // 销毁窗口前要做的退订（关窗口、能力停用两条路径都调用）
@@ -33,6 +33,7 @@ public sealed partial class App
         launcher.OpenFiles+=(q,focus)=>ShowFiles(q,focus);
         launcher.OpenTranslate+=text=>ShowTranslate(text);
         launcher.OpenChat+=(q,history)=>ShowChat(q,history);
+        launcher.OpenImage+=(entry,q)=>ShowImage(entry,q,fromLauncher:true);   /* 162：带图片附件「识别图片」 */
         launcher.OpenRename+=(files,window)=>ShowRename(files,window);
         launcher.OpenTimer+=ShowTimer;   /* 058：「定时关机…」 */
         launcher.SetAppHotkey+=SetAppHotkey;   /* 122：Ctrl+K「设置快捷键」 */
@@ -63,6 +64,13 @@ public sealed partial class App
     public void OpenSettings(string? section){Command("show-settings");if(section!=null&&settings?.View is SettingsView v)v.ShowSection(section);}
     public void ShowTranslate(string? text)=>Present(SecondaryId.Translate, Strings.Common_Translate,()=>{var v=new TranslateView(Ai,secondaryActions!);v.OpenSettings+=(_,_)=>OpenSettings("ai");return v;},v=>((TranslateView)v).Open(text));
     public void ShowChat(string? question,IReadOnlyList<AiChatMessage>? history)=>Present(SecondaryId.Chat, Strings.Common_AiChat,()=>new ChatView(Ai,secondaryActions!),v=>((ChatView)v).Open(question,history));
+    /// <summary>识别图片（162，issue 37）：剪贴板图片条目 / 复制的图片文件、启动器图片附件。拿不到图片文件就不开。</summary>
+    public void ShowImage(ClipEntry entry,string? question,bool fromLauncher)
+    {
+        if(ChatView.ImagePathOf(entry) is not {} path)return;
+        Present(SecondaryId.Image, Strings.Image_Title,()=>new ChatView(Ai,secondaryActions!,Store){ImageMode=true},
+            v=>((ChatView)v).OpenImage(path,entry.ImageWidth,entry.ImageHeight,fromLauncher?Strings.Image_FromLauncher:Strings.Words_FromClipboard,question));
+    }
     public void ShowChatDraft(string draft)=>Present(SecondaryId.Chat, Strings.Common_AiChat,()=>new ChatView(Ai,secondaryActions!),v=>((ChatView)v).SetDraft(draft));
 
     /// <summary>
@@ -150,6 +158,7 @@ public sealed partial class App
                 ShowRename(q=="empty"?[]:Pane.DesignData.RenameSample.Photos,0);
                 if(q!="empty"&&secondaries.TryGetValue(SecondaryId.Rename,out var rw))((RenameView)rw.View).UseRules(Pane.DesignData.RenameSample.SampleRules);
                 break;
+            case "image":ShowImage(new("demo-image",ClipKind.Image,null,null,new(q),1280,860,"微信",null,DateTimeOffset.Now,false,q),null,false);break;   /* 162：QUERY 给图片路径 */ // 不翻译：演示数据
             case "chat":ShowChat(q,q==null?[new(AiChatRole.User,"玻璃上的文字怎么保持清晰"),new(AiChatRole.Assistant,"让玻璃上的文字保持清晰，主要靠三件事：背景要糊、底色要压、文字要够实。\n\n- 模糊半径不低于 30 像素，背后的细节糊掉，文字才不打架；\n- 深色主题加一层深色着色（约 40%），亮壁纸也压得住；\n- 正文用不透明的文字色，`主题色` 只用在小面积的强调上。")]:null);break; // 不翻译：演示数据
         }
     }

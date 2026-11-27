@@ -18,6 +18,7 @@ internal static class Program
             if (!child.WaitForExit(20000)) { child.Kill(true); return 3; }
             return child.ExitCode;
         }
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         ApplicationConfiguration.Initialize();
         Application.Run(new Fixture(args));
         return Environment.ExitCode;

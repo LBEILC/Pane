@@ -24,6 +24,7 @@ public sealed partial class App
     void WireClipboardLauncher(GlassPanel panel, ClipboardView view)
     {
         view.OpenWords += (_, entry) => { if (entry.Text is { } text) ShowWords(text, entry.Source, fromClipboard: true); };   // 分词（093）
+        view.OpenImage += (_, entry) => ShowImage(entry, null, fromLauncher: false);   // 识别图片（162）
         view.SaveMemo += (_, entry) => { if (entry.Text is { } text) SaveToMemo(text, entry.Tags); };   // 备忘录（123）；带上这条的标签（144）
         view.UseInLauncher += (_, entry) =>
         {

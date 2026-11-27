@@ -39,7 +39,10 @@ void Boundary(const fs::path& root){
 void Pump(int ms){auto end=GetTickCount64()+ms;do{MSG msg{};while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE)){TranslateMessage(&msg);DispatchMessageW(&msg);}Sleep(5);}while(GetTickCount64()<end);}
 std::vector<std::wstring> Read(HWND window){auto text=PaneFileSelectionRead(window);std::vector<std::wstring> rows;if(text){for(auto p=text;*p;p+=wcslen(p)+1)rows.emplace_back(p);CoTaskMemFree(text);}return rows;}
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int wmain(int argc,wchar_t** argv){
+    pane::diagnostics::Initialize();
+
     if(argc!=2)return 2;logFile.open(fs::path(argv[1]));HRESULT apartment=OleInitialize(nullptr);int code=0;
     ComPtr<IWebBrowser2> browser;fs::path root=fs::path(argv[1]).parent_path()/(L"selection-fixture-"+std::to_wstring(GetCurrentProcessId()));
     try{

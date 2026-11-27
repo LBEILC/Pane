@@ -330,7 +330,10 @@ void Idle(){
 }
 #include "DialogSearch107.h"
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int wmain(int argc,wchar_t** argv){
+    pane::diagnostics::Initialize();
+
     if(argc!=2&&argc!=3)return 2;wchar_t desktop[256]{};DWORD needed=0;
     if(!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,desktop,sizeof(desktop),&needed)||wcsncmp(desktop,L"Pane027-",8)!=0)return 2;
     logFile.open(argv[1]);Apartment apartment;

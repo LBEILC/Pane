@@ -12,10 +12,13 @@ internal static partial class Program
     static async Task<string> Run(AiService ai,CancellationToken ct=default){var text="";await foreach(var part in ai.RunAsync(new("ask","fixture attachment",null,"fixture question"),ct))text+=part;return text;}
     static async Task Main(string[] args)
     {
+        if (args is ["--crash-selftest"]) throw new InvalidOperationException("Pane crash self-test");
         if(args.Length==2&&args[0]=="server"){
             await using var fake=new FakeServer();File.WriteAllText(args[1]+".url",fake.Url);while(!File.Exists(args[1]+".stop"))await Task.Delay(100);return;
         }
         string directory=TestResults.NewDirectory();Directory.CreateDirectory(directory);
+        await ImageProcessingTests(directory);
+        foreach (var path in args) await MeasureImage(path);
         var store=new SettingsStore(directory,Defaults());
         foreach(var message in new[]{"不支援 reasoning", "不識別思考參數"}) { using var error=JsonDocument.Parse("\""+message+"\""); Check(AiProtocol.UnsupportedReasoning(error.RootElement), "繁体推理参数错误:"+message); }
         var settings=new AiSettings();
@@ -54,6 +57,7 @@ internal static partial class Program
         Check(await Run(ai)=="你好","split utf8 SSE blank invalid done");
         using(var body=JsonDocument.Parse(server.LastBody!)){Check(body.RootElement.GetProperty("stream").GetBoolean(),"stream true");Check(body.RootElement.GetProperty("messages")[0].GetProperty("content").GetString()==AiProtocol.SystemPrompt,"system prompt");}
         await ChatTests(ai,store,server);
+        await ImageRequestTests(ai,store,server);
         var models=await ai.ListModelsAsync(default);Check(models.Count==1&&ai.CurrentModelName=="Fixture Model","models");
         foreach(var status in new[]{"401","403","400","model-error"}){server.Mode=status;await Error<AiCredentialException>(()=>Run(ai),"credential");}
         server.Mode="500";await Error<AiNetworkException>(()=>Run(ai),"5xx");
@@ -86,6 +90,7 @@ internal static partial class Program
         using(var body=JsonDocument.Parse(server.LastBody!)){Check(server.LastPath=="/responses"&&!body.RootElement.GetProperty("store").GetBoolean(),"responses format");Check(body.RootElement.GetProperty("instructions").GetString()==AiProtocol.SystemPrompt,"responses system");}
         Check((await ai.ListModelsAsync(default)).Count==1,"chat models");
         await ChatTests(ai,store,server);
+        await ImageRequestTests(ai,store,server);
         await ai.SignOutAsync(default);Check(ai.Account==null&&ai.Status==AiStatus.NeedsSignIn&&server.Revocations==1,"signout");
         server.Mode="free";await ai.SignInAsync(default);if(server.CallbackTask!=null)await server.CallbackTask;Check(ai.Account?.CanUsePlan==false,"free plan");await Error<AiQuotaException>(()=>Run(ai),"free quota");await ai.SignOutAsync(default);
         server.Mode="normal";await ai.SignInAsync(default);if(server.CallbackTask!=null)await server.CallbackTask;server.RefreshFails=true;await Error<AiSignInRequiredException>(()=>Run(ai),"refresh invalid");Check(ai.Account==null,"invalid session clear");

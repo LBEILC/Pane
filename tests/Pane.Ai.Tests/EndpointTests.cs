@@ -90,6 +90,7 @@ internal static partial class Program
             if(mode=="reject"&&body.Contains("\"thinking\""))return(400,"{\"error\":{\"message\":\"This model does not support thinking\"}}","application/json");
             return(200,stream,"text/event-stream");
         };
+        await ImageRequestTests(ai,store,server);
         foreach(var effort in Enum.GetValues<AiReasoningEffort>()){
             store.Save(store.Current with{Ai=store.Current.Ai with{Reasoning=effort}});
             string text="";await foreach(var part in ai.ChatAsync([new(AiChatRole.User,"first"),new(AiChatRole.Assistant,"answer"),new(AiChatRole.User,"next")],null,default))text+=part;

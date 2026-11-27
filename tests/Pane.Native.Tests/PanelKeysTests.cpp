@@ -152,7 +152,10 @@ void superUnit(){
  {PanelKeys s;s.begin(PanelMode::Super,held);s.feed({0xA4,0,true},{},0);
   check(!s.feed({0xA4,0,false},{},0).mask,"super plain Alt unchanged");}
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(int argc,char** argv){
+    pane::diagnostics::Initialize();
+
  if(argc<2)return 2;std::ofstream log(argv[1]);HWND window=nullptr;
  try{
   unit();log<<"unit assertions="<<checks<<std::endl;

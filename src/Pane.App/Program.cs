@@ -7,6 +7,21 @@ internal static class Program
     {
         var args=Environment.GetCommandLineArgs().Skip(1).ToArray();
         var mode = Pane.Hosting.RuntimeMode.Current;
+        if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1" ||
+            Environment.GetEnvironmentVariable("PANE_VERIFY") == "1" ||
+            Environment.GetEnvironmentVariable("PANE_OBSERVE") == "1" ||
+            !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_RESULT")))
+            Pane.Diagnostics.ProcessErrorMode.ReportUnhandledToStandardError();
+        if (args is ["--crash-selftest"] && Environment.GetEnvironmentVariable("PANE_DEMO") == "1" &&
+            !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("PANE_DATA_DIR")) &&
+            !string.Equals(mode.DataDirectory, Pane.Settings.SettingsStore.ProductionDirectory, StringComparison.OrdinalIgnoreCase))
+        {
+            AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            {
+                if (e.ExceptionObject is Exception error) new Pane.Hosting.CrashLog(mode.DataDirectory).Write(error);
+            };
+            throw new InvalidOperationException("Pane crash self-test");
+        }
         if (mode.IsPortable)
         {
             Environment.ExitCode = mode.CheckWritable(AppContext.BaseDirectory, folder => {

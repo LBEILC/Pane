@@ -2,6 +2,8 @@ using Pane.Localization;
 // AI 对话窗口逻辑（设计负责人）。照原型 prototype/launcher.html「二级：AI 对话窗口」：
 // 用户消息右侧气泡，AI 回答左侧正文（Markdown 和公式，见 Controls/Markdown.cs），逐字流出；往上翻就不再自动滚到底；回答下方复制，最后一条可「重新回答」。
 // 生成中发送键变成停止键；Esc 先停止、再清空输入（不关窗口）；Ctrl+N 新对话；Ctrl+W 关。只保留当前这次对话，关窗口即清空。
+// 识别图片（162，issue 37）：同一个视图的图片模式（ImageMode，宿主另开一个窗口 SecondaryId.Image）。左栏图片；输入框上方一排动作小片，
+// 点一下发一条消息（气泡写动作名，发给模型的是提示词）；第一条用户消息带上图片，之后照常多轮。打开时自动跑上次用的动作。
 using Microsoft.UI.Input;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
@@ -15,6 +17,7 @@ using Pane.Views.Controls;
 using Windows.Foundation;
 using Windows.System;
 using Windows.UI.Core;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace Pane.Views;
 
@@ -26,21 +29,24 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         public string Text { get; set; } = text;
         public bool Live, Stopped;
         public string? Error;
+        public string? Prompt;   // 识别图片的动作：发给模型的提示词（气泡里显示的是动作名 Text）
         public FrameworkElement? Element;
     }
 
     readonly IAiService ai;
     readonly ISelectionActions output;
+    readonly Pane.Settings.SettingsStore? store;   // 识别图片的自定义动作、上次用的动作
     readonly List<Message> messages = [];
     CancellationTokenSource? running;
     string? modelId;
     string? modelName;
     bool topmost;
 
-    public ChatView(IAiService ai, ISelectionActions output)
+    public ChatView(IAiService ai, ISelectionActions output, Pane.Settings.SettingsStore? store = null)
     {
         this.ai = ai;
         this.output = output;
+        this.store = store;
         InitializeComponent();
         Controls.PaneCaret.Attach(Input);
         KeyHints.Fill(Hints, [(["Enter"], Strings.Ai_Chat_Send), (["Shift", "+", "Enter"], Strings.Ai_Chat_NewLine), (["Esc"], Strings.Ai_Chat_StopOrClear)], HintLabelProto, KbdProto);
@@ -94,8 +100,8 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     // ---------------- ISecondaryView ----------------
 
-    public Size PreferredSize => new(780, 620);
-    public Size MinimumSize => new(520, 420);
+    public Size PreferredSize => ImageMode ? new(960, 620) : new(780, 620);
+    public Size MinimumSize => ImageMode ? new(760, 460) : new(520, 420);
     public event EventHandler<Size>? SizeRequested { add { } remove { } }
     public event EventHandler? CloseRequested;
     public event EventHandler<bool>? TopmostChanged;
@@ -138,6 +144,8 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         if (ai.Status == AiStatus.NotConfigured) return;
         ModelList.Children.Clear();
         ModelList.Children.Add(MenuNote(Strings.Ai_Chat_LoadingModels));
+        // 菜单贴着模型按钮的左边（图片模式下按钮前面多了来源小字）
+        ModelMenu.Margin = new Thickness(ModelButton.TransformToVisual((UIElement)ModelMenu.Parent).TransformPoint(new Point(0, 0)).X, -6, 0, 0);
         ModelMenu.Visibility = Visibility.Visible;
         IReadOnlyList<AiModel> models;
         try { models = await ai.ListModelsAsync(CancellationToken.None); }
@@ -199,7 +207,15 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     async Task Reply()
     {
-        var history = messages.Where(m => m.Error is null).Select(m => new AiChatMessage(m.Role, m.Text)).ToList();
+        // 图片只随第一条用户消息发一次（162）；动作的气泡写动作名，发给模型的是它的提示词
+        var history = new List<AiChatMessage>();
+        bool imageSent = false;
+        foreach (var m in messages.Where(m => m.Error is null))
+        {
+            IReadOnlyList<string>? images = null;
+            if (m.Role == AiChatRole.User && !imageSent) { imageSent = true; if (imagePath is { } p) images = [p]; }
+            history.Add(new AiChatMessage(m.Role, m.Prompt ?? m.Text, images));
+        }
         var answer = new Message(AiChatRole.Assistant, "") { Live = true };
         messages.Add(answer);
         Render();
@@ -317,10 +333,12 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     void UpdateJump() => JumpButton.Visibility = !follow && Busy ? Visibility.Visible : Visibility.Collapsed;
 
+    double ChatWidth => (ActualWidth > 0 ? ActualWidth : PreferredSize.Width) - ImageColumn.Width.Value;
+
     FrameworkElement UserBubble(string text) => new Border
     {
         HorizontalAlignment = HorizontalAlignment.Right,
-        MaxWidth = Math.Max(240, (ActualWidth > 0 ? ActualWidth : 780) * 0.78 - 44),
+        MaxWidth = Math.Max(240, ChatWidth * 0.78 - 44),
         Padding = new Thickness(14, 9, 14, 9),
         CornerRadius = new CornerRadius(16, 16, 4, 16),
         Background = BubbleProto.Background,
@@ -331,7 +349,7 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
 
     FrameworkElement AiBlock(Message m, bool last)
     {
-        var panel = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = Math.Max(300, (ActualWidth > 0 ? ActualWidth : 780) * 0.92 - 44) };
+        var panel = new StackPanel { Spacing = 8, HorizontalAlignment = HorizontalAlignment.Left, MaxWidth = Math.Max(300, ChatWidth * 0.92 - 44) };
         if (m.Text.Length > 0 || m.Live) foreach (var block in MarkdownRender.Build(m.Text, Md, m.Live ? Caret() : null, out _)) panel.Children.Add(block);
         if (m.Stopped) panel.Children.Add(Note(Strings.Ai_Chat_Stopped, Text3Proto.Foreground));
         if (m.Error is { } error) panel.Children.Add(Note(error, ErrorProto.Foreground));
@@ -389,9 +407,11 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
         switch (e.Key)
         {
             case VirtualKey.Enter when !shift && !ctrl && ReferenceEquals(e.OriginalSource, Input): Ask(Input.Text); break;
+            case VirtualKey.Enter when ReferenceEquals(e.OriginalSource, ActionName): if (SaveAction.IsEnabled) SaveEditor(); else ActionPrompt.Focus(FocusState.Programmatic); break;
             case VirtualKey.Escape:
-                // 不关窗口：先关模型菜单，再停止生成，再清空输入
+                // 不关窗口：先关模型菜单和动作编辑行，再停止生成，再清空输入
                 if (ModelMenu.Visibility == Visibility.Visible) ModelMenu.Visibility = Visibility.Collapsed;
+                else if (ActionEditor.Visibility == Visibility.Visible) CloseEditor();
                 else if (Busy) Stop();
                 else Input.Text = "";
                 Input.Focus(FocusState.Programmatic);
@@ -401,5 +421,151 @@ public sealed partial class ChatView : UserControl, ISecondaryView, IDisposable
             default: return;
         }
         e.Handled = true;
+    }
+
+    // ---------------- 识别图片（162） ----------------
+
+    /// <summary>图片模式：宿主建窗口时设（SecondaryId.Image），决定窗口大小；界面在 <see cref="OpenImage"/> 里切过去。</summary>
+    public bool ImageMode { get; set; }   // 不能用 init：XAML 生成的类型信息要给公开属性写赋值
+    string? imagePath;
+    ImageAction? editing;
+
+    sealed record ImageAction(string Id, string Name, string Prompt, bool Custom);
+
+    // 内置两个（提示词是界面资源，跟界面语言）+ 用户加的
+    List<ImageAction> ImageActionList() =>
+    [
+        new("ocr", Strings.Image_Ocr, Strings.Image_OcrPrompt, false),
+        new("describe", Strings.Image_Describe, Strings.Image_DescribePrompt, false),
+        .. (store?.Current.Ai.ImageActions ?? []).Select(a => new ImageAction(a.Id, a.Name, a.Prompt, true)),
+    ];
+
+    static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase) { ".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp" };
+
+    /// <summary>剪贴板条目里能拿去识别的图片：图片条目的完整图片，或复制的文件里第一张图片；没有为 null。</summary>
+    public static string? ImagePathOf(ClipEntry e) => e.Kind switch
+    {
+        ClipKind.Image => e.ContentPath is { } p && System.IO.File.Exists(p) ? p : null,
+        ClipKind.Files when e.Thumbnail is not null => e.Files?.FirstOrDefault(f => ImageExtensions.Contains(System.IO.Path.GetExtension(f)) && System.IO.File.Exists(f)),
+        _ => null,
+    };
+
+    /// <summary>
+    /// 打开（或复用）识别图片窗口：换成这张图、清空对话。question 不为空时把它当第一个问题，否则自动跑上次用的动作（第一次是「识别文字」）。
+    /// width / height 是原图尺寸（剪贴板条目给的），没有就等图片读出来再写。
+    /// </summary>
+    public void OpenImage(string path, int? width, int? height, string source, string? question)
+    {
+        UpdateModel();
+        Stop();
+        messages.Clear();
+        CloseEditor();
+        imagePath = path;
+        ImageColumn.Width = new GridLength(340);
+        ImagePane.Visibility = Visibility.Visible;
+        KindIcon.Glyph = "image";
+        KindText.Text = Strings.Image_Title;
+        SourceText.Text = source;
+        SourceText.Visibility = Visibility.Visible;
+        Input.PlaceholderText = Strings.Image_QuestionPlaceholder;
+        EmptyText.Text = Strings.Image_Empty;
+        Suggestions.Visibility = Visibility.Collapsed;
+        ImageActions.Visibility = Visibility.Visible;
+        PictureSize.Text = width is int w && height is int h ? $"{w} × {h}" : "";
+        // 左栏最多 320 宽，按两倍解码就够，不按原图解码省内存
+        var bitmap = new BitmapImage { DecodePixelWidth = 640 };
+        if (width is null) bitmap.ImageOpened += (_, _) => PictureSize.Text = $"{bitmap.PixelWidth} × {bitmap.PixelHeight}";
+        try { bitmap.UriSource = new Uri(path); } catch (UriFormatException) { }
+        Picture.Source = bitmap;
+        RenderImageActions();
+        Render();
+        if (!string.IsNullOrWhiteSpace(question)) Ask(question);
+        else
+        {
+            var all = ImageActionList();
+            RunImageAction(all.FirstOrDefault(a => a.Id == store?.Current.Ai.LastImageAction) ?? all[0]);
+        }
+    }
+
+    void RunImageAction(ImageAction a)
+    {
+        if (Busy) return;
+        CloseEditor();
+        if (store is { } s && s.Current.Ai.LastImageAction != a.Id) s.Save(s.Current with { Ai = s.Current.Ai with { LastImageAction = a.Id } });
+        messages.Add(new Message(AiChatRole.User, a.Name) { Prompt = a.Prompt });
+        follow = true;
+        _ = Reply();
+    }
+
+    void RenderImageActions()
+    {
+        ImageActions.Children.Clear();
+        var all = ImageActionList();
+        foreach (var a in all)
+        {
+            var chip = Chip(a.Name, null);
+            ToolTipService.SetToolTip(chip, a.Custom ? a.Prompt + "\n" + Strings.Image_EditTip : a.Prompt);
+            chip.Click += (_, _) => RunImageAction(a);
+            if (a.Custom) chip.RightTapped += (_, e) => { OpenEditor(a); e.Handled = true; };   // 右键自定义的：展开编辑行（带删除）
+            ImageActions.Children.Add(chip);
+        }
+        if (all.Count(a => a.Custom) < 12)
+        {
+            var add = Chip(Strings.Image_AddAction, "plus");
+            add.Click += (_, _) => OpenEditor(null);
+            ImageActions.Children.Add(add);
+        }
+    }
+
+    Button Chip(string text, string? glyph)
+    {
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        if (glyph is not null) content.Children.Add(new PaneIcon { Glyph = glyph, Width = 13, Height = 13, VerticalAlignment = VerticalAlignment.Center, Foreground = ChipTextProto.Foreground });
+        content.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center, FontFamily = ChipTextProto.FontFamily, FontSize = ChipTextProto.FontSize, Foreground = ChipTextProto.Foreground });
+        return new Button { Style = ChipProto.Style, Height = PaneTokens.ControlSm, CornerRadius = new CornerRadius(14), Content = content };
+    }
+
+    void OpenEditor(ImageAction? a)
+    {
+        editing = a;
+        ActionName.Text = a?.Name ?? "";
+        ActionPrompt.Text = a?.Prompt ?? "";
+        DeleteAction.Visibility = a is null ? Visibility.Collapsed : Visibility.Visible;
+        ActionEditor.Visibility = Visibility.Visible;
+        UpdateSaveAction();
+        ActionName.Focus(FocusState.Programmatic);
+    }
+
+    void CloseEditor()
+    {
+        editing = null;
+        ActionEditor.Visibility = Visibility.Collapsed;
+    }
+
+    void UpdateSaveAction() => SaveAction.IsEnabled = ActionName.Text.Trim().Length > 0 && ActionPrompt.Text.Trim().Length > 0;
+    void OnActionTextChanged(object sender, TextChangedEventArgs e) => UpdateSaveAction();
+    void OnCancelAction(object sender, RoutedEventArgs e) { CloseEditor(); Input.Focus(FocusState.Programmatic); }
+    void OnSaveAction(object sender, RoutedEventArgs e) => SaveEditor();
+
+    void SaveEditor()
+    {
+        string name = ActionName.Text.Trim(), prompt = ActionPrompt.Text.Trim();
+        if (store is not { } s || name.Length == 0 || prompt.Length == 0) return;
+        var list = (s.Current.Ai.ImageActions ?? []).ToList();
+        if (editing is { } old) { int i = list.FindIndex(x => x.Id == old.Id); if (i >= 0) list[i] = list[i] with { Name = name, Prompt = prompt }; }
+        else if (list.Count < 12) list.Add(new("img-" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(4)).ToLowerInvariant(), name, prompt));
+        s.Save(s.Current with { Ai = s.Current.Ai with { ImageActions = [.. list] } });
+        CloseEditor();
+        RenderImageActions();
+        Input.Focus(FocusState.Programmatic);
+    }
+
+    void OnDeleteAction(object sender, RoutedEventArgs e)
+    {
+        if (store is not { } s || editing is not { } old) return;
+        s.Save(s.Current with { Ai = s.Current.Ai with { ImageActions = [.. (s.Current.Ai.ImageActions ?? []).Where(x => x.Id != old.Id)] } });
+        CloseEditor();
+        RenderImageActions();
+        Input.Focus(FocusState.Programmatic);
     }
 }

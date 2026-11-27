@@ -51,8 +51,13 @@ public interface IAiService
 
 public enum AiChatRole { User, Assistant }
 
-/// <summary>对话里的一条消息。只有文字，不带附件。</summary>
-public sealed record AiChatMessage(AiChatRole Role, string Text);
+/// <summary>
+/// 对话里的一条消息。
+/// <para>Images（162，识别图片，2026-11-27 设计加）：本机图片文件的完整路径（PNG / JPEG / WebP / GIF / BMP），只放在用户消息里，
+/// 一般只有第一条带。服务负责读取、缩放（长边不超过 2048）、转码（单张 4 MB 以内）后按当前接入方式发出；文件读不了抛 <see cref="AiException"/> 的子类
+/// <see cref="AiUnsupportedInputException"/>（消息写明原因）。null 或空 = 纯文字，和以前一样。</para>
+/// </summary>
+public sealed record AiChatMessage(AiChatRole Role, string Text, IReadOnlyList<string>? Images = null);
 
 /// <summary>ChatGPT 账号登录后的信息。CanUsePlan 为 false 表示免费账号：能登录，但用不了套餐额度，设置页要明确提示。</summary>
 public sealed record AiAccount(string Email, string? PlanName, bool CanUsePlan);
@@ -101,3 +106,8 @@ public sealed class AiNetworkException(string message, Exception? inner = null) 
 public sealed class AiCredentialException(string message) : AiException(message);
 public sealed class AiSignInRequiredException(string message) : AiException(message);
 public sealed class AiQuotaException(string message) : AiException(message);
+/// <summary>
+/// 当前模型或接入方式处理不了这次的输入（162）：主要是模型不支持图片（服务按接口返回的错误判断），也用于图片文件读不了、格式不认识。
+/// 界面显示「当前模型不支持识别图片」类的说明和「去设置」；消息是给用户看的中文原因。
+/// </summary>
+public sealed class AiUnsupportedInputException(string message, Exception? inner = null) : AiException(message, inner);

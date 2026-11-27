@@ -9,7 +9,10 @@ int checks=0;
 void check(bool value,const char* name){checks++;if(!value)throw std::runtime_error(name);}
 LRESULT input(UINT message,int x=20,DWORD flags=0,uintptr_t tag=0){MSLLHOOKSTRUCT p{};p.pt={x,20};p.time=GetTickCount();p.flags=flags;p.dwExtraInfo=tag;return hook(HC_ACTION,message,reinterpret_cast<LPARAM>(&p));}
 bool registeredRaw(){UINT n=0;GetRegisteredRawInputDevices(nullptr,&n,sizeof(RAWINPUTDEVICE));return n!=0;}
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(int argc,char** argv){
+    pane::diagnostics::Initialize();
+
  if(argc!=2)return 2;std::ofstream log(argv[1]);
  try{
   wchar_t desktop[128]{};DWORD size=0;

@@ -15,10 +15,10 @@ public sealed class WGesturesImporter : IWGesturesImporter
     {
         directory ??= FindDirectory();
         if (directory is null) return null;
-        var (config, unsupported, version, globalCount) = Read(directory, true);
+        var (config, unsupported, version, globalCount, approximated) = Read(directory, true);
         return new(directory, version, globalCount, config.Apps.Count,
             config.Apps.Count(a => a.Mode == AppRuleMode.Disabled), unsupported,
-            config.Settings.TrailColors.Any(p=>GestureConfigStore.Empty.Settings.TrailColors[p.Key]!=p.Value));
+            config.Settings.TrailColors.Any(p=>GestureConfigStore.Empty.Settings.TrailColors[p.Key]!=p.Value), approximated);
     }
     public GestureConfig Import(ImportPreview preview, bool keepTrailColors) => Read(preview.SourceDirectory, keepTrailColors).Config;
 
@@ -53,9 +53,26 @@ public sealed class WGesturesImporter : IWGesturesImporter
     static string? Newest(IEnumerable<string> files) => files.OrderByDescending(File.GetLastWriteTimeUtc)
         .ThenBy(p => p, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
 
-    static (GestureConfig Config, List<UnsupportedItem> Unsupported, string Version, int GlobalCount) Read(string path, bool colors)
+    internal sealed record ReadResult(GestureConfig Config, List<UnsupportedItem> Unsupported,
+        string Version, int GlobalCount, IReadOnlyList<ApproximatedItem> Approximated);
+
+    static ReadResult Read(string path, bool colors)
     {
-        try { return ReadCore(path, colors); }
+        try
+        {
+            if (File.Exists(path))
+            {
+                using var stream = File.OpenRead(path);
+                if (stream.ReadByte() == 'P' && stream.ReadByte() == 'K')
+                {
+                    stream.Position = 0;
+                    return WGestures2Importer.Read(stream, colors);
+                }
+                if (Path.GetExtension(path).Equals(".wg28bw", StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("不是 WGestures 导出的文件");
+            }
+            return ReadCore(path, colors);
+        }
         catch (Exception e) when (Path.GetExtension(path).Equals(".wgb", StringComparison.OrdinalIgnoreCase)
             && e is JsonException or XmlException or KeyNotFoundException or InvalidOperationException or FormatException)
         {
@@ -63,7 +80,7 @@ public sealed class WGesturesImporter : IWGesturesImporter
         }
     }
 
-    static (GestureConfig Config, List<UnsupportedItem> Unsupported, string Version, int GlobalCount) ReadCore(string path, bool colors)
+    static ReadResult ReadCore(string path, bool colors)
     {
         var source = ReadSource(path);
         using var gestureStream = new MemoryStream(source.Gestures);
@@ -119,7 +136,7 @@ public sealed class WGesturesImporter : IWGesturesImporter
             Flag("PathTrackerStayTimeout", false) ? Number("PathTrackerStayTimeoutMillis", 1200) : null,
             hotkey, palette), global, apps);
         GestureConfigStore.Validate(config);
-        return (config, unsupported, version, root.GetProperty("Global").GetProperty("GestureIntents").GetArrayLength());
+        return new(config, unsupported, version, root.GetProperty("Global").GetProperty("GestureIntents").GetArrayLength(), []);
     }
 
     static (byte[] Gestures, byte[]? Config, string Name) ReadSource(string path)

@@ -20,7 +20,10 @@ void input(WPARAM message,int x=0,int y=0,DWORD data=0){
     hook(HC_ACTION,message,reinterpret_cast<LPARAM>(&value));
 }
 void pump(unsigned milliseconds){auto end=GetTickCount64()+milliseconds;MSG msg{};do{while(PeekMessageW(&msg,nullptr,0,0,PM_REMOVE))dispatch(msg);Sleep(1);}while(GetTickCount64()<end);}
-int main(){HANDLE signal=CreateEventW(nullptr,FALSE,FALSE,nullptr);try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+HANDLE signal=CreateEventW(nullptr,FALSE,FALSE,nullptr);try{
     MSG msg{};PeekMessageW(&msg,nullptr,0,0,PM_NOREMOVE);threadId=GetCurrentThreadId();running=true;observe=false;PaneSetWakeEvent(signal);
     pump(40);check(captureTimer==0,"idle timer off");check(WaitForSingleObject(signal,0)==WAIT_TIMEOUT,"idle event quiet");
     input(WM_RBUTTONDOWN);check(captureTimer!=0,"right down starts timer");check(WaitForSingleObject(signal,0)==WAIT_OBJECT_0,"begin wakes consumer");

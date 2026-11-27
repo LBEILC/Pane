@@ -64,7 +64,10 @@ LRESULT CALLBACK procedure(HWND window,UINT message,WPARAM w,LPARAM l){
  return DefWindowProcW(window,message,w,l);
 }
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int wmain(int argc,wchar_t** argv){
+    pane::diagnostics::Initialize();
+
  if(argc<4)return 2;
  bool limitTest=wcscmp(argv[1],L"--hidden-replay-limit-test")==0;
  bool hiddenTest=limitTest||wcscmp(argv[1],L"--hidden-watchdog-test")==0;

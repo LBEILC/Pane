@@ -7,7 +7,10 @@ void drain(){MSG m{};while(PeekMessageW(&m,nullptr,0,0,PM_REMOVE)){TranslateMess
 void settle(){auto end=GetTickCount64()+100;while(GetTickCount64()<end){drain();Sleep(1);}}
 void publishActual(){auto revision=PanePolicyBegin();POINT point{};GetCursorPos(&point);auto g=policyGeometry(point);PanePolicy(reinterpret_cast<intptr_t>(g.window),g.pid,point.x,point.y,96,0,1,0);PanePolicyCommit(revision);}
 void changed(HANDLE signal,const char* name){check(WaitForSingleObject(signal,1000)==WAIT_OBJECT_0,name);check(PanePolicyDirty()!=0,"event marks dirty");settle();publishActual();ResetEvent(signal);check(!PanePolicyDirty(),"refresh acknowledges latest event");}
-int main(){HWND a=nullptr,b=nullptr;HANDLE signal=nullptr;try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+HWND a=nullptr,b=nullptr;HANDLE signal=nullptr;try{
  wchar_t desktop[256]{};DWORD length=0;check(GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()),UOI_NAME,desktop,sizeof(desktop),&length)&&wcsncmp(desktop,L"Pane027-",8)==0,"hidden desktop required");
  signal=CreateEventW(nullptr,FALSE,FALSE,nullptr);PaneSetWakeEvent(signal);check(PaneStart(0)!=0,"normal hook starts");
  WNDCLASSW wc{};wc.lpfnWndProc=DefWindowProcW;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"Pane028EventFixture";check(RegisterClassW(&wc)!=0,"fixture class");

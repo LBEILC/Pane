@@ -96,16 +96,24 @@ public interface IGestureService : IAsyncDisposable
 }
 
 public sealed record UnsupportedItem(string Where, string GestureText, string Reason);
+/// <summary>
+/// 按方向近似转换的手势（161，WGestures 2）：WG2 存的是手画形状（一串坐标），Pane 只认方向，
+/// 手画的复杂形状只能折算成方向序列。Where 同 <see cref="UnsupportedItem.Where"/>（「全局」或程序名），Name 是手势名，
+/// Pattern 是折算结果（界面显示触发键和方向，请用户导入后试一下）。标准笔画（WG2 编辑器画的直线段）准确对上的不算近似。
+/// </summary>
+public sealed record ApproximatedItem(string Where, string Name, GesturePattern Pattern);
 public sealed record ImportPreview(
     string SourceDirectory, string SourceVersion,
     int GlobalCount, int AppRuleCount, int DisabledAppCount,
     IReadOnlyList<UnsupportedItem> Unsupported,
-    bool HasCustomTrailColors);
+    bool HasCustomTrailColors,
+    IReadOnlyList<ApproximatedItem>? Approximated = null);   // 161：null 或空 = 没有近似转换的（WG1 的配置本来就是方向）
 
 public interface IWGesturesImporter
 {
     /// <summary>
-    /// null = 自动查找；找不到返回 null。043 起参数也可以是文件：<c>gestures.wg2</c> / <c>gestures.wg</c>（1～3 版格式）或 WGestures 导出的 <c>.wgb</c>。
+    /// null = 自动查找；找不到返回 null。043 起参数也可以是文件：<c>gestures.wg2</c> / <c>gestures.wg</c>（1～3 版格式）或 WGestures 导出的 <c>.wgb</c>；
+    /// 161 起也可以是 WGestures 2 导出的配置包（<c>.wg28bw</c>，按内容认，不看扩展名）。
     /// <see cref="ImportPreview.SourceDirectory"/> 存的就是这个参数（自动查找时是找到的数据目录）。
     /// </summary>
     ImportPreview? Preview(string? directory = null);

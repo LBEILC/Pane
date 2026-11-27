@@ -1,0 +1,6 @@
+﻿<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)../src/Pane.App/Hosting/ProcessErrorMode.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)TestCrashDiagnostics.cs" />
+  </ItemGroup>
+</Project>

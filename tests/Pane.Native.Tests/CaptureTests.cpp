@@ -9,7 +9,11 @@ int assertions=0;
 void check(bool value,const char* name){assertions++;if(!value)throw std::runtime_error(name);}
 Input event(Kind kind,int button=0,int x=0,int y=0,uint64_t t=0){Input i{};i.kind=kind;i.button=button;i.x=x;i.y=y;i.time=t;return i;}
 LRESULT CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){return DefWindowProcW(h,m,w,l);}
-int main(){try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(int argc, char** argv){
+    pane::diagnostics::Initialize();
+    if (argc == 2 && std::string(argv[1]) == "--crash-selftest") RaiseException(0xE0000163, 0, 0, nullptr);
+try{
  for(int button:{1,2,4,8}){
   Capture c;c.enabled=15;check(c.feed(event(Down,button)).swallow,"trigger down");auto r=c.feed(event(Up,button));check(r.swallow&&r.signal==Replay&&r.value==button,"short replay");
   c.feed(event(Down,button));c.feed(event(Move,0,10,0));r=c.feed(event(Up,button));check(r.signal==End&&r.value==0,"moved no replay");

@@ -28,7 +28,10 @@ void check(bool value,const char* name){checks++;if(!value)throw std::runtime_er
 LRESULT input(UINT message,DWORD mouseData=0){MSLLHOOKSTRUCT p{};p.mouseData=mouseData;return hook(HC_ACTION,message,reinterpret_cast<LPARAM>(&p));}
 void reset(){capture={};updateTimer();head=tail=0;requestedPid=0;}
 void publish(std::shared_ptr<ProcessIdentity> entry){auto cache=std::make_unique<IdentitySnapshot>();if(entry)cache->processes.push_back(entry);identityCache.publish(std::move(cache));}
-int main(){try{
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+try{
  running=true;observe=false;ownIntegrity=SECURITY_MANDATORY_MEDIUM_RID;
  PanePressPolicyBegin(15,0,0,0,4,400,0);PanePressPolicyRule(L"C:\\excluded.exe",nullptr,1,0);PanePressPolicyCommit();
  publish(nullptr);check(input(WM_RBUTTONDOWN)==0&&!capture.active,"unknown integrity passes safely");check(queries==0&&requestedPid==fixture.pid,"cold press queues query without opening process");reset();

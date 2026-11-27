@@ -9,4 +9,8 @@
     <Compile Include="../../src/Pane.App/Services/Setup/PayloadPatch.cs" />
     <Compile Include="../../src/Pane.App/Services/Setup/SetupFiles.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Pane.App/Hosting/ProcessErrorMode.cs" />
+    <Compile Include="../../tests/TestCrashDiagnostics.cs" />
+  </ItemGroup>
 </Project>

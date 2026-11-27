@@ -29,6 +29,13 @@
                         <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" StrokeWidth="2" Foreground="White" Visibility="{x:Bind ColoredVisibility, Mode=OneWay}"/>
                         <c:PaneIcon Width="17" Height="17" Glyph="{x:Bind Glyph}" Foreground="{ThemeResource PaneText2Brush}" Visibility="{x:Bind PlainVisibility, Mode=OneWay}"/>
                         <Image Width="32" Height="32" Source="{x:Bind Picture, Mode=OneWay}" Visibility="{x:Bind PictureVisibility, Mode=OneWay}"/>
+                        <!-- 按住 Ctrl：前 9 个结果的序号（issue 75），样式同格子的 Alt 序号，压在图标左上角 -->
+                        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-6,-5,0,0" MinWidth="16" Height="16" Padding="4,0,4,0"
+                                CornerRadius="5" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
+                                Visibility="{x:Bind NumberVisibility, Mode=OneWay}">
+                            <TextBlock Text="{x:Bind Badge, Mode=OneWay}" FontFamily="{StaticResource PaneFontUi}" FontSize="10" LineHeight="14" TextAlignment="Center"
+                                       Foreground="{ThemeResource PaneText2Brush}"/>
+                        </Border>
                     </Grid>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
                         <TextBlock c:MatchText.Source="{x:Bind Match}"
@@ -83,7 +90,7 @@
                 </StackPanel>
             </DataTemplate>
 
-            <!-- 格子：图标 40 + 名字（最多两行）；动作格子是中性底，按住 Alt 左上角出数字 -->
+            <!-- 格子：图标 40 + 名字（最多两行）；动作格子是中性底，按住 Alt 左上角出数字；按住 Ctrl 时结果格子也出数字（issue 75） -->
             <DataTemplate x:Key="TileTemplate" x:DataType="launcher:LauncherRow">
                 <Grid Width="82" Height="92" Padding="4,10,4,0" Background="Transparent">
                     <StackPanel Spacing="6">
@@ -108,7 +115,7 @@
                     <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,2,0,0" MinWidth="16" Height="16" Padding="4,0,4,0"
                             CornerRadius="5" Background="{ThemeResource PaneFillControlBrush}" BorderBrush="{ThemeResource PaneStrokeBrush}" BorderThickness="1"
                             Visibility="{x:Bind NumberVisibility, Mode=OneWay}">
-                        <TextBlock Text="{x:Bind Number}" FontFamily="{StaticResource PaneFontUi}" FontSize="10" LineHeight="14" TextAlignment="Center"
+                        <TextBlock Text="{x:Bind Badge, Mode=OneWay}" FontFamily="{StaticResource PaneFontUi}" FontSize="10" LineHeight="14" TextAlignment="Center"
                                    Foreground="{ThemeResource PaneText2Brush}"/>
                     </Border>
                 </Grid>

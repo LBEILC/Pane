@@ -63,6 +63,17 @@ internal static class AiProtocol
         }catch(Exception e) when(e is JsonException or InvalidOperationException){throw new AiNetworkException(Strings.Ai_InvalidResponse);}
     }
     internal static byte[] Body(string model,string prompt,bool chat)=>Body(model,[new(AiChatRole.User,prompt)],chat);
+    internal static bool UnsupportedImages(JsonElement body)
+    {
+        var error = body.ValueKind == JsonValueKind.Object && body.TryGetProperty("error", out var nested) ? nested : body;
+        var message = (String(error, "message") ?? (error.ValueKind == JsonValueKind.String ? error.GetString() : null) ?? "").ToLowerInvariant();
+        return message.Contains("image_url is only supported by certain models") ||
+            message.Contains("image_url' is only supported by certain models") ||
+            message.Contains("image input is not supported") || message.Contains("image inputs are not supported") ||
+            message.Contains("does not support image input") || message.Contains("does not support images") ||
+            message.Contains("does not support multimodal") || message.Contains("does not support image prompts") ||
+            message.Contains("model only supports text") || message.Contains("模型不支持图片") || message.Contains("模型不支持多模态");
+    }
     internal static bool UnsupportedReasoning(JsonElement body)
     {
         var error=body.ValueKind==JsonValueKind.Object&&body.TryGetProperty("error",out var e)?e:body;
@@ -72,7 +83,7 @@ internal static class AiProtocol
         return (message.Contains("reasoning")||message.Contains("思考"))&& // 不翻译：外部数据匹配
             (message.Contains("unsupported")||message.Contains("not support")||message.Contains("unknown")||message.Contains("unrecognized")||message.Contains("not allowed")||message.Contains("invalid")||message.Contains("不支持")||message.Contains("不支援")||message.Contains("不识别")||message.Contains("不識別")||message.Contains("非法")); // 不翻译：外部数据匹配
     }
-    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,bool chat,AiReasoningEffort reasoning=AiReasoningEffort.Default)
+    internal static byte[] Body(string model,IReadOnlyList<AiChatMessage> messages,bool chat,AiReasoningEffort reasoning=AiReasoningEffort.Default, IReadOnlyDictionary<string,AiImage>? images=null)
     {
         using var stream=new MemoryStream();using(var w=new Utf8JsonWriter(stream)){
             w.WriteStartObject();w.WriteString("model",model);w.WriteBoolean("stream",true);
@@ -83,7 +94,17 @@ internal static class AiProtocol
             if(chat){w.WriteBoolean("store",false);w.WriteString("instructions",SystemPrompt);}
             w.WriteStartArray(chat?"input":"messages");
             if(!chat){w.WriteStartObject();w.WriteString("role","system");w.WriteString("content",SystemPrompt);w.WriteEndObject();}
-            foreach(var message in messages){w.WriteStartObject();w.WriteString("role",message.Role switch{AiChatRole.User=>"user",AiChatRole.Assistant=>"assistant",_=>throw new AiCredentialException(Strings.Ai_InvalidChatRole)});w.WriteString("content",message.Text);w.WriteEndObject();}w.WriteEndArray();w.WriteEndObject();
+            foreach(var message in messages){w.WriteStartObject();w.WriteString("role",message.Role switch{AiChatRole.User=>"user",AiChatRole.Assistant=>"assistant",_=>throw new AiCredentialException(Strings.Ai_InvalidChatRole)});
+                if (message.Images is { Count: > 0 } paths)
+                {
+                    w.WriteStartArray("content");
+                    AiImage.WriteText(w, message.Text, chat);
+                    foreach (var path in paths) images![path].Write(w, chat, false);
+                    w.WriteEndArray();
+                }
+                else w.WriteString("content",message.Text);
+                w.WriteEndObject();
+            }w.WriteEndArray();w.WriteEndObject();
         }return stream.ToArray();
     }
 }

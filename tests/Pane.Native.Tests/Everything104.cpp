@@ -61,7 +61,10 @@ int synchronousQuery(DWORD budget,bool reject,int& total){
     return result;
 }
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(){
+    pane::diagnostics::Initialize();
+
     WNDCLASSW wc{};wc.lpfnWndProc=respond;wc.hInstance=GetModuleHandleW(nullptr);wc.lpszClassName=L"PaneTest104";
     if(!RegisterClassW(&wc))return 2;
     auto target=CreateWindowW(wc.lpszClassName,L"",0,0,0,0,0,HWND_MESSAGE,nullptr,wc.hInstance,nullptr);

@@ -81,7 +81,10 @@ void gesture(const char* scenario,int delay,DWORD flags){
  while(PanePoll(&e)){begin+=e.kind==pane::Begin;point+=e.kind==pane::Point;end+=e.kind==pane::End;replay+=e.kind==pane::Replay;}
  check(begin==1&&point==1&&end==1&&replay==0,"fast gesture emits ordered session without click replay");reset();
 }
-int main(){running=true;observe=false;configure();
+#include "../../src/Pane.Native/ProcessErrorMode.h"
+int main(){
+    pane::diagnostics::Initialize();
+running=true;observe=false;configure();
  for(DWORD flags:{DWORD(0),DWORD(LLMHF_INJECTED)}){
   publish();fixture.window=reinterpret_cast<HWND>(reinterpret_cast<intptr_t>(fixture.window)+1);fixture.pid++;
   gesture("new window before asynchronous notification",0,flags);

@@ -34,7 +34,10 @@ void gesture(const char* scenario,int delay,DWORD flags){
  check(swallowed==1);check(sequence);
  output<<scenario<<" delayMs="<<delay<<" flags="<<flags<<" swallowed="<<swallowed<<" sequence="<<sequence<<"\n";reset();
 }
+#include "../../src/Pane.Native/ProcessErrorMode.h"
 int main(int argc,char** argv){
+    pane::diagnostics::Initialize();
+
  if(argc!=2)return 2;output.open(argv[1]);HWND a=nullptr,b=nullptr;HHOOK installed=nullptr;
  try{
   wchar_t own[256]{},input[256]{};DWORD needed=0;

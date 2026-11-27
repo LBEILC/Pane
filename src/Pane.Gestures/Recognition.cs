@@ -42,7 +42,7 @@ public sealed class GestureRecognizer
         directions.Add(direction);
         return true;
     }
-    static GestureDirection Cardinal(double dx, double dy) => Math.Abs(dx) > Math.Abs(dy)
+    internal static GestureDirection Cardinal(double dx, double dy) => Math.Abs(dx) > Math.Abs(dy)
         ? (dx > 0 ? GestureDirection.Right : GestureDirection.Left)
         : (dy > 0 ? GestureDirection.Down : GestureDirection.Up);
     public static GestureDirection Classify(double dx, double dy)

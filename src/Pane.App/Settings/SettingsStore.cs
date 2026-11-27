@@ -126,8 +126,31 @@ public sealed class SettingsStore
         }
         File.Move(temp,path,true); Current=value;
     }
+    static AiImageAction[]? NormalizeImageActions(AiImageAction[]? actions)
+    {
+        if (actions == null) return null;
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<AiImageAction>();
+        static string Limit(string text, int count)
+        {
+            var elements = System.Globalization.StringInfo.GetTextElementEnumerator(text);
+            while (count-- > 0 && elements.MoveNext()) { }
+            return elements.MoveNext() ? text[..elements.ElementIndex] : text;
+        }
+        foreach (var action in actions)
+        {
+            if (action?.Id is not { Length: 12 } id || !id.StartsWith("img-", StringComparison.Ordinal) ||
+                id.AsSpan(4).IndexOfAnyExcept("0123456789abcdef") >= 0 ||
+                string.IsNullOrWhiteSpace(action.Name) || string.IsNullOrWhiteSpace(action.Prompt)) continue;
+            var prompt = Limit(action.Prompt, 2000);
+            if (string.IsNullOrWhiteSpace(prompt) || !ids.Add(id)) continue;
+            result.Add(action with { Name = Limit(action.Name.Trim(), 12), Prompt = prompt });
+            if (result.Count == 12) break;
+        }
+        return result.ToArray();
+    }
     static PaneSettings Normalize(PaneSettings value) => value with {
-        Ai=value.Ai.Migrate() with {Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
+        Ai=value.Ai.Migrate() with {ImageActions=NormalizeImageActions(value.Ai.ImageActions),Disabled=value.Modules is null?value.Ai.Disabled:!value.Modules.GetValueOrDefault("ai",true)},
         Launcher=value.Launcher with {Portable=value.Launcher.Portable.DistinctBy(e=>e.Path,StringComparer.OrdinalIgnoreCase).ToArray()},
         Clipboard=value.Clipboard with {Enabled=value.Modules?.GetValueOrDefault("clipboard",true)??value.Clipboard.Enabled},
         SuperPanel=value.SuperPanel with {

@@ -11,6 +11,7 @@ internal static class Program
         var desktop = new StringBuilder(256);
         if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), 2, desktop, 512, out _) ||
             !desktop.ToString().StartsWith("Pane027-", StringComparison.Ordinal)) { Environment.ExitCode = 2; return; }
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
         ApplicationConfiguration.Initialize();
         Application.Run(new Fixture(args[0]));
     }
