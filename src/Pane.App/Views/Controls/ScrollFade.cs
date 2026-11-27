@@ -4,6 +4,7 @@
 //    原内容在这条边上用 InsetClip 裁掉；中间部分照常直接画。
 //    2026-11-27 改（任务 158）：原来整个滚动区都经 VisualSurface 重画，岛里的圆角全部失去抗锯齿（用户：选中块圆角有毛刺）。
 //    现在只有正在渐隐的边条离屏，滚到顶 / 底时那条边连离屏也撤掉，顶上的选中块等直接画、边缘平滑。
+//    2026-11-27 改：ScrollViewer 的上下 Padding 挪到内容 Margin 上，内容滚到边上才淡出（见 MovePadding）。
 // 2. 细滑块：系统滚动条隐藏（鼠标移上去会展开成带箭头的宽条，和玻璃不搭），右侧画一条宽 4 的细条，
 //    滚动或鼠标进来时出现，0.9 秒没动静淡出；移到细条上变宽 6，可以拖、点轨道跳转、滚轮照常。同文件窗口的 ScrollThumb。
 //    细条贴右边、离边 2 画在留白里，不压选中高亮（2026-11-26）；可拖的范围仍是 12 宽，透明地伸进内容一点。
@@ -92,11 +93,24 @@ public sealed partial class ScrollFade : Grid
         scroller = sv;
         if (sv == null) return;
         sv.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;   // 细滑块代替系统滚动条
+        MovePadding(sv);
         sv.ViewChanged += OnViewChanged;
         sv.RegisterPropertyChangedCallback(ScrollViewer.ScrollableHeightProperty, (_, _) => Update());
         sv.SizeChanged += (_, _) => Update();
         thumb.Background = Application.Current.Resources.TryGetValue("PaneText3Brush", out var b) ? (Brush)b : null;
         Update();
+    }
+
+    // ScrollViewer 的 Padding 加在内容呈现器外面、不跟着内容滚：内容在离边 Padding 处被硬切，渐隐落在空白里（设置页底部 24 最明显）。
+    // 上下 Padding 挪到内容的 Margin 上（左右不动）：内容一直滚到边上再淡出，滚到头时照样留白。同原型（padding 在滚动元素里、跟着滚）。
+    // 偏移、可滚高度不变；ViewportHeight 会大出上下 Padding 之和，按视口算位置的地方要自己扣掉（文件窗口、设置页展开跟随）。
+    static void MovePadding(ScrollViewer sv)
+    {
+        var p = sv.Padding;
+        if (p.Top == 0 && p.Bottom == 0 || sv.Content is not FrameworkElement inner) return;
+        var m = inner.Margin;
+        inner.Margin = new Thickness(m.Left, m.Top + p.Top, m.Right, m.Bottom + p.Bottom);
+        sv.Padding = new Thickness(p.Left, 0, p.Right, 0);
     }
 
     static ScrollViewer? Find(DependencyObject? root)

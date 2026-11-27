@@ -204,6 +204,7 @@ public sealed partial class App
                 SettingsView.PortableApps = a.launcherSearch;
                 SettingsView.AppAliases = a.launcherSearch;
                 SettingsView.HiddenItems = a.launcherSearch;
+                SettingsView.HomeSearch = a.launcherSearch;
             }
             if(a.demo)a.WebSearchHistory=new Pane.DesignData.WebSearchHistorySample(()=>a.Store.Current.Launcher.RememberWebSearches);
             a.EngineIcons=new Pane.Services.Launcher.EngineIcons(a.Store.DirectoryPath,!a.demo);
@@ -222,6 +223,7 @@ public sealed partial class App
             if(a.launcherSearch!=null)a.launcherSearch.HotkeyIndexChanged -= a.AppIndexChanged;
             SettingsView.AppAliases = null;
             SettingsView.HiddenItems = null;
+            SettingsView.HomeSearch = null;
             SettingsView.PortableApps = null; a.launcherSearch?.Dispose(); a.launcherSearch = null; (a.WebSuggestions as IDisposable)?.Dispose(); a.WebSuggestions = null;
             a.TerminalHistory = null; a.Files = null; a.FileSearchStatus=null!;
             a.WebSearchHistory=null;

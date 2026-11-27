@@ -54,9 +54,42 @@ public sealed partial class SettingsView
     }
 
     // 常用应用（148，issue 88，原型 settings.js spAppsGroup）：没选中内容时常用面板列出的应用，最多 8 个，和启动器首页固定分开。
-    // 列表（上移、移除）→「添加应用」就地搜索 →「从启动器首页添加」小片（首页固定了、这里还没有的）
-    string? superAppQuery;   // null = 没在添加
+    // 列表（上移、移除）→「添加应用」就地搜索 →「从启动器添加」小片（2026-11-27 用户要：最近使用在前、再接首页固定，这里还没有的）
+    // null = 没在添加。设计预览（只在演示模式）：PANE_DESIGN_SUPER_ADD=1 打开时就展开「添加应用」
+    string? superAppQuery = Environment.GetEnvironmentVariable("PANE_DEMO") == "1" && Environment.GetEnvironmentVariable("PANE_DESIGN_SUPER_ADD") == "1" ? "" : null;
     StackPanel? superAppResults;
+    List<string>? superRecent;   // 启动器首页「最近使用」的应用 id，新的在前；打开设置后第一次进这一页时取一次
+    bool superRecentLoading;
+
+    /// <summary>启动器搜索（启动器能力在时由 App 接上），取首页「最近使用」给快速添加用。没有时（演示）用应用目录。</summary>
+    internal static ILauncherSearch? HomeSearch { get; set; }
+
+    // 快速添加的候选：最近使用、首页固定，去重，去掉已经加了的和目录里找不到的，最多 12 个
+    List<string> SuperQuickApps(Dictionary<string, AppIconInfo> catalog, List<string> taken)
+    {
+        if (superRecent == null) LoadSuperRecent();
+        var pinned = app.Store.Current.Launcher.PinnedApps.Where(id => id.StartsWith("app:", StringComparison.Ordinal));
+        return (superRecent ?? []).Concat(pinned).Distinct().Where(id => !taken.Contains(id) && catalog.ContainsKey(id)).Take(12).ToList();
+    }
+
+    async void LoadSuperRecent()
+    {
+        if (superRecentLoading) return;
+        superRecentLoading = true;
+        List<string> found = [];
+        try
+        {
+            if (HomeSearch is { } search)
+                found = (await search.SearchAsync("", CancellationToken.None)).Items
+                    .Where(i => i.Kind == LauncherItemKind.App && i.Group == LauncherGroups.Recent).Select(i => i.Id).ToList();
+            else if (Environment.GetEnvironmentVariable("PANE_DEMO") == "1")
+                found = app.AppIcons.Apps().Select(a => a.Id).Reverse().ToList();   // 演示：应用目录倒过来当最近使用
+        }
+        catch (Exception) { }   // 取不到就只列首页固定
+        superRecent = found;
+        // 还停在这一页、没在搜索时重画一次（搜索框开着时重画会丢焦点，下次重画再带上）
+        if (found.Count > 0 && current.Id == "superpanel" && superAppQuery == null) Render();
+    }
 
     void RenderSuperApps(SuperPanelSettings p)
     {
@@ -75,12 +108,13 @@ public sealed partial class SettingsView
             rows.Add(ListRow(AppIcon(info?.Icon), Text(info?.Name ?? id, LabelProto), info == null ? Strings.SuperPanel_AppMissing : string.Format(Strings.Settings_Super_AppKey, (object?)(pos + 1)), false, tools.ToArray()));
         }
         if (full) rows.Add(AddRow(Text(Strings.Settings_Super_AppsFull, DescProto)));
-        else rows.Add(superAppQuery == null
-            ? AddRow(Button(Strings.Settings_Super_AddApp, "plus", () => { superAppQuery = ""; Render(); }))
-            : SuperAppSearch(catalog.Values, ids));
-        // 从启动器首页添加：首页固定里的应用（app:），这里还没有的
-        var home = app.Store.Current.Launcher.PinnedApps.Where(id => id.StartsWith("app:", StringComparison.Ordinal) && !ids.Contains(id) && catalog.ContainsKey(id)).ToList();
-        if (home.Count > 0)
+        var home = SuperQuickApps(catalog, ids);
+        bool searching = superAppQuery != null && !full;
+        if (!full) rows.Add(searching
+            ? SuperAppSearch(catalog.Values, ids, home)
+            : AddRow(Button(Strings.Settings_Super_AddApp, "plus", () => { superAppQuery = ""; Render(); })));
+        // 从启动器添加：最近使用、首页固定里这里还没有的应用；正在搜索时由搜索框下的候选代替，不重复列
+        if (home.Count > 0 && !searching)
         {
             var chips = new WrapPanel { HorizontalSpacing = 6, VerticalSpacing = 6 };
             foreach (var id in home)
@@ -99,13 +133,19 @@ public sealed partial class SettingsView
                 if (!full) chip.Tapped += (_, _) => { SaveSuper(x => (x.Apps ?? []).Contains(id) || (x.Apps?.Length ?? 0) >= SuperPanelSettings.MaxApps ? x : x with { Apps = [.. x.Apps ?? [], id] }); Render(); };
                 chips.Children.Add(chip);
             }
-            rows.Add(Row(Strings.Settings_Super_FromHome, Strings.Settings_Super_FromHomeDescription, chips));
+            // 文字一行、小片另起一排铺满（同 AI 服务商）：放在 Row 的控件列里会挤成一行、把文字压没
+            var stack = new StackPanel();
+            stack.Children.Add(Row(Strings.Settings_Super_FromHome, Strings.Settings_Super_FromHomeDescription));
+            chips.Margin = new Thickness(14, 0, 14, 12);
+            stack.Children.Add(chips);
+            rows.Add(stack);
         }
         Group(Strings.Settings_Super_Apps, rows.ToArray(), Strings.Settings_Super_AppsDescription);
     }
 
     // 「添加应用」：同图标分区的就地搜索（只刷新结果，不重建整页，否则输入框会丢焦点）
-    FrameworkElement SuperAppSearch(IEnumerable<AppIconInfo> all, List<string> taken)
+    // 还没输入时先列快速添加的候选（quick：最近使用、首页固定），没有候选再列全部应用的前几个（同原型）
+    FrameworkElement SuperAppSearch(IEnumerable<AppIconInfo> all, List<string> taken, List<string> quick)
     {
         var box = Field(Strings.Settings_Super_AppSearchPlaceholder, 260);
         box.Text = superAppQuery ?? "";
@@ -115,8 +155,10 @@ public sealed partial class SettingsView
         {
             superAppResults!.Children.Clear();
             var q = (superAppQuery ?? "").Trim();
-            if (q.Length == 0) return;
-            foreach (var a in candidates.Where(a => a.Name.Contains(q, StringComparison.CurrentCultureIgnoreCase)).Take(6))
+            var hits = q.Length > 0 ? candidates.Where(a => a.Name.Contains(q, StringComparison.CurrentCultureIgnoreCase))
+                : quick.Count > 0 ? quick.Select(id => candidates.FirstOrDefault(a => a.Id == id)).OfType<AppIconInfo>()
+                : candidates;
+            foreach (var a in hits.Take(6))
             {
                 var pick = new Grid { ColumnSpacing = 10, Padding = new Thickness(8, 6, 8, 6), CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent) };
                 pick.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

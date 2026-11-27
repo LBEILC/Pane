@@ -1660,8 +1660,8 @@
   <data name="Settings_Super_AppsDescription" xml:space="preserve"><value>沒有選取內容時，超級面板列出這些應用程式，按 1～8 直接開啟。最多 8 個，和啟動器首頁的釘選分開設定</value></data>
   <data name="Settings_Super_AddApp" xml:space="preserve"><value>新增應用程式</value></data>
   <data name="Settings_Super_AppSearchPlaceholder" xml:space="preserve"><value>搜尋應用程式</value></data>
-  <data name="Settings_Super_FromHome" xml:space="preserve"><value>從啟動器首頁新增</value></data>
-  <data name="Settings_Super_FromHomeDescription" xml:space="preserve"><value>啟動器首頁已釘選、這裡還沒有的應用程式，點一下新增</value></data>
+  <data name="Settings_Super_FromHome" xml:space="preserve"><value>從啟動器新增</value></data>
+  <data name="Settings_Super_FromHomeDescription" xml:space="preserve"><value>啟動器裡最近使用和首頁釘選的應用程式，點一下新增</value></data>
   <data name="Settings_Super_AppsFull" xml:space="preserve"><value>已有 8 個，先移除一個再新增</value></data>
   <data name="Settings_Super_AppKey" xml:space="preserve"><value>按 {0} 開啟</value></data>
   <data name="SuperPanel_TranslateError" xml:space="preserve"><value>翻譯失敗：{0}</value></data>

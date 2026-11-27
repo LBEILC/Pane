@@ -443,8 +443,8 @@ public sealed partial class FilesView : UserControl, ISecondaryView, IDisposable
         FillHints();
         UpdateActions();
         if (!scroll) { UpdatePreview(); return; }
-        // 行高固定：直接按下标算位置滚进视野
-        double top = index * RowHeight, bottom = top + RowHeight, y = ListScroller.VerticalOffset, view = ListScroller.ViewportHeight;
+        // 行高固定：直接按下标算位置滚进视野。上下 Padding（6 + 6）被 ScrollFade 挪到了内容 Margin 上，视口里扣掉
+        double top = index * RowHeight, bottom = top + RowHeight, y = ListScroller.VerticalOffset, view = ListScroller.ViewportHeight - 12;
         if (top < y) ListScroller.ChangeView(null, top, null, true);
         else if (bottom > y + view - 12) ListScroller.ChangeView(null, bottom - view + 12, null, true);
         if (index >= rows.Count - 5) _ = LoadMore();

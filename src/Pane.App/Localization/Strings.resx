@@ -1660,8 +1660,8 @@
   <data name="Settings_Super_AppsDescription" xml:space="preserve"><value>没有选中内容时，超级面板列出这些应用，按 1～8 直接打开。最多 8 个，和启动器首页的固定分开设置</value></data>
   <data name="Settings_Super_AddApp" xml:space="preserve"><value>添加应用</value></data>
   <data name="Settings_Super_AppSearchPlaceholder" xml:space="preserve"><value>搜索应用</value></data>
-  <data name="Settings_Super_FromHome" xml:space="preserve"><value>从启动器首页添加</value></data>
-  <data name="Settings_Super_FromHomeDescription" xml:space="preserve"><value>启动器首页已固定、这里还没有的应用，点一下添加</value></data>
+  <data name="Settings_Super_FromHome" xml:space="preserve"><value>从启动器添加</value></data>
+  <data name="Settings_Super_FromHomeDescription" xml:space="preserve"><value>启动器里最近使用和首页固定的应用，点一下添加</value></data>
   <data name="Settings_Super_AppsFull" xml:space="preserve"><value>已有 8 个，先移除一个再添加</value></data>
   <data name="Settings_Super_AppKey" xml:space="preserve"><value>按 {0} 打开</value></data>
   <data name="SuperPanel_TranslateError" xml:space="preserve"><value>翻译失败：{0}</value></data>

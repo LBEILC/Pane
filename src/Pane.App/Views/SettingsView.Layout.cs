@@ -95,7 +95,8 @@ public sealed partial class SettingsView
         if (open)
         {
             double top = host.TransformToVisual(Scroller).TransformPoint(new Point(0, 0)).Y;
-            follow = Math.Max(0, Math.Min(top + full + 16 - Scroller.ViewportHeight, top - 72));
+            // 底部 Padding 24 被 ScrollFade 挪进了内容 Margin，ViewportHeight 不再扣它：这里自己扣，展开的部分不落进渐隐
+            follow = Math.Max(0, Math.Min(top + full + 16 + 24 - Scroller.ViewportHeight, top - 72));
         }
         double startOffset = Scroller.VerticalOffset;
         void Follow(object? s, object e) => Scroller.ChangeView(null, Math.Min(startOffset + follow, Scroller.ScrollableHeight), null, true);
