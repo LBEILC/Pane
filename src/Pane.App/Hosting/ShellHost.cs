@@ -137,12 +137,14 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         if(wordsKey!=0&&(wordsKey==keys.Launcher||wordsKey==keys.Clipboard)){RegistrationResult("words",words!,false,1409);wordsKey=0;}
         uint memoKey=!suspended && memo?.IsValidDoubleTap==true ? memo.VirtualKey : 0u;
         if(memoKey!=0 && (memoKey==keys.Launcher || memoKey==keys.Clipboard || memoKey==wordsKey)){RegistrationResult("memo",memo!,false,1409);memoKey=0;}
-        if(keys.Launcher!=0||keys.Clipboard!=0||wordsKey!=0||memoKey!=0){
-            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard,wordsKey,memoKey,settings.General.DoubleTapPauseInFullscreen?1:0);
+        int startKey=ShellHotkeyBindings.StartKeyFlags(settings.Launcher.StartKey,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
+        if(keys.Launcher!=0||keys.Clipboard!=0||wordsKey!=0||memoKey!=0||startKey!=0){
+            int code=PaneKeyboardStart(shellWindow,0x8005,keyboardGeneration,keys.Launcher,keys.Clipboard,wordsKey,memoKey,settings.General.DoubleTapPauseInFullscreen?1:0,startKey);
             keyboardStarted=code==0;
             if(code!=0){if(keys.Launcher!=0)RegistrationResult("launcher",a,false,code);if(keys.Clipboard!=0)RegistrationResult("clipboard",b,false,code);}
             if(memoKey!=0)RegistrationResult("memo",memo!,code==0,code);
             if(wordsKey!=0)RegistrationResult("words",words!,code==0,code);
+            if(startKey!=0)lock(diagnostics)diagnostics.Add($"startkey={startKey};registered={code==0};error={code}");
         }
         lock(diagnostics){diagnostics.RemoveAll(d=>d.StartsWith("keyhook="));diagnostics.Add($"keyhook={(KeyboardHookActive?1:0)}");}
         WinVRegistrationChanged?.Invoke(active);
@@ -226,7 +228,7 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
     [DllImport("user32.dll")] static extern bool PostMessageW(nint h,uint m,nuint w,nint l);
     [DllImport("user32.dll")] static extern void PostQuitMessage(int code);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern uint RegisterWindowMessageW(string name);
-    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard,uint words,uint memo,int pauseWhenFull);
+    [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardStart(nint window,uint message,nuint generation,uint launcher,uint clipboard,uint words,uint memo,int pauseWhenFull,int start);
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern void PaneKeyboardStop();
     [DllImport("Pane.Native.dll",CallingConvention=CallingConvention.Cdecl)] static extern int PaneKeyboardActive();
 }

@@ -24,6 +24,13 @@ static class DoubleTapBindingsTests
         }
         Check(ShellHotkeyBindings.Command(1)=="hotkey-launcher"&&ShellHotkeyBindings.Command(2)=="hotkey-clipboard"&&ShellHotkeyBindings.Command(3)=="hotkey-clipboard","commands preserved");
         Check(ShellHotkeyBindings.Command(4)=="hotkey-words","words command");
+        // 代替开始菜单（2026-11-28）：开着才挂，录热键时、启动器停用时都不挂；两项（单按 Win、开始按钮）总是一起
+        foreach(bool on in new[]{false,true})foreach(bool suspended in new[]{false,true})foreach(bool launcherOn in new[]{false,true})
+            Check(ShellHotkeyBindings.StartKeyFlags(on,suspended,launcherOn)==(on&&!suspended&&launcherOn?3:0),"start key flags");
+        var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(chord),new(new(KeyModifiers.Ctrl,86)));
+        Check(!System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartKey,"start key off by default");
+        var withStart=settings with{Launcher=settings.Launcher with{StartKey=true}};
+        Check(System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(withStart,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartKey,"start key saved");
         foreach(bool enabled in new[]{false,true})foreach(bool suspended in new[]{false,true})foreach(var key in new Hotkey?[]{null,chord,left})
         {
             List<int> registered=[4],removed=[],requested=[];

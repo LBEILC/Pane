@@ -17,6 +17,10 @@ public sealed partial class SettingsView
         var s = app.Store.Current;
         var global = new List<FrameworkElement>();
         if (ModuleGate.On(ModuleIds.Launcher)) global.Add(LauncherHotkeyRow(Strings.Common_Launcher));
+        // 代替开始菜单（2026-11-28）：紧跟启动器热键，开关即生效
+        if (ModuleGate.On(ModuleIds.Launcher))
+            global.Add(Row(Strings.Settings_Hotkeys_StartKey, Strings.Settings_Hotkeys_StartKeyDescription,
+                Switch(s.Launcher.StartKey, v => SaveLauncher(l => l with { StartKey = v }))));
         if (ModuleGate.On(ModuleIds.Clipboard)) global.Add(ClipboardHotkeyRow(Strings.Common_Clipboard));
         if (ModuleGate.On(ModuleIds.Words)) global.Add(WordsHotkeyRow(s.Words.Hotkey, s.Launcher.Hotkey, Strings.Module_Words_Name));
         if (ModuleGate.On(ModuleIds.Memo)) global.Add(MemoHotkeyRow(s.Memo.Hotkey, s.Launcher.Hotkey, Strings.Memo_Title));
