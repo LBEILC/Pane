@@ -68,7 +68,7 @@ public sealed partial class AiService : IAiService,IAiSetup,IDisposable
     public string? CurrentModelName=>ModelName(CurrentModelId);
     static string? TranslationModel(AiSettings s)=>s.Provider==AiProvider.ChatGpt?s.TranslationModel:s.CurrentEndpoint.TranslationModel;
     public string? TranslationModelName=>ModelName(TranslationModel(store.Current.Ai)??CurrentModelId);
-    public IReadOnlyList<AiAction> Actions=>store.Current.Ai.Actions.Select(a=>new AiAction(a.Id,a.Name,a.Glyph,a.PromptTemplate)).ToArray();
+    public IReadOnlyList<AiAction> Actions=>store.Current.Ai.Actions.Select(a=>new AiAction(a.Id,a.Label,a.Glyph,a.PromptTemplate)).ToArray();
     public string? ApiKeyMask {get{var value=Key(store.Current.Ai);return value==null?null:value.Length<=8?"••••":value[..4]+"…"+value[^4..];}}
     public void SaveApiKey(string value){value=value.Trim();if(value.Any(char.IsControl))throw new AiCredentialException(Strings.Ai_InvalidKeyFormat);lock(gate){secrets.Write(KeyFile(store.Current.Ai.CurrentEndpoint.Id),value.Length==0?null:value);}Notify();}
     internal static SocketsHttpHandler CreateHandler(AiSettings settings)

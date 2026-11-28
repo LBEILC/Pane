@@ -88,7 +88,17 @@ public sealed record AppHotkey(string AppId, string Name, Hotkey Hotkey);
 public sealed record AppAliasEntry(string AppId, string Name, string[] Aliases);
 // 不在搜索中显示的条目（设计加，2026-11-13，issue 49，任务 098）：Name 是隐藏时的标题，索引里找不到时设置页用它显示
 public sealed record HiddenItemEntry(string Id, string Name);
-public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate);
+public sealed record SearchEngine(string Name, string Keyword, string UrlTemplate)
+{
+    /// <summary>显示用的名字：内置站点没改过名时按界面语言显示（存的是简体），改过的照原样。</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string Label => (Keyword, Name) switch
+    {
+        ("bing", "必应") => Pane.Localization.Strings.Engine_Bing, // 不翻译：内置默认值
+        ("bd", "百度") => Pane.Localization.Strings.Engine_Baidu, // 不翻译：内置默认值
+        ("b", "哔哩哔哩") => Pane.Localization.Strings.Engine_Bilibili, // 不翻译：内置默认值
+        _ => Name,
+    };
+}
 // 空启动器显示什么（设计加，2026-10-31，用户反馈要极简）：最近和固定 / 只显示固定 / 什么都不显示（只剩搜索栏）
 // RecentOnly 是 issue 47 加的，排在最后，已存的设置值不变
 public enum LauncherHome { RecentAndPinned, PinnedOnly, Nothing, RecentOnly }

@@ -198,7 +198,7 @@ public sealed partial class SettingsView
     // 一排放 6 个，开满了其余的开关变灰。候选：AI 预设动作、搜索、复制
     void RenderSuperActions(SuperPanelSettings p)
     {
-        var all = app.Store.Current.Ai.Actions.Select(a => ("ai:" + a.Id, a.Name, a.Glyph))
+        var all = app.Store.Current.Ai.Actions.Select(a => ("ai:" + a.Id, a.Label, a.Glyph))
             .Append(("search", Strings.Common_Search, "globe")).Append(("copy", Strings.Common_Copy, "clipboard")).ToList();
         List<string> Shown(SuperPanelSettings s) =>
             (s.Actions ?? SuperPanelSettings.DefaultActions(app.Store.Current.Ai.Actions.Select(a => a.Id))).Where(id => all.Any(a => a.Item1 == id)).Distinct().ToList();

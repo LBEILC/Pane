@@ -439,7 +439,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
                 "ai:ask" => (Strings.Launcher_AskAi, "ai"),
                 "files" => (Strings.Launcher_SearchFiles, "folder"),
                 _ when id.StartsWith("ai:", StringComparison.Ordinal) && ai.Actions.FirstOrDefault(x => x.Id == id[3..]) is { } act => (act.Name, act.Glyph),
-                _ when id.StartsWith("web:", StringComparison.Ordinal) && Engine(id) is { } engine => (engine.Name, "globe"),
+                _ when id.StartsWith("web:", StringComparison.Ordinal) && Engine(id) is { } engine => (engine.Label, "globe"),
                 _ => null,
             };
             if (a is { } v) items.Add(new("act:" + id, LauncherItemKind.Action, LauncherGroups.Actions, v.name, null, new(v.glyph)));
@@ -573,7 +573,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
         EngineGlyph.Visibility = glyph is { FullBleed: false } ? Visibility.Visible : Visibility.Collapsed;
         EngineFull.Visibility = glyph is { FullBleed: true } ? Visibility.Visible : Visibility.Collapsed;
         // 取不到图标：玻璃底上放站点名的首字
-        EngineMono.Text = EngineBadgeImages.Monogram(engine.Name);
+        EngineMono.Text = EngineBadgeImages.Monogram(engine.Label);
         EngineMono.Visibility = glyph is null ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -740,8 +740,8 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             var address = WebAddress(web.Text);
             if (address is not null)
                 Add(Section(Strings.Common_Open, LauncherSectionKind.List), new("direct:url:" + address, LauncherItemKind.Web, LauncherGroups.Direct, address, Strings.Launcher_DirectOpenUrl, new("globe"), Hotkey: "Enter"), LauncherCell.Command);
-            var s = Section(web.Engine.Name, LauncherSectionKind.List);
-            Add(s, WebItem(web.Engine, web.Text, Strings.FormatName(Strings.Launcher_SearchWithQuery, web.Engine.Name, web.Text), address is null ? "Enter" : ""), LauncherCell.Command);   // 有「打开网址」时 Enter 徽标只留给它（空串不显示，但仍按「第一项」处理 Tab）
+            var s = Section(web.Engine.Label, LauncherSectionKind.List);
+            Add(s, WebItem(web.Engine, web.Text, Strings.FormatName(Strings.Launcher_SearchWithQuery, web.Engine.Label, web.Text), address is null ? "Enter" : ""), LauncherCell.Command);   // 有「打开网址」时 Enter 徽标只留给它（空串不显示，但仍按「第一项」处理 Tab）
             var recent = History?.Recent(web.Engine, web.Text, 3) ?? [];
             foreach (var text in recent) AddHistory(s, web.Engine, text);
             if (suggested.Query == web.Engine.Keyword + " " + web.Text)
@@ -901,7 +901,7 @@ public sealed partial class LauncherView : UserControl, IPanelView, IPanelOpenin
             // 直达（098 / issue 52）：打开网址
             LauncherCell.Command when item.Group == LauncherGroups.Direct => (string.Format(Strings.Launcher_OpenTarget, (object?)(item.Title)), [(["Enter"], Strings.Common_Open)]),
             // 关键字搜网页（issue 43）：底栏写用哪个站点，不重复结果行；历史行多一个 Shift+Delete 删除
-            LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (Strings.FormatName(Strings.Launcher_SearchUsing, we.Name),
+            LauncherCell.Command when item.Kind == LauncherItemKind.Web && webEngine is { } we => (Strings.FormatName(Strings.Launcher_SearchUsing, we.Label),
                 row.HistoryText is null ? [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)] : [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput), (["Shift", "+", "Delete"], Strings.Common_Delete)]),
             LauncherCell.Command when item.Kind == LauncherItemKind.Web => (item.Hotkey is null ? string.Format(Strings.Launcher_SearchTarget, (object?)(item.Title)) : item.Title, [(["Enter"], Strings.Common_Search), (["Tab"], Strings.Launcher_FillInput)]),
             LauncherCell.Command when item.Group == LauncherGroups.Timer => (item.Title.TrimEnd('…'), [(["Enter"], item.Id == "power:panel" ? Strings.Common_Open : item.Id == "power:cancel" ? Strings.Common_Execute : Strings.Timer_Go)]),

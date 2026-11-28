@@ -161,7 +161,7 @@ internal sealed class WebSource(ILauncherExecutor executor):LauncherSource(Launc
         token.ThrowIfCancellationRequested();if(c.Query.Length==0)return Rows([]);var rows=new List<LauncherItem>();int space=c.Query.IndexOf(' ');
         if(space>0&&c.Settings.SearchEngines.FirstOrDefault(e=>string.Equals(e.Keyword,c.Query[..space],StringComparison.OrdinalIgnoreCase)) is {} engine)Add(engine,c.Query[(space+1)..].Trim());
         Add(LauncherSearch.DefaultEngine(c.Settings),c.Query);return Rows(rows);
-        void Add(SearchEngine engine,string text)=>rows.Add(new("web:"+LauncherSearch.BuildUrl(engine,text),LauncherItemKind.Web,Group,Strings.FormatName(Strings.Launcher_SearchQuery, engine.Name, text),engine.Name,new("search")));
+        void Add(SearchEngine engine,string text)=>rows.Add(new("web:"+LauncherSearch.BuildUrl(engine,text),LauncherItemKind.Web,Group,Strings.FormatName(Strings.Launcher_SearchQuery, engine.Label, text),engine.Label,new("search")));
     }
     public override Task ExecuteAsync(LauncherItem item,SourceContext c,CancellationToken token)=>executor.OpenAsync(item.Id[4..],false,token);
 }

@@ -2094,4 +2094,10 @@
 关闭窗口后不再保留</value></data>
   <data name="Image_QuestionPlaceholder" xml:space="preserve"><value>问点关于这张图的…</value></data>
   <data name="Launcher_RecognizeImageDescription" xml:space="preserve"><value>用 AI 识别文字、描述图片</value></data>
+  <data name="Ai_Action_Summary" xml:space="preserve"><value>总结</value></data>
+  <data name="Ai_Action_Polish" xml:space="preserve"><value>润色</value></data>
+  <data name="Ai_Action_Explain" xml:space="preserve"><value>解释</value></data>
+  <data name="Engine_Bing" xml:space="preserve"><value>必应</value></data>
+  <data name="Engine_Baidu" xml:space="preserve"><value>百度</value></data>
+  <data name="Engine_Bilibili" xml:space="preserve"><value>哔哩哔哩</value></data>
 </root>
