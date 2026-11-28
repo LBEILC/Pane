@@ -194,7 +194,7 @@ public sealed partial class SettingsView
         {
             bool def = e.Keyword == l.DefaultEngine;
             var label = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            label.Children.Add(Text(e.Name, LabelProto));
+            label.Children.Add(Text(e.Label, LabelProto));
             label.Children.Add(Chip(e.Keyword));
             if (def) label.Children.Add(Chip(Strings.Common_Default));
             var tail = new List<FrameworkElement>();

@@ -39,6 +39,7 @@ static class Program
   ClipboardHistorySuppression.IgnoreSequence(42);ClipboardHistorySuppression.CancelPending();Check(ClipboardHistorySuppression.TryConsume(42)&&!ClipboardHistorySuppression.TryConsume(43),"delayed notification sequence");
   var hotkey=new Hotkey(KeyModifiers.Alt,32);
   checks+=DoubleTapBindingsTests.Run();
+  checks+=BuiltInNamesTests.Run();
   checks+=await Crash077Tests.Run();
   var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(hotkey),new(new(KeyModifiers.Ctrl,86)));
   string json=JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings);using var document=JsonDocument.Parse(json);var old=string.Join(",",document.RootElement.EnumerateObject().Where(p=>p.Name!="SuperPanel").Select(p=>"\""+p.Name+"\":"+p.Value.GetRawText()));

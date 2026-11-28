@@ -346,8 +346,8 @@ public sealed partial class SettingsView
     {
         var ai = app.Store.Current.Ai;
         var all = new List<(string Id, string Name, string Glyph)> { ("ai:translate", Strings.Common_Translate, "translate"), ("ai:ask", Strings.Launcher_AskAi, "ai"), ("files", Strings.Launcher_SearchFiles, "folder") };
-        all.AddRange(ai.Actions.Where(a => a.Id != "translate").Select(a => ("ai:" + a.Id, a.Name, a.Glyph)));
-        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, Strings.FormatName(Strings.Launcher_SearchWith, e.Name), "globe")));
+        all.AddRange(ai.Actions.Where(a => a.Id != "translate").Select(a => ("ai:" + a.Id, a.Label, a.Glyph)));
+        all.AddRange(l.SearchEngines.Select(e => ("web:" + e.Keyword, Strings.FormatName(Strings.Launcher_SearchWith, e.Label), "globe")));
         var shown = l.ActionRow.Where(id => all.Any(a => a.Id == id)).ToList();
         var ordered = shown.Select(id => all.First(a => a.Id == id)).Concat(all.Where(a => !shown.Contains(a.Id))).ToList();
         // issue 49：开关一拨行就跳到前面，连着点容易点错。页面开着时行的位置不动（只有「上移」改顺序），换分区或重开设置再按显示顺序排
@@ -440,8 +440,8 @@ public sealed partial class SettingsView
             var act = a.Actions[i];
             int index = i;
             var name = Field(Strings.Common_Name, 120);
-            name.Text = act.Name;
-            name.LostFocus += (_, _) => { var v = name.Text.Trim(); if (v.Length > 0 && v != act.Name) aiFieldError = Try(() => SaveAction(index, x => x with { Name = v })); };
+            name.Text = act.Label;
+            name.LostFocus += (_, _) => { var v = name.Text.Trim(); if (v.Length > 0 && v != act.Label) aiFieldError = Try(() => SaveAction(index, x => x with { Name = v })); };
             var prompt = Field(Strings.Settings_Ai_ActionPrompt, 0);
             prompt.Width = double.NaN;
             prompt.Height = 92;

@@ -7,7 +7,18 @@ public enum AiProvider { Api, ChatGpt }
 public enum AiProxyMode { System, None, Custom }
 /// <summary>思考程度（042）：Default = 不传这个参数，用服务的默认；模型不支持时服务自动去掉。</summary>
 public enum AiReasoningEffort { Default, Low, Medium, High }
-public sealed record AiActionSettings(string Id, string Name, string Glyph, string PromptTemplate);
+public sealed record AiActionSettings(string Id, string Name, string Glyph, string PromptTemplate)
+{
+    /// <summary>显示用的名字：内置动作没改过名时按界面语言显示（存的是简体），改过的照原样。</summary>
+    [System.Text.Json.Serialization.JsonIgnore] public string Label => (Id, Name) switch
+    {
+        ("translate", "翻译") => Pane.Localization.Strings.Common_Translate, // 不翻译：内置默认值
+        ("summary", "总结") => Pane.Localization.Strings.Ai_Action_Summary, // 不翻译：内置默认值
+        ("polish", "润色") => Pane.Localization.Strings.Ai_Action_Polish, // 不翻译：内置默认值
+        ("explain", "解释") => Pane.Localization.Strings.Ai_Action_Explain, // 不翻译：内置默认值
+        _ => Name,
+    };
+}
 /// <summary>
 /// 识别图片窗口里用户自己加的动作（162，2026-11-27 设计加）：Id 形如 "img-" + 8 位小写十六进制，生成后不变；
 /// Name 1～12 字；Prompt 1～2000 字，原样发给模型（没有变量）。内置的「识别文字」「描述图片」不在这里（Id "ocr" / "describe"，提示词是界面资源）。

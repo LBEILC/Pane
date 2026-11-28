@@ -2094,4 +2094,10 @@
 關閉視窗後不再保留</value></data>
   <data name="Image_QuestionPlaceholder" xml:space="preserve"><value>問點關於這張圖的…</value></data>
   <data name="Launcher_RecognizeImageDescription" xml:space="preserve"><value>用 AI 識別文字、描述圖片</value></data>
+  <data name="Ai_Action_Summary" xml:space="preserve"><value>總結</value></data>
+  <data name="Ai_Action_Polish" xml:space="preserve"><value>潤色</value></data>
+  <data name="Ai_Action_Explain" xml:space="preserve"><value>解釋</value></data>
+  <data name="Engine_Bing" xml:space="preserve"><value>Bing</value></data>
+  <data name="Engine_Baidu" xml:space="preserve"><value>百度</value></data>
+  <data name="Engine_Bilibili" xml:space="preserve"><value>嗶哩嗶哩</value></data>
 </root>
