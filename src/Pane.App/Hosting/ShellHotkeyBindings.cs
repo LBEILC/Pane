@@ -14,6 +14,10 @@ internal static class ShellHotkeyBindings
         uint b=enabled&&clipboard.IsValidDoubleTap?clipboard.VirtualKey:0u;
         return (a,b==a?0:b);
     }
+    // 代替开始菜单（2026-11-28）：1 = 单按 Win，2 = 开始按钮；录热键时暂停，启动器停用时不挂
+    internal static int StartKeyFlags(bool on,bool suspended,bool launcherEnabled)=>on&&!suspended&&launcherEnabled?3:0;
+    // 只用开始键时不注册启动器热键；没开代替开始菜单时照常
+    internal static bool LauncherHotkeyOn(bool launcherEnabled,bool startKey,bool startOnly)=>launcherEnabled&&!(startKey&&startOnly);
     internal static bool KeepClipboardHotkey(bool enabled,bool suspended,bool keepHotkeyWithWinV,bool winVRegistered)
         =>enabled&&!suspended&&(keepHotkeyWithWinV||!winVRegistered);
     internal static Hotkey ParseOverride(string text)

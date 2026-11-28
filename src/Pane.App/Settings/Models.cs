@@ -111,6 +111,11 @@ public sealed record LauncherSettings(Hotkey Hotkey, LauncherPosition? Position=
     // 设计加（2026-11-25，issue 69 / 86，任务 121）：记住「输入什么、选了哪个」，同样的输入下次把选过的放进「最佳结果」（见 ISearchMemory），默认开；
     // 关掉后不记、也不用已有记录（「清空」才删）
     public bool LearnSelections { get; init; } = true;
+    // 设计加（2026-11-28）：代替开始菜单，单按 Win 或点任务栏的开始按钮时按启动器热键处理（开着时收起），不再弹系统开始菜单；
+    // Win 组合键照常。默认关；开着时挂键盘和鼠标钩子（见 Pane.Native/StartKey.h、StartButton.cpp）
+    public bool StartKey { get; init; }
+    // 只用开始键：StartKey 开着时不再注册启动器热键（如 Alt+Space），只能用 Win / 开始按钮打开。StartKey 关着时不起作用
+    public bool StartOnly { get; init; }
     FavoriteEntry[] favorites=[];
     public FavoriteEntry[] Favorites { get=>favorites; init=>favorites=value??[]; }
     AppHotkey[] appHotkeys=[];

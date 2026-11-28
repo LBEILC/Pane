@@ -24,6 +24,25 @@ static class DoubleTapBindingsTests
         }
         Check(ShellHotkeyBindings.Command(1)=="hotkey-launcher"&&ShellHotkeyBindings.Command(2)=="hotkey-clipboard"&&ShellHotkeyBindings.Command(3)=="hotkey-clipboard","commands preserved");
         Check(ShellHotkeyBindings.Command(4)=="hotkey-words","words command");
+        // 代替开始菜单（2026-11-28）：开着才挂，录热键时、启动器停用时都不挂；两项（单按 Win、开始按钮）总是一起
+        foreach(bool on in new[]{false,true})foreach(bool suspended in new[]{false,true})foreach(bool launcherOn in new[]{false,true})
+            Check(ShellHotkeyBindings.StartKeyFlags(on,suspended,launcherOn)==(on&&!suspended&&launcherOn?3:0),"start key flags");
+        var settings=new PaneSettings(1,new(false,true,ThemeMode.Dark,"#FF5874C9",20,1,new(.2,.2,1,1,1,0),new(.2,.2,1,1,1,0)),new(chord),new(new(KeyModifiers.Ctrl,86)));
+        Check(!System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(settings,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartKey,"start key off by default");
+        var withStart=settings with{Launcher=settings.Launcher with{StartKey=true}};
+        Check(System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(withStart,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartKey,"start key saved");
+        // 只用开始键：只在代替开始菜单开着时关掉启动器热键
+        foreach(bool launcherOn in new[]{false,true})foreach(bool start in new[]{false,true})foreach(bool alone in new[]{false,true})
+            Check(ShellHotkeyBindings.LauncherHotkeyOn(launcherOn,start,alone)==(launcherOn&&!(start&&alone)),"start only gates launcher hotkey");
+        Check(!System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(withStart,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartOnly,"start only off by default");
+        var only=withStart with{Launcher=withStart.Launcher with{StartOnly=true}};
+        Check(System.Text.Json.JsonSerializer.Deserialize(System.Text.Json.JsonSerializer.Serialize(only,SettingsJson.Default.PaneSettings),SettingsJson.Default.PaneSettings)!.Launcher.StartOnly,"start only saved");
+        {
+            List<int> registered=[],removed=[],requested=[];
+            ShellHotkeyBindings.Rebind(registered,removed.Add,(id,_,_)=>requested.Add(id),chord,chord,false,false,ShellHotkeyBindings.LauncherHotkeyOn(true,true,true));
+            Check(!requested.Contains(1),"start only leaves launcher chord unregistered");
+            Check(ShellHotkeyBindings.DoubleTapKeys(left,chord,false,false,ShellHotkeyBindings.LauncherHotkeyOn(true,true,true)).Launcher==0,"start only leaves launcher double tap unhooked");
+        }
         foreach(bool enabled in new[]{false,true})foreach(bool suspended in new[]{false,true})foreach(var key in new Hotkey?[]{null,chord,left})
         {
             List<int> registered=[4],removed=[],requested=[];
