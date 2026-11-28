@@ -129,10 +129,12 @@ internal sealed class ShellHost : IDisposable, Pane.Services.WinV.IWinVHotkey
         bool wordsEnabled=settings.Modules?.GetValueOrDefault("words",true)??true;
         var memo = (settings.Modules?.GetValueOrDefault("memo",true) ?? true) ? settings.Memo.Hotkey : null;
         registeredChords.Clear();
-        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV,words,wordsEnabled,memo);
+        bool launcherOn=settings.Modules?.GetValueOrDefault("launcher",true)??true;
+        bool launcherHotkey=ShellHotkeyBindings.LauncherHotkeyOn(launcherOn,settings.Launcher.StartKey,settings.Launcher.StartOnly);
+        bool active=ShellHotkeyBindings.Rebind(registered,id=>Native.UnregisterHotKey(shellWindow,id),Register,a,b,settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled,suspended,launcherHotkey,settings.Clipboard.KeepHotkeyWithWinV,ApplyWinV,words,wordsEnabled,memo);
         AppBindings.Bind(settings.Launcher.AppHotkeys,!suspended&&(settings.Modules?.GetValueOrDefault("launcher",true)??true),AppExists,(id,key)=>!registeredChords.Contains(key)&&RegisterChord(id,key,out _));
         OriginalClipboardHotkeySuppressed=active&&!settings.Clipboard.KeepHotkeyWithWinV;
-        var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,!OriginalClipboardHotkeySuppressed&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled),suspended,settings.Modules?.GetValueOrDefault("launcher",true)??true);
+        var keys=ShellHotkeyBindings.DoubleTapKeys(a,b,!OriginalClipboardHotkeySuppressed&&(settings.Modules?.GetValueOrDefault("clipboard",settings.Clipboard.Enabled)??settings.Clipboard.Enabled),suspended,launcherHotkey);
         uint wordsKey=wordsEnabled&&!suspended&&words?.IsValidDoubleTap==true?words.VirtualKey:0u;
         if(wordsKey!=0&&(wordsKey==keys.Launcher||wordsKey==keys.Clipboard)){RegistrationResult("words",words!,false,1409);wordsKey=0;}
         uint memoKey=!suspended && memo?.IsValidDoubleTap==true ? memo.VirtualKey : 0u;

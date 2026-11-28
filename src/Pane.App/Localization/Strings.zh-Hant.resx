@@ -1987,6 +1987,8 @@
   <data name="Settings_Hotkeys_DoubleTapFullscreenDescription" xml:space="preserve"><value>遊戲、影片全螢幕時，連按兩下修飾鍵不呼出；組合鍵照常</value></data>
   <data name="Settings_Hotkeys_StartKey" xml:space="preserve"><value>用 Win 鍵和開始按鈕打開</value></data>
   <data name="Settings_Hotkeys_StartKeyDescription" xml:space="preserve"><value>單按 Win 或點工作列的開始按鈕時打開啟動器，不再彈出開始選單；Win 組合鍵照常</value></data>
+  <data name="Settings_Hotkeys_StartOnly" xml:space="preserve"><value>只用開始鍵</value></data>
+  <data name="Settings_Hotkeys_StartOnlyDescription" xml:space="preserve"><value>關掉啟動器熱鍵，只用 Win 和開始按鈕打開</value></data>
   <data name="Settings_Hotkeys_ActivationNote" xml:space="preserve"><value>在任意程式中均可使用；與其他程式的快速鍵衝突時顯示佔用情況</value></data>
   <data name="Settings_Hotkeys_Dialog" xml:space="preserve"><value>檔案對話方塊</value></data>
   <data name="Settings_Hotkeys_DialogNote" xml:space="preserve"><value>僅在「開啟 / 另存新檔」對話方塊位於前景時生效，可與全域快速鍵相同</value></data>
